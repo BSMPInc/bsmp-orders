@@ -259,7 +259,7 @@ tr:hover .del-btn{opacity:1}
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">Orders</div>
-    <div class="nav-item active"><i class="ti ti-clipboard-list"></i> Open Orders</div>
+    <div class="nav-item active" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item" onclick="setFilter('Ready for Invoice')"><i class="ti ti-file-invoice-dollar"></i> Ready to Invoice</div>
     <div class="nav-item" onclick="setFilter('Invoiced')"><i class="ti ti-circle-check"></i> Invoiced</div>
     <div class="nav-item" onclick="setFilter('Need Purchase Order')"><i class="ti ti-alert-circle"></i> Need PO</div>
@@ -777,8 +777,8 @@ window.exportExcel=async()=>{
   const wb=utils.book_new();utils.book_append_sheet(wb,ws,'Open Orders');writeFile(wb,`BSMP_Orders_${new Date().toISOString().slice(0,10)}.xlsx`);
 };
 
-window.setFilter=(status)=>{document.getElementById('filter-status').value=status;render();};
-window.setGroupMode=(mode)=>{document.getElementById('group-mode').value=mode;render();};
+window.setFilter=(status)=>{showPage('orders');document.getElementById('filter-status').value=status;render();};
+window.setGroupMode=(mode)=>{showPage('orders');document.getElementById('group-mode').value=mode;render();};
 
 document.querySelectorAll('th[data-key]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.key;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}document.querySelectorAll('th').forEach(t=>t.classList.remove('sorted'));th.classList.add('sorted');render();}));
 
@@ -953,6 +953,7 @@ window.showPage = (page) => {
   document.getElementById('topbar-add-btn').style.display = ordersOnly ? '' : 'none';
   document.getElementById('topbar-ai-btn').style.display = ordersOnly ? '' : 'none';
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
   if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
