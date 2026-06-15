@@ -179,6 +179,65 @@ tr:hover .del-btn{opacity:1}
 .spinner{display:inline-block;width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:8px}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ── Schedule view toggle ── */
+.view-toggle{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:3px;gap:2px}
+.view-toggle button{height:28px;padding:0 14px;font-size:12px;font-weight:600;border:none;background:transparent;color:var(--text2);border-radius:7px;cursor:pointer;font-family:inherit}
+.view-toggle button.active{background:var(--navy);color:#fff}
+
+/* ── Calendar grid ── */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.cal-nav{display:flex;align-items:center;gap:8px}
+.cal-month{font-size:16px;font-weight:700;min-width:170px;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.cal-dow{background:#f7f9fc;padding:7px 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);text-align:center}
+.cal-cell{background:var(--card);min-height:96px;padding:5px 6px;position:relative;overflow:hidden}
+.cal-cell.other-month{background:#fafbfc}
+.cal-cell.today{background:#fff8f0}
+.cal-daynum{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:3px}
+.cal-cell.other-month .cal-daynum{color:var(--text3);opacity:.5}
+.cal-cell.today .cal-daynum{background:var(--navy);color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center}
+.cal-event{font-size:10px;padding:2px 5px;border-radius:5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-weight:500;border-left:3px solid}
+.cal-more{font-size:10px;color:var(--text3);padding:1px 4px}
+
+/* ── Gantt ── */
+.gantt-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}
+.gantt{min-width:900px;font-size:11px}
+.gantt-head{display:flex;border-bottom:1px solid var(--border);background:#f7f9fc;position:sticky;top:0;z-index:3}
+.gantt-label-col{min-width:200px;width:200px;flex-shrink:0;padding:8px 10px;font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;color:var(--text2);border-right:1px solid var(--border)}
+.gantt-days{display:flex;flex:1}
+.gantt-day{min-width:34px;flex:1;text-align:center;padding:6px 0;font-size:10px;color:var(--text2);border-right:1px solid var(--border);position:relative}
+.gantt-day.weekend{background:#f0f2f5}
+.gantt-day.today{background:#fff1e0}
+.gantt-day .gd-dow{font-weight:700;color:var(--text3)}
+.gantt-row{display:flex;border-bottom:1px solid var(--border);min-height:36px}
+.gantt-row:hover{background:#fafbfd}
+.gantt-row-label{min-width:200px;width:200px;flex-shrink:0;padding:7px 10px;border-right:1px solid var(--border);overflow:hidden}
+.gantt-row-label .grl-cust{font-weight:600;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-row-label .grl-part{font-size:10px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-track{flex:1;position:relative;display:flex}
+.gantt-track .gantt-day{border-bottom:none}
+.gantt-bars{position:absolute;inset:0;padding:4px 0}
+.gantt-bar{position:absolute;height:22px;border-radius:5px;font-size:9px;color:#fff;padding:0 6px;display:flex;align-items:center;overflow:hidden;white-space:nowrap;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.15);font-weight:600}
+.gantt-duebar{position:absolute;top:0;bottom:0;width:2px;background:var(--red);z-index:2}
+
+/* ── Process duration settings ── */
+.dur-grid{display:grid;grid-template-columns:1fr auto auto;gap:8px 12px;align-items:center}
+.dur-grid .dur-name{font-size:13px;font-weight:500}
+.dur-grid input{width:64px;font-size:13px;padding:5px 8px;border:1px solid var(--border2);border-radius:8px;text-align:center;font-family:inherit;outline:none}
+.dur-grid input:focus{border-color:var(--green)}
+.dur-swatch{width:16px;height:16px;border-radius:4px;flex-shrink:0}
+
+/* ── Schedule steps in detail row ── */
+.sched-steps{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.sched-step{display:flex;align-items:center;gap:8px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px}
+.sched-step .ss-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.sched-step .ss-name{flex:1;font-weight:500}
+.sched-step input[type=date]{font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:6px;font-family:inherit}
+.sched-step input[type=number]{width:48px;font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:6px;font-family:inherit;text-align:center}
+.sched-step .ss-toggle{cursor:pointer;color:var(--text3);font-size:14px}
+.sched-step.ss-on .ss-toggle{color:var(--green)}
+.sched-step.ss-off{opacity:.5}
+
 @media print{
   .sidebar,.filterbar,.topbar-actions,.del-btn,.group-chevron,.no-print{display:none!important}
   body{background:#fff}
@@ -208,6 +267,8 @@ tr:hover .del-btn{opacity:1}
   <div class="sidebar-section">
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
+    <div class="nav-item" id="nav-schedule" onclick="showPage('schedule')"><i class="ti ti-calendar-time"></i> Schedule</div>
+    <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
   </div>
   <div class="sidebar-section">
     <div class="sidebar-section-label">Views</div>
@@ -307,6 +368,40 @@ tr:hover .del-btn{opacity:1}
         <input type="text" id="customer-search" placeholder="Search customers…" oninput="renderCustomers()" style="width:100%;height:34px;font-size:13px;padding:0 12px;border:1px solid var(--border2);border-radius:10px;background:#f7f9fc;color:var(--text);outline:none;font-family:inherit">
       </div>
       <div id="customer-list" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+    </div>
+  </div>
+
+  <!-- Schedule Page -->
+  <div id="schedule-page" style="display:none">
+    <div class="cal-header">
+      <div class="view-toggle">
+        <button id="vt-cal" class="active" onclick="setScheduleView('calendar')"><i class="ti ti-calendar"></i> Calendar</button>
+        <button id="vt-gantt" onclick="setScheduleView('gantt')"><i class="ti ti-timeline"></i> Gantt</button>
+      </div>
+      <div class="cal-nav">
+        <button class="btn sm" onclick="schedNav(-1)"><i class="ti ti-chevron-left"></i></button>
+        <div class="cal-month" id="sched-period-label"></div>
+        <button class="btn sm" onclick="schedNav(1)"><i class="ti ti-chevron-right"></i></button>
+        <button class="btn sm" onclick="schedToday()">Today</button>
+      </div>
+    </div>
+    <div id="calendar-view"></div>
+    <div id="gantt-view" style="display:none"></div>
+  </div>
+
+  <!-- Settings / Process Times Page -->
+  <div id="settings-page" style="display:none">
+    <div class="table-card" style="max-width:560px">
+      <div class="table-card-header">
+        <i class="ti ti-settings"></i><span>Default Process Durations</span>
+      </div>
+      <div style="padding:16px">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Set how many working days each process typically takes. New orders inherit these defaults, and you can override them per order in the schedule section of each order's detail row.</p>
+        <div class="dur-grid" id="duration-grid"></div>
+        <div style="margin-top:16px;display:flex;justify-content:flex-end">
+          <button class="btn green" onclick="saveDurations()"><i class="ti ti-check"></i> Save Defaults</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -427,6 +522,9 @@ const ordersRef = ref(db, 'orders');
 const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
 const STATUS_CLASS = {'Confirmed':'s-confirmed','In Progress':'s-in-progress','QC':'s-qc','Ready for Invoice':'s-ready','Invoiced':'s-invoiced','Completed':'s-completed','Need Purchase Order':'s-need-po'};
 const PROCESSES = ['Laser Cut','Forming / Bending','Welding','Deburr / Finishing','Powder Coat / Plating','Hardware / Assembly','QC / Inspection','Shipping'];
+const PROCESS_COLORS = {'Laser Cut':'#185FA5','Forming / Bending':'#7ab648','Welding':'#d4880a','Deburr / Finishing':'#534AB7','Powder Coat / Plating':'#c0392b','Hardware / Assembly':'#0a8754','QC / Inspection':'#8a5cd1','Shipping':'#475569'};
+const DEFAULT_DURATIONS = {'Laser Cut':1,'Forming / Bending':1,'Welding':2,'Deburr / Finishing':1,'Powder Coat / Plating':3,'Hardware / Assembly':1,'QC / Inspection':1,'Shipping':1};
+let durations = {...DEFAULT_DURATIONS};
 const PAY_CLASS = {Unpaid:'pay-unpaid',Partial:'pay-partial',Paid:'pay-paid'};
 
 let orders=[], expanded=new Set(), collapsedGroups=new Set();
@@ -531,14 +629,34 @@ function detailRow(r){
     const isDone=done.includes(p),isActive=r.currentProcess===p;
     return`<button class="proc-btn${isDone?' done':isActive?' active':''}" onclick="window._tp('${r.id}','${p}',event)">${p}</button>`;
   }).join('');
+  const sch=ensureSchedule(r);
+  const computed=computeStepDates(r);
+  const computedMap={}; computed.forEach(c=>computedMap[c.name]=c);
+  const schedSteps=PROCESSES.map(p=>{
+    const step=sch.steps.find(s=>s.name===p)||{enabled:false,duration:durations[p]??1,start:''};
+    const cd=computedMap[p];
+    const dateLabel = cd ? `${fmtDate(toISO(cd.start))} → ${fmtDate(toISO(cd.end))}` : '';
+    return`<div class="sched-step ${step.enabled?'ss-on':'ss-off'}">
+      <i class="ti ti-${step.enabled?'circle-check-filled':'circle'} ss-toggle" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
+      <span class="ss-dot" style="background:${PROCESS_COLORS[p]}"></span>
+      <span class="ss-name">${p}</span>
+      <input type="number" min="0" step="0.5" value="${step.duration??durations[p]??1}" title="Working days" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
+      <span style="font-size:10px;color:var(--text3)">days</span>
+      <input type="date" value="${step.start||''}" title="Override start (optional)" onchange="window._stepStart('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
+      <span style="font-size:10px;color:var(--text2);min-width:120px">${dateLabel}</span>
+    </div>`;
+  }).join('');
   return`<tr class="detail-row"><td colspan="13"><div class="detail-inner">
     <div class="detail-section">
       <div class="detail-label">Current Process</div>
       <div class="process-grid">${procs}</div>
       <div style="margin-top:6px;font-size:11px;color:var(--text3)">Click → active · click again → done · click done to clear</div>
+      <div class="detail-label" style="margin-top:14px">Production Schedule</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Toggle steps on, set durations. Steps auto-schedule back from due date; set a start date to anchor manually.</div>
+      <div class="sched-steps">${schedSteps}</div>
       <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">
         ${r.ordered?`<span style="font-size:11px;color:var(--text2)"><b>Ordered:</b> ${fmtDate(r.ordered)}</span>`:''}
-        ${r.part&&r.desc?`<span style="font-size:11px;color:var(--text2)"><b>Part #:</b> ${r.part}</span>`:''}
+        ${r.due?`<span style="font-size:11px;color:var(--text2)"><b>Due:</b> ${fmtDate(r.due)}</span>`:''}
         ${r.cost?`<span style="font-size:11px;color:var(--text2)"><b>Cost/part:</b> ${fmtMoney(r.cost)}</span>`:''}
       </div>
     </div>
@@ -614,7 +732,7 @@ window.saveOrder=()=>{
   const customer=document.getElementById('f-customer').value.trim();if(!customer){alert('Customer name is required.');return;}
   const qty=parseFloat(document.getElementById('f-qty').value)||0,cost=parseFloat(document.getElementById('f-cost').value)||0;
   const ex=editId?orders.find(o=>o.id===editId):{};
-  const order={id:editId||uid(),customer,po:document.getElementById('f-po').value.trim(),job:document.getElementById('f-job').value.trim(),part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),qty,cost,total:qty&&cost?qty*cost:0,ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),currentProcess:(ex||{}).currentProcess||'',completedProcesses:(ex||{}).completedProcesses||[]};
+  const order={id:editId||uid(),customer,po:document.getElementById('f-po').value.trim(),job:document.getElementById('f-job').value.trim(),part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),qty,cost,total:qty&&cost?qty*cost:0,ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),currentProcess:(ex||{}).currentProcess||'',completedProcesses:(ex||{}).completedProcesses||[],schedule:(ex||{}).schedule||null};
   if(editId){const i=orders.findIndex(o=>o.id===editId);orders[i]=order;}else orders.unshift(order);
   saveDB();render();closeModal('add-modal');
 };
@@ -818,17 +936,308 @@ function autoIndexCustomer(name, poNotes) {
 }
 
 // ── Page switching ─────────────────────────────────────────────────────────────
+const PAGE_META = {
+  orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
+  customers:{title:'Customers',      sub:'Customer index & PO format notes'},
+  schedule: {title:'Production Schedule', sub:'Timeline of all jobs in the shop'},
+  settings: {title:'Process Times',  sub:'Default durations for each process'}
+};
 window.showPage = (page) => {
-  document.getElementById('orders-page').style.display = page==='orders' ? 'block' : 'none';
-  document.getElementById('customers-page').style.display = page==='customers' ? 'block' : 'none';
-  document.getElementById('topbar-title-text').textContent = page==='customers' ? 'Customers' : 'Open Orders';
-  document.getElementById('topbar-subtitle-text').textContent = page==='customers' ? 'Customer index & PO format notes' : 'Track and manage active jobs';
-  document.getElementById('topbar-add-btn').style.display = page==='customers' ? 'none' : '';
-  document.getElementById('topbar-ai-btn').style.display = page==='customers' ? 'none' : '';
+  ['orders','customers','schedule','settings'].forEach(p=>{
+    const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
+  });
+  const meta = PAGE_META[page]||PAGE_META.orders;
+  document.getElementById('topbar-title-text').textContent = meta.title;
+  document.getElementById('topbar-subtitle-text').textContent = meta.sub;
+  const ordersOnly = page==='orders';
+  document.getElementById('topbar-add-btn').style.display = ordersOnly ? '' : 'none';
+  document.getElementById('topbar-ai-btn').style.display = ordersOnly ? '' : 'none';
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
-  if(page==='orders') renderCustomers();
+  if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
+  if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
+  if(page==='customers') renderCustomers();
+  if(page==='schedule') renderSchedule();
+  if(page==='settings') renderDurationSettings();
 };
+
+// ── Durations Firebase sync ───────────────────────────────────────────────────
+const durationsRef = ref(db, 'durations');
+onValue(durationsRef, (snap) => {
+  const data = snap.val();
+  if(data) durations = {...DEFAULT_DURATIONS, ...data};
+  if(document.getElementById('settings-page')?.style.display==='block') renderDurationSettings();
+});
+
+function renderDurationSettings(){
+  const grid = document.getElementById('duration-grid');
+  if(!grid) return;
+  grid.innerHTML = PROCESSES.map(p=>`
+    <div class="dur-name" style="display:flex;align-items:center;gap:8px"><span class="dur-swatch" style="background:${PROCESS_COLORS[p]}"></span>${p}</div>
+    <input type="number" min="0" step="0.5" id="dur-${p.replace(/[^a-z]/gi,'')}" value="${durations[p]??DEFAULT_DURATIONS[p]??1}">
+    <span style="font-size:12px;color:var(--text2)">day${(durations[p]??1)!==1?'s':''}</span>
+  `).join('');
+}
+window.saveDurations = () => {
+  const out = {};
+  PROCESSES.forEach(p=>{ out[p] = parseFloat(document.getElementById('dur-'+p.replace(/[^a-z]/gi,'')).value)||0; });
+  durations = {...DEFAULT_DURATIONS, ...out};
+  set(durationsRef, out);
+  alert('Process durations saved.');
+};
+
+// ── Scheduling engine ─────────────────────────────────────────────────────────
+// An order has order.schedule = { steps: [{name, enabled, duration, start(optional manual)}] }
+// Default: enabled steps auto-schedule sequentially backward from due date.
+function ensureSchedule(r){
+  if(!r.schedule || !r.schedule.steps){
+    r.schedule = { steps: PROCESSES.map(p=>({name:p, enabled:false, duration:durations[p]??1, start:''})) };
+  } else {
+    // make sure every process exists in steps (in case PROCESSES changed)
+    PROCESSES.forEach(p=>{
+      if(!r.schedule.steps.find(s=>s.name===p)) r.schedule.steps.push({name:p,enabled:false,duration:durations[p]??1,start:''});
+    });
+  }
+  return r.schedule;
+}
+
+function addDays(date, n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
+function isWeekend(d){ const g=d.getDay(); return g===0||g===6; }
+function addWorkingDays(date, n){
+  // n working days forward (n can be fractional, rounded up to whole days for layout)
+  let d=new Date(date), added=0, whole=Math.max(1,Math.ceil(n));
+  while(added<whole){ d=addDays(d,1); if(!isWeekend(d)) added++; }
+  return d;
+}
+function subWorkingDays(date, n){
+  let d=new Date(date), sub=0, whole=Math.max(1,Math.ceil(n));
+  while(sub<whole){ d=addDays(d,-1); if(!isWeekend(d)) sub++; }
+  return d;
+}
+function toISO(d){ return d.toISOString().slice(0,10); }
+
+// Compute concrete start/end dates for each enabled step
+function computeStepDates(r){
+  const sch = ensureSchedule(r);
+  const enabled = sch.steps.filter(s=>s.enabled);
+  if(!enabled.length) return [];
+  // Build sequence in PROCESS order
+  const ordered = PROCESSES.map(p=>enabled.find(s=>s.name===p)).filter(Boolean);
+
+  // If any step has a manual start, anchor from the earliest manual start forward.
+  // Otherwise, schedule backward from due date.
+  const manualAnchor = ordered.find(s=>s.start);
+  const result = [];
+
+  if(manualAnchor){
+    // place manualAnchor at its start, fill subsequent forward, preceding backward
+    const ai = ordered.indexOf(manualAnchor);
+    // forward from anchor
+    let cursor = new Date(manualAnchor.start+'T00:00:00');
+    for(let i=ai;i<ordered.length;i++){
+      const s=ordered[i];
+      const start = (i===ai && s.start) ? new Date(s.start+'T00:00:00') : cursor;
+      const end = addWorkingDays(start, s.duration||1);
+      result[i] = {name:s.name, start, end, duration:s.duration||1};
+      cursor = end;
+    }
+    // backward before anchor
+    let back = new Date(manualAnchor.start+'T00:00:00');
+    for(let i=ai-1;i>=0;i--){
+      const s=ordered[i];
+      const end = back;
+      const start = subWorkingDays(end, s.duration||1);
+      result[i] = {name:s.name, start, end, duration:s.duration||1};
+      back = start;
+    }
+  } else if(r.due){
+    // backward from due date: last step ends on due date
+    let end = new Date(r.due+'T00:00:00');
+    for(let i=ordered.length-1;i>=0;i--){
+      const s=ordered[i];
+      const start = subWorkingDays(end, s.duration||1);
+      result[i] = {name:s.name, start, end, duration:s.duration||1};
+      end = start;
+    }
+  } else {
+    // no due date, no manual: schedule forward from today
+    let cursor = new Date(); cursor.setHours(0,0,0,0);
+    for(let i=0;i<ordered.length;i++){
+      const s=ordered[i];
+      const start = cursor;
+      const end = addWorkingDays(start, s.duration||1);
+      result[i] = {name:s.name, start, end, duration:s.duration||1};
+      cursor = end;
+    }
+  }
+  return result.filter(Boolean);
+}
+
+window._toggleStep = (id, name, e) => {
+  e.stopPropagation();
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const sch = ensureSchedule(r);
+  const step = sch.steps.find(s=>s.name===name);
+  step.enabled = !step.enabled;
+  if(step.enabled && !step.duration) step.duration = durations[name]??1;
+  saveDB(); render();
+};
+window._stepDuration = (id, name, val) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const sch = ensureSchedule(r);
+  const step = sch.steps.find(s=>s.name===name);
+  step.duration = parseFloat(val)||1;
+  saveDB();
+};
+window._stepStart = (id, name, val) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const sch = ensureSchedule(r);
+  const step = sch.steps.find(s=>s.name===name);
+  step.start = val;
+  saveDB();
+};
+
+// ── Schedule rendering (calendar + gantt) ────────────────────────────────────
+let scheduleView = 'calendar';
+let calRef = new Date(); calRef.setDate(1);
+let ganttStart = new Date(); ganttStart.setHours(0,0,0,0);
+
+window.setScheduleView = (v) => {
+  scheduleView = v;
+  document.getElementById('vt-cal').classList.toggle('active', v==='calendar');
+  document.getElementById('vt-gantt').classList.toggle('active', v==='gantt');
+  document.getElementById('calendar-view').style.display = v==='calendar'?'block':'none';
+  document.getElementById('gantt-view').style.display = v==='gantt'?'block':'none';
+  renderSchedule();
+};
+window.schedNav = (dir) => {
+  if(scheduleView==='calendar'){ calRef.setMonth(calRef.getMonth()+dir); }
+  else { ganttStart = addDays(ganttStart, dir*14); }
+  renderSchedule();
+};
+window.schedToday = () => {
+  calRef = new Date(); calRef.setDate(1);
+  ganttStart = new Date(); ganttStart.setHours(0,0,0,0);
+  renderSchedule();
+};
+
+function gatherScheduledSteps(){
+  // returns [{order, name, start, end, color}]
+  const out = [];
+  orders.forEach(r=>{
+    const steps = computeStepDates(r);
+    steps.forEach(s=>{
+      out.push({order:r, name:s.name, start:s.start, end:s.end, color:PROCESS_COLORS[s.name]||'#888'});
+    });
+  });
+  return out;
+}
+
+function renderSchedule(){
+  if(scheduleView==='calendar') renderCalendar();
+  else renderGantt();
+}
+
+function renderCalendar(){
+  const label = document.getElementById('sched-period-label');
+  const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  label.textContent = `${monthNames[calRef.getMonth()]} ${calRef.getFullYear()}`;
+
+  const year=calRef.getFullYear(), month=calRef.getMonth();
+  const first=new Date(year,month,1);
+  const startDay=first.getDay();
+  const gridStart=addDays(first, -startDay);
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  const steps = gatherScheduledSteps();
+  // bucket steps by ISO date (spanning start..end-1)
+  const byDay={};
+  steps.forEach(s=>{
+    let d=new Date(s.start);
+    const end=new Date(s.end);
+    while(d<end){
+      const key=toISO(d);
+      (byDay[key]=byDay[key]||[]).push(s);
+      d=addDays(d,1);
+    }
+  });
+
+  let html='<div class="cal-grid">';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>html+=`<div class="cal-dow">${d}</div>`);
+  for(let i=0;i<42;i++){
+    const day=addDays(gridStart,i);
+    const inMonth=day.getMonth()===month;
+    const isToday=day.getTime()===today.getTime();
+    const key=toISO(day);
+    const events=(byDay[key]||[]);
+    html+=`<div class="cal-cell${inMonth?'':' other-month'}${isToday?' today':''}">
+      <div class="cal-daynum">${day.getDate()}</div>`;
+    events.slice(0,4).forEach(ev=>{
+      html+=`<div class="cal-event" style="background:${ev.color}1a;border-left-color:${ev.color};color:${ev.color}" onclick="openEditFromSchedule('${ev.order.id}')" title="${ev.order.customer} — ${ev.name}">${ev.order.customer.split(' ')[0]} · ${ev.name.split(' ')[0]}</div>`;
+    });
+    if(events.length>4) html+=`<div class="cal-more">+${events.length-4} more</div>`;
+    html+='</div>';
+  }
+  html+='</div>';
+  document.getElementById('calendar-view').innerHTML=html;
+}
+
+function renderGantt(){
+  const label=document.getElementById('sched-period-label');
+  const DAYS=21;
+  const start=new Date(ganttStart);
+  const end=addDays(start,DAYS);
+  const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  label.textContent=`${monthNames[start.getMonth()]} ${start.getDate()} – ${monthNames[end.getMonth()]} ${end.getDate()}`;
+  const today=new Date(); today.setHours(0,0,0,0);
+
+  // only orders with at least one enabled step
+  const jobs = orders.filter(r=>{const s=ensureSchedule(r);return s.steps.some(x=>x.enabled);});
+
+  // header days
+  let head=`<div class="gantt-head"><div class="gantt-label-col">Job</div><div class="gantt-days">`;
+  for(let i=0;i<DAYS;i++){
+    const d=addDays(start,i);
+    const we=isWeekend(d), td=d.getTime()===today.getTime();
+    head+=`<div class="gantt-day${we?' weekend':''}${td?' today':''}"><div class="gd-dow">${['S','M','T','W','T','F','S'][d.getDay()]}</div>${d.getDate()}</div>`;
+  }
+  head+='</div></div>';
+
+  let rows='';
+  if(!jobs.length){
+    rows=`<div style="padding:40px;text-align:center;color:var(--text2);font-size:13px"><i class="ti ti-calendar-off" style="font-size:32px;display:block;margin-bottom:8px;opacity:.4"></i>No scheduled jobs yet — enable process steps on an order to see it here</div>`;
+  }
+  const dayMs=86400000;
+  jobs.forEach(r=>{
+    const steps=computeStepDates(r);
+    let bars='';
+    steps.forEach(s=>{
+      const offset=Math.round((s.start-start)/dayMs);
+      const span=Math.max(1,Math.round((s.end-s.start)/dayMs));
+      if(offset+span<0||offset>DAYS) return;
+      const leftPct=(Math.max(0,offset)/DAYS)*100;
+      const widthPct=(Math.min(span,DAYS-Math.max(0,offset))/DAYS)*100;
+      bars+=`<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${s.color||PROCESS_COLORS[s.name]}" title="${s.name}: ${toISO(s.start)} → ${toISO(s.end)}" onclick="openEditFromSchedule('${r.id}')">${s.name.split(' ')[0]}</div>`;
+    });
+    // due marker
+    let dueMark='';
+    if(r.due){
+      const dd=new Date(r.due+'T00:00:00');
+      const off=Math.round((dd-start)/dayMs);
+      if(off>=0&&off<=DAYS){ dueMark=`<div class="gantt-duebar" style="left:${(off/DAYS)*100}%" title="Due ${r.due}"></div>`; }
+    }
+    let dayCells='';
+    for(let i=0;i<DAYS;i++){const d=addDays(start,i);dayCells+=`<div class="gantt-day${isWeekend(d)?' weekend':''}${d.getTime()===today.getTime()?' today':''}"></div>`;}
+    rows+=`<div class="gantt-row">
+      <div class="gantt-row-label"><div class="grl-cust">${r.customer}</div><div class="grl-part">${r.desc||r.part||''} ${r.po?'· PO '+r.po:''}</div></div>
+      <div class="gantt-track">${dayCells}<div class="gantt-bars">${bars}${dueMark}</div></div>
+    </div>`;
+  });
+
+  document.getElementById('gantt-view').innerHTML=`<div class="gantt-wrap"><div class="gantt">${head}${rows}</div></div>`;
+}
+
+window.openEditFromSchedule = (id) => { showPage('orders'); setTimeout(()=>openEdit(id),50); };
 
 document.getElementById('filter-process').innerHTML='<option value="">All processes</option>'+PROCESSES.map(p=>`<option>${p}</option>`).join('');
 </script>
