@@ -87,10 +87,13 @@ select:focus{border-color:var(--green)}
 .table-card-header span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text2)}
 .tbl-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;min-width:1020px}
-th{background:#f7f9fc;font-size:11px;font-weight:700;color:var(--text2);text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.4px}
+th{background:#f7f9fc;font-size:11px;font-weight:700;color:var(--text2);text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);white-space:normal;cursor:pointer;user-select:none;text-transform:uppercase;letter-spacing:.4px;position:relative}
+.col-resizer{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;user-select:none;z-index:5}
+.col-resizer:hover{background:var(--green)}
+table{table-layout:fixed}
 th:hover{color:var(--text)}
 th.sorted{color:var(--navy)}
-td{padding:8px 11px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;color:var(--text)}
+td{padding:8px 11px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:top;white-space:normal;overflow:hidden;word-break:break-word;color:var(--text)}
 
 /* group rows */
 tr.po-group-row td{background:#f0f4fa;font-weight:600;font-size:12px;border-top:1px solid var(--border2);cursor:pointer}
@@ -660,6 +663,40 @@ window.setFilter=(status)=>{document.getElementById('filter-status').value=statu
 window.setGroupMode=(mode)=>{document.getElementById('group-mode').value=mode;render();};
 
 document.querySelectorAll('th[data-key]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.key;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}document.querySelectorAll('th').forEach(t=>t.classList.remove('sorted'));th.classList.add('sorted');render();}));
+
+// ── Column resizing ─────────────────────────────────────────────────────────
+(function initColumnResizers(){
+  const headers = document.querySelectorAll('#main-table thead th');
+  headers.forEach((th, idx) => {
+    // skip the first two narrow utility columns (chevron + delete)
+    if(idx < 2) return;
+    const resizer = document.createElement('div');
+    resizer.className = 'col-resizer';
+    th.appendChild(resizer);
+    let startX, startWidth;
+    resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startX = e.pageX;
+      startWidth = th.offsetWidth;
+      const onMove = (ev) => {
+        const newW = Math.max(40, startWidth + (ev.pageX - startX));
+        th.style.width = newW + 'px';
+      };
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      document.body.style.cursor = 'col-resize';
+    });
+    // prevent the sort-click from firing when grabbing the resizer
+    resizer.addEventListener('click', e => e.stopPropagation());
+  });
+})();
+
 document.getElementById('search').addEventListener('input',render);
 document.getElementById('filter-status').addEventListener('change',render);
 document.getElementById('filter-process').addEventListener('change',render);
