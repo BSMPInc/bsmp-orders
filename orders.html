@@ -396,7 +396,7 @@ tr:hover .del-btn{opacity:1}
         <i class="ti ti-settings"></i><span>Default Process Durations</span>
       </div>
       <div style="padding:16px">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Set how many working days each process typically takes. New orders inherit these defaults, and you can override them per order in the schedule section of each order's detail row.</p>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Set how long each process typically takes. Internal stations are measured in working hours (8-hour days), external steps in business days. New orders inherit these defaults, and you can override them per order in each order's detail row.</p>
         <div class="dur-grid" id="duration-grid"></div>
         <div style="margin-top:16px;display:flex;justify-content:flex-end">
           <button class="btn green" onclick="saveDurations()"><i class="ti ti-check"></i> Save Defaults</button>
@@ -521,9 +521,31 @@ const ordersRef = ref(db, 'orders');
 
 const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
 const STATUS_CLASS = {'Confirmed':'s-confirmed','In Progress':'s-in-progress','QC':'s-qc','Ready for Invoice':'s-ready','Invoiced':'s-invoiced','Completed':'s-completed','Need Purchase Order':'s-need-po'};
-const PROCESSES = ['Laser Cut','Forming / Bending','Welding','Deburr / Finishing','Powder Coat / Plating','Hardware / Assembly','QC / Inspection','Shipping'];
-const PROCESS_COLORS = {'Laser Cut':'#185FA5','Forming / Bending':'#7ab648','Welding':'#d4880a','Deburr / Finishing':'#534AB7','Powder Coat / Plating':'#c0392b','Hardware / Assembly':'#0a8754','QC / Inspection':'#8a5cd1','Shipping':'#475569'};
-const DEFAULT_DURATIONS = {'Laser Cut':1,'Forming / Bending':1,'Welding':2,'Deburr / Finishing':1,'Powder Coat / Plating':3,'Hardware / Assembly':1,'QC / Inspection':1,'Shipping':1};
+const INTERNAL_PROCESSES = ['3D Programming','Shearing','Saw','Laser','CNC Mill','Manual Mill','De-Burr','Timesaver','Brake 8ft','Brake 4ft','Tig Welder 1','Tig Welder 2','Mig Welder 1','Mig Welder 2','Quality Control','Packaging'];
+const EXTERNAL_PROCESSES = ['Purchasing- Material','Purchasing- Hardware','Purchasing- Tooling','Outsource- Plating','Outsource- Paint','Outsource- Machining','Outsource- Other'];
+const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
+const EXTERNAL_SET = new Set(EXTERNAL_PROCESSES);
+function isExternal(name){ return EXTERNAL_SET.has(name); }
+function procUnit(name){ return isExternal(name) ? 'd' : 'h'; }
+const PROCESS_COLORS = {
+  '3D Programming':'#534AB7',
+  'Shearing':'#185FA5','Saw':'#185FA5','Laser':'#185FA5','CNC Mill':'#185FA5','Manual Mill':'#185FA5',
+  'De-Burr':'#5F5E5A','Timesaver':'#5F5E5A',
+  'Brake 8ft':'#0F6E56','Brake 4ft':'#0F6E56',
+  'Tig Welder 1':'#BA7517','Tig Welder 2':'#BA7517','Mig Welder 1':'#BA7517','Mig Welder 2':'#BA7517',
+  'Quality Control':'#3B6D11',
+  'Packaging':'#D85A30',
+  'Purchasing- Material':'#993556','Purchasing- Hardware':'#993556','Purchasing- Tooling':'#993556',
+  'Outsource- Plating':'#A32D2D','Outsource- Paint':'#A32D2D','Outsource- Machining':'#A32D2D','Outsource- Other':'#A32D2D'
+};
+const DEFAULT_DURATIONS = {
+  '3D Programming':4,'Shearing':1,'Saw':1,'Laser':2,'CNC Mill':4,'Manual Mill':3,'De-Burr':2,'Timesaver':1,
+  'Brake 8ft':2,'Brake 4ft':2,'Tig Welder 1':4,'Tig Welder 2':4,'Mig Welder 1':4,'Mig Welder 2':4,
+  'Quality Control':2,'Packaging':1,
+  'Purchasing- Material':5,'Purchasing- Hardware':5,'Purchasing- Tooling':7,
+  'Outsource- Plating':5,'Outsource- Paint':5,'Outsource- Machining':7,'Outsource- Other':5
+};
+function defDur(name){ return durations[name] ?? DEFAULT_DURATIONS[name] ?? (isExternal(name)?5:2); }
 let durations = {...DEFAULT_DURATIONS};
 const PAY_CLASS = {Unpaid:'pay-unpaid',Partial:'pay-partial',Paid:'pay-paid'};
 
@@ -569,6 +591,7 @@ function filteredOrders(){
 }
 
 function render(){
+  invalidateSched();
   const rows=filteredOrders();
   const mode=document.getElementById('group-mode').value;
   const tbody=document.getElementById('tbody');
@@ -625,35 +648,53 @@ function lineRow(r,ind){
 
 function detailRow(r){
   const done=r.completedProcesses||[];
-  const procs=PROCESSES.map(p=>{
+  const procBtns=(list)=>list.map(p=>{
     const isDone=done.includes(p),isActive=r.currentProcess===p;
     return`<button class="proc-btn${isDone?' done':isActive?' active':''}" onclick="window._tp('${r.id}','${p}',event)">${p}</button>`;
   }).join('');
   const sch=ensureSchedule(r);
   const computed=computeStepDates(r);
   const computedMap={}; computed.forEach(c=>computedMap[c.name]=c);
-  const schedSteps=PROCESSES.map(p=>{
-    const step=sch.steps.find(s=>s.name===p)||{enabled:false,duration:durations[p]??1,start:''};
+  const ord=enabledOrdered(sch);
+  const seqRows = ord.map((step,idx)=>{
+    const p=step.name; const ext=isExternal(p); const unit=ext?'days':'hrs';
     const cd=computedMap[p];
-    const dateLabel = cd ? `${fmtDate(toISO(cd.start))} → ${fmtDate(toISO(cd.end))}` : '';
-    return`<div class="sched-step ${step.enabled?'ss-on':'ss-off'}">
-      <i class="ti ti-${step.enabled?'circle-check-filled':'circle'} ss-toggle" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
+    const dateLabel = cd ? (ext ? `${fmtDate(toISO(cd.start))} → ${fmtDate(toISO(cd.end))}` : `${fmtDate(toISO(cd.start))} · ${cd.duration}h`) : '';
+    const conflictTag = cd&&cd.conflict ? `<span style="font-size:9px;color:#fff;background:#A32D2D;border-radius:4px;padding:1px 5px;margin-left:4px">clash</span>` : '';
+    const anchorIcon = step.start ? `<i class="ti ti-pin" style="font-size:12px;color:var(--blue)" title="Manual anchor"></i>` : '';
+    return`<div class="sched-step ss-on">
+      <span style="display:flex;flex-direction:column;line-height:.6">
+        <i class="ti ti-chevron-up" style="cursor:pointer;font-size:13px;color:${idx===0?'var(--border2)':'var(--text2)'}" onclick="window._moveStep('${r.id}','${p}',-1,event)"></i>
+        <i class="ti ti-chevron-down" style="cursor:pointer;font-size:13px;color:${idx===ord.length-1?'var(--border2)':'var(--text2)'}" onclick="window._moveStep('${r.id}','${p}',1,event)"></i>
+      </span>
+      <span style="font-size:10px;font-weight:700;color:var(--text2);min-width:14px;text-align:center">${idx+1}</span>
       <span class="ss-dot" style="background:${PROCESS_COLORS[p]}"></span>
-      <span class="ss-name">${p}</span>
-      <input type="number" min="0" step="0.5" value="${step.duration??durations[p]??1}" title="Working days" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
-      <span style="font-size:10px;color:var(--text3)">days</span>
-      <input type="date" value="${step.start||''}" title="Override start (optional)" onchange="window._stepStart('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
-      <span style="font-size:10px;color:var(--text2);min-width:120px">${dateLabel}</span>
+      <span class="ss-name">${p}${anchorIcon}</span>
+      <input type="number" min="0" step="${ext?'1':'0.5'}" value="${step.duration??defDur(p)}" title="${ext?'Business days':'Working hours'}" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
+      <span style="font-size:10px;color:var(--text3);min-width:26px">${unit}</span>
+      <input type="date" value="${step.start||''}" title="Override start (optional anchor)" onchange="window._stepStart('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
+      <span style="font-size:10px;color:var(--text2);min-width:120px">${dateLabel}${conflictTag}</span>
+      <i class="ti ti-x" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
     </div>`;
   }).join('');
+  const addBtns=(list)=>list.filter(p=>!sch.steps.find(s=>s.name===p&&s.enabled))
+    .map(p=>`<button class="proc-btn" onclick="window._toggleStep('${r.id}','${p}',event)"><i class="ti ti-plus" style="font-size:11px"></i> ${p}</button>`).join('');
+  const subLabel=(t)=>`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:8px 0 4px">${t}</div>`;
   return`<tr class="detail-row"><td colspan="13"><div class="detail-inner">
     <div class="detail-section">
       <div class="detail-label">Current Process</div>
-      <div class="process-grid">${procs}</div>
+      ${subLabel('Internal')}
+      <div class="process-grid">${procBtns(INTERNAL_PROCESSES)}</div>
+      ${subLabel('External')}
+      <div class="process-grid">${procBtns(EXTERNAL_PROCESSES)}</div>
       <div style="margin-top:6px;font-size:11px;color:var(--text3)">Click → active · click again → done · click done to clear</div>
-      <div class="detail-label" style="margin-top:14px">Production Schedule</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Toggle steps on, set durations. Steps auto-schedule back from due date; set a start date to anchor manually.</div>
-      <div class="sched-steps">${schedSteps}</div>
+      <div class="detail-label" style="margin-top:16px">Production Schedule</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps run in hours on single-job stations and auto-slot by due date; external steps are lead-time gates in business days. Set a date to pin a step as a fixed anchor (📌).</div>
+      ${ord.length ? `<div class="sched-steps">${seqRows}</div>` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them below in the order they should run.</div>`}
+      ${subLabel('Add internal step')}
+      <div class="process-grid">${addBtns(INTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
+      ${subLabel('Add external step')}
+      <div class="process-grid">${addBtns(EXTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
       <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">
         ${r.ordered?`<span style="font-size:11px;color:var(--text2)"><b>Ordered:</b> ${fmtDate(r.ordered)}</span>`:''}
         ${r.due?`<span style="font-size:11px;color:var(--text2)"><b>Due:</b> ${fmtDate(r.due)}</span>`:''}
@@ -967,112 +1008,195 @@ const durationsRef = ref(db, 'durations');
 onValue(durationsRef, (snap) => {
   const data = snap.val();
   if(data) durations = {...DEFAULT_DURATIONS, ...data};
+  invalidateSched();
   if(document.getElementById('settings-page')?.style.display==='block') renderDurationSettings();
 });
 
 function renderDurationSettings(){
   const grid = document.getElementById('duration-grid');
   if(!grid) return;
-  grid.innerHTML = PROCESSES.map(p=>`
-    <div class="dur-name" style="display:flex;align-items:center;gap:8px"><span class="dur-swatch" style="background:${PROCESS_COLORS[p]}"></span>${p}</div>
-    <input type="number" min="0" step="0.5" id="dur-${p.replace(/[^a-z]/gi,'')}" value="${durations[p]??DEFAULT_DURATIONS[p]??1}">
-    <span style="font-size:12px;color:var(--text2)">day${(durations[p]??1)!==1?'s':''}</span>
-  `).join('');
+  const row=(p)=>{
+    const ext=isExternal(p); const i=PROCESSES.indexOf(p);
+    return`<div class="dur-name" style="display:flex;align-items:center;gap:8px"><span class="dur-swatch" style="background:${PROCESS_COLORS[p]}"></span>${p}</div>
+      <input type="number" min="0" step="${ext?'1':'0.5'}" id="dur-${i}" value="${durations[p]??DEFAULT_DURATIONS[p]??(ext?5:2)}">
+      <span style="font-size:12px;color:var(--text2);min-width:34px">${ext?'days':'hrs'}</span>`;
+  };
+  grid.innerHTML =
+    `<div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);margin:4px 0 2px">Internal — hours</div>`+
+    INTERNAL_PROCESSES.map(row).join('')+
+    `<div style="grid-column:1/-1;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);margin:12px 0 2px">External — business days</div>`+
+    EXTERNAL_PROCESSES.map(row).join('');
 }
 window.saveDurations = () => {
   const out = {};
-  PROCESSES.forEach(p=>{ out[p] = parseFloat(document.getElementById('dur-'+p.replace(/[^a-z]/gi,'')).value)||0; });
+  PROCESSES.forEach((p,i)=>{ const el=document.getElementById('dur-'+i); if(el) out[p] = parseFloat(el.value)||0; });
   durations = {...DEFAULT_DURATIONS, ...out};
   set(durationsRef, out);
   alert('Process durations saved.');
 };
 
 // ── Scheduling engine ─────────────────────────────────────────────────────────
-// An order has order.schedule = { steps: [{name, enabled, duration, start(optional manual)}] }
-// Default: enabled steps auto-schedule sequentially backward from due date.
+// order.schedule = { steps: [{name, enabled, duration, start(optional manual anchor)}] }
+// Internal steps measured in working hours and capacity-limited (one job per station).
+// External steps measured in business days and not capacity-limited (lead-time gates).
+const HOURS_PER_DAY = 8;
+const WORK_START_H = 6;
 function ensureSchedule(r){
   if(!r.schedule || !r.schedule.steps){
-    r.schedule = { steps: PROCESSES.map(p=>({name:p, enabled:false, duration:durations[p]??1, start:''})) };
+    r.schedule = { steps: PROCESSES.map(p=>({name:p, enabled:false, duration:defDur(p), start:''})) };
   } else {
-    // make sure every process exists in steps (in case PROCESSES changed)
+    // drop steps no longer in the process list
+    r.schedule.steps = r.schedule.steps.filter(s=>PROCESSES.includes(s.name));
+    // add any newly-introduced processes
     PROCESSES.forEach(p=>{
-      if(!r.schedule.steps.find(s=>s.name===p)) r.schedule.steps.push({name:p,enabled:false,duration:durations[p]??1,start:''});
+      if(!r.schedule.steps.find(s=>s.name===p)) r.schedule.steps.push({name:p,enabled:false,duration:defDur(p),start:''});
     });
   }
   return r.schedule;
 }
+// enabled steps in the job's chosen run order (seq), falling back to list order
+function enabledOrdered(sch){
+  return sch.steps.filter(s=>s.enabled).sort((a,b)=>{
+    const as = (a.seq!=null) ? a.seq : 1000+PROCESSES.indexOf(a.name);
+    const bs = (b.seq!=null) ? b.seq : 1000+PROCESSES.indexOf(b.name);
+    return as-bs;
+  });
+}
 
 function addDays(date, n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
 function isWeekend(d){ const g=d.getDay(); return g===0||g===6; }
-function addWorkingDays(date, n){
-  // n working days forward (n can be fractional, rounded up to whole days for layout)
-  let d=new Date(date), added=0, whole=Math.max(1,Math.ceil(n));
-  while(added<whole){ d=addDays(d,1); if(!isWeekend(d)) added++; }
+function atWorkStart(d){ const x=new Date(d); x.setHours(WORK_START_H,0,0,0); return x; }
+function workEnd(d){ const x=new Date(d); x.setHours(WORK_START_H+HOURS_PER_DAY,0,0,0); return x; }
+function nextBusinessDayStart(d){ let x=new Date(d); do{ x=addDays(x,1); }while(isWeekend(x)); return atWorkStart(x); }
+function normalizeStart(d){
+  let x=new Date(d);
+  if(isWeekend(x)) return nextBusinessDayStart(x);
+  const ws=atWorkStart(x), we=workEnd(x);
+  if(x<ws) return ws;
+  if(x>=we) return nextBusinessDayStart(x);
+  return x;
+}
+// add working HOURS to a datetime, skipping nights and weekends
+function addWorkingHours(start, hours){
+  let d=normalizeStart(start);
+  let rem=Math.max(0.25, hours), guard=0;
+  while(rem>1e-9 && guard++<100000){
+    const we=workEnd(d);
+    const avail=(we-d)/3600000;
+    if(rem<=avail+1e-9){ d=new Date(d.getTime()+rem*3600000); rem=0; }
+    else { rem-=avail; d=nextBusinessDayStart(d); }
+  }
   return d;
 }
-function subWorkingDays(date, n){
-  let d=new Date(date), sub=0, whole=Math.max(1,Math.ceil(n));
-  while(sub<whole){ d=addDays(d,-1); if(!isWeekend(d)) sub++; }
-  return d;
+// add BUSINESS DAYS to a date, returning the work-start of the end day
+function addBusinessDays(start, days){
+  let d=atWorkStart(normalizeStart(start)), n=Math.max(1,Math.ceil(days)), added=0;
+  while(added<n){ d=addDays(d,1); if(!isWeekend(d)) added++; }
+  return atWorkStart(d);
 }
+// legacy (kept for safety): whole working days
+function addWorkingDays(date, n){ return addBusinessDays(date, n); }
+function stepEnd(name, start, dur){ return isExternal(name) ? addBusinessDays(start, dur) : addWorkingHours(start, dur); }
 function toISO(d){ return d.toISOString().slice(0,10); }
 
-// Compute concrete start/end dates for each enabled step
-function computeStepDates(r){
-  const sch = ensureSchedule(r);
-  const enabled = sch.steps.filter(s=>s.enabled);
-  if(!enabled.length) return [];
-  // Build sequence in PROCESS order
-  const ordered = PROCESSES.map(p=>enabled.find(s=>s.name===p)).filter(Boolean);
+// ── Capacity-aware global scheduler ───────────────────────────────────────────
+// Each process is a single station that can run one job at a time.
+// Jobs are dispatched in due-date order (earliest first). Each step is auto-slotted
+// into the next free window on its station, after the job's prior step finishes.
+// A manual start date on a step locks it as a fixed anchor everything else works around.
+let _schedCache = null;
+function invalidateSched(){ _schedCache = null; }
 
-  // If any step has a manual start, anchor from the earliest manual start forward.
-  // Otherwise, schedule backward from due date.
-  const manualAnchor = ordered.find(s=>s.start);
-  const result = [];
-
-  if(manualAnchor){
-    // place manualAnchor at its start, fill subsequent forward, preceding backward
-    const ai = ordered.indexOf(manualAnchor);
-    // forward from anchor
-    let cursor = new Date(manualAnchor.start+'T00:00:00');
-    for(let i=ai;i<ordered.length;i++){
-      const s=ordered[i];
-      const start = (i===ai && s.start) ? new Date(s.start+'T00:00:00') : cursor;
-      const end = addWorkingDays(start, s.duration||1);
-      result[i] = {name:s.name, start, end, duration:s.duration||1};
-      cursor = end;
-    }
-    // backward before anchor
-    let back = new Date(manualAnchor.start+'T00:00:00');
-    for(let i=ai-1;i>=0;i--){
-      const s=ordered[i];
-      const end = back;
-      const start = subWorkingDays(end, s.duration||1);
-      result[i] = {name:s.name, start, end, duration:s.duration||1};
-      back = start;
-    }
-  } else if(r.due){
-    // backward from due date: last step ends on due date
-    let end = new Date(r.due+'T00:00:00');
-    for(let i=ordered.length-1;i>=0;i--){
-      const s=ordered[i];
-      const start = subWorkingDays(end, s.duration||1);
-      result[i] = {name:s.name, start, end, duration:s.duration||1};
-      end = start;
-    }
-  } else {
-    // no due date, no manual: schedule forward from today
-    let cursor = new Date(); cursor.setHours(0,0,0,0);
-    for(let i=0;i<ordered.length;i++){
-      const s=ordered[i];
-      const start = cursor;
-      const end = addWorkingDays(start, s.duration||1);
-      result[i] = {name:s.name, start, end, duration:s.duration||1};
-      cursor = end;
+function _overlap(aS,aE,bS,bE){ return aS < bE && bS < aE; }
+function _findFreeWindow(busy, notBefore, endFn){
+  let cand = normalizeStart(new Date(notBefore));
+  const sorted = [...busy].sort((a,b)=>a.start-b.start);
+  let moved = true, guard = 0;
+  while(moved && guard++ < 100000){
+    moved = false;
+    const end = endFn(cand);
+    for(const iv of sorted){
+      if(_overlap(cand, end, iv.start, iv.end)){ cand = normalizeStart(new Date(iv.end)); moved = true; break; }
     }
   }
-  return result.filter(Boolean);
+  return cand;
 }
+
+function computeGlobalSchedule(){
+  const result = new Map();
+  const stationBusy = {};
+  INTERNAL_PROCESSES.forEach(p=>stationBusy[p]=[]);   // only internal stations have capacity
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStart = atWorkStart(today);
+
+  // Phase 1 — reserve manual anchors on internal stations so auto-slotting flows around them
+  orders.forEach(r=>{
+    const sch = ensureSchedule(r);
+    sch.steps.forEach(s=>{
+      if(s.enabled && s.start && !isExternal(s.name)){
+        const start = normalizeStart(new Date(s.start+'T00:00:00'));
+        const end = addWorkingHours(start, defDur(s.name)===s.duration?s.duration:(s.duration||defDur(s.name)));
+        stationBusy[s.name].push({start, end, orderId:r.id, manual:true});
+      }
+    });
+  });
+
+  // Phase 2 — dispatch jobs earliest-due-date first, forward-schedule each
+  const farFuture = new Date('2999-01-01');
+  const sorted = [...orders].sort((a,b)=>{
+    const ad = a.due ? new Date(a.due+'T00:00:00') : farFuture;
+    const bd = b.due ? new Date(b.due+'T00:00:00') : farFuture;
+    return ad - bd;
+  });
+
+  sorted.forEach(r=>{
+    const sch = ensureSchedule(r);
+    const steps = enabledOrdered(sch);
+    if(!steps.length){ result.set(r.id, []); return; }
+    let earliestNext = r.ordered ? atWorkStart(new Date(r.ordered+'T00:00:00')) : new Date(todayStart);
+    if(earliestNext < todayStart) earliestNext = new Date(todayStart);
+    const out = [];
+    steps.forEach(s=>{
+      const dur = s.duration || defDur(s.name);
+      const ext = isExternal(s.name);
+      let start, end;
+      if(ext){
+        // lead-time gate: not capacity-constrained, just elapsed business days
+        start = s.start ? atWorkStart(new Date(s.start+'T00:00:00')) : normalizeStart(new Date(earliestNext));
+        end = addBusinessDays(start, dur);
+      } else if(s.start){
+        start = normalizeStart(new Date(s.start+'T00:00:00'));
+        end = addWorkingHours(start, dur);
+      } else {
+        start = _findFreeWindow(stationBusy[s.name], earliestNext, c=>addWorkingHours(c, dur));
+        end = addWorkingHours(start, dur);
+        stationBusy[s.name].push({start, end, orderId:r.id, manual:false});
+      }
+      out.push({name:s.name, start, end, duration:dur, unit:procUnit(s.name), external:ext, manual:!!s.start, conflict:false});
+      earliestNext = new Date(Math.max(earliestNext.getTime(), end.getTime()));
+    });
+    result.set(r.id, out);
+  });
+
+  // Conflict pass — only manual anchors can still overlap on internal stations
+  INTERNAL_PROCESSES.forEach(p=>{
+    const ivs = stationBusy[p].slice().sort((a,b)=>a.start-b.start);
+    for(let i=1;i<ivs.length;i++){
+      if(ivs[i].start < ivs[i-1].end){
+        [ivs[i], ivs[i-1]].forEach(iv=>{
+          const steps = result.get(iv.orderId);
+          const st = steps && steps.find(s=>s.name===p);
+          if(st) st.conflict = true;
+        });
+      }
+    }
+  });
+
+  return result;
+}
+
+function getSched(){ if(!_schedCache) _schedCache = computeGlobalSchedule(); return _schedCache; }
+function computeStepDates(r){ return getSched().get(r.id) || []; }
 
 window._toggleStep = (id, name, e) => {
   e.stopPropagation();
@@ -1080,7 +1204,25 @@ window._toggleStep = (id, name, e) => {
   const sch = ensureSchedule(r);
   const step = sch.steps.find(s=>s.name===name);
   step.enabled = !step.enabled;
-  if(step.enabled && !step.duration) step.duration = durations[name]??1;
+  if(step.enabled){
+    if(!step.duration) step.duration = defDur(name);
+    const maxSeq = Math.max(0, ...sch.steps.filter(s=>s.enabled && s.seq!=null).map(s=>s.seq));
+    step.seq = maxSeq + 1;
+  } else {
+    step.seq = null;
+  }
+  saveDB(); render();
+};
+window._moveStep = (id, name, dir, e) => {
+  if(e) e.stopPropagation();
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const sch = ensureSchedule(r);
+  const ord = enabledOrdered(sch);
+  ord.forEach((s,k)=>s.seq=k+1);          // normalize to 1..n
+  const i = ord.findIndex(s=>s.name===name);
+  const j = i + dir;
+  if(i<0 || j<0 || j>=ord.length) return;
+  const tmp = ord[i].seq; ord[i].seq = ord[j].seq; ord[j].seq = tmp;
   saveDB(); render();
 };
 window._stepDuration = (id, name, val) => {
@@ -1135,6 +1277,7 @@ function gatherScheduledSteps(){
 }
 
 function renderSchedule(){
+  invalidateSched();
   if(scheduleView==='calendar') renderCalendar();
   else renderGantt();
 }
@@ -1218,7 +1361,7 @@ function renderGantt(){
       if(offset+span<0||offset>DAYS) return;
       const leftPct=(Math.max(0,offset)/DAYS)*100;
       const widthPct=(Math.min(span,DAYS-Math.max(0,offset))/DAYS)*100;
-      bars+=`<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${s.color||PROCESS_COLORS[s.name]}" title="${s.name}: ${toISO(s.start)} → ${toISO(s.end)}" onclick="openEditFromSchedule('${r.id}')">${s.name.split(' ')[0]}</div>`;
+      bars+=`<div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${s.color||PROCESS_COLORS[s.name]}${s.conflict?';outline:2px solid #A32D2D;outline-offset:1px':''}" title="${s.name}: ${toISO(s.start)} → ${toISO(s.end)}${s.conflict?' — station double-booked':''}${s.manual?' (manual)':''}" onclick="openEditFromSchedule('${r.id}')">${s.manual?'📌 ':''}${s.name.split(' ')[0]}</div>`;
     });
     // due marker
     let dueMark='';
