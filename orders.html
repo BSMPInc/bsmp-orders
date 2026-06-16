@@ -646,7 +646,7 @@ function lineRow(r,ind){
     <td class="editable" title="${r.customer||''}" ondblclick="window._ec(event,this,'${r.id}','customer')">${r.customer||''}</td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','po')">${r.po||''}</td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','job')">${r.job||''}</td>
-    <td class="editable" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}" ondblclick="window._ec(event,this,'${r.id}','desc')">${r.desc||r.part||''}</td>
+    <td class="editable" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}" ondblclick="window._ec(event,this,'${r.id}','desc')">${r.drawing&&r.drawing.url?'<i class="ti ti-paperclip" style="font-size:12px;color:var(--blue);margin-right:3px" title="Drawing attached"></i>':''}${r.desc||r.part||''}</td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','qty')">${r.qty||''}</td>
     <td>${total?fmtMoney(total):''}</td>
     <td>${fmtDate(r.due)}</td>
@@ -713,11 +713,52 @@ function detailRow(r){
       </div>
     </div>
     <div class="detail-section">
-      <div class="detail-label">Notes</div>
+      <div class="detail-label">Drawing</div>
+      ${drawingBlock(r)}
+      <div class="detail-label" style="margin-top:14px">Notes</div>
       <textarea class="notes-input" placeholder="Add notes…" onchange="window._sn('${r.id}',this.value)" onclick="event.stopPropagation()">${r.notes||''}</textarea>
       <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i> Edit Full Details</button>
     </div>
   </div></td></tr>`;
+}
+
+// Normalize a Google Drive share link into a direct-view/preview URL
+function driveDirectView(url){
+  if(!url) return null;
+  // https://drive.google.com/file/d/FILEID/view?...  OR  ...open?id=FILEID  OR  ...uc?id=FILEID
+  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m) return 'https://drive.google.com/file/d/'+m[1]+'/preview';
+  return null;
+}
+function isImageUrl(url){ return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url||''); }
+
+function drawingBlock(r){
+  const d = r.drawing || {}; // {url, label, name, kind:'link'|'upload'}
+  if(d.url){
+    const drive = driveDirectView(d.url);
+    const label = d.label || d.name || 'Drawing';
+    const openUrl = d.url;
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <i class="ti ti-${drive?'file-cad':isImageUrl(d.url)?'photo':'file'}" style="font-size:18px;color:var(--blue)"></i>
+        <span style="font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+        <i class="ti ti-x" style="cursor:pointer;color:var(--red);font-size:15px" title="Remove drawing" onclick="window._clearDrawing('${r.id}')"></i>
+      </div>
+      ${drive ? `<iframe src="${drive}" style="width:100%;height:180px;border:1px solid var(--border);border-radius:8px" onclick="event.stopPropagation()"></iframe>`
+        : isImageUrl(d.url) ? `<img src="${d.url}" style="width:100%;max-height:200px;object-fit:contain;border:1px solid var(--border);border-radius:8px">`
+        : `<div style="font-size:11px;color:var(--text2);word-break:break-all;margin-bottom:8px">${d.url}</div>`}
+      <a href="${openUrl}" target="_blank" rel="noopener" class="btn sm" style="margin-top:8px;text-decoration:none;display:inline-flex" onclick="event.stopPropagation()"><i class="ti ti-external-link"></i> Open drawing</a>
+      <button class="btn sm" style="margin-top:8px;margin-left:6px" onclick="window._editDrawing('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i> Change</button>
+    </div>`;
+  }
+  // empty state — paste a link (upload coming later)
+  return `<div style="border:1px dashed var(--border2);border-radius:10px;padding:12px;background:#f7f9fc">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Paste a drawing link (Google Drive, network share, etc.). One drawing per line item.</div>
+    <input type="text" id="draw-url-${r.id}" placeholder="https://drive.google.com/file/d/…" style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border2);border-radius:8px;margin-bottom:6px;font-family:inherit" onclick="event.stopPropagation()">
+    <input type="text" id="draw-label-${r.id}" placeholder="Label (e.g. 610-1094 Rev A)" style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border2);border-radius:8px;margin-bottom:8px;font-family:inherit" onclick="event.stopPropagation()">
+    <button class="btn green sm" onclick="window._saveDrawing('${r.id}');event.stopPropagation()"><i class="ti ti-link"></i> Attach drawing</button>
+    <div style="font-size:10px;color:var(--text3);margin-top:8px">Tip: in Google Drive, set the file to "Anyone with the link can view" so your team can open it.</div>
+  </div>`;
 }
 
 function renderSummary(){
@@ -1262,6 +1303,33 @@ window._stepStart = (id, name, val) => {
   const step = sch.steps.find(s=>s.name===name);
   step.start = val;
   saveDB();
+};
+
+// ── Drawings ──────────────────────────────────────────────────────────────────
+window._saveDrawing = (id) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const url = (document.getElementById('draw-url-'+id)?.value||'').trim();
+  const label = (document.getElementById('draw-label-'+id)?.value||'').trim();
+  if(!url){ alert('Paste a drawing link first.'); return; }
+  r.drawing = { url, label, kind:'link' };
+  saveDB(); render();
+};
+window._clearDrawing = (id) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  if(!confirm('Remove this drawing link?')) return;
+  r.drawing = null;
+  saveDB(); render();
+};
+window._editDrawing = (id) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  r._editingDrawing = true;
+  const cur = r.drawing || {};
+  r.drawing = null;        // drop to empty state to re-enter
+  saveDB(); render();
+  setTimeout(()=>{
+    const u=document.getElementById('draw-url-'+id), l=document.getElementById('draw-label-'+id);
+    if(u) u.value=cur.url||''; if(l) l.value=cur.label||'';
+  },30);
 };
 
 // ── Schedule rendering (calendar + gantt) ────────────────────────────────────
