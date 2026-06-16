@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BSMP — Order Tracker</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -309,7 +310,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.2.0</div>
+    <div class="ver">v2.3.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -472,6 +473,17 @@ tr:hover .del-btn{opacity:1}
   </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app-root -->
+
+<!-- Customer Confirmation Ticket Modal -->
+<div class="modal-bg" id="confirm-modal" style="display:none">
+  <div class="modal" style="max-width:640px;padding:0;overflow:hidden">
+    <div id="confirm-ticket" style="max-height:74vh;overflow:auto"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);background:var(--card)">
+      <button class="btn" onclick="closeModal('confirm-modal')">Close</button>
+      <button class="btn green" onclick="window.printConfirmation()"><i class="ti ti-printer"></i> Print / Save PDF</button>
+    </div>
+  </div>
+</div>
 
 <!-- Add/Edit Modal -->
 <div class="modal-bg" id="add-modal" style="display:none">
@@ -816,6 +828,7 @@ function detailRow(r){
       <textarea class="notes-input" placeholder="Add notes…" onchange="window._sn('${r.id}',this.value)" onclick="event.stopPropagation()">${r.notes||''}</textarea>
       <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i> Edit Full Details</button>
       <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i> Archive order</button>
+      <button class="btn sm green" style="margin-top:8px;align-self:flex-start" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i> Customer Confirmation</button>
     </div>
   </div></td></tr>`;
 }
@@ -922,6 +935,85 @@ window._unarchiveOrder=(id)=>{
   r.archived=false; r.archivedAt=null;
   saveDB(); renderArchive(); render();
 };
+
+// ── Customer order confirmation ticket (per PO) ──────────────────────────────
+window._showConfirmation=(id)=>{
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  const items=orders.filter(o=>o.customer===r.customer && (o.po||'')===(r.po||''));
+  // dates
+  const orderedDates=items.map(i=>i.ordered).filter(Boolean).sort();
+  const dueDates=items.map(i=>i.due).filter(Boolean).sort();
+  const orderDate=orderedDates[0]||'';
+  const dueDate=dueDates[dueDates.length-1]||'';
+  const baseJob=(items.find(i=>i.job)?.job||'').replace(/-\d+$/,'');
+  const grand=items.reduce((s,i)=>s+rowTotal(i),0);
+  const logoSrc=document.querySelector('.sidebar-logo img')?.src||'';
+  const rows=items.map(i=>{
+    const lt=rowTotal(i);
+    return `<tr>
+      <td style="padding:7px 8px;border-bottom:1px solid #eee;font-size:12px;white-space:nowrap">${i.job||''}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eee;font-size:12px">${i.part?`<b>${i.part}</b>`:''}${i.part&&i.desc?' — ':''}${i.desc||''}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eee;font-size:12px;text-align:center">${i.qty||''}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eee;font-size:12px;text-align:right">${i.cost?fmtMoney(i.cost):''}</td>
+      <td style="padding:7px 8px;border-bottom:1px solid #eee;font-size:12px;text-align:right">${lt?fmtMoney(lt):''}</td>
+    </tr>`;
+  }).join('');
+  const infoCell=(label,val)=>`<div style="flex:1;min-width:120px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#888;font-weight:700">${label}</div><div style="font-size:13px;color:#1a1a1a;font-weight:600">${val||'—'}</div></div>`;
+  document.getElementById('confirm-ticket').innerHTML=`
+  <div id="confirm-ticket-inner" style="background:#fff;padding:30px 32px;color:#1a1a1a;font-family:-apple-system,Segoe UI,sans-serif">
+    <div style="display:flex;align-items:center;gap:16px;border-bottom:3px solid #5a8a2c;padding-bottom:16px;margin-bottom:18px">
+      ${logoSrc?`<img src="${logoSrc}" style="height:52px;width:auto">`:''}
+      <div>
+        <div style="font-size:17px;font-weight:800;color:#2d2d2d;line-height:1.1">Bert's Sheet Metal Products, Inc.</div>
+        <div style="font-size:11px;color:#666;margin-top:2px">20622 Superior St, Chatsworth, CA 91311</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:17px;font-weight:800;color:#5a8a2c;letter-spacing:1px;line-height:1.1">ORDER<br>CONFIRMATION</div>
+      </div>
+    </div>
+    <div style="font-size:13px;color:#333;margin-bottom:16px">This confirms that we have <b>received your order</b>. Thank you for your business!</div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;background:#f6f8f3;border:1px solid #e3ead7;border-radius:8px;padding:14px 16px;margin-bottom:8px">
+      ${infoCell('Customer', r.customer)}
+      ${infoCell('PO #', r.po||'verbal')}
+      ${infoCell('Job # (Base)', baseJob)}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:14px;background:#f6f8f3;border:1px solid #e3ead7;border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      ${infoCell('Order Date', orderDate?fmtDate(orderDate):'')}
+      ${infoCell('Completion Date', dueDate?fmtDate(dueDate):'')}
+      ${infoCell('Due Date', dueDate?fmtDate(dueDate):'')}
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:6px">
+      <thead><tr style="background:#2d3a22">
+        <th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#fff">Job #</th>
+        <th style="padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#fff">Item / Description</th>
+        <th style="padding:8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#fff">Qty</th>
+        <th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#fff">Cost / Part</th>
+        <th style="padding:8px;text-align:right;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#fff">Item Total</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <div style="min-width:200px">
+        <div style="display:flex;justify-content:space-between;padding:8px 8px;border-top:2px solid #2d3a22;font-size:15px;font-weight:800;color:#2d3a22">
+          <span>TOTAL</span><span>${fmtMoney(grand)}</span>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:22px;border-top:1px solid #eee;padding-top:12px;font-size:10px;color:#999;text-align:center">
+      Bert's Sheet Metal Products, Inc. · Chatsworth, CA · This document confirms receipt of your order and is not an invoice.
+    </div>
+  </div>`;
+  openModalById('confirm-modal');
+};
+function openModalById(mid){ const el=document.getElementById(mid); if(el) el.style.display='flex'; }
+window.printConfirmation=()=>{
+  const node=document.getElementById('confirm-ticket-inner'); if(!node) return;
+  const w=window.open('','_blank','width=720,height=900');
+  w.document.write(`<html><head><title>Order Confirmation</title></head><body style="margin:0">${node.outerHTML}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 250);
+};
+
 
 window.handleCustomerSelect = (sel) => {
   const inp = document.getElementById('f-customer');
