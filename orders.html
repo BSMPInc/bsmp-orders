@@ -102,6 +102,7 @@ tr.po-group-row:hover td{background:#e8edf7}
 tr.po-group-row.alt:hover td{background:#dde6f2}
 .group-chevron{transition:transform .18s;display:inline-block;font-size:20px;font-weight:700;color:var(--text2);margin-right:4px;line-height:1}
 .group-chevron.open{transform:rotate(90deg)}
+.draw-drop.drag{border-color:var(--green)!important;background:#f3f9ec!important}
 
 tr.line-row{cursor:pointer}
 tr.line-row:hover td{background:#fafbfd}
@@ -535,10 +536,20 @@ tr:hover .del-btn{opacity:1}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, ref, onValue, set, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
-const firebaseConfig = { databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com" };
+const firebaseConfig = {
+  apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
+  authDomain: "bsmp-orders.firebaseapp.com",
+  databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com",
+  projectId: "bsmp-orders",
+  storageBucket: "bsmp-orders.firebasestorage.app",
+  messagingSenderId: "924947028289",
+  appId: "1:924947028289:web:c58c74e37ee51aa1b9e9c0"
+};
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const storage = getStorage(app);
 const ordersRef = ref(db, 'orders');
 
 const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
@@ -752,31 +763,45 @@ function driveDirectView(url){
 function isImageUrl(url){ return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/i.test(url||''); }
 
 function drawingBlock(r){
-  const d = r.drawing || {}; // {url, label, name, kind:'link'|'upload'}
+  const d = r.drawing || {}; // {url, label, name, kind:'link'|'upload', path, ctype}
   if(d.url){
     const drive = driveDirectView(d.url);
     const label = d.label || d.name || 'Drawing';
     const openUrl = d.url;
+    const isUpload = d.kind==='upload';
+    const isImg = isImageUrl(d.url) || (d.ctype||'').startsWith('image/');
+    const isPdf = /\.pdf(\?|$)/i.test(d.url) || (d.ctype||'')==='application/pdf';
+    let preview;
+    if(drive) preview = `<iframe src="${drive}" style="width:100%;height:180px;border:1px solid var(--border);border-radius:8px" onclick="event.stopPropagation()"></iframe>`;
+    else if(isImg) preview = `<img src="${d.url}" style="width:100%;max-height:200px;object-fit:contain;border:1px solid var(--border);border-radius:8px">`;
+    else if(isPdf && isUpload) preview = `<iframe src="${d.url}" style="width:100%;height:200px;border:1px solid var(--border);border-radius:8px" onclick="event.stopPropagation()"></iframe>`;
+    else preview = `<div style="font-size:11px;color:var(--text2);word-break:break-all;margin-bottom:8px">${d.name||d.url}</div>`;
     return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-        <i class="ti ti-${drive?'file-cad':isImageUrl(d.url)?'photo':'file'}" style="font-size:18px;color:var(--blue)"></i>
-        <span style="font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
+        <i class="ti ti-${isUpload?'file-upload':drive?'file-cad':isImg?'photo':'file'}" style="font-size:18px;color:var(--blue)"></i>
+        <span style="font-size:12px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}${isUpload?' <span style="font-size:9px;background:#eaf5d8;color:#2d6010;border-radius:4px;padding:1px 5px;font-weight:600">uploaded</span>':''}</span>
         <i class="ti ti-x" style="cursor:pointer;color:var(--red);font-size:15px" title="Remove drawing" onclick="window._clearDrawing('${r.id}')"></i>
       </div>
-      ${drive ? `<iframe src="${drive}" style="width:100%;height:180px;border:1px solid var(--border);border-radius:8px" onclick="event.stopPropagation()"></iframe>`
-        : isImageUrl(d.url) ? `<img src="${d.url}" style="width:100%;max-height:200px;object-fit:contain;border:1px solid var(--border);border-radius:8px">`
-        : `<div style="font-size:11px;color:var(--text2);word-break:break-all;margin-bottom:8px">${d.url}</div>`}
+      ${preview}
       <a href="${openUrl}" target="_blank" rel="noopener" class="btn sm" style="margin-top:8px;text-decoration:none;display:inline-flex" onclick="event.stopPropagation()"><i class="ti ti-external-link"></i> Open drawing</a>
       <button class="btn sm" style="margin-top:8px;margin-left:6px" onclick="window._editDrawing('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i> Change</button>
     </div>`;
   }
-  // empty state — paste a link (upload coming later)
+  // empty state — upload a file OR paste a link
   return `<div style="border:1px dashed var(--border2);border-radius:10px;padding:12px;background:#f7f9fc">
-    <div style="font-size:11px;color:var(--text2);margin-bottom:8px">Paste a drawing link (Google Drive, network share, etc.). One drawing per line item.</div>
+    <div class="draw-drop" id="draw-drop-${r.id}" onclick="document.getElementById('draw-file-${r.id}').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+      ondrop="event.preventDefault();this.classList.remove('drag');window._uploadDrawing('${r.id}',event.dataTransfer.files[0])"
+      style="border:1.5px dashed var(--border2);border-radius:8px;padding:16px;text-align:center;cursor:pointer;background:#fff;margin-bottom:10px">
+      <i class="ti ti-cloud-upload" style="font-size:22px;color:var(--green);display:block;margin-bottom:4px"></i>
+      <span style="font-size:12px;color:var(--text2)">Drop a PDF or image here, or click to upload</span>
+      <div id="draw-progress-${r.id}" style="font-size:11px;color:var(--blue);margin-top:6px"></div>
+    </div>
+    <input type="file" id="draw-file-${r.id}" accept="image/*,.pdf,.dxf,.dwg" style="display:none" onchange="window._uploadDrawing('${r.id}',this.files[0])">
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:8px">— or paste a link —</div>
     <input type="text" id="draw-url-${r.id}" placeholder="https://drive.google.com/file/d/…" style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border2);border-radius:8px;margin-bottom:6px;font-family:inherit" onclick="event.stopPropagation()">
     <input type="text" id="draw-label-${r.id}" placeholder="Label (e.g. 610-1094 Rev A)" style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border2);border-radius:8px;margin-bottom:8px;font-family:inherit" onclick="event.stopPropagation()">
-    <button class="btn green sm" onclick="window._saveDrawing('${r.id}');event.stopPropagation()"><i class="ti ti-link"></i> Attach drawing</button>
-    <div style="font-size:10px;color:var(--text3);margin-top:8px">Tip: in Google Drive, set the file to "Anyone with the link can view" so your team can open it.</div>
+    <button class="btn green sm" onclick="window._saveDrawing('${r.id}');event.stopPropagation()"><i class="ti ti-link"></i> Attach link</button>
   </div>`;
 }
 
@@ -1397,21 +1422,46 @@ window._saveDrawing = (id) => {
   r.drawing = { url, label, kind:'link' };
   saveDB(); render();
 };
-window._clearDrawing = (id) => {
+window._uploadDrawing = async (id, file) => {
+  if(!file) return;
   const r = orders.find(o=>o.id===id); if(!r) return;
-  if(!confirm('Remove this drawing link?')) return;
+  const prog = document.getElementById('draw-progress-'+id);
+  const path = `drawings/${id}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,'_')}`;
+  try{
+    const task = uploadBytesResumable(sRef(storage, path), file, {contentType:file.type});
+    task.on('state_changed', s=>{
+      const pct = Math.round((s.bytesTransferred/s.totalBytes)*100);
+      if(prog) prog.textContent = `Uploading… ${pct}%`;
+    });
+    await task;
+    const url = await getDownloadURL(task.snapshot.ref);
+    const label = (document.getElementById('draw-label-'+id)?.value||'').trim() || file.name;
+    r.drawing = { url, label, name:file.name, kind:'upload', path, ctype:file.type };
+    saveDB(); render();
+  }catch(err){
+    if(prog) prog.textContent = '';
+    alert('Upload failed: '+err.message+'\n\nIf this mentions permissions, the Storage security rules may need to allow writes.');
+  }
+};
+window._clearDrawing = async (id) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  if(!confirm('Remove this drawing?')) return;
+  const d = r.drawing;
   r.drawing = null;
   saveDB(); render();
+  // if it was an uploaded file, delete it from Storage too
+  if(d && d.kind==='upload' && d.path){
+    try{ await deleteObject(sRef(storage, d.path)); }catch(e){ /* ignore if already gone */ }
+  }
 };
 window._editDrawing = (id) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
-  r._editingDrawing = true;
   const cur = r.drawing || {};
   r.drawing = null;        // drop to empty state to re-enter
   saveDB(); render();
   setTimeout(()=>{
     const u=document.getElementById('draw-url-'+id), l=document.getElementById('draw-label-'+id);
-    if(u) u.value=cur.url||''; if(l) l.value=cur.label||'';
+    if(u && cur.kind==='link') u.value=cur.url||''; if(l) l.value=cur.label||'';
   },30);
 };
 
