@@ -364,13 +364,14 @@ tr:hover .del-btn{opacity:1}
             <th style="width:175px" data-key="desc">Part / Description</th>
             <th style="width:50px" data-key="qty">Qty</th>
             <th style="width:90px" data-key="total">PO Total</th>
+            <th style="width:84px" data-key="ordered">Start Date</th>
             <th style="width:84px" data-key="due">Due Date</th>
             <th style="width:56px" data-key="days">Days</th>
             <th style="width:148px" data-key="status">Status</th>
             <th style="width:68px" data-key="invoice">Invoice #</th>
             <th style="width:90px" data-key="payment">Payment</th>
           </tr></thead>
-          <tbody id="tbody"><tr><td colspan="13"><div class="loading-row"><div class="spinner"></div><br>Connecting to database…</div></td></tr></tbody>
+          <tbody id="tbody"><tr><td colspan="14"><div class="loading-row"><div class="spinner"></div><br>Connecting to database…</div></td></tr></tbody>
         </table>
       </div>
     </div>
@@ -660,7 +661,7 @@ function render(){
   const mode=document.getElementById('group-mode').value;
   const tbody=document.getElementById('tbody');
   renderSummary();
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="13"><div class="empty-state"><i class="ti ti-clipboard-list"></i><p>No orders yet — click Add Order or use AI Extract</p></div></td></tr>`;return;}
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="14"><div class="empty-state"><i class="ti ti-clipboard-list"></i><p>No orders yet — click Add Order or use AI Extract</p></div></td></tr>`;return;}
   let html='';
   if(mode==='none'){
     rows.forEach(r=>{html+=lineRow(r,false);if(expanded.has(r.id))html+=detailRow(r);});
@@ -687,6 +688,7 @@ function render(){
         <td style="font-weight:700;color:var(--text)">${fmtMoney(gtotal)}</td>
         <td></td>
         <td></td>
+        <td></td>
         <td>${statuses.map(s=>`<span class="status-badge ${STATUS_CLASS[s]||'s-confirmed'}" style="pointer-events:none;margin-right:2px">${s}</span>`).join('')}</td>
         <td></td>
         <td></td>
@@ -709,6 +711,7 @@ function lineRow(r,ind){
     <td class="editable" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}" ondblclick="window._ec(event,this,'${r.id}','desc')">${r.drawing&&r.drawing.url?'<i class="ti ti-paperclip" style="font-size:12px;color:var(--blue);margin-right:3px" title="Drawing attached"></i>':''}${r.desc||r.part||''}</td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','qty')">${r.qty||''}</td>
     <td>${total?fmtMoney(total):''}</td>
+    <td class="editable" ondblclick="window._editDate(event,'${r.id}','ordered')" title="Double-click to set start date">${fmtDate(r.ordered)}</td>
     <td>${fmtDate(r.due)}</td>
     <td>${fmtDays(days)}</td>
     <td><span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span></td>
@@ -751,7 +754,7 @@ function detailRow(r){
   const addBtns=(list)=>list.filter(p=>!sch.steps.find(s=>s.name===p&&s.enabled))
     .map(p=>`<button class="proc-btn" onclick="window._toggleStep('${r.id}','${p}',event)"><i class="ti ti-plus" style="font-size:11px"></i> ${p}</button>`).join('');
   const subLabel=(t)=>`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:8px 0 4px">${t}</div>`;
-  return`<tr class="detail-row"><td colspan="13"><div class="detail-inner">
+  return`<tr class="detail-row"><td colspan="14"><div class="detail-inner">
     <div class="detail-section">
       <div class="detail-label">Current Process</div>
       ${subLabel('Internal')}
@@ -865,6 +868,7 @@ window._tp=(id,proc,e)=>{e.stopPropagation();const r=orders.find(o=>o.id===id);i
 window._sn=(id,val)=>{const r=orders.find(o=>o.id===id);if(r){r.notes=val;saveDB();}};
 window._del=(id)=>{if(!confirm('Delete this order?'))return;orders=orders.filter(o=>o.id!==id);expanded.delete(id);deleteDB(id);render();};
 window._ec=(e,td,id,field)=>{e.stopPropagation();const cur=td.textContent;const inp=document.createElement('input');inp.className='cell-edit';inp.value=cur;td.innerHTML='';td.appendChild(inp);inp.focus();inp.select();function commit(){const r=orders.find(o=>o.id===id);if(r){r[field]=inp.value.trim();if(field==='qty'||field==='cost'){r.qty=parseFloat(r.qty)||0;r.cost=parseFloat(r.cost)||0;r.total=r.qty*r.cost;}saveDB();}render();}inp.addEventListener('blur',commit);inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape')render();});};
+window._editDate=(e,id,field)=>{e.stopPropagation();const td=e.currentTarget;const r=orders.find(o=>o.id===id);const inp=document.createElement('input');inp.type='date';inp.className='cell-edit';inp.value=(r&&r[field])||'';td.innerHTML='';td.appendChild(inp);inp.focus();try{inp.showPicker&&inp.showPicker();}catch(_){}function commit(){const rr=orders.find(o=>o.id===id);if(rr){rr[field]=inp.value;saveDB();}render();}inp.addEventListener('blur',commit);inp.addEventListener('change',commit);inp.addEventListener('keydown',ev=>{if(ev.key==='Enter')inp.blur();if(ev.key==='Escape')render();});};
 window._sp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('status-picker');picker.innerHTML=`<div class="picker-label">Change Status</div>`+STATUSES.map(s=>`<div class="picker-item" onclick="window._ss('${id}','${s}')"><span class="status-badge ${STATUS_CLASS[s]}">${s}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._ss=(id,status)=>{const r=orders.find(o=>o.id===id);if(r){r.status=status;if(['Invoiced','Ready for Invoice'].includes(status)&&!r.payment)r.payment='Unpaid';saveDB();render();}document.getElementById('status-picker').style.display='none';};
 window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
