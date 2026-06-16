@@ -288,6 +288,7 @@ tr:hover .del-btn{opacity:1}
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
     <div class="nav-item" id="nav-schedule" onclick="showPage('schedule')"><i class="ti ti-calendar-time"></i> Schedule</div>
+    <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
     <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
   </div>
   <div class="sidebar-section">
@@ -308,7 +309,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.1.0</div>
+    <div class="ver">v2.2.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -410,6 +411,33 @@ tr:hover .del-btn{opacity:1}
     </div>
     <div id="calendar-view"></div>
     <div id="gantt-view" style="display:none"></div>
+  </div>
+
+  <!-- Archive Page -->
+  <div id="archive-page" style="display:none">
+    <div class="table-card">
+      <div class="table-card-header">
+        <i class="ti ti-archive"></i><span>Archived Orders</span>
+        <input id="archive-search" placeholder="Search archive…" oninput="renderArchive()" style="margin-left:auto;font-size:13px;padding:7px 11px;border:1px solid var(--border2);border-radius:8px;font-family:inherit;width:240px;max-width:40vw">
+      </div>
+      <div style="overflow-x:auto">
+        <table id="archive-table" style="width:100%">
+          <thead><tr>
+            <th style="width:150px">Customer</th>
+            <th style="width:80px">PO #</th>
+            <th style="width:74px">Job #</th>
+            <th>Part / Description</th>
+            <th style="width:50px">Qty</th>
+            <th style="width:90px">PO Total</th>
+            <th style="width:80px">Invoice #</th>
+            <th style="width:80px">Payment</th>
+            <th style="width:96px">Archived</th>
+            <th style="width:104px"></th>
+          </tr></thead>
+          <tbody id="archive-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- Settings / Process Times Page -->
@@ -617,6 +645,7 @@ function startDataListeners(){
     const data = snap.val();
     orders = data ? Object.values(data) : [];
     setSyncStatus('live'); render();
+    if(document.getElementById('archive-page')?.style.display==='block') renderArchive();
   }, () => setSyncStatus('error'));
   startCustomerListener();
   startDurationsListener();
@@ -644,7 +673,7 @@ function fmtMoney(v){if(v===''||v==null||isNaN(v))return'';return'$'+parseFloat(
 function rowTotal(r){return r.qty&&r.cost?r.qty*r.cost:(parseFloat(r.total)||0);}
 
 function filteredOrders(){
-  let rows=[...orders];
+  let rows=orders.filter(r=>!r.archived);
   const q=document.getElementById('search').value.toLowerCase();
   const sf=document.getElementById('filter-status').value;
   const pf=document.getElementById('filter-process').value;
@@ -781,6 +810,7 @@ function detailRow(r){
       <div class="detail-label" style="margin-top:14px">Notes</div>
       <textarea class="notes-input" placeholder="Add notes…" onchange="window._sn('${r.id}',this.value)" onclick="event.stopPropagation()">${r.notes||''}</textarea>
       <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i> Edit Full Details</button>
+      <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i> Archive order</button>
     </div>
   </div></td></tr>`;
 }
@@ -839,14 +869,15 @@ function drawingBlock(r){
 }
 
 function renderSummary(){
-  const open=orders.filter(r=>!['Completed','Invoiced'].includes(r.status)).length;
-  const inv=orders.filter(r=>r.status==='Invoiced').length;
-  const rfi=orders.filter(r=>r.status==='Ready for Invoice').length;
-  const late=orders.filter(r=>{const d=daysUntil(r.due);return d!==null&&d<0&&!['Completed','Invoiced'].includes(r.status);}).length;
-  const outstanding=orders.filter(r=>['Invoiced','Ready for Invoice'].includes(r.status)&&r.payment!=='Paid').reduce((s,r)=>s+rowTotal(r),0);
-  const total=orders.reduce((s,r)=>s+rowTotal(r),0);
+  const active=orders.filter(r=>!r.archived);
+  const open=active.filter(r=>!['Completed','Invoiced'].includes(r.status)).length;
+  const inv=active.filter(r=>r.status==='Invoiced').length;
+  const rfi=active.filter(r=>r.status==='Ready for Invoice').length;
+  const late=active.filter(r=>{const d=daysUntil(r.due);return d!==null&&d<0&&!['Completed','Invoiced'].includes(r.status);}).length;
+  const outstanding=active.filter(r=>['Invoiced','Ready for Invoice'].includes(r.status)&&r.payment!=='Paid').reduce((s,r)=>s+rowTotal(r),0);
+  const total=active.reduce((s,r)=>s+rowTotal(r),0);
   document.getElementById('summary').innerHTML=`
-    <div class="stat"><div class="stat-label">Total Orders</div><div class="stat-val">${orders.length}</div></div>
+    <div class="stat"><div class="stat-label">Total Orders</div><div class="stat-val">${active.length}</div></div>
     <div class="stat"><div class="stat-label">Open</div><div class="stat-val blue">${open}</div></div>
     <div class="stat"><div class="stat-label">Ready to Invoice</div><div class="stat-val green">${rfi}</div></div>
     <div class="stat"><div class="stat-label">Invoiced</div><div class="stat-val" style="color:#0a5535">${inv}</div></div>
@@ -874,6 +905,18 @@ window._ss=(id,status)=>{const r=orders.find(o=>o.id===id);if(r){r.status=status
 window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._pps=(id,pay)=>{const r=orders.find(o=>o.id===id);if(r){r.payment=pay;saveDB();render();}document.getElementById('pay-picker').style.display='none';};
 window._oe=(id)=>openEdit(id);
+window._archiveOrder=(id)=>{
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  if(!confirm('Archive this order? It will move to the Archive and leave the active board.')) return;
+  r.archived=true; r.archivedAt=new Date().toISOString();
+  expanded.delete(id);
+  saveDB(); render();
+};
+window._unarchiveOrder=(id)=>{
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  r.archived=false; r.archivedAt=null;
+  saveDB(); renderArchive(); render();
+};
 
 window.handleCustomerSelect = (sel) => {
   const inp = document.getElementById('f-customer');
@@ -1135,10 +1178,11 @@ const PAGE_META = {
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   customers:{title:'Customers',      sub:'Customer index & PO format notes'},
   schedule: {title:'Production Schedule', sub:'Timeline of all jobs in the shop'},
+  archive:  {title:'Archive',        sub:'Completed orders you have archived'},
   settings: {title:'Process Times',  sub:'Default durations for each process'}
 };
 window.showPage = (page) => {
-  ['orders','customers','schedule','settings'].forEach(p=>{
+  ['orders','customers','schedule','archive','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -1151,11 +1195,42 @@ window.showPage = (page) => {
   if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
   if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
+  if(page==='archive') document.getElementById('nav-archive')?.classList.add('active');
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
   if(page==='customers') renderCustomers();
   if(page==='schedule') renderSchedule();
+  if(page==='archive') renderArchive();
   if(page==='settings') renderDurationSettings();
 };
+
+function renderArchive(){
+  const tb=document.getElementById('archive-tbody'); if(!tb) return;
+  const q=(document.getElementById('archive-search')?.value||'').toLowerCase();
+  let rows=orders.filter(r=>r.archived);
+  if(q) rows=rows.filter(r=>[r.customer,r.po,r.job,r.part,r.desc,r.invoice].join(' ').toLowerCase().includes(q));
+  rows.sort((a,b)=>(b.archivedAt||'').localeCompare(a.archivedAt||''));
+  if(!rows.length){
+    tb.innerHTML=`<tr><td colspan="10"><div class="empty-state"><i class="ti ti-archive"></i><p>${q?'No archived orders match your search':'No archived orders yet — use the Archive button on an order when it is done'}</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML=rows.map(r=>{
+    const total=rowTotal(r);
+    const arch=r.archivedAt?fmtDate(r.archivedAt.slice(0,10)):'';
+    const payCls=r.payment==='Paid'?'s-completed':r.payment==='Partial'?'s-qc':'s-need-po';
+    return `<tr>
+      <td>${r.customer||''}</td>
+      <td>${r.po||''}</td>
+      <td>${r.job||''}</td>
+      <td>${r.part?`<b>${r.part}</b> · `:''}${r.desc||''}</td>
+      <td>${r.qty||''}</td>
+      <td>${total?fmtMoney(total):''}</td>
+      <td>${r.invoice||''}</td>
+      <td><span class="status-badge ${payCls}" style="pointer-events:none">${r.payment||'Unpaid'}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${arch}</td>
+      <td><button class="btn sm" onclick="window._unarchiveOrder('${r.id}')"><i class="ti ti-arrow-back-up"></i> Restore</button></td>
+    </tr>`;
+  }).join('');
+}
 
 // ── Durations Firebase sync ───────────────────────────────────────────────────
 const durationsRef = ref(db, 'durations');
@@ -1343,7 +1418,7 @@ function computeGlobalSchedule(){
   const todayStart = atWorkStart(today);
 
   // Phase 1 — reserve manual anchors on internal stations so auto-slotting flows around them
-  orders.forEach(r=>{
+  orders.filter(r=>!r.archived).forEach(r=>{
     const sch = ensureSchedule(r);
     sch.steps.forEach(s=>{
       if(s.enabled && s.start && !isExternal(s.name)){
@@ -1356,7 +1431,7 @@ function computeGlobalSchedule(){
 
   // Phase 2 — dispatch jobs earliest-due-date first, forward-schedule each
   const farFuture = new Date('2999-01-01');
-  const sorted = [...orders].sort((a,b)=>{
+  const sorted = orders.filter(r=>!r.archived).sort((a,b)=>{
     const ad = a.due ? new Date(a.due+'T00:00:00') : farFuture;
     const bd = b.due ? new Date(b.due+'T00:00:00') : farFuture;
     return ad - bd;
@@ -1532,7 +1607,7 @@ window.schedToday = () => {
 function gatherScheduledSteps(){
   // returns [{order, name, start, end, color}]
   const out = [];
-  orders.forEach(r=>{
+  orders.filter(r=>!r.archived).forEach(r=>{
     const steps = computeStepDates(r);
     steps.forEach(s=>{
       out.push({order:r, name:s.name, start:s.start, end:s.end, color:PROCESS_COLORS[s.name]||'#888'});
@@ -1601,7 +1676,7 @@ function renderGantt(){
   const today=new Date(); today.setHours(0,0,0,0);
 
   // only orders with at least one enabled step
-  const jobs = orders.filter(r=>{const s=ensureSchedule(r);return s.steps.some(x=>x.enabled);});
+  const jobs = orders.filter(r=>!r.archived && ensureSchedule(r).steps.some(x=>x.enabled));
 
   // header days
   let head=`<div class="gantt-head"><div class="gantt-label-col">Job</div><div class="gantt-days">`;
