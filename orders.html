@@ -254,6 +254,23 @@ tr:hover .del-btn{opacity:1}
 </head>
 <body>
 
+<!-- Login gate -->
+<div id="login-overlay" style="display:none;position:fixed;inset:0;background:var(--navy);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--card);border-radius:16px;padding:32px;width:360px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,0.3)">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:700;color:var(--text)"><span style="color:var(--green)">BSMP</span> Order Tracker</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px">Sign in to continue</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <input id="login-email" type="email" placeholder="Email" autocomplete="username" style="font-size:14px;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;font-family:inherit;outline:none">
+      <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password" style="font-size:14px;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;font-family:inherit;outline:none">
+      <div id="login-error" style="font-size:12px;color:var(--red);min-height:14px"></div>
+      <button id="login-btn" class="btn green" style="height:40px;font-size:14px;justify-content:center" onclick="window._login()">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<div id="app-root" style="display:none;flex:1;min-height:100vh;width:100%">
 <!-- Sidebar -->
 <nav class="sidebar">
   <div class="sidebar-logo">
@@ -291,7 +308,8 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.0.0</div>
+    <div class="ver">v2.1.0</div>
+    <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
 
@@ -421,9 +439,10 @@ tr:hover .del-btn{opacity:1}
         </div>
       </div>
     </div>
-  </div>
-</div>
-</div>
+  </div><!-- /settings-page -->
+  </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app-root -->
 
 <!-- Add/Edit Modal -->
 <div class="modal-bg" id="add-modal" style="display:none">
@@ -537,6 +556,7 @@ tr:hover .del-btn{opacity:1}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, ref, onValue, set, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
@@ -550,6 +570,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const storage = getStorage(app);
+const auth = getAuth(app);
 const ordersRef = ref(db, 'orders');
 
 const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
@@ -586,15 +607,24 @@ let orders=[], expanded=new Set(), collapsedGroups=new Set();
 let _didInitCollapse=false;
 let sortKey='', sortDir=1, editId=null, aiParsed=[];
 let saveTimeout=null;
+let _listenersStarted=false;
 
-onValue(ordersRef, (snap) => {
-  const data = snap.val();
-  orders = data ? Object.values(data) : [];
-  setSyncStatus('live'); render();
-}, () => setSyncStatus('error'));
+function startDataListeners(){
+  if(_listenersStarted) return;
+  _listenersStarted = true;
+  onValue(ordersRef, (snap) => {
+    const data = snap.val();
+    orders = data ? Object.values(data) : [];
+    setSyncStatus('live'); render();
+  }, () => setSyncStatus('error'));
+  startCustomerListener();
+  startDurationsListener();
+  startJobCounterListener();
+}
 
 function setSyncStatus(s) {
   const dot=document.getElementById('sync-dot'), lbl=document.getElementById('sync-label');
+  if(!dot||!lbl) return;
   if(s==='live'){dot.className='sync-dot live';lbl.textContent='Live';}
   else if(s==='saving'){dot.className='sync-dot saving';lbl.textContent='Saving…';}
   else{dot.className='sync-dot';lbl.textContent='Offline';}
@@ -984,12 +1014,14 @@ const customersRef = ref(db, 'customers');
 let customers = [];
 let editCustomerId = null;
 
-onValue(customersRef, (snap) => {
-  const data = snap.val();
-  customers = data ? Object.values(data) : [];
-  renderCustomers();
-  populateCustomerDropdown();
-});
+function startCustomerListener(){
+  onValue(customersRef, (snap) => {
+    const data = snap.val();
+    customers = data ? Object.values(data) : [];
+    renderCustomers();
+    populateCustomerDropdown();
+  });
+}
 
 function saveCustomersDB() {
   const obj = {};
@@ -1123,21 +1155,25 @@ window.showPage = (page) => {
 
 // ── Durations Firebase sync ───────────────────────────────────────────────────
 const durationsRef = ref(db, 'durations');
-onValue(durationsRef, (snap) => {
-  const data = snap.val();
-  if(data) durations = {...DEFAULT_DURATIONS, ...data};
-  invalidateSched();
-  if(document.getElementById('settings-page')?.style.display==='block') renderDurationSettings();
-});
+function startDurationsListener(){
+  onValue(durationsRef, (snap) => {
+    const data = snap.val();
+    if(data) durations = {...DEFAULT_DURATIONS, ...data};
+    invalidateSched();
+    if(document.getElementById('settings-page')?.style.display==='block') renderDurationSettings();
+  });
+}
 
 // ── Internal job numbering (format: letter + 2 digits + -line, e.g. U22-1) ─────
 let jobCounter = { letter:'U', num:22 };   // next BASE to assign
 const jobCounterRef = ref(db, 'jobCounter');
-onValue(jobCounterRef, (snap) => {
-  const data = snap.val();
-  if(data && data.letter && data.num!=null) jobCounter = {letter:data.letter, num:data.num};
-  if(document.getElementById('settings-page')?.style.display==='block') renderDurationSettings();
-});
+function startJobCounterListener(){
+  onValue(jobCounterRef, (snap) => {
+    const data = snap.val();
+    if(data && data.letter && data.num!=null) jobCounter = {letter:data.letter, num:data.num};
+    if(document.getElementById('settings-page')?.style.display==='block') renderDurationSettings();
+  });
+}
 function saveJobCounter(){ set(jobCounterRef, jobCounter); }
 function baseToString(letter, num){ return letter + String(num).padStart(2,'0'); }
 function nextLetter(L){ let c=L.charCodeAt(0)+1; if(c>90) c=65; return String.fromCharCode(c); }
@@ -1609,6 +1645,41 @@ function renderGantt(){
 window.openEditFromSchedule = (id) => { showPage('orders'); setTimeout(()=>openEdit(id),50); };
 
 document.getElementById('filter-process').innerHTML='<option value="">All processes</option>'+PROCESSES.map(p=>`<option>${p}</option>`).join('');
+
+// ── Authentication gate ───────────────────────────────────────────────────────
+const loginOverlay = document.getElementById('login-overlay');
+const appRoot = document.getElementById('app-root');
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    loginOverlay.style.display = 'none';
+    appRoot.style.display = 'flex';
+    startDataListeners();
+  } else {
+    loginOverlay.style.display = 'flex';
+    appRoot.style.display = 'none';
+  }
+});
+
+window._login = async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+  }catch(e){
+    err.textContent = (e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found')
+      ? 'Incorrect email or password.' : ('Sign-in error: '+e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+};
+window._logout = () => { signOut(auth); };
+document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window._login(); });
 </script>
 </body>
 </html>
