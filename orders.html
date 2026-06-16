@@ -326,6 +326,7 @@ tr:hover .del-btn{opacity:1}
         <option value="customer">Group by Customer</option>
         <option value="none">No Grouping</option>
       </select>
+      <button class="btn" onclick="toggleAllGroups()" id="expand-toggle-btn"><i class="ti ti-arrows-diagonal"></i> Expand all</button>
     </div>
 
     <div class="table-card">
@@ -552,6 +553,7 @@ let durations = {...DEFAULT_DURATIONS};
 const PAY_CLASS = {Unpaid:'pay-unpaid',Partial:'pay-partial',Paid:'pay-paid'};
 
 let orders=[], expanded=new Set(), collapsedGroups=new Set();
+let _didInitCollapse=false;
 let sortKey='', sortDir=1, editId=null, aiParsed=[];
 let saveTimeout=null;
 
@@ -606,6 +608,7 @@ function render(){
     const keyFn=mode==='po'?r=>(r.customer+'||'+(r.po||'verbal')):r=>r.customer;
     const groups=new Map();
     rows.forEach(r=>{const k=keyFn(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);});
+    if(!_didInitCollapse && groups.size){ groups.forEach((_,k)=>collapsedGroups.add(k)); _didInitCollapse=true; }
     let gi=0;
     groups.forEach((items,gk)=>{
       const collapsed=collapsedGroups.has(gk);
@@ -824,6 +827,19 @@ window.exportExcel=async()=>{
 
 window.setFilter=(status)=>{showPage('orders');document.getElementById('filter-status').value=status;render();};
 window.setGroupMode=(mode)=>{showPage('orders');document.getElementById('group-mode').value=mode;render();};
+window.toggleAllGroups=()=>{
+  const mode=document.getElementById('group-mode').value;
+  if(mode==='none')return;
+  const keyFn=mode==='po'?r=>(r.customer+'||'+(r.po||'verbal')):r=>r.customer;
+  const allKeys=new Set(filteredOrders().map(keyFn));
+  // if any group is currently expanded (not in collapsedGroups), collapse all; else expand all
+  const anyExpanded=[...allKeys].some(k=>!collapsedGroups.has(k));
+  if(anyExpanded){ allKeys.forEach(k=>collapsedGroups.add(k)); }
+  else { allKeys.forEach(k=>collapsedGroups.delete(k)); }
+  const btn=document.getElementById('expand-toggle-btn');
+  if(btn) btn.innerHTML = anyExpanded ? '<i class="ti ti-arrows-diagonal"></i> Expand all' : '<i class="ti ti-arrows-diagonal-minimize-2"></i> Collapse all';
+  render();
+};
 
 document.querySelectorAll('th[data-key]').forEach(th=>th.addEventListener('click',()=>{const k=th.dataset.key;if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=1;}document.querySelectorAll('th').forEach(t=>t.classList.remove('sorted'));th.classList.add('sorted');render();}));
 
