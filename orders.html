@@ -284,8 +284,69 @@ tr:hover .del-btn{opacity:1}
 .sched-step.ss-on .ss-toggle{color:var(--green)}
 .sched-step.ss-off{opacity:.5}
 
+/* ── View toggle ── */
+.view-toggle{display:inline-flex;border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:#f7f9fc;margin-left:auto}
+.view-toggle button{height:34px;padding:0 13px;font-size:12px;font-weight:600;border:none;background:transparent;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:inherit;transition:all .15s}
+.view-toggle button.active{background:var(--navy);color:#fff}
+.view-toggle button:not(.active):hover{background:var(--bg);color:var(--text)}
+.view-toggle button i{font-size:15px}
+
+/* ── Sort bar (card view) ── */
+.sortbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.sortbar .sort-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-right:2px}
+.sort-chip{height:40px;padding:0 16px;font-size:13px;font-weight:600;border-radius:12px;border:1px solid var(--border2);background:var(--card);color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;transition:all .15s;box-shadow:var(--shadow)}
+.sort-chip:hover{border-color:var(--green);color:var(--text)}
+.sort-chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.sort-chip i{font-size:16px}
+.sort-chip .sort-dir{font-size:13px;opacity:.85;font-weight:700}
+
+/* ── PO cards grid ── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;align-items:start}
+.po-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .08s}
+.po-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.10),0 6px 22px rgba(0,0,0,0.08)}
+.po-card:active{transform:scale(.997)}
+.po-card.expanded{grid-column:1 / -1}
+.po-card .card-accent{position:absolute;left:0;top:0;bottom:0;width:5px}
+.card-head{padding:15px 16px 14px 22px}
+.card-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:13px}
+.card-cust{font-size:15px;font-weight:700;color:var(--text);line-height:1.15}
+.card-po-chip{font-size:11px;font-weight:600;color:#46506a;background:#dde5f1;border-radius:6px;padding:2px 8px}
+.card-count{font-size:11px;font-weight:600;color:var(--text2);background:#fff;border:1px solid var(--border2);border-radius:10px;padding:1px 9px}
+.card-overdue{margin-left:auto;color:var(--red);font-size:11px;font-weight:700;white-space:nowrap}
+.card-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.card-stat{display:flex;flex-direction:column;gap:3px;min-width:0}
+.card-stat .cs-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3)}
+.card-stat .cs-val{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-stat .cs-val small{font-size:11px;font-weight:600;color:var(--text3);margin-left:3px}
+.card-foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:13px;padding-right:18px}
+.card-foot .status-badge{cursor:default;pointer-events:none}
+.card-chevron{position:absolute;right:13px;bottom:11px;font-size:20px;font-weight:700;color:var(--text3);transition:transform .18s;line-height:1}
+.po-card.expanded .card-chevron{transform:rotate(90deg)}
+
+.card-items{border-top:1px solid var(--border);background:#f7f9fc;padding:4px 12px 10px;cursor:default}
+.ci-row{display:grid;grid-template-columns:58px 1fr 40px 92px 132px;gap:8px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer}
+.ci-row:last-child{border-bottom:none}
+.ci-row.expanded-line{background:#eef2f8;border-radius:8px}
+.ci-row:hover{background:#eef2f8;border-radius:8px}
+.ci-job{font-weight:700;color:var(--text2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-desc{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-qty{text-align:center;color:var(--text2);font-weight:600}
+.ci-due{font-size:11px;color:var(--text2);white-space:nowrap}
+.ci-due small{color:var(--text3);margin-left:3px}
+.ci-row .status-badge{justify-self:start;font-size:10px;padding:2px 8px}
+.ci-detail{background:#fff;border-bottom:1px solid var(--border);border-radius:0 0 8px 8px;margin-bottom:2px}
+.ci-detail .detail-inner{padding:12px 14px 14px}
+
+@media(max-width:900px){
+  .detail-inner{grid-template-columns:1fr}
+  .ci-row{grid-template-columns:50px 1fr 60px;gap:6px}
+  .ci-row .ci-due,.ci-row .status-badge{display:none}
+}
+
 @media print{
-  .sidebar,.filterbar,.topbar-actions,.del-btn,.group-chevron,.no-print{display:none!important}
+  .sidebar,.filterbar,.sortbar,.view-toggle,.topbar-actions,.del-btn,.group-chevron,.card-chevron,.no-print{display:none!important}
+  #cards{display:block!important}
+  .po-card{break-inside:avoid;box-shadow:none;border:1px solid #ccc;margin-bottom:8px}
   body{background:#fff}
   .main{width:100%}
   .table-card{box-shadow:none;border:1px solid #ccc}
@@ -355,7 +416,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.10.0</div>
+    <div class="ver">v2.11.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -388,15 +449,25 @@ tr:hover .del-btn{opacity:1}
         <option>Completed</option><option>Need Purchase Order</option>
       </select>
       <select id="filter-process"><option value="">All processes</option></select>
-      <select id="group-mode">
-        <option value="po">Group by PO</option>
-        <option value="customer">Group by Customer</option>
-        <option value="none">No Grouping</option>
-      </select>
-      <button class="btn" onclick="toggleAllGroups()" id="expand-toggle-btn"><i class="ti ti-arrows-diagonal"></i> Expand all</button>
+      <span class="table-only-controls" style="display:flex;gap:8px;align-items:center">
+        <select id="group-mode">
+          <option value="po">Group by PO</option>
+          <option value="customer">Group by Customer</option>
+          <option value="none">No Grouping</option>
+        </select>
+        <button class="btn" onclick="toggleAllGroups()" id="expand-toggle-btn"><i class="ti ti-arrows-diagonal"></i> Expand all</button>
+      </span>
+      <div class="view-toggle">
+        <button id="vt-card" onclick="setViewMode('card')"><i class="ti ti-layout-grid"></i> Cards</button>
+        <button id="vt-table" onclick="setViewMode('table')"><i class="ti ti-table"></i> Table</button>
+      </div>
     </div>
 
-    <div class="table-card">
+    <!-- Card view: sort bar + grid -->
+    <div class="sortbar no-print" id="sortbar"></div>
+    <div class="cards-grid" id="cards"><div class="loading-row" style="grid-column:1/-1"><div class="spinner"></div><br>Connecting to database…</div></div>
+
+    <div class="table-card" id="table-view" style="display:none">
       <div class="table-card-header">
         <i class="ti ti-clipboard-list"></i>
         <span>Active Orders</span>
@@ -749,6 +820,8 @@ const PAY_CLASS = {Unpaid:'pay-unpaid',Partial:'pay-partial',Paid:'pay-paid'};
 let orders=[], expanded=new Set(), collapsedGroups=new Set();
 let _didInitCollapse=false;
 let sortKey='', sortDir=1, editId=null, aiParsed=[];
+let viewMode='card';                 // 'card' | 'table' — card is the default (iPad-friendly)
+let cardSortKey='due', cardSortDir=1; // due | customer | value | status | newest
 let saveTimeout=null;
 let _listenersStarted=false;
 
@@ -800,10 +873,20 @@ function filteredOrders(){
 
 function render(){
   invalidateSched();
+  // toggle which view is visible
+  const isCard = viewMode==='card';
+  const tv=document.getElementById('table-view'), cg=document.getElementById('cards'), sb=document.getElementById('sortbar');
+  if(tv) tv.style.display = isCard?'none':'';
+  if(cg) cg.style.display = isCard?'':'none';
+  if(sb) sb.style.display = isCard?'':'none';
+  document.querySelectorAll('.table-only-controls').forEach(e=>e.style.display = isCard?'none':'');
+  document.getElementById('vt-card')?.classList.toggle('active', isCard);
+  document.getElementById('vt-table')?.classList.toggle('active', !isCard);
+  renderSummary();
+  if(isCard){ renderCards(); return; }
   const rows=filteredOrders();
   const mode=document.getElementById('group-mode').value;
   const tbody=document.getElementById('tbody');
-  renderSummary();
   if(!rows.length){tbody.innerHTML=`<tr><td colspan="14"><div class="empty-state"><i class="ti ti-clipboard-list"></i><p>No orders yet — click Add Order or use AI Extract</p></div></td></tr>`;return;}
   let html='';
   if(mode==='none'){
@@ -855,6 +938,147 @@ function render(){
   tbody.innerHTML=html;
 }
 
+// ── Card / Tile view (one card per PO) ───────────────────────────────────────
+const CARD_SORTS=[
+  {key:'due',      label:'Due Date', icon:'calendar-due'},
+  {key:'customer', label:'Customer', icon:'user'},
+  {key:'value',    label:'Value',    icon:'currency-dollar'},
+  {key:'status',   label:'Status',   icon:'flag'},
+  {key:'newest',   label:'Newest',   icon:'sparkles'},
+];
+const STATUS_SORT_ORDER={'Need Purchase Order':0,'Confirmed':1,'In Progress':2,'QC':3,'Ready for Invoice':4,'Invoiced':5,'Completed':6};
+
+function renderSortbar(){
+  const sb=document.getElementById('sortbar'); if(!sb) return;
+  sb.innerHTML=`<span class="sort-label">Sort by</span>`+CARD_SORTS.map(s=>{
+    const active=s.key===cardSortKey;
+    const arrow=active?`<span class="sort-dir">${cardSortDir===1?'↓':'↑'}</span>`:'';
+    return `<button class="sort-chip${active?' active':''}" onclick="window._cardSort('${s.key}')"><i class="ti ti-${s.icon}"></i> ${s.label}${arrow}</button>`;
+  }).join('');
+}
+
+function poGroups(){
+  // build one group per Customer + PO, with rollup stats
+  const rows=orders.filter(r=>!r.archived);
+  const q=document.getElementById('search').value.toLowerCase();
+  const sf=document.getElementById('filter-status').value;
+  const pf=document.getElementById('filter-process').value;
+  let live=rows;
+  if(q) live=live.filter(r=>[r.customer,r.po,r.job,r.part,r.desc,r.invoice].join(' ').toLowerCase().includes(q));
+  if(sf) live=live.filter(r=>r.status===sf);
+  if(pf) live=live.filter(r=>r.currentProcess===pf||(r.completedProcesses||[]).includes(pf));
+  const map=new Map();
+  live.forEach(r=>{const k=r.customer+'||'+(r.po||'verbal');if(!map.has(k))map.set(k,[]);map.get(k).push(r);});
+  const groups=[];
+  map.forEach((items,gk)=>{
+    const gtotal=items.reduce((s,r)=>s+rowTotal(r),0);
+    const gqty=items.reduce((s,r)=>s+(parseFloat(r.qty)||0),0);
+    const statuses=[...new Set(items.map(r=>r.status||'Confirmed'))];
+    const overdue=items.some(r=>{const d=daysUntil(r.due);return d!==null&&d<0&&!['Completed','Invoiced'].includes(r.status);});
+    const dueList=items.map(r=>r.due).filter(Boolean).sort();
+    const gdue=dueList[0]||'';
+    const gdays=gdue?daysUntil(gdue):null;
+    const dueOverdue=gdays!==null&&gdays<0&&!items.every(r=>['Completed','Invoiced'].includes(r.status));
+    const pays=items.map(r=>r.payment||'Unpaid');
+    const payRoll=pays.every(p=>p==='Paid')?'Paid':(pays.every(p=>p==='Unpaid')?'Unpaid':'Partial');
+    const newest=items.reduce((m,r)=>{const v=r.ordered||r.id||'';return v>m?v:m;},'');
+    // line items ordered by due date then job for the expanded list
+    const sortedItems=[...items].sort((a,b)=>((a.due||'9999')+'').localeCompare((b.due||'9999')+'')||((a.job||'')+'').localeCompare((b.job||''))); 
+    groups.push({gk,items:sortedItems,customer:items[0].customer||'',po:items[0].po||'verbal',
+      gtotal,gqty,statuses,overdue,gdue,gdays,dueOverdue,payRoll,newest});
+  });
+  return groups;
+}
+
+function sortGroups(groups){
+  const dir=cardSortDir;
+  return groups.sort((a,b)=>{
+    let c=0;
+    switch(cardSortKey){
+      case 'customer': c=a.customer.localeCompare(b.customer); break;
+      case 'value':    c=b.gtotal-a.gtotal; break;
+      case 'status':   c=(STATUS_SORT_ORDER[a.statuses[0]]??99)-(STATUS_SORT_ORDER[b.statuses[0]]??99); break;
+      case 'newest':   c=(b.newest>a.newest?1:b.newest<a.newest?-1:0); break;
+      case 'due':
+      default:
+        if(!a.gdue&&!b.gdue)c=0; else if(!a.gdue)return 1; else if(!b.gdue)return -1;
+        else c=a.gdue<b.gdue?-1:a.gdue>b.gdue?1:0;
+    }
+    if(c===0) c=a.customer.localeCompare(b.customer);
+    return c*dir;
+  });
+}
+
+function cardDaysLabel(days){
+  if(days===null) return '';
+  if(days<0) return `<small style="color:var(--red)">${-days}d ago</small>`;
+  if(days===0) return `<small style="color:var(--amber)">today</small>`;
+  return `<small>+${days}d</small>`;
+}
+
+function renderCards(){
+  renderSortbar();
+  const cg=document.getElementById('cards'); if(!cg) return;
+  let groups=poGroups();
+  if(!groups.length){
+    cg.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><i class="ti ti-clipboard-list"></i><p>No orders match — click Add Order or use AI Extract</p></div>`;
+    return;
+  }
+  if(!_didInitCollapse){ groups.forEach(g=>collapsedGroups.add(g.gk)); _didInitCollapse=true; }
+  groups=sortGroups(groups);
+  cg.innerHTML=groups.map(g=>{
+    const expandedCard=!collapsedGroups.has(g.gk);
+    const accColor=STATUS_ACCENT[g.statuses[0]]||'#9aa3b2';
+    const gkE=g.gk.replace(/'/g,"\\'");
+    const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
+    const dueValStyle=g.dueOverdue?'color:var(--red)':'';
+    const dueVal=g.gdue?`${fmtDate(g.gdue)} ${cardDaysLabel(g.gdays)}`:'—';
+    let itemsHtml='';
+    if(expandedCard){
+      itemsHtml=`<div class="card-items" onclick="event.stopPropagation()">`+g.items.map(r=>{
+        const days=daysUntil(r.due);
+        const clip=r.drawing&&r.drawing.url?'<i class="ti ti-paperclip" style="font-size:11px;color:var(--blue);margin-right:3px"></i>':'';
+        const det=expanded.has(r.id)?`<div class="ci-detail">${detailInner(r)}</div>`:'';
+        return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}" onclick="window._tl('${r.id}',event)">
+          <span class="ci-job">${r.job||'—'}</span>
+          <span class="ci-desc" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}">${clip}${r.desc||r.part||'<span style="color:var(--text3)">(no description)</span>'}</span>
+          <span class="ci-qty">${r.qty||''}</span>
+          <span class="ci-due">${r.due?fmtDate(r.due):'—'}${r.due?' '+cardDaysLabel(days):''}</span>
+          <span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span>
+        </div>${det}`;
+      }).join('')+`</div>`;
+    }
+    return `<div class="po-card${expandedCard?' expanded':''}" onclick="window._tcard('${gkE}')">
+      <div class="card-accent" style="background:${accColor}"></div>
+      <div class="card-head">
+        <div class="card-title-row">
+          <span class="card-cust">${g.customer||'—'}</span>
+          <span class="card-po-chip">PO #${g.po}</span>
+          <span class="card-count">${g.items.length} item${g.items.length!==1?'s':''}</span>
+          ${g.overdue?`<span class="card-overdue">● Overdue</span>`:''}
+        </div>
+        <div class="card-stats">
+          <div class="card-stat"><span class="cs-label">Total Qty</span><span class="cs-val">${g.gqty||'—'}</span></div>
+          <div class="card-stat"><span class="cs-label">PO Value</span><span class="cs-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
+          <div class="card-stat"><span class="cs-label">Earliest Due</span><span class="cs-val" style="${dueValStyle}">${dueVal}</span></div>
+        </div>
+        <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${g.payRoll}</span></div>
+      </div>
+      <span class="card-chevron">›</span>
+      ${itemsHtml}
+    </div>`;
+  }).join('');
+}
+
+window.setViewMode=(m)=>{ viewMode=m; render(); };
+window._cardSort=(key)=>{
+  if(cardSortKey===key) cardSortDir*=-1;
+  else { cardSortKey=key; cardSortDir=1; }
+  render();
+};
+window._tcard=(gk)=>{ if(collapsedGroups.has(gk))collapsedGroups.delete(gk); else collapsedGroups.add(gk); render(); };
+
+
 function lineRow(r,ind){
   const days=daysUntil(r.due), total=rowTotal(r), pay=r.payment||'Unpaid';
   const showPay=['Invoiced','Ready for Invoice'].includes(r.status);
@@ -876,7 +1100,8 @@ function lineRow(r,ind){
   </tr>`;
 }
 
-function detailRow(r){
+function detailRow(r){return`<tr class="detail-row"><td colspan="14">${detailInner(r)}</td></tr>`;}
+function detailInner(r){
   const done=r.completedProcesses||[];
   const procBtns=(list)=>list.map(p=>{
     const isDone=done.includes(p),isActive=r.currentProcess===p;
@@ -923,7 +1148,7 @@ function detailRow(r){
   const addBtns=(list)=>list.filter(p=>!sch.steps.find(s=>s.name===p&&s.enabled))
     .map(p=>`<button class="proc-btn" onclick="window._toggleStep('${r.id}','${p}',event)"><i class="ti ti-plus" style="font-size:11px"></i> ${p}</button>`).join('');
   const subLabel=(t)=>`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:8px 0 4px">${t}</div>`;
-  return`<tr class="detail-row"><td colspan="14"><div class="detail-inner">
+  return`<div class="detail-inner">
     <div class="detail-section">
       <div class="detail-label">Current Process</div>
       ${subLabel('Internal')}
@@ -954,7 +1179,7 @@ function detailRow(r){
       <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i> Archive order</button>
       <button class="btn sm green" style="margin-top:8px;align-self:flex-start" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i> Customer Confirmation</button>
     </div>
-  </div></td></tr>`;
+  </div>`;
 }
 
 // Normalize a Google Drive share link into a direct-view/preview URL
