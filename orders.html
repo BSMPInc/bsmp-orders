@@ -277,6 +277,29 @@ tr:hover .del-btn{opacity:1}
 .io-empty i{font-size:26px;opacity:.4;display:block;margin-bottom:6px}
 .io-empty div{font-size:12.5px;font-weight:700;color:var(--text2);margin-bottom:2px}
 .io-empty span{font-size:11px}
+.io-vend{color:#2f6e8f;font-weight:600}
+.btn.blue{background:#3a6ea5;color:#fff;border-color:#3a6ea5}.btn.blue:hover{background:#315e8c}
+/* Step-detail dialog */
+.iod-head{display:flex;align-items:center;gap:11px;padding:14px 16px;color:#fff}
+.iod-ic{width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.18);border-radius:8px}
+.iod-ic svg{width:20px;height:20px}
+.iod-htext{flex:1;min-width:0}
+.iod-title{font-size:16px;font-weight:800;line-height:1.1}
+.iod-sub{font-size:11px;opacity:.88;margin-top:2px}
+.iod-prio{font-size:10px;font-weight:800;padding:3px 8px;border-radius:20px;color:#fff;white-space:nowrap}
+.iod-x{background:rgba(255,255,255,.18);border:none;color:#fff;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:16px;display:inline-flex;align-items:center;justify-content:center}
+.iod-x:hover{background:rgba(255,255,255,.32)}
+.iod-body{padding:14px 16px;max-height:58vh;overflow:auto}
+.iod-sect{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:15px 0 7px;border-bottom:1px solid var(--border);padding-bottom:4px}
+.iod-sect:first-child{margin-top:0}
+.iod-row{display:flex;gap:12px;padding:3px 0;font-size:13px}
+.iod-k{width:118px;flex-shrink:0;color:var(--text2)}
+.iod-v{flex:1;min-width:0;color:var(--text);font-weight:600;word-break:break-word}
+.iod-field{margin:9px 0}
+.iod-field label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px}
+.iod-field input{width:100%;box-sizing:border-box}
+.iod-saved{font-size:11px;color:#2f8f6b;font-weight:700;opacity:0;transition:opacity .3s;height:14px;margin-top:2px}
+.iod-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:#fff}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-month{font-size:16px;font-weight:700;min-width:170px;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -480,7 +503,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.23.0</div>
+    <div class="ver">v2.24.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -693,6 +716,13 @@ tr:hover .del-btn{opacity:1}
       <button class="btn" id="cd-cancel" onclick="closeModal('confirm-done-modal')">Cancel</button>
       <button class="btn green" id="cd-yes"><i class="ti ti-check"></i> Yes, mark complete</button>
     </div>
+  </div>
+</div>
+
+<!-- External step detail (Incoming/Outgoing board) -->
+<div class="modal-bg" id="io-detail-modal" style="display:none;z-index:68">
+  <div class="modal" style="max-width:470px;padding:0;overflow:hidden">
+    <div id="io-detail-body"></div>
   </div>
 </div>
 
@@ -2228,7 +2258,7 @@ function computeGlobalSchedule(){
       }
       const start = s.start ? atWorkStart(new Date(s.start+'T00:00:00')) : normalizeStart(new Date(earliestNext));
       const end = addBusinessDays(start, dur);
-      out.push({name:s.name, start, end, duration:dur, unit:'d', external:true, manual:!!s.start, done:false, sentAt:s.sentAt||null, receivedAt:s.receivedAt||null});
+      out.push({name:s.name, start, end, duration:dur, unit:'d', external:true, manual:!!s.start, done:false, sentAt:s.sentAt||null, receivedAt:s.receivedAt||null, vendor:s.vendor||'', vendorPO:s.vendorPO||''});
       earliestNext = new Date(Math.max(earliestNext.getTime(), end.getTime()));
     });
     result.set(r.id, out);
@@ -2277,6 +2307,77 @@ window.undoSent = (id, name, e) => {
   s.sentAt=null;
   saveDB(); invalidateSched(); render(); renderSchedule();
 };
+
+// Focused dialog for one external step: order info + process + vendor + our PO.
+window.openStepDetail = (orderId, stepName) => {
+  const r = orders.find(o=>o.id===orderId); if(!r) return;
+  const step = _extStep(orderId, stepName); if(!step) return;
+  const c = computeStepDates(r).find(s=>s.name===stepName) || {};
+  const k = extKind(stepName), isOut = k.group==='outsource';
+  const col = PROCESS_COLORS[stepName]||'#888';
+  const today=new Date(); today.setHours(0,0,0,0);
+  const st = c.start ? ioStatus({start:c.start,end:c.end,sentAt:step.sentAt,kind:k}, today) : {label:'Not scheduled',c:'#888'};
+  const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const sentWord=isOut?'Sent':'Ordered', backWord=isOut?'Back':'In', sendVerb=isOut?'Sent':'Ordered';
+  const outDate = step.sentAt ? fmtDate(step.sentAt) : (c.start?fmtDate(toISO(c.start)):'—');
+  const backDate = c.end ? fmtDate(toISO(c.end)) : '—';
+  const pr = (r.priority==null?2:r.priority);
+
+  const info = (lbl,val)=>`<div class="iod-row"><span class="iod-k">${lbl}</span><span class="iod-v">${val||'—'}</span></div>`;
+  const actLbl=step.sentAt?(isOut?'Mark Received':'Mark In'):(isOut?'Mark Sent':'Mark Ordered');
+  const actFn=step.sentAt?'_iodRecv':'_iodSend';
+
+  document.getElementById('io-detail-body').innerHTML = `
+    <div class="iod-head" style="background:${col}">
+      <span class="iod-ic">${procIcon(stepName,20)}</span>
+      <div class="iod-htext">
+        <div class="iod-title">${shortProc(stepName)}</div>
+        <div class="iod-sub">${isOut?'Outgoing — sent to a vendor':'Incoming — on order / arriving'}</div>
+      </div>
+      <span class="iod-prio" style="background:${PRIORITY_COLOR[pr]}">${PRIORITY_LABEL[pr]}</span>
+      <button class="iod-x" onclick="closeModal('io-detail-modal')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="iod-body">
+      <div class="iod-sect">Order</div>
+      ${info('Part #', esc(r.part)||esc(r.desc))}
+      ${info('Description', esc(r.desc))}
+      ${info('Customer', esc(r.customer))}
+      ${info('Customer PO', r.po?esc(r.po):'—')}
+      ${info('Job #', esc(r.job))}
+      ${info('Qty', r.qty||'—')}
+      ${info('Due', r.due?fmtDate(r.due):'—')}
+
+      <div class="iod-sect">Process status</div>
+      ${info('Process', shortProc(stepName))}
+      ${info('Status', `<span class="io-status" style="color:${st.c};background:${st.c}1a">${st.label}</span>`)}
+      ${info(isOut?'Out / Back':'Order / In', `${sendVerb} ${outDate} → ${backWord} ${backDate}`)}
+
+      <div class="iod-sect">Vendor — our PO to them</div>
+      <div class="iod-field"><label>Vendor performing this process</label>
+        <input id="iod-vendor" type="text" placeholder="e.g. Acme Plating" value="${esc(step.vendor)}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
+      <div class="iod-field"><label>Our PO # to ${isOut?'vendor':'supplier'}</label>
+        <input id="iod-vpo" type="text" placeholder="PO we issued to them" value="${esc(step.vendorPO)}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
+      <div id="iod-saved" class="iod-saved">Saved ✓</div>
+    </div>
+    <div class="iod-actions">
+      ${step.sentAt?`<button class="btn" onclick="_iodUndo('${orderId}','${stepName}')">Undo ${sentWord.toLowerCase()}</button>`:'<span></span>'}
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="closeModal('io-detail-modal')">Close</button>
+        <button class="btn ${step.sentAt?'green':'blue'}" onclick="${actFn}('${orderId}','${stepName}')">${actLbl}</button>
+      </div>
+    </div>`;
+  document.getElementById('io-detail-modal').style.display='flex';
+};
+window._iodSaveVendor = (id,name)=>{
+  const s=_extStep(id,name); if(!s) return;
+  s.vendor=(document.getElementById('iod-vendor').value||'').trim();
+  s.vendorPO=(document.getElementById('iod-vpo').value||'').trim();
+  saveDB(); render(); renderSchedule();
+  const tick=document.getElementById('iod-saved'); if(tick){ tick.style.opacity='1'; setTimeout(()=>tick.style.opacity='0',1200); }
+};
+window._iodSend = (id,name)=>{ _iodSaveVendor(id,name); markSent(id,name); openStepDetail(id,name); };
+window._iodRecv = (id,name)=>{ _iodSaveVendor(id,name); markReceived(id,name); closeModal('io-detail-modal'); };
+window._iodUndo = (id,name)=>{ undoSent(id,name); openStepDetail(id,name); };
 
 window._toggleStep = (id, name, e) => {
   e.stopPropagation();
@@ -2545,7 +2646,7 @@ function gatherExternalSteps(){
   orders.filter(r=>!r.archived && !isDoneRow(r)).forEach(r=>{
     computeStepDates(r).forEach(s=>{
       if(s.done) return;
-      out.push({order:r, name:s.name, start:s.start, end:s.end, sentAt:s.sentAt, kind:extKind(s.name)});
+      out.push({order:r, name:s.name, start:s.start, end:s.end, sentAt:s.sentAt, vendor:s.vendor||'', vendorPO:s.vendorPO||'', kind:extKind(s.name)});
     });
   });
   return out;
@@ -2588,13 +2689,14 @@ function renderBoard(){
         const st=ioStatus(it,today), k=it.kind;
         const label=(r.part||r.desc||'—');
         const sentWord=isOut?'Sent':'Ordered', backWord=cap(k.b);
+        const vend = it.vendor ? ` · <span class="io-vend">${it.vendor}${it.vendorPO?' (PO '+it.vendorPO+')':''}</span>` : '';
         const dateLine = it.sentAt
-          ? `<span class="io-undo" onclick="undoSent('${r.id}','${name}',event)" title="Click to undo">${sentWord} ${fmtDate(it.sentAt)}</span> · ${backWord} ~${fmtDate(toISO(it.end))}`
-          : `${cap(k.a)} ${fmtDate(toISO(it.start))} → ${backWord} ${fmtDate(toISO(it.end))}`;
+          ? `<span class="io-undo" onclick="undoSent('${r.id}','${name}',event)" title="Click to undo">${sentWord} ${fmtDate(it.sentAt)}</span> · ${backWord} ~${fmtDate(toISO(it.end))}${vend}`
+          : `${cap(k.a)} ${fmtDate(toISO(it.start))} → ${backWord} ${fmtDate(toISO(it.end))}${vend}`;
         const actCls=it.sentAt?'recv':'send';
         const actLbl=it.sentAt?(isOut?'Receive':'Mark in'):(isOut?'Send':'Order');
         const actFn=it.sentAt?'markReceived':'markSent';
-        return `<div class="io-item" onclick="openEditFromSchedule('${r.id}')" title="${(r.customer||'').replace(/"/g,'&quot;')} — ${shortProc(name)}">
+        return `<div class="io-item" onclick="openStepDetail('${r.id}','${name}')" title="${(r.customer||'').replace(/"/g,'&quot;')} — ${shortProc(name)}">
           <span class="io-prio" style="background:${PRIORITY_COLOR[pr]}" title="${PRIORITY_LABEL[pr]}"></span>
           <span class="io-main">
             <span class="io-r1"><span class="io-part">${label}</span><span class="io-meta">${r.customer||''}${r.po?' · PO '+r.po:''}</span></span>
