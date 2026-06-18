@@ -39,6 +39,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .nav-item.active{background:rgba(122,182,72,0.15);color:var(--green)}
 .nav-item.active i{color:var(--green)}
 .nav-item i{font-size:16px;color:#e8c9cf}
+.nav-label{flex:1}
+.nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;background:#FFD400;color:#3a2c00;font-size:11px;font-weight:800;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px rgba(255,212,0,.30);animation:navpulse 2s ease-in-out infinite}
+@keyframes navpulse{0%,100%{box-shadow:0 0 0 2px rgba(255,212,0,.30)}50%{box-shadow:0 0 0 4px rgba(255,212,0,.12)}}
 .sidebar-footer{margin-top:auto;padding:16px 20px;border-top:1px solid var(--navy3)}
 .sidebar-footer .city{font-size:11px;color:#f0d8dc}
 .sidebar-footer .ver{font-size:10px;color:#c98e98;margin-top:2px}
@@ -411,9 +414,9 @@ tr:hover .del-btn{opacity:1}
     <div class="sidebar-section-label op-only" style="display:none">Shop Floor</div>
     <div class="nav-item active mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
-    <div class="nav-item mgr-only" onclick="setFilter('Ready for Invoice')"><i class="ti ti-file-invoice-dollar"></i> Ready to Invoice</div>
+    <div class="nav-item mgr-only" id="nav-ready" onclick="setFilter('Ready for Invoice')"><i class="ti ti-file-invoice-dollar"></i> <span class="nav-label">Ready to Invoice</span><span class="nav-badge" id="badge-ready" style="display:none"></span></div>
     <div class="nav-item mgr-only" onclick="setFilter('Invoiced')"><i class="ti ti-circle-check"></i> Invoiced</div>
-    <div class="nav-item mgr-only" onclick="setFilter('Need Purchase Order')"><i class="ti ti-alert-circle"></i> Need PO</div>
+    <div class="nav-item mgr-only" id="nav-needpo" onclick="setFilter('Need Purchase Order')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
   </div>
   <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Directory</div>
@@ -441,7 +444,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.19.0</div>
+    <div class="ver">v2.20.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -928,8 +931,15 @@ function filteredOrders(){
   return rows;
 }
 
+function updateNavBadges(){
+  const active=orders.filter(r=>!r.archived);
+  const set=(id,n)=>{const el=document.getElementById(id);if(!el)return;if(n>0){el.textContent=n;el.style.display='';}else{el.style.display='none';}};
+  set('badge-ready', active.filter(r=>r.status==='Ready for Invoice').length);
+  set('badge-needpo', active.filter(r=>r.status==='Need Purchase Order').length);
+}
 function render(){
   invalidateSched();
+  updateNavBadges();
   // toggle which view is visible
   const isCard = viewMode==='card';
   const tv=document.getElementById('table-view'), cg=document.getElementById('cards'), sb=document.getElementById('sortbar');
