@@ -243,6 +243,36 @@ tr:hover .del-btn{opacity:1}
 
 /* ── Calendar grid ── */
 .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+/* Incoming / Outgoing board */
+.io-banner{display:flex;align-items:center;gap:8px;background:#A32D2D12;border:1px solid #A32D2D33;color:#8a2525;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;margin-bottom:14px}
+.io-board{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+@media(max-width:920px){.io-board{grid-template-columns:1fr}}
+.io-colhead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:0 2px 11px;border-bottom:2px solid var(--border);margin-bottom:13px}
+.io-colhead i{font-size:17px}
+.io-colhead.out{color:var(--clay,#A8443A)}
+.io-colhead.inc{color:#B07A1E}
+.io-count{font-size:12px;font-weight:800;color:#fff;background:currentColor;border-radius:20px;min-width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.io-colhead.out .io-count{background:#A8443A}.io-colhead.inc .io-count{background:#B07A1E}
+.io-colhead .io-count{color:#fff}
+.io-colsub{margin-left:auto;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text3)}
+.io-card{background:#fff;border:1px solid var(--border2);border-left:4px solid #888;border-radius:13px;margin-bottom:13px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.io-cardhead{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--border2);font-weight:800;font-size:13.5px;color:var(--text)}
+.io-ic{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center}
+.io-ic svg{width:18px;height:18px}
+.io-cardcount{margin-left:auto;font-size:11px;font-weight:800;color:var(--text2);background:#eef2f8;border-radius:20px;padding:2px 9px}
+.io-item{display:flex;align-items:center;gap:11px;padding:9px 14px;border-bottom:1px solid #f1f3f7;cursor:pointer;transition:background .12s}
+.io-item:last-child{border-bottom:none}
+.io-item:hover{background:#f7f9fc}
+.io-prio{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.io-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.io-part{font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.io-cust{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.io-dates{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.io-status{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.io-empty{text-align:center;color:var(--text3);padding:34px 16px;border:1px dashed var(--border);border-radius:13px;background:#fafbfd}
+.io-empty i{font-size:30px;opacity:.4;display:block;margin-bottom:8px}
+.io-empty div{font-size:13px;font-weight:700;color:var(--text2);margin-bottom:3px}
+.io-empty span{font-size:11.5px}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-month{font-size:16px;font-weight:700;min-width:170px;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -446,7 +476,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.21.1</div>
+    <div class="ver">v2.22.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -563,17 +593,19 @@ tr:hover .del-btn{opacity:1}
   <div id="schedule-page" style="display:none">
     <div class="cal-header">
       <div class="view-toggle">
-        <button id="vt-cal" class="active" onclick="setScheduleView('calendar')"><i class="ti ti-calendar"></i> Calendar</button>
+        <button id="vt-board" class="active" onclick="setScheduleView('board')"><i class="ti ti-layout-columns"></i> Board</button>
+        <button id="vt-cal" onclick="setScheduleView('calendar')"><i class="ti ti-calendar"></i> Calendar</button>
         <button id="vt-gantt" onclick="setScheduleView('gantt')"><i class="ti ti-timeline"></i> Gantt</button>
       </div>
-      <div class="cal-nav">
+      <div class="cal-nav" id="sched-datenav" style="display:none">
         <button class="btn sm" onclick="schedNav(-1)"><i class="ti ti-chevron-left"></i></button>
         <div class="cal-month" id="sched-period-label"></div>
         <button class="btn sm" onclick="schedNav(1)"><i class="ti ti-chevron-right"></i></button>
         <button class="btn sm" onclick="schedToday()">Today</button>
       </div>
     </div>
-    <div id="calendar-view"></div>
+    <div id="board-view"></div>
+    <div id="calendar-view" style="display:none"></div>
     <div id="gantt-view" style="display:none"></div>
   </div>
 
@@ -1802,7 +1834,7 @@ const PAGE_META = {
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   queues:   {title:'Work Queues',    sub:'Shop-floor task lists grouped by process'},
   customers:{title:'Customers',      sub:'Customer index & PO format notes'},
-  schedule: {title:'Production Schedule', sub:'Timeline of external lead times & due dates'},
+  schedule: {title:'Incoming &amp; Outgoing', sub:'External steps — parts out to vendors and material/POs coming in'},
   archive:  {title:'Archive',        sub:'Completed orders you have archived'},
   settings: {title:'Process Times',  sub:'Lead times for outside processes'}
 };
@@ -2433,17 +2465,20 @@ window._editDrawing = (id) => {
   },30);
 };
 
-// ── Schedule rendering (calendar + gantt) ────────────────────────────────────
-let scheduleView = 'calendar';
+// ── Schedule rendering (board + calendar + gantt) ────────────────────────────
+let scheduleView = 'board';
 let calRef = new Date(); calRef.setDate(1);
 let ganttStart = new Date(); ganttStart.setHours(0,0,0,0);
 
 window.setScheduleView = (v) => {
   scheduleView = v;
+  document.getElementById('vt-board').classList.toggle('active', v==='board');
   document.getElementById('vt-cal').classList.toggle('active', v==='calendar');
   document.getElementById('vt-gantt').classList.toggle('active', v==='gantt');
+  document.getElementById('board-view').style.display = v==='board'?'block':'none';
   document.getElementById('calendar-view').style.display = v==='calendar'?'block':'none';
   document.getElementById('gantt-view').style.display = v==='gantt'?'block':'none';
+  document.getElementById('sched-datenav').style.display = v==='board'?'none':'flex';
   renderSchedule();
 };
 window.schedNav = (dir) => {
@@ -2469,9 +2504,110 @@ function gatherScheduledSteps(){
   return out;
 }
 
+// ── Incoming / Outgoing board ────────────────────────────────────────────────
+// Every NOT-yet-done external step across active orders becomes a tracker entry.
+// Outsource steps = OUTGOING (parts sent to a vendor); Purchasing steps =
+// INCOMING (material / POs arriving). Grouped into a card per step, each card's
+// items sorted by the date that matters then by priority (Hot first).
+function gatherExternalSteps(){
+  const out=[];
+  orders.filter(r=>!r.archived && !isDoneRow(r)).forEach(r=>{
+    computeStepDates(r).forEach(s=>{
+      if(s.done) return;
+      out.push({order:r, name:s.name, start:s.start, end:s.end, kind:extKind(s.name)});
+    });
+  });
+  return out;
+}
+
+function ioStatus(it, today){
+  const isOut = it.kind.group==='outsource';
+  const dayMs=86400000;
+  const dBack = Math.round((it.end - today)/dayMs);
+  if(dBack < 0) return {label:isOut?'Overdue back':'Overdue', c:'#A32D2D'};
+  const started = it.start <= today;
+  if(started){
+    if(dBack<=3) return {label:isOut?`Back in ${dBack}d`:`In ${dBack}d`, c:'#BA7517'};
+    return {label:isOut?'At vendor':'On order', c:'#BA7517'};
+  }
+  const dSend = Math.round((it.start - today)/dayMs);
+  return {label:(isOut?'Send in ':'Order in ')+dSend+'d', c:'#3a6ea5'};
+}
+
+function renderBoard(){
+  const host=document.getElementById('board-view');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const all=gatherExternalSteps();
+
+  const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+  const prioOf=r=>(r.priority==null?2:r.priority);
+
+  // group rows by step name within each column
+  function colCards(items, sortDateFn){
+    const byStep={};
+    items.forEach(it=>{ (byStep[it.name]=byStep[it.name]||[]).push(it); });
+    // preserve canonical EXTERNAL_PROCESSES order
+    const names=EXTERNAL_PROCESSES.filter(n=>byStep[n]);
+    return names.map(name=>{
+      const list=byStep[name].sort((a,b)=>{
+        const d=sortDateFn(a)-sortDateFn(b); if(d) return d;
+        const p=prioOf(a.order)-prioOf(b.order); if(p) return p;
+        return (a.order.due||'').localeCompare(b.order.due||'');
+      });
+      const col=PROCESS_COLORS[name]||'#888';
+      const rows=list.map(it=>{
+        const r=it.order, pr=prioOf(r);
+        const st=ioStatus(it,today);
+        const k=it.kind;
+        const label=(r.part||r.desc||'—');
+        const dates=`${cap(k.a)} ${fmtDate(toISO(it.start))} → ${cap(k.b)} ${fmtDate(toISO(it.end))}`;
+        return `<div class="io-item" onclick="openEditFromSchedule('${r.id}')" title="${(r.customer||'').replace(/"/g,'&quot;')} — ${shortProc(name)}">
+          <span class="io-prio" style="background:${PRIORITY_COLOR[pr]}" title="${PRIORITY_LABEL[pr]}"></span>
+          <span class="io-main">
+            <span class="io-part">${label}</span>
+            <span class="io-cust">${r.customer||''}${r.po?' · PO '+r.po:''}</span>
+            <span class="io-dates">${dates}</span>
+          </span>
+          <span class="io-status" style="color:${st.c};background:${st.c}1a">${st.label}</span>
+        </div>`;
+      }).join('');
+      return `<div class="io-card" style="border-left-color:${col}">
+        <div class="io-cardhead">
+          <span class="io-ic" style="color:${col}">${procIcon(name,16)}</span>
+          <span>${shortProc(name)}</span>
+          <span class="io-cardcount">${list.length}</span>
+        </div>
+        ${rows}
+      </div>`;
+    }).join('');
+  }
+
+  const outItems=all.filter(it=>it.kind.group==='outsource');
+  const inItems =all.filter(it=>it.kind.group==='purchasing');
+  const outCards=colCards(outItems, it=>+it.start);   // outgoing: sort by send date
+  const inCards =colCards(inItems,  it=>+it.end);      // incoming: sort by arrival date
+
+  const overdueCount=all.filter(it=>it.end<today).length;
+  const empty=`<div class="io-empty"><i class="ti ti-package-off"></i><div>Nothing here yet</div><span>Enable an outside or purchasing step on an order to track it.</span></div>`;
+
+  host.innerHTML=`
+    ${overdueCount?`<div class="io-banner"><i class="ti ti-alert-triangle"></i> ${overdueCount} external step${overdueCount>1?'s':''} past due — check dates below.</div>`:''}
+    <div class="io-board">
+      <div class="io-col">
+        <div class="io-colhead out"><i class="ti ti-truck-delivery"></i> Outgoing <span class="io-count">${outItems.length}</span><span class="io-colsub">to vendors</span></div>
+        ${outCards||empty}
+      </div>
+      <div class="io-col">
+        <div class="io-colhead inc"><i class="ti ti-package-import"></i> Incoming <span class="io-count">${inItems.length}</span><span class="io-colsub">on order &amp; arriving</span></div>
+        ${inCards||empty}
+      </div>
+    </div>`;
+}
+
 function renderSchedule(){
   invalidateSched();
-  if(scheduleView==='calendar') renderCalendar();
+  if(scheduleView==='board') renderBoard();
+  else if(scheduleView==='calendar') renderCalendar();
   else renderGantt();
 }
 
