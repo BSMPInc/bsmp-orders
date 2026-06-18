@@ -39,6 +39,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .nav-item.active{background:rgba(122,182,72,0.15);color:var(--green)}
 .nav-item.active i{color:var(--green)}
 .nav-item i{font-size:16px;color:#e8c9cf}
+.nav-item svg.nav-ico{width:16px;height:16px;stroke:#e8c9cf;fill:none;flex-shrink:0}
+.nav-item.active svg.nav-ico{stroke:var(--green)}
 .nav-label{flex:1}
 .nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;background:#FFD400;color:#3a2c00;font-size:11px;font-weight:800;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px rgba(255,212,0,.30);animation:navpulse 2s ease-in-out infinite}
 @keyframes navpulse{0%,100%{box-shadow:0 0 0 2px rgba(255,212,0,.30)}50%{box-shadow:0 0 0 4px rgba(255,212,0,.12)}}
@@ -414,7 +416,7 @@ tr:hover .del-btn{opacity:1}
     <div class="sidebar-section-label op-only" style="display:none">Shop Floor</div>
     <div class="nav-item active mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
-    <div class="nav-item mgr-only" id="nav-ready" onclick="setFilter('Ready for Invoice')"><i class="ti ti-file-invoice-dollar"></i> <span class="nav-label">Ready to Invoice</span><span class="nav-badge" id="badge-ready" style="display:none"></span></div>
+    <div class="nav-item mgr-only" id="nav-ready" onclick="setFilter('Ready for Invoice')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 17v1m0-8v1"/><path d="M13.8 12.2a1.6 1.6 0 0 0-1.8-1.2 1.5 1.5 0 0 0-.2 3h.8a1.5 1.5 0 0 1 .2 3 1.6 1.6 0 0 1-1.8-1.2"/></svg> <span class="nav-label">Ready to Invoice</span><span class="nav-badge" id="badge-ready" style="display:none"></span></div>
     <div class="nav-item mgr-only" onclick="setFilter('Invoiced')"><i class="ti ti-circle-check"></i> Invoiced</div>
     <div class="nav-item mgr-only" id="nav-needpo" onclick="setFilter('Need Purchase Order')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
   </div>
@@ -444,7 +446,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.20.0</div>
+    <div class="ver">v2.21.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
