@@ -244,35 +244,39 @@ tr:hover .del-btn{opacity:1}
 /* ── Calendar grid ── */
 .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 /* Incoming / Outgoing board */
-.io-banner{display:flex;align-items:center;gap:8px;background:#A32D2D12;border:1px solid #A32D2D33;color:#8a2525;font-size:12.5px;font-weight:700;padding:9px 13px;border-radius:10px;margin-bottom:14px}
-.io-board{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
-@media(max-width:920px){.io-board{grid-template-columns:1fr}}
-.io-colhead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:0 2px 11px;border-bottom:2px solid var(--border);margin-bottom:13px}
-.io-colhead i{font-size:17px}
-.io-colhead.out{color:var(--clay,#A8443A)}
-.io-colhead.inc{color:#B07A1E}
-.io-count{font-size:12px;font-weight:800;color:#fff;background:currentColor;border-radius:20px;min-width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.io-banner{display:flex;align-items:center;gap:7px;background:#A32D2D12;border:1px solid #A32D2D33;color:#8a2525;font-size:12px;font-weight:700;padding:7px 11px;border-radius:9px;margin-bottom:11px}
+.io-board{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+@media(max-width:860px){.io-board{grid-template-columns:1fr}}
+.io-colhead{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:0 2px 8px;border-bottom:2px solid var(--border);margin-bottom:10px}
+.io-colhead i{font-size:15px}
+.io-colhead.out{color:#A8443A}.io-colhead.inc{color:#B07A1E}
+.io-count{font-size:11px;font-weight:800;color:#fff;border-radius:20px;min-width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
 .io-colhead.out .io-count{background:#A8443A}.io-colhead.inc .io-count{background:#B07A1E}
-.io-colhead .io-count{color:#fff}
-.io-colsub{margin-left:auto;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text3)}
-.io-card{background:#fff;border:1px solid var(--border2);border-left:4px solid #888;border-radius:13px;margin-bottom:13px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
-.io-cardhead{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--border2);font-weight:800;font-size:13.5px;color:var(--text)}
-.io-ic{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center}
-.io-ic svg{width:18px;height:18px}
-.io-cardcount{margin-left:auto;font-size:11px;font-weight:800;color:var(--text2);background:#eef2f8;border-radius:20px;padding:2px 9px}
-.io-item{display:flex;align-items:center;gap:11px;padding:9px 14px;border-bottom:1px solid #f1f3f7;cursor:pointer;transition:background .12s}
+.io-colsub{margin-left:auto;font-size:10.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text3)}
+.io-card{background:#fff;border:1px solid var(--border2);border-left:3px solid #888;border-radius:11px;margin-bottom:10px;overflow:hidden}
+.io-cardhead{display:flex;align-items:center;gap:7px;padding:7px 11px;background:#fafbfd;border-bottom:1px solid var(--border2);font-weight:800;font-size:12.5px;color:var(--text)}
+.io-ic{width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center}
+.io-ic svg{width:16px;height:16px}
+.io-cardcount{margin-left:auto;font-size:10.5px;font-weight:800;color:var(--text2);background:#eef2f8;border-radius:20px;padding:1px 8px}
+.io-item{display:flex;align-items:center;gap:9px;padding:7px 11px;border-bottom:1px solid #f1f3f7;cursor:pointer;transition:background .12s}
 .io-item:last-child{border-bottom:none}
 .io-item:hover{background:#f7f9fc}
-.io-prio{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.io-prio{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .io-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.io-part{font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.io-cust{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.io-dates{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.io-status{font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;white-space:nowrap;flex-shrink:0}
-.io-empty{text-align:center;color:var(--text3);padding:34px 16px;border:1px dashed var(--border);border-radius:13px;background:#fafbfd}
-.io-empty i{font-size:30px;opacity:.4;display:block;margin-bottom:8px}
-.io-empty div{font-size:13px;font-weight:700;color:var(--text2);margin-bottom:3px}
-.io-empty span{font-size:11.5px}
+.io-r1{display:flex;align-items:baseline;gap:7px;min-width:0}
+.io-part{font-weight:700;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:58%}
+.io-meta{font-size:10.5px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.io-dates{font-size:10.5px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.io-undo{color:#2f7d57;cursor:pointer;text-decoration:underline dotted}
+.io-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0}
+.io-status{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;white-space:nowrap}
+.io-act{font-size:10.5px;font-weight:700;border:none;border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;color:#fff;line-height:1.3}
+.io-act.send{background:#3a6ea5}.io-act.send:hover{background:#315e8c}
+.io-act.recv{background:#2f8f6b}.io-act.recv:hover{background:#287a5b}
+.io-empty{text-align:center;color:var(--text3);padding:24px 14px;border:1px dashed var(--border);border-radius:11px;background:#fafbfd}
+.io-empty i{font-size:26px;opacity:.4;display:block;margin-bottom:6px}
+.io-empty div{font-size:12.5px;font-weight:700;color:var(--text2);margin-bottom:2px}
+.io-empty span{font-size:11px}
 .cal-nav{display:flex;align-items:center;gap:8px}
 .cal-month{font-size:16px;font-weight:700;min-width:170px;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
@@ -453,7 +457,7 @@ tr:hover .del-btn{opacity:1}
   <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
-    <div class="nav-item" id="nav-schedule" onclick="showPage('schedule')"><i class="ti ti-calendar-time"></i> Schedule</div>
+    <div class="nav-item" id="nav-schedule" onclick="showPage('schedule')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 9h11"/><path d="M12 6l3 3-3 3"/><path d="M20 15H9"/><path d="M12 12l-3 3 3 3"/></svg> <span class="nav-label">Incoming / Outgoing</span></div>
     <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
     <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
   </div>
@@ -476,7 +480,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.22.0</div>
+    <div class="ver">v2.23.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -2224,7 +2228,7 @@ function computeGlobalSchedule(){
       }
       const start = s.start ? atWorkStart(new Date(s.start+'T00:00:00')) : normalizeStart(new Date(earliestNext));
       const end = addBusinessDays(start, dur);
-      out.push({name:s.name, start, end, duration:dur, unit:'d', external:true, manual:!!s.start, done:false});
+      out.push({name:s.name, start, end, duration:dur, unit:'d', external:true, manual:!!s.start, done:false, sentAt:s.sentAt||null, receivedAt:s.receivedAt||null});
       earliestNext = new Date(Math.max(earliestNext.getTime(), end.getTime()));
     });
     result.set(r.id, out);
@@ -2246,6 +2250,33 @@ function stepStatus(r, name){
 
 function getSched(){ if(!_schedCache) _schedCache = computeGlobalSchedule(); return _schedCache; }
 function computeStepDates(r){ return getSched().get(r.id) || []; }
+
+// Sent / received marking for external steps (Incoming/Outgoing board).
+function _extStep(id, name){
+  const r = orders.find(o=>o.id===id); if(!r) return null;
+  const sch = ensureSchedule(r);
+  return sch.steps.find(s=>s.name===name) || null;
+}
+window.markSent = (id, name, e) => {
+  if(e) e.stopPropagation();
+  const s=_extStep(id,name); if(!s) return;
+  const t=toISO(new Date());
+  s.sentAt=t; s.start=t;            // anchor lead-time to the actual send/order date
+  saveDB(); invalidateSched(); render(); renderSchedule();
+};
+window.markReceived = (id, name, e) => {
+  if(e) e.stopPropagation();
+  const s=_extStep(id,name); if(!s) return;
+  const t=toISO(new Date());
+  s.receivedAt=t; s.done=true; s.doneAt=t;   // received completes the external step
+  saveDB(); invalidateSched(); render(); renderSchedule();
+};
+window.undoSent = (id, name, e) => {
+  if(e) e.stopPropagation();
+  const s=_extStep(id,name); if(!s) return;
+  s.sentAt=null;
+  saveDB(); invalidateSched(); render(); renderSchedule();
+};
 
 window._toggleStep = (id, name, e) => {
   e.stopPropagation();
@@ -2505,16 +2536,16 @@ function gatherScheduledSteps(){
 }
 
 // ── Incoming / Outgoing board ────────────────────────────────────────────────
-// Every NOT-yet-done external step across active orders becomes a tracker entry.
-// Outsource steps = OUTGOING (parts sent to a vendor); Purchasing steps =
-// INCOMING (material / POs arriving). Grouped into a card per step, each card's
-// items sorted by the date that matters then by priority (Hot first).
+// Every NOT-yet-done external step across active orders is a tracker entry.
+// Outsource = OUTGOING (sent to a vendor); Purchasing = INCOMING (arriving).
+// Each step gets a card; items sort by date then priority (Hot first). Operators
+// mark steps Sent/Ordered then Received/In; received steps drop off the board.
 function gatherExternalSteps(){
   const out=[];
   orders.filter(r=>!r.archived && !isDoneRow(r)).forEach(r=>{
     computeStepDates(r).forEach(s=>{
       if(s.done) return;
-      out.push({order:r, name:s.name, start:s.start, end:s.end, kind:extKind(s.name)});
+      out.push({order:r, name:s.name, start:s.start, end:s.end, sentAt:s.sentAt, kind:extKind(s.name)});
     });
   });
   return out;
@@ -2523,30 +2554,27 @@ function gatherExternalSteps(){
 function ioStatus(it, today){
   const isOut = it.kind.group==='outsource';
   const dayMs=86400000;
-  const dBack = Math.round((it.end - today)/dayMs);
-  if(dBack < 0) return {label:isOut?'Overdue back':'Overdue', c:'#A32D2D'};
-  const started = it.start <= today;
-  if(started){
-    if(dBack<=3) return {label:isOut?`Back in ${dBack}d`:`In ${dBack}d`, c:'#BA7517'};
-    return {label:isOut?'At vendor':'On order', c:'#BA7517'};
+  if(!it.sentAt){
+    const dSend=Math.round((it.start-today)/dayMs);
+    if(dSend<=0) return {label:isOut?'Send now':'Order now', c:'#A32D2D'};
+    return {label:(isOut?'Send in ':'Order in ')+dSend+'d', c:'#3a6ea5'};
   }
-  const dSend = Math.round((it.start - today)/dayMs);
-  return {label:(isOut?'Send in ':'Order in ')+dSend+'d', c:'#3a6ea5'};
+  const dBack=Math.round((it.end-today)/dayMs);
+  if(dBack<0) return {label:isOut?'Overdue back':'Overdue', c:'#A32D2D'};
+  if(dBack<=3) return {label:isOut?`Back in ${dBack}d`:`In ${dBack}d`, c:'#BA7517'};
+  return {label:isOut?'At vendor':'On order', c:'#2f8f6b'};
 }
 
 function renderBoard(){
   const host=document.getElementById('board-view');
   const today=new Date(); today.setHours(0,0,0,0);
   const all=gatherExternalSteps();
-
   const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
   const prioOf=r=>(r.priority==null?2:r.priority);
 
-  // group rows by step name within each column
   function colCards(items, sortDateFn){
     const byStep={};
     items.forEach(it=>{ (byStep[it.name]=byStep[it.name]||[]).push(it); });
-    // preserve canonical EXTERNAL_PROCESSES order
     const names=EXTERNAL_PROCESSES.filter(n=>byStep[n]);
     return names.map(name=>{
       const list=byStep[name].sort((a,b)=>{
@@ -2556,27 +2584,30 @@ function renderBoard(){
       });
       const col=PROCESS_COLORS[name]||'#888';
       const rows=list.map(it=>{
-        const r=it.order, pr=prioOf(r);
-        const st=ioStatus(it,today);
-        const k=it.kind;
+        const r=it.order, pr=prioOf(r), isOut=it.kind.group==='outsource';
+        const st=ioStatus(it,today), k=it.kind;
         const label=(r.part||r.desc||'—');
-        const dates=`${cap(k.a)} ${fmtDate(toISO(it.start))} → ${cap(k.b)} ${fmtDate(toISO(it.end))}`;
+        const sentWord=isOut?'Sent':'Ordered', backWord=cap(k.b);
+        const dateLine = it.sentAt
+          ? `<span class="io-undo" onclick="undoSent('${r.id}','${name}',event)" title="Click to undo">${sentWord} ${fmtDate(it.sentAt)}</span> · ${backWord} ~${fmtDate(toISO(it.end))}`
+          : `${cap(k.a)} ${fmtDate(toISO(it.start))} → ${backWord} ${fmtDate(toISO(it.end))}`;
+        const actCls=it.sentAt?'recv':'send';
+        const actLbl=it.sentAt?(isOut?'Receive':'Mark in'):(isOut?'Send':'Order');
+        const actFn=it.sentAt?'markReceived':'markSent';
         return `<div class="io-item" onclick="openEditFromSchedule('${r.id}')" title="${(r.customer||'').replace(/"/g,'&quot;')} — ${shortProc(name)}">
           <span class="io-prio" style="background:${PRIORITY_COLOR[pr]}" title="${PRIORITY_LABEL[pr]}"></span>
           <span class="io-main">
-            <span class="io-part">${label}</span>
-            <span class="io-cust">${r.customer||''}${r.po?' · PO '+r.po:''}</span>
-            <span class="io-dates">${dates}</span>
+            <span class="io-r1"><span class="io-part">${label}</span><span class="io-meta">${r.customer||''}${r.po?' · PO '+r.po:''}</span></span>
+            <span class="io-dates">${dateLine}</span>
           </span>
-          <span class="io-status" style="color:${st.c};background:${st.c}1a">${st.label}</span>
+          <span class="io-right">
+            <span class="io-status" style="color:${st.c};background:${st.c}1a">${st.label}</span>
+            <button class="io-act ${actCls}" onclick="${actFn}('${r.id}','${name}',event)">${actLbl}</button>
+          </span>
         </div>`;
       }).join('');
       return `<div class="io-card" style="border-left-color:${col}">
-        <div class="io-cardhead">
-          <span class="io-ic" style="color:${col}">${procIcon(name,16)}</span>
-          <span>${shortProc(name)}</span>
-          <span class="io-cardcount">${list.length}</span>
-        </div>
+        <div class="io-cardhead"><span class="io-ic" style="color:${col}">${procIcon(name,16)}</span><span>${shortProc(name)}</span><span class="io-cardcount">${list.length}</span></div>
         ${rows}
       </div>`;
     }).join('');
@@ -2584,10 +2615,9 @@ function renderBoard(){
 
   const outItems=all.filter(it=>it.kind.group==='outsource');
   const inItems =all.filter(it=>it.kind.group==='purchasing');
-  const outCards=colCards(outItems, it=>+it.start);   // outgoing: sort by send date
-  const inCards =colCards(inItems,  it=>+it.end);      // incoming: sort by arrival date
-
-  const overdueCount=all.filter(it=>it.end<today).length;
+  const outCards=colCards(outItems, it=>+(it.sentAt?it.end:it.start));
+  const inCards =colCards(inItems,  it=>+it.end);
+  const overdueCount=all.filter(it=>it.sentAt && it.end<today).length;
   const empty=`<div class="io-empty"><i class="ti ti-package-off"></i><div>Nothing here yet</div><span>Enable an outside or purchasing step on an order to track it.</span></div>`;
 
   host.innerHTML=`
