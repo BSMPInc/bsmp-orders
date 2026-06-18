@@ -162,6 +162,12 @@ tr:last-child td{border-bottom:none}
 .proc-btn:hover{border-color:var(--green);color:var(--green2)}
 .proc-btn.active{background:#fff8e6;color:#8a5c00;border-color:#d4880a}
 .proc-btn.done{background:#f0f8e8;color:#3a6b10;border-color:var(--green)}
+.proc-btn.icon-btn{width:32px;height:32px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:9px}
+.proc-btn.icon-btn .proc-ico{display:block}
+.proc-btn.icon-btn.add{position:relative;color:var(--text3)}
+.proc-btn.icon-btn.add:hover{color:var(--green2)}
+.proc-btn.icon-btn.add .add-badge{position:absolute;top:-5px;right:-5px;font-size:10px;background:var(--green);color:#fff;border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;line-height:1;border:1.5px solid #fff}
+.ss-ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:16px;height:16px}
 .notes-input{width:100%;font-size:12px;border:1px solid var(--border2);border-radius:10px;padding:8px 10px;background:#fff;color:var(--text);resize:none;min-height:56px;font-family:inherit}
 .notes-input:focus{outline:none;border-color:var(--green)}
 
@@ -306,6 +312,12 @@ tr:hover .del-btn{opacity:1}
 .po-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.10),0 6px 22px rgba(0,0,0,0.08)}
 .po-card:active{transform:scale(.997)}
 .po-card.expanded{grid-column:1 / -1}
+/* Fully-invoiced POs are sunk to the bottom and dimmed so the eye skips them */
+.po-card.done{opacity:.6}
+.po-card.done:hover{opacity:1}
+.po-group-row.done,.line-row.done{opacity:.62}
+.po-group-row.done:hover,.line-row.done:hover{opacity:1}
+.btn.active{background:var(--navy);color:#fff;border-color:var(--navy)}
 .po-card .card-accent{position:absolute;left:0;top:0;bottom:0;width:5px}
 .card-head{padding:15px 16px 14px 22px}
 .card-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:13px}
@@ -427,7 +439,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.13.0</div>
+    <div class="ver">v2.15.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -468,6 +480,7 @@ tr:hover .del-btn{opacity:1}
         </select>
         <button class="btn" onclick="toggleAllGroups()" id="expand-toggle-btn"><i class="ti ti-arrows-diagonal"></i> Expand all</button>
       </span>
+      <button class="btn" id="hide-invoiced-btn" onclick="toggleHideInvoiced()" title="Invoiced POs always sink to the bottom; this hides them completely"><i class="ti ti-eye"></i> Hide invoiced</button>
       <div class="view-toggle">
         <button id="vt-card" onclick="setViewMode('card')"><i class="ti ti-layout-grid"></i> Cards</button>
         <button id="vt-table" onclick="setViewMode('table')"><i class="ti ti-table"></i> Table</button>
@@ -820,6 +833,28 @@ const PROCESS_COLORS = {
   'Purchasing- Material':GROUP_COLORS.purchasing,'Purchasing- Hardware':GROUP_COLORS.purchasing,'Purchasing- Tooling':GROUP_COLORS.purchasing,
   'Outsource- Plating':GROUP_COLORS.outsource,'Outsource- Paint':GROUP_COLORS.outsource,'Outsource- Machining':GROUP_COLORS.outsource,'Outsource- Other':GROUP_COLORS.outsource
 };
+// Small inline-SVG glyphs (Tabler stroke style) representing each process, so the
+// detail panel can show an icon instead of a long text label. Full name shows on hover.
+const PROC_ICON_PATHS = {
+  'Program':'<path d="M9 8l-4 4 4 4"/><path d="M15 8l4 4-4 4"/>',
+  'Laser':'<path d="M12 3v7"/><path d="M5 18h14"/><path d="M12 10l-2.6 2.6M12 10l2.6 2.6M12 11.5v3"/>',
+  'De-Burr/Finish':'<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>',
+  'Form':'<path d="M3 18h9l9 -9"/><path d="M12 18l4.5 -4.5"/>',
+  'Machining':'<path d="M12 2.6l1.5 2 2.4 -.6 .3 2.5 2.3 1 -1 2.3 1 2.3 -2.3 1 -.3 2.5 -2.4 -.6 -1.5 2 -1.5 -2 -2.4 .6 -.3 -2.5 -2.3 -1 1 -2.3 -1 -2.3 2.3 -1 .3 -2.5 2.4 .6z"/><circle cx="12" cy="12" r="3"/>',
+  'Weld':'<path d="M4 19h16"/><path d="M12 5v8"/><path d="M8 7l8 4"/><path d="M16 7l-8 4"/>',
+  'Hardware/Assembly':'<path d="M10 4h4v3h-4z"/><path d="M11 7h2v7l-1 3-1 -3z"/><path d="M11 9.5h2M11 11.5h2M11 13.5h2"/>',
+  'Purchasing- Material':'<path d="M12 4l8 4-8 4-8 -4z"/><path d="M4 12l8 4 8 -4"/><path d="M4 16l8 4 8 -4"/>',
+  'Purchasing- Hardware':'<path d="M12 4l7 4v8l-7 4-7 -4V8z"/><circle cx="12" cy="12" r="3"/>',
+  'Purchasing- Tooling':'<path d="M14.7 6.3a4 4 0 0 0 -5 5L5 15.9 8.1 19l4.6 -4.7a4 4 0 0 0 5 -5l-2.4 2.4 -2.1 -.6 -.6 -2.1z"/>',
+  'Outsource- Plating':'<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1 -12 0c0 -3 2 -6 6 -11z"/>',
+  'Outsource- Paint':'<path d="M8 9h6v11H8z"/><path d="M10 9V6h2v3"/><path d="M16 5h1.5M18 4v1.5M18 7.5h1.5"/>',
+  'Outsource- Machining':'<path d="M12 3v5"/><path d="M9 8h6l-3 13z"/><path d="M10 11h4M10.7 14h2.6"/>',
+  'Outsource- Other':'<circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/>'
+};
+function procIcon(name, size=15){
+  const inner = PROC_ICON_PATHS[name] || '<circle cx="12" cy="12" r="3"/>';
+  return `<svg class="proc-ico" viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+}
 const DEFAULT_DURATIONS = {
   'Purchasing- Material':5,'Purchasing- Hardware':5,'Purchasing- Tooling':7,
   'Outsource- Plating':5,'Outsource- Paint':5,'Outsource- Machining':7,'Outsource- Other':5
@@ -837,6 +872,10 @@ let _didInitCollapse=false;
 let sortKey='', sortDir=1, editId=null, aiParsed=[];
 let viewMode='card';                 // 'card' | 'table' — card is the default (iPad-friendly)
 let cardSortKey='due', cardSortDir=1; // due | customer | value | status | newest
+let hideInvoiced=false;              // toggle: remove fully-invoiced POs from the active list
+const DONE_STATUSES=new Set(['Invoiced']);     // statuses treated as "done" → sink to bottom / hide
+function isDoneRow(r){ return DONE_STATUSES.has(r.status); }
+function isDoneGroup(items){ return items.length>0 && items.every(isDoneRow); }
 let saveTimeout=null;
 let _listenersStarted=false;
 
@@ -905,14 +944,22 @@ function render(){
   if(!rows.length){tbody.innerHTML=`<tr><td colspan="14"><div class="empty-state"><i class="ti ti-clipboard-list"></i><p>No orders yet — click Add Order or use AI Extract</p></div></td></tr>`;return;}
   let html='';
   if(mode==='none'){
-    rows.forEach(r=>{html+=lineRow(r,false);if(expanded.has(r.id))html+=detailRow(r);});
+    let list = rows;
+    if(hideInvoiced) list=list.filter(r=>!isDoneRow(r));
+    // invoiced rows sink to the bottom (stable sort keeps the existing order otherwise)
+    list=[...list].sort((a,b)=> isDoneRow(a)===isDoneRow(b)?0:(isDoneRow(a)?1:-1));
+    list.forEach(r=>{html+=lineRow(r,false);if(expanded.has(r.id))html+=detailRow(r);});
   } else {
     const keyFn=mode==='po'?r=>(r.customer+'||'+(r.po||'verbal')):r=>r.customer;
     const groups=new Map();
     rows.forEach(r=>{const k=keyFn(r);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);});
     if(!_didInitCollapse && groups.size){ groups.forEach((_,k)=>collapsedGroups.add(k)); _didInitCollapse=true; }
+    // fully-invoiced groups sink to the bottom (and hide when toggled). Stable sort keeps the rest in order.
+    let entries=[...groups.entries()].map(([gk,items])=>({gk,items,done:isDoneGroup(items)}));
+    if(hideInvoiced) entries=entries.filter(e=>!e.done);
+    entries.sort((a,b)=> a.done===b.done?0:(a.done?1:-1));
     let gi=0;
-    groups.forEach((items,gk)=>{
+    entries.forEach(({gk,items,done})=>{
       const collapsed=collapsedGroups.has(gk);
       const stripe = (gi++ % 2 === 1) ? ' alt' : '';
       const gtotal=items.reduce((s,r)=>s+rowTotal(r),0);
@@ -935,7 +982,7 @@ function render(){
         : `<span class="grp-cust">${s.customer}</span>`;
       const gkE=gk.replace(/'/g,"\\'");
       const statusBadges = statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}" style="pointer-events:none;margin-right:2px">${st}</span>`).join('');
-      html+=`<tr class="po-group-row${stripe}" onclick="window._tg('${gkE}')">
+      html+=`<tr class="po-group-row${stripe}${done?' done':''}" onclick="window._tg('${gkE}')">
         <td style="padding-left:10px;width:36px"><span class="grp-acc" style="background:${accColor}"></span><span class="group-chevron${collapsed?'':' open'}">›</span></td>
         <td colspan="5">${lbl}<span class="grp-items">${items.length} item${items.length!==1?'s':''}</span>${overdue?`<span class="grp-overdue">● Overdue</span>`:''}</td>
         <td style="text-align:center;color:var(--text2);font-weight:600">${gqty||''}</td>
@@ -949,6 +996,10 @@ function render(){
       </tr>`;
       if(!collapsed) items.forEach(r=>{html+=lineRow(r,true);if(expanded.has(r.id))html+=detailRow(r);});
     });
+  }
+  if(!html){
+    const hidden=hideInvoiced && orders.some(r=>!r.archived && isDoneRow(r));
+    html=`<tr><td colspan="14"><div class="empty-state"><i class="ti ti-${hidden?'eye-off':'clipboard-list'}"></i><p>${hidden?'All orders here are invoiced — they\u2019re hidden. Toggle \u201CShow invoiced\u201D to bring them back.':'No orders match'}</p></div></td></tr>`;
   }
   tbody.innerHTML=html;
 }
@@ -1021,7 +1072,7 @@ function poGroups(){
     // line items ordered by due date then job for the expanded list
     const sortedItems=[...items].sort((a,b)=>((a.due||'9999')+'').localeCompare((b.due||'9999')+'')||((a.job||'')+'').localeCompare((b.job||''))); 
     groups.push({gk,items:sortedItems,customer:items[0].customer||'',po:items[0].po||'verbal',
-      gtotal,gqty,statuses,overdue,gdue,gdays,dueOverdue,payRoll,newest});
+      gtotal,gqty,statuses,overdue,gdue,gdays,dueOverdue,payRoll,newest,allInvoiced:isDoneGroup(items)});
   });
   return groups;
 }
@@ -1029,6 +1080,8 @@ function poGroups(){
 function sortGroups(groups){
   const dir=cardSortDir;
   return groups.sort((a,b)=>{
+    // fully-invoiced POs always sink to the bottom, whatever the sort
+    if(a.allInvoiced!==b.allInvoiced) return a.allInvoiced?1:-1;
     let c=0;
     switch(cardSortKey){
       case 'customer': c=a.customer.localeCompare(b.customer); break;
@@ -1056,8 +1109,10 @@ function renderCards(){
   renderSortbar();
   const cg=document.getElementById('cards'); if(!cg) return;
   let groups=poGroups();
+  if(hideInvoiced) groups=groups.filter(g=>!g.allInvoiced);
   if(!groups.length){
-    cg.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><i class="ti ti-clipboard-list"></i><p>No orders match — click Add Order or use AI Extract</p></div>`;
+    const hidden=hideInvoiced && orders.some(r=>!r.archived && isDoneRow(r));
+    cg.innerHTML=`<div class="empty-state" style="grid-column:1/-1"><i class="ti ti-${hidden?'eye-off':'clipboard-list'}"></i><p>${hidden?'No active orders — invoiced POs are hidden. Toggle “Show invoiced” to bring them back.':'No orders match — click Add Order or use AI Extract'}</p></div>`;
     return;
   }
   if(!_didInitCollapse){ groups.forEach(g=>collapsedGroups.add(g.gk)); _didInitCollapse=true; }
@@ -1105,7 +1160,7 @@ function renderCards(){
         <span class="co-dates"><b style="${outStyle}">${k.a} ${fmtDate(outISO)}</b><span class="co-arrow">→</span>${k.b} ${fmtDate(backISO)}</span>
       </div>`;
     }
-    return `<div class="po-card${expandedCard?' expanded':''}" onclick="window._tcard('${gkE}')">
+    return `<div class="po-card${expandedCard?' expanded':''}${g.allInvoiced?' done':''}" onclick="window._tcard('${gkE}')">
       <div class="card-accent" style="background:${accColor}"></div>
       <div class="card-head">
         <div class="card-title-row">
@@ -1135,12 +1190,20 @@ window._cardSort=(key)=>{
   render();
 };
 window._tcard=(gk)=>{ if(collapsedGroups.has(gk))collapsedGroups.delete(gk); else collapsedGroups.add(gk); render(); };
+window.toggleHideInvoiced=()=>{
+  hideInvoiced=!hideInvoiced;
+  const b=document.getElementById('hide-invoiced-btn');
+  if(b){ b.classList.toggle('active',hideInvoiced); b.innerHTML = hideInvoiced
+    ? '<i class="ti ti-eye-off"></i> Show invoiced'
+    : '<i class="ti ti-eye"></i> Hide invoiced'; }
+  render();
+};
 
 
 function lineRow(r,ind){
   const days=daysUntil(r.due), total=rowTotal(r), pay=r.payment||'Unpaid';
   const showPay=['Invoiced','Ready for Invoice'].includes(r.status);
-  return`<tr class="line-row${expanded.has(r.id)?' expanded-line':''}" data-rowid="${r.id}" onclick="window._tl('${r.id}',event)">
+  return`<tr class="line-row${expanded.has(r.id)?' expanded-line':''}${isDoneRow(r)?' done':''}" data-rowid="${r.id}" onclick="window._tl('${r.id}',event)">
     <td style="padding-left:${ind?30:12}px"><span class="group-chevron${expanded.has(r.id)?' open':''}">›</span></td>
     <td><button class="del-btn" onclick="window._del('${r.id}')" tabindex="-1"><i class="ti ti-x"></i></button></td>
     <td class="editable" title="${r.customer||''}" ondblclick="window._ec(event,this,'${r.id}','customer')">${r.customer||''}</td>
@@ -1163,7 +1226,7 @@ function detailInner(r){
   const done=r.completedProcesses||[];
   const procBtns=(list)=>list.map(p=>{
     const isDone=done.includes(p),isActive=r.currentProcess===p;
-    return`<button class="proc-btn${isDone?' done':isActive?' active':''}" onclick="window._tp('${r.id}','${p}',event)">${p}</button>`;
+    return`<button class="proc-btn icon-btn${isDone?' done':isActive?' active':''}" title="${p}" aria-label="${p}" onclick="window._tp('${r.id}','${p}',event)">${procIcon(p)}</button>`;
   }).join('');
   const sch=ensureSchedule(r);
   const computed=computeStepDates(r);
@@ -1194,7 +1257,7 @@ function detailInner(r){
         <i class="ti ti-chevron-down" style="cursor:pointer;font-size:13px;color:${idx===ord.length-1?'var(--border2)':'var(--text2)'}" onclick="window._moveStep('${r.id}','${p}',1,event)"></i>
       </span>
       <span style="font-size:10px;font-weight:700;color:var(--text2);min-width:14px;text-align:center">${idx+1}</span>
-      <span class="ss-dot" style="background:${PROCESS_COLORS[p]}"></span>
+      <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,16)}</span>
       <span class="ss-name" style="flex:1;${done?'text-decoration:line-through;color:var(--text3)':''}">${p}${anchorIcon}</span>
       ${rightControls}
       <span style="font-size:10px;color:${done?'var(--green)':'var(--text2)'};min-width:96px;text-align:right;${done?'font-weight:600':''}">${dateLabel}</span>
@@ -1204,7 +1267,7 @@ function detailInner(r){
   const doneCount = ord.filter(s=>s.done).length;
   const progressPill = ord.length ? `<span style="font-size:11px;font-weight:600;color:${doneCount===ord.length?'var(--green)':'var(--text2)'};background:${doneCount===ord.length?'#eaf5d8':'#eef1f6'};border-radius:10px;padding:2px 9px;margin-left:8px">${doneCount}/${ord.length} done</span>` : '';
   const addBtns=(list)=>list.filter(p=>!sch.steps.find(s=>s.name===p&&s.enabled))
-    .map(p=>`<button class="proc-btn" onclick="window._toggleStep('${r.id}','${p}',event)"><i class="ti ti-plus" style="font-size:11px"></i> ${p}</button>`).join('');
+    .map(p=>`<button class="proc-btn icon-btn add" title="Add ${p}" aria-label="Add ${p}" onclick="window._toggleStep('${r.id}','${p}',event)">${procIcon(p)}<i class="ti ti-plus add-badge"></i></button>`).join('');
   const subLabel=(t)=>`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:8px 0 4px">${t}</div>`;
   return`<div class="detail-inner">
     <div class="detail-section">
