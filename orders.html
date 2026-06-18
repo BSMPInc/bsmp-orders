@@ -329,13 +329,24 @@ tr:hover .del-btn{opacity:1}
 .ci-row.expanded-line{background:#eef2f8;border-radius:8px}
 .ci-row:hover{background:#eef2f8;border-radius:8px}
 .ci-job{font-weight:700;color:var(--text2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ci-desc{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-desc{min-width:0;display:flex;flex-direction:column;gap:2px}
+.ci-desc-main{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-out{font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:600}
 .ci-qty{text-align:center;color:var(--text2);font-weight:600}
 .ci-due{font-size:11px;color:var(--text2);white-space:nowrap}
 .ci-due small{color:var(--text3);margin-left:3px}
 .ci-row .status-badge{justify-self:start;font-size:10px;padding:2px 8px}
 .ci-detail{background:#fff;border-bottom:1px solid var(--border);border-radius:0 0 8px 8px;margin-bottom:2px}
 .ci-detail .detail-inner{padding:12px 14px 14px}
+
+/* PO-level outsource glance strip */
+.card-outsource{display:flex;align-items:center;gap:6px;margin-top:11px;padding-top:10px;border-top:1px dashed var(--border2);font-size:11px;color:var(--text2);min-width:0}
+.card-outsource .co-ic{font-size:14px}
+.card-outsource .co-name{font-weight:700;color:var(--text);white-space:nowrap}
+.card-outsource .co-dates{color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-flex;align-items:center;gap:5px}
+.card-outsource .co-dates b{font-weight:700;color:var(--text2)}
+.card-outsource .co-arrow{color:var(--text3);opacity:.7}
+.co-dot{display:inline-block;width:7px;height:7px;border-radius:50%;flex:none}
 
 @media(max-width:900px){
   .detail-inner{grid-template-columns:1fr}
@@ -416,7 +427,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.11.0</div>
+    <div class="ver">v2.13.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -698,7 +709,7 @@ tr:hover .del-btn{opacity:1}
         <select id="f-status"><option>Confirmed</option><option>In Progress</option><option>QC</option><option>Ready for Invoice</option><option>Invoiced</option><option>Completed</option><option>Need Purchase Order</option></select>
       </div>
       <div class="form-group"><label>Payment</label>
-        <select id="f-payment"><option value="Unpaid">Unpaid</option><option value="Partial">Partial</option><option value="Paid">Paid</option></select>
+        <select id="f-payment"><option value="Unpaid">Open</option><option value="Partial">Partial</option><option value="Paid">Paid</option></select>
       </div>
       <div class="form-group"><label>Invoice #</label><input id="f-invoice" type="text" placeholder="e.g. 6300"></div>
       <div class="form-group full"><label>Notes</label><textarea id="f-notes" placeholder="Additional notes…"></textarea></div>
@@ -795,16 +806,19 @@ const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 const EXTERNAL_SET = new Set(EXTERNAL_PROCESSES);
 function isExternal(name){ return EXTERNAL_SET.has(name); }
 function procUnit(name){ return isExternal(name) ? 'd' : 'h'; }
+// Colors are grouped (not per-process) to keep the calendar, queues and cards calm:
+// one tone for all in-house work, one for purchasing, one for outsourcing.
+const GROUP_COLORS = { internal:'#64748B', purchasing:'#C08A2E', outsource:'#A8443A' };
 const PROCESS_COLORS = {
-  'Program':'#534AB7',
-  'Laser':'#185FA5',
-  'De-Burr/Finish':'#5F5E5A',
-  'Form':'#0F6E56',
-  'Machining':'#BA7517',
-  'Weld':'#D85A30',
-  'Hardware/Assembly':'#3B6D11',
-  'Purchasing- Material':'#993556','Purchasing- Hardware':'#993556','Purchasing- Tooling':'#993556',
-  'Outsource- Plating':'#A32D2D','Outsource- Paint':'#A32D2D','Outsource- Machining':'#A32D2D','Outsource- Other':'#A32D2D'
+  'Program':GROUP_COLORS.internal,
+  'Laser':GROUP_COLORS.internal,
+  'De-Burr/Finish':GROUP_COLORS.internal,
+  'Form':GROUP_COLORS.internal,
+  'Machining':GROUP_COLORS.internal,
+  'Weld':GROUP_COLORS.internal,
+  'Hardware/Assembly':GROUP_COLORS.internal,
+  'Purchasing- Material':GROUP_COLORS.purchasing,'Purchasing- Hardware':GROUP_COLORS.purchasing,'Purchasing- Tooling':GROUP_COLORS.purchasing,
+  'Outsource- Plating':GROUP_COLORS.outsource,'Outsource- Paint':GROUP_COLORS.outsource,'Outsource- Machining':GROUP_COLORS.outsource,'Outsource- Other':GROUP_COLORS.outsource
 };
 const DEFAULT_DURATIONS = {
   'Purchasing- Material':5,'Purchasing- Hardware':5,'Purchasing- Tooling':7,
@@ -816,6 +830,7 @@ const PRIORITIES = [{v:0,label:'Hot'},{v:1,label:'High'},{v:2,label:'Normal'},{v
 const PRIORITY_LABEL = {0:'Hot',1:'High',2:'Normal',3:'Low'};
 const PRIORITY_COLOR = {0:'#A32D2D',1:'#BA7517',2:'#5F5E5A',3:'#888780'};
 const PAY_CLASS = {Unpaid:'pay-unpaid',Partial:'pay-partial',Paid:'pay-paid'};
+const PAY_LABEL = {Unpaid:'Open',Partial:'Partial',Paid:'Paid'};  // display label only — stored value stays 'Unpaid'
 
 let orders=[], expanded=new Set(), collapsedGroups=new Set();
 let _didInitCollapse=false;
@@ -930,7 +945,7 @@ function render(){
         <td style="text-align:center;${dueOverdue?'color:var(--red);font-weight:700':'color:var(--text3)'}">${gdays!==null?gdays:''}</td>
         <td>${statusBadges}</td>
         <td></td>
-        <td><span class="pay-pill ${PAY_CLASS[payRoll]||'pay-unpaid'}">${payRoll}</span></td>
+        <td><span class="pay-pill ${PAY_CLASS[payRoll]||'pay-unpaid'}">${PAY_LABEL[payRoll]||payRoll}</span></td>
       </tr>`;
       if(!collapsed) items.forEach(r=>{html+=lineRow(r,true);if(expanded.has(r.id))html+=detailRow(r);});
     });
@@ -947,6 +962,27 @@ const CARD_SORTS=[
   {key:'newest',   label:'Newest',   icon:'sparkles'},
 ];
 const STATUS_SORT_ORDER={'Need Purchase Order':0,'Confirmed':1,'In Progress':2,'QC':3,'Ready for Invoice':4,'Invoiced':5,'Completed':6};
+
+// Short, friendly name for a process: "Outsource- Plating" → "Plating"
+function shortProc(name){ return (name||'').replace(/^(Outsource|Purchasing)-\s*/,''); }
+// Icon + date wording differ for buying material (inbound) vs sending parts out.
+function extKind(name){
+  return String(name).startsWith('Purchasing-')
+    ? {group:'purchasing', icon:'shopping-cart', a:'order', b:'in'}
+    : {group:'outsource',  icon:'truck-delivery', a:'out',   b:'back'};
+}
+// The next external gate (purchasing OR outsource) for a line item, with its
+// computed dates. We surface only the FIRST upcoming one for a quick glance.
+function firstExtStep(r){
+  const steps=computeStepDates(r);           // external steps only, in run order
+  return steps.find(s=>!s.done) || null;     // first not-yet-done external step
+}
+// Earliest upcoming external step across all line items in a PO group.
+function poFirstExt(items){
+  let best=null;
+  items.forEach(r=>{ const s=firstExtStep(r); if(s && (!best||s.start<best.start)) best={...s,order:r}; });
+  return best;
+}
 
 function renderSortbar(){
   const sb=document.getElementById('sortbar'); if(!sb) return;
@@ -1039,14 +1075,35 @@ function renderCards(){
         const days=daysUntil(r.due);
         const clip=r.drawing&&r.drawing.url?'<i class="ti ti-paperclip" style="font-size:11px;color:var(--blue);margin-right:3px"></i>':'';
         const det=expanded.has(r.id)?`<div class="ci-detail">${detailInner(r)}</div>`:'';
+        const os=firstExtStep(r);
+        const osLine=os?(()=>{const k=extKind(os.name);return `<span class="ci-out" title="${shortProc(os.name)}: ${k.a} ${fmtDate(toISO(os.start))} → ${k.b} ${fmtDate(toISO(os.end))}"><span class="co-dot" style="background:${PROCESS_COLORS[os.name]||'#888'}"></span>${shortProc(os.name)} ${k.a} ${fmtDate(toISO(os.start))}</span>`;})():'';
         return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}" onclick="window._tl('${r.id}',event)">
           <span class="ci-job">${r.job||'—'}</span>
-          <span class="ci-desc" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}">${clip}${r.desc||r.part||'<span style="color:var(--text3)">(no description)</span>'}</span>
+          <div class="ci-desc">
+            <span class="ci-desc-main" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}">${clip}${r.desc||r.part||'<span style="color:var(--text3)">(no description)</span>'}</span>
+            ${osLine}
+          </div>
           <span class="ci-qty">${r.qty||''}</span>
           <span class="ci-due">${r.due?fmtDate(r.due):'—'}${r.due?' '+cardDaysLabel(days):''}</span>
           <span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span>
         </div>${det}`;
       }).join('')+`</div>`;
+    }
+    // PO-level glance: earliest upcoming purchasing/outsource gate across the PO
+    const poExt=poFirstExt(g.items);
+    let outsourceStrip='';
+    if(poExt){
+      const k=extKind(poExt.name);
+      const c=PROCESS_COLORS[poExt.name]||'#888';
+      const outISO=toISO(poExt.start), backISO=toISO(poExt.end);
+      const dleft=daysUntil(outISO);
+      const outStyle=(dleft!==null&&dleft<0)?'color:var(--red);font-weight:700':'';
+      outsourceStrip=`<div class="card-outsource" title="${shortProc(poExt.name)} — ${k.a} ${fmtDate(outISO)}, ${k.b} ${fmtDate(backISO)}">
+        <span class="co-dot" style="background:${c}"></span>
+        <i class="ti ti-${k.icon} co-ic" style="color:${c}"></i>
+        <span class="co-name">${shortProc(poExt.name)}</span>
+        <span class="co-dates"><b style="${outStyle}">${k.a} ${fmtDate(outISO)}</b><span class="co-arrow">→</span>${k.b} ${fmtDate(backISO)}</span>
+      </div>`;
     }
     return `<div class="po-card${expandedCard?' expanded':''}" onclick="window._tcard('${gkE}')">
       <div class="card-accent" style="background:${accColor}"></div>
@@ -1062,7 +1119,8 @@ function renderCards(){
           <div class="card-stat"><span class="cs-label">PO Value</span><span class="cs-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
           <div class="card-stat"><span class="cs-label">Earliest Due</span><span class="cs-val" style="${dueValStyle}">${dueVal}</span></div>
         </div>
-        <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${g.payRoll}</span></div>
+        <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span></div>
+        ${outsourceStrip}
       </div>
       <span class="card-chevron">›</span>
       ${itemsHtml}
@@ -1096,7 +1154,7 @@ function lineRow(r,ind){
     <td>${fmtDays(days)}</td>
     <td><span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span></td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','invoice')">${r.invoice||''}</td>
-    <td>${showPay?`<span class="pay-badge ${PAY_CLASS[pay]||'pay-unpaid'}" onclick="window._pp('${r.id}',event)">${pay}</span>`:''}</td>
+    <td>${showPay?`<span class="pay-badge ${PAY_CLASS[pay]||'pay-unpaid'}" onclick="window._pp('${r.id}',event)">${PAY_LABEL[pay]||pay}</span>`:''}</td>
   </tr>`;
 }
 
@@ -1269,7 +1327,7 @@ window._ec=(e,td,id,field)=>{e.stopPropagation();const cur=td.textContent;const 
 window._editDate=(e,id,field)=>{e.stopPropagation();const td=e.currentTarget;const r=orders.find(o=>o.id===id);const inp=document.createElement('input');inp.type='date';inp.className='cell-edit';inp.value=(r&&r[field])||'';td.innerHTML='';td.appendChild(inp);inp.focus();try{inp.showPicker&&inp.showPicker();}catch(_){}function commit(){const rr=orders.find(o=>o.id===id);if(rr){rr[field]=inp.value;saveDB();}render();}inp.addEventListener('blur',commit);inp.addEventListener('change',commit);inp.addEventListener('keydown',ev=>{if(ev.key==='Enter')inp.blur();if(ev.key==='Escape')render();});};
 window._sp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('status-picker');picker.innerHTML=`<div class="picker-label">Change Status</div>`+STATUSES.map(s=>`<div class="picker-item" onclick="window._ss('${id}','${s}')"><span class="status-badge ${STATUS_CLASS[s]}">${s}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._ss=(id,status)=>{const r=orders.find(o=>o.id===id);if(r){r.status=status;if(['Invoiced','Ready for Invoice'].includes(status)&&!r.payment)r.payment='Unpaid';saveDB();render();}document.getElementById('status-picker').style.display='none';};
-window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
+window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${PAY_LABEL[p]||p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._pps=(id,pay)=>{const r=orders.find(o=>o.id===id);if(r){r.payment=pay;saveDB();render();}document.getElementById('pay-picker').style.display='none';};
 window._oe=(id)=>openEdit(id);
 window._archiveOrder=(id)=>{
@@ -1846,7 +1904,7 @@ function renderArchive(){
       <td>${r.qty||''}</td>
       <td>${total?fmtMoney(total):''}</td>
       <td>${r.invoice||''}</td>
-      <td><span class="status-badge ${payCls}" style="pointer-events:none">${r.payment||'Unpaid'}</span></td>
+      <td><span class="status-badge ${payCls}" style="pointer-events:none">${PAY_LABEL[r.payment||'Unpaid']||r.payment||'Open'}</span></td>
       <td style="font-size:12px;color:var(--text2)">${arch}</td>
       <td><button class="btn sm" onclick="window._unarchiveOrder('${r.id}')"><i class="ti ti-arrow-back-up"></i> Restore</button></td>
     </tr>`;
