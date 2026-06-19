@@ -113,6 +113,7 @@ select:focus{border-color:var(--green)}
 .q-row.q-done{opacity:.6}
 .q-badge{font-size:10px;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
 .qp-select{font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:6px;padding:3px 6px;background:var(--card);cursor:pointer}
+.q-needby{font-size:12px;padding:4px 6px;border:1px solid var(--border2);border-radius:6px;background:var(--card)}
 .q-thumb{width:40px;height:40px;object-fit:cover;border:1px solid var(--border2);border-radius:6px;cursor:pointer;vertical-align:middle;transition:transform .1s}
 .q-thumb:hover{transform:scale(1.08);border-color:var(--blue)}
 .q-draw-btn{min-width:54px;height:40px;padding:0 8px;border:1px solid var(--blue);border-radius:6px;background:#f3f8ff;cursor:pointer;color:var(--blue);font-size:11px;font-weight:700;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1.1}
@@ -556,7 +557,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.30.0</div>
+    <div class="ver">v2.31.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -1421,7 +1422,8 @@ function detailInner(r){
       ? `<input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Business days" style="width:48px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
          <span style="font-size:10px;color:var(--text3);min-width:26px">days</span>
          <input type="date" value="${step.start||''}" title="Override start (optional anchor)" onchange="window._stepStart('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>`
-      : `<span style="font-size:10px;color:var(--text3)">done</span>
+      : `<span style="font-size:10px;color:var(--text3)">need by</span>
+         <input type="date" value="${step.needBy||''}" title="Need this step finished by" style="width:138px" onchange="window._stepNeedBy('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
          <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`;
     return`<div class="sched-step ss-on" style="${done?'opacity:.62':''}">
@@ -2072,6 +2074,11 @@ function renderQueues(){
     const dueTxt=r.due?fmtDate(r.due):'—';
     const overdue = r.due && new Date(r.due+'T00:00:00') < new Date(new Date().toDateString());
     const done = status==='completed';
+    const nb = step.needBy||'';
+    const nbOver = nb && !done && new Date(nb+'T00:00:00') < new Date(new Date().toDateString());
+    const needByCell = (op||done)
+      ? `<span style="${nbOver?'color:var(--red);font-weight:700':'color:var(--text2)'}">${nb?fmtDate(nb):'—'}</span>`
+      : `<input type="date" value="${nb}" class="q-needby" title="Need this step finished by" style="${nbOver?'color:var(--red);font-weight:600':''}" onclick="event.stopPropagation()" onchange="window._stepNeedBy('${r.id}','${proc.replace(/'/g,"\\'")}',this.value)">`;
     const qtyInput = done
       ? `<span style="color:var(--text3)">${step.qtyDone??need} / ${need||'—'}</span>`
       : `<input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" style="width:64px" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${proc.replace(/'/g,"\\'")}',this.value)">`;
@@ -2096,6 +2103,7 @@ function renderQueues(){
       <td>${r.part?`<b>${r.part}</b>`:''}${r.part&&r.desc?' · ':''}${r.desc||''}</td>
       <td style="text-align:center">${drawCell}</td>
       <td style="${overdue&&!done?'color:var(--red);font-weight:600':''}">${dueTxt}</td>
+      <td style="text-align:center">${needByCell}</td>
       <td style="text-align:center">${need||'—'}</td>
       <td style="text-align:center">${qtyInput}</td>
       <td style="text-align:center">
@@ -2114,6 +2122,7 @@ function renderQueues(){
       <th>Part Number / Description</th>
       <th style="width:72px;text-align:center">Drawing</th>
       <th style="width:96px">Due Date</th>
+      <th style="width:110px;text-align:center">Need By</th>
       <th style="width:70px;text-align:center">Qty</th>
       <th style="width:90px;text-align:center">Completed</th>
       <th style="width:60px;text-align:center">Done</th>
@@ -2628,6 +2637,14 @@ window._stepStart = (id, name, val) => {
   const step = sch.steps.find(s=>s.name===name);
   step.start = val;
   saveDB();
+};
+window._stepNeedBy = (id, name, val) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const sch = ensureSchedule(r);
+  const step = sch.steps.find(s=>s.name===name); if(!step) return;
+  step.needBy = val||'';
+  saveDB();
+  if(document.getElementById('queues-page')?.style.display !== 'none') renderQueues();
 };
 window._stepQty = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
