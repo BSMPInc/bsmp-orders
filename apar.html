@@ -129,6 +129,13 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .ai-drop .d1{font-size:13px;font-weight:600;color:var(--text)}
 .ai-status{font-size:12px;color:var(--text2);margin-top:12px;white-space:pre-wrap;background:#f7f9fc;border:1px solid var(--border);border-radius:8px;padding:9px 11px;max-height:120px;overflow:auto}
 .ai-status.err{background:#A32D2D10;border-color:#A32D2D33;color:var(--red)}
+.ai-cta{display:flex;align-items:center;gap:14px;background:#2f8f6b0d;border:1px solid #2f8f6b33;border-radius:12px;padding:13px 16px;margin-bottom:16px;cursor:pointer;transition:.15s}
+.ai-cta:hover{background:#2f8f6b18;border-color:#2f8f6b55}
+.ai-cta>i{font-size:26px;color:var(--ar)}
+.ai-cta .t{font-size:14px;font-weight:700;color:var(--text)}
+.ai-cta .s{font-size:12px;color:var(--text2);margin-top:1px}
+.ai-cta .spacer{flex:1}
+.ai-cta-btn{background:var(--navy);color:#fff;font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
 /* login */
 #login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:100}
 .login-box{background:#fff;border-radius:16px;padding:34px 30px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
@@ -175,7 +182,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="side-foot">
       Bert's Sheet Metal Products
       <div class="so" onclick="doSignOut()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
-      <div class="ver">v0.1.3 · shares order-tracker data</div>
+      <div class="ver">v0.1.4 · shares order-tracker data</div>
     </div>
   </nav>
   <div class="main">
@@ -404,6 +411,12 @@ function renderDash(entries){
   const apOver=entries.filter(e=>e.type==='ap'&&statusOf(e)==='over').reduce((s,e)=>s+((e.amount||0)-(e.paid||0)),0);
   const net=arOut-apOut;
   $('content').innerHTML=`
+    <div class="ai-cta" onclick="openAI()">
+      <i class="ti ti-sparkles"></i>
+      <div><div class="t">AI Extract an invoice or bill</div><div class="s">Drop a PDF or photo — Claude fills in the receivable or payable for you</div></div>
+      <span class="spacer"></span>
+      <span class="ai-cta-btn"><i class="ti ti-upload"></i> Start</span>
+    </div>
     <div class="stats">
       <div class="stat ar"><div class="l">Receivable</div><div class="v">${fmtMoney(arOut)}</div><div class="s">owed to you</div></div>
       <div class="stat ap"><div class="l">Payable</div><div class="v">${fmtMoney(apOut)}</div><div class="s">you owe</div></div>
