@@ -114,6 +114,7 @@ select:focus{border-color:var(--green)}
 .q-badge{font-size:10px;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
 .qp-select{font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:6px;padding:3px 6px;background:var(--card);cursor:pointer}
 .q-needby{font-size:12px;padding:4px 6px;border:1px solid var(--border2);border-radius:6px;background:var(--card)}
+.inv-chip{display:inline-block;font-size:10px;font-weight:700;color:#0a7050;background:#0a705015;border:1px solid #0a705033;border-radius:5px;padding:0 6px;margin-left:6px;vertical-align:middle}
 .q-thumb{width:40px;height:40px;object-fit:cover;border:1px solid var(--border2);border-radius:6px;cursor:pointer;vertical-align:middle;transition:transform .1s}
 .q-thumb:hover{transform:scale(1.08);border-color:var(--blue)}
 .q-draw-btn{min-width:54px;height:40px;padding:0 8px;border:1px solid var(--blue);border-radius:6px;background:#f3f8ff;cursor:pointer;color:var(--blue);font-size:11px;font-weight:700;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:0;line-height:1.1}
@@ -424,6 +425,15 @@ tr:hover .del-btn{opacity:1}
 .pm-status{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
 .pm-status .status-badge{font-size:9.5px;padding:1px 7px}
 .po-detail-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden}
+.po-ref{padding:9px 16px;border-top:1px solid var(--border2);background:#fafbfd}
+.po-ref-h{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+.po-ref-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:2px 0}
+.po-ref-ic{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+.po-ref-ic svg{width:14px;height:14px}
+.po-ref-proc{font-weight:700;min-width:92px}
+.po-ref-vend{color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.po-ref-num{font-weight:700;color:#0a7050;background:#0a705012;border:1px solid #0a705033;border-radius:5px;padding:1px 7px;font-size:11px;white-space:nowrap}
+.po-ref-detail{font-size:11px;color:var(--text3);margin:0 0 4px 26px}
 .po-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:box-shadow .15s,transform .08s}
 .po-card:hover{box-shadow:0 2px 8px rgba(0,0,0,0.10),0 6px 22px rgba(0,0,0,0.08)}
 .po-card:active{transform:scale(.997)}
@@ -536,6 +546,7 @@ tr:hover .del-btn{opacity:1}
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
     <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
+    <div class="nav-item" id="nav-issuedpos" onclick="showPage('issuedpos')"><i class="ti ti-receipt"></i> Issued POs</div>
     <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
   </div>
   <div class="sidebar-section mgr-only">
@@ -557,7 +568,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.31.0</div>
+    <div class="ver">v2.34.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -693,6 +704,17 @@ tr:hover .del-btn{opacity:1}
   <!-- Need PO Page -->
   <div id="needpo-page" style="display:none">
     <div id="needpo-body"></div>
+  </div>
+
+  <!-- Issued POs Page -->
+  <div id="issuedpos-page" style="display:none">
+    <div class="table-card">
+      <div class="table-card-header">
+        <i class="ti ti-receipt"></i><span>Issued Purchase Orders</span>
+        <input id="issuedpos-search" placeholder="Search vendor, PO #, customer…" oninput="renderIssuedPOs()" style="margin-left:auto;font-size:13px;padding:7px 11px;border:1px solid var(--border2);border-radius:8px;font-family:inherit;width:280px;max-width:44vw">
+      </div>
+      <div id="issuedpos-body"></div>
+    </div>
   </div>
 
   <!-- Archive Page -->
@@ -920,6 +942,21 @@ tr:hover .del-btn{opacity:1}
 </div>
 <div class="picker" id="status-picker"></div>
 <div class="picker" id="pay-picker"></div>
+
+<!-- Invoice number dialog (Ready for Invoice → Invoiced) -->
+<div class="modal-bg" id="invoice-modal" style="display:none;align-items:center;justify-content:center;z-index:72">
+  <div class="modal" style="max-width:380px;padding:22px">
+    <div style="font-size:17px;font-weight:800;margin-bottom:3px">Mark as Invoiced</div>
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:16px" id="inv-sub"></div>
+    <label style="font-size:11px;font-weight:600;color:var(--text2)">Invoice #</label>
+    <input id="inv-number" type="text" placeholder="e.g. 1042" onkeydown="if(event.key==='Enter')window._confirmInvoice()" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-top:5px">
+    <div style="font-size:11px;color:var(--text3);margin-top:7px">This number carries to the Invoiced list and the AP/AR receivable for this order.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="window._cancelInvoice()">Cancel</button>
+      <button class="btn green" onclick="window._confirmInvoice()">Mark Invoiced</button>
+    </div>
+  </div>
+</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -1261,6 +1298,7 @@ function poItemsHtml(g){
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
         <span class="ci-desc-main" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}">${clip}${r.desc||r.part||'<span style="color:var(--text3)">(no description)</span>'}</span>
+        ${r.invoice?`<span class="inv-chip" title="Invoice number">Inv ${r.invoice}</span>`:''}
         ${osLine}
       </div>
       <span class="ci-qty">${r.qty||''}</span>
@@ -1308,6 +1346,25 @@ function condensedCard(g){
 }
 
 // Full detail pane on the right
+function vendorPOsHtml(g){
+  const rows=[];
+  g.items.forEach(r=>{
+    ((r.schedule&&r.schedule.steps)||[]).forEach(s=>{
+      if(s&&s.vendorPO&&String(s.vendorPO).trim())
+        rows.push({name:s.name,vendor:s.vendor||'',po:String(s.vendorPO).trim(),detail:s.detail||''});
+    });
+  });
+  if(!rows.length) return '';
+  return `<div class="po-ref">
+    <div class="po-ref-h"><i class="ti ti-receipt"></i> Vendor POs</div>
+    ${rows.map(x=>{const c=PROCESS_COLORS[x.name]||'#888';return `<div class="po-ref-row">
+      <span class="po-ref-ic" style="color:${c}">${procIcon(x.name,14)}</span>
+      <span class="po-ref-proc">${shortProc(x.name)}</span>
+      <span class="po-ref-vend">${x.vendor||'<span style=\"color:var(--text3)\">no vendor</span>'}</span>
+      <span class="po-ref-num">PO ${x.po}</span>
+    </div>${x.detail?`<div class="po-ref-detail">${x.detail}</div>`:''}`;}).join('')}
+  </div>`;
+}
 function poDetailHtml(g){
   const accColor=STATUS_ACCENT[g.statuses[0]]||'#9aa3b2';
   const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
@@ -1331,6 +1388,7 @@ function poDetailHtml(g){
       <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span></div>
       ${outsourceStripHtml(g)}
     </div>
+    ${vendorPOsHtml(g)}
     ${poItemsHtml(g)}
   </div>`;
 }
@@ -1565,7 +1623,35 @@ window._del=(id)=>{if(!confirm('Delete this order?'))return;orders=orders.filter
 window._ec=(e,td,id,field)=>{e.stopPropagation();const cur=td.textContent;const inp=document.createElement('input');inp.className='cell-edit';inp.value=cur;td.innerHTML='';td.appendChild(inp);inp.focus();inp.select();function commit(){const r=orders.find(o=>o.id===id);if(r){r[field]=inp.value.trim();if(field==='qty'||field==='cost'){r.qty=parseFloat(r.qty)||0;r.cost=parseFloat(r.cost)||0;r.total=r.qty*r.cost;}saveDB();}render();}inp.addEventListener('blur',commit);inp.addEventListener('keydown',e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape')render();});};
 window._editDate=(e,id,field)=>{e.stopPropagation();const td=e.currentTarget;const r=orders.find(o=>o.id===id);const inp=document.createElement('input');inp.type='date';inp.className='cell-edit';inp.value=(r&&r[field])||'';td.innerHTML='';td.appendChild(inp);inp.focus();try{inp.showPicker&&inp.showPicker();}catch(_){}function commit(){const rr=orders.find(o=>o.id===id);if(rr){rr[field]=inp.value;saveDB();}render();}inp.addEventListener('blur',commit);inp.addEventListener('change',commit);inp.addEventListener('keydown',ev=>{if(ev.key==='Enter')inp.blur();if(ev.key==='Escape')render();});};
 window._sp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('status-picker');picker.innerHTML=`<div class="picker-label">Change Status</div>`+STATUSES.map(s=>`<div class="picker-item" onclick="window._ss('${id}','${s}')"><span class="status-badge ${STATUS_CLASS[s]}">${s}</span></div>`).join('');showPicker(picker,e.currentTarget);};
-window._ss=(id,status)=>{const r=orders.find(o=>o.id===id);if(r){r.status=status;if(['Invoiced','Ready for Invoice'].includes(status)&&!r.payment)r.payment='Unpaid';saveDB();render();}document.getElementById('status-picker').style.display='none';};
+window._ss=(id,status)=>{
+  const r=orders.find(o=>o.id===id);
+  document.getElementById('status-picker').style.display='none';
+  if(!r) return;
+  // moving to Invoiced → capture the invoice number first
+  if(status==='Invoiced' && r.status!=='Invoiced'){
+    _pendingInvoiceId=id;
+    const inp=document.getElementById('inv-number'); inp.value=r.invoice||'';
+    document.getElementById('inv-sub').textContent=(r.customer||'')+(r.po?(' · PO '+r.po):'')+(r.job?(' · Job '+r.job):'');
+    document.getElementById('invoice-modal').style.display='flex';
+    setTimeout(()=>inp.focus(),30);
+    return;
+  }
+  r.status=status;
+  if(['Invoiced','Ready for Invoice'].includes(status)&&!r.payment)r.payment='Unpaid';
+  saveDB();render();
+};
+let _pendingInvoiceId=null;
+window._confirmInvoice=()=>{
+  const r=orders.find(o=>o.id===_pendingInvoiceId);
+  if(r){
+    r.invoice=(document.getElementById('inv-number').value||'').trim();
+    r.status='Invoiced';
+    if(!r.payment)r.payment='Unpaid';
+    saveDB();render();
+  }
+  document.getElementById('invoice-modal').style.display='none'; _pendingInvoiceId=null;
+};
+window._cancelInvoice=()=>{ document.getElementById('invoice-modal').style.display='none'; _pendingInvoiceId=null; };
 window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${PAY_LABEL[p]||p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._pps=(id,pay)=>{const r=orders.find(o=>o.id===id);if(r){r.payment=pay;saveDB();render();}document.getElementById('pay-picker').style.display='none';};
 window._oe=(id)=>openEdit(id);
@@ -1964,12 +2050,13 @@ const PAGE_META = {
   customers:{title:'Customers',      sub:'Customer index & PO format notes'},
   schedule: {title:'Incoming / Outgoing', sub:'External steps — parts out to vendors and material/POs coming in'},
   needpo:   {title:'Need PO',         sub:'Assign the vendor and our PO number for outside processes'},
+  issuedpos:{title:'Issued POs',      sub:'History of every purchase order assigned to a vendor'},
   archive:  {title:'Archive',        sub:'Completed orders you have archived'},
   settings: {title:'Process Times',  sub:'Lead times for outside processes'}
 };
 window.showPage = (page) => {
   if(userRole==='operator') page='queues';   // operators are locked to Work Queues
-  ['orders','queues','customers','schedule','needpo','archive','settings'].forEach(p=>{
+  ['orders','queues','customers','schedule','needpo','issuedpos','archive','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -1984,12 +2071,14 @@ window.showPage = (page) => {
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
   if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
   if(page==='needpo') document.getElementById('nav-needpo')?.classList.add('active');
+  if(page==='issuedpos') document.getElementById('nav-issuedpos')?.classList.add('active');
   if(page==='archive') document.getElementById('nav-archive')?.classList.add('active');
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
   if(page==='queues') renderQueues();
   if(page==='customers') renderCustomers();
   if(page==='schedule') renderSchedule();
   if(page==='needpo') renderNeedPO();
+  if(page==='issuedpos') renderIssuedPOs();
   if(page==='archive') renderArchive();
   if(page==='settings') renderDurationSettings();
 };
@@ -2489,6 +2578,7 @@ window._iodSaveVendor = (id,name)=>{
   s.vendor=(document.getElementById('iod-vendor').value||'').trim();
   s.vendorPO=(document.getElementById('iod-vpo').value||'').trim();
   const dt=document.getElementById('iod-detail'); if(dt) s.detail=(dt.value||'').trim();
+  if(s.vendorPO && !s.poAt) s.poAt=toISO(new Date()); if(!s.vendorPO) delete s.poAt;
   saveDB(); render(); renderSchedule();
   const tick=document.getElementById('iod-saved'); if(tick){ tick.style.opacity='1'; setTimeout(()=>tick.style.opacity='0',1200); }
 };
@@ -2539,6 +2629,7 @@ window.assignVendorPO=(id,name,i)=>{
   const s=_extStep(id,name); if(!s) return;
   const v=document.getElementById(`np-v-${id}-${i}`), p=document.getElementById(`np-p-${id}-${i}`), d=document.getElementById(`np-d-${id}-${i}`);
   s.vendor=(v&&v.value||'').trim(); s.vendorPO=(p&&p.value||'').trim(); s.detail=(d&&d.value||'').trim();
+  if(s.vendorPO && !s.poAt) s.poAt=toISO(new Date()); if(!s.vendorPO) delete s.poAt;
   saveDB(); invalidateSched(); render(); renderSchedule(); renderNeedPO(); updateNavBadges();
 };
 window.npoComplete=(id)=>{
@@ -2546,6 +2637,62 @@ window.npoComplete=(id)=>{
   r.status='Confirmed';
   saveDB(); invalidateSched(); render(); renderSchedule(); renderNeedPO(); updateNavBadges();
 };
+
+// ── Issued POs page: history/log of every vendor PO assigned ──────────────────
+function renderIssuedPOs(){
+  const host=document.getElementById('issuedpos-body'); if(!host) return;
+  const q=(document.getElementById('issuedpos-search')?.value||'').toLowerCase().trim();
+  const rows=[];
+  orders.forEach(r=>{
+    ((r.schedule&&r.schedule.steps)||[]).forEach(s=>{
+      if(s&&s.vendorPO&&String(s.vendorPO).trim()){
+        rows.push({
+          po:String(s.vendorPO).trim(), vendor:s.vendor||'', proc:s.name,
+          customer:r.customer||'', custPO:r.po||'', job:r.job||'', part:r.part||r.desc||'',
+          detail:s.detail||'', at:s.poAt||'', received:!!(s.receivedAt||s.done), sent:!!s.sentAt,
+          archived:!!r.archived, orderId:r.id
+        });
+      }
+    });
+  });
+  rows.sort((a,b)=>(b.at||'').localeCompare(a.at||'') || (b.po).localeCompare(a.po));
+  let view=rows;
+  if(q) view=rows.filter(x=>[x.po,x.vendor,x.proc,x.customer,x.custPO,x.job,x.part,x.detail].join(' ').toLowerCase().includes(q));
+  if(!view.length){
+    host.innerHTML=`<div class="np-empty"><i class="ti ti-receipt-off"></i><div>${q?'No POs match your search':'No purchase orders issued yet'}</div><span>${q?'Try a different vendor, PO number, or customer.':'Assign a vendor and our PO number on the Need PO page and it logs here.'}</span></div>`;
+    return;
+  }
+  const stat=(x)=> x.received
+    ? `<span class="q-badge" style="background:#eaf5d8;color:#3B6D11">Received</span>`
+    : x.sent ? `<span class="q-badge" style="background:#e7f0fb;color:#185FA5">Sent</span>`
+             : `<span class="q-badge" style="background:#f1efe8;color:#5F5E5A">Open</span>`;
+  const totalLabel = `${view.length} PO${view.length!==1?'s':''}`;
+  host.innerHTML=`<div class="table-scroll"><table class="q-table ipo-table">
+    <thead><tr>
+      <th style="width:120px">Our PO #</th>
+      <th style="width:180px">Vendor</th>
+      <th style="width:130px">Process</th>
+      <th>For (customer · job · part)</th>
+      <th style="width:96px">Date</th>
+      <th style="width:96px">Status</th>
+      <th style="width:56px;text-align:center">Open</th>
+    </tr></thead>
+    <tbody>${view.map(x=>{
+      const col=PROCESS_COLORS[x.proc]||'#888';
+      return `<tr class="q-row${x.archived?' q-done':''}">
+        <td><span class="po-ref-num">PO ${esc2(x.po)}</span></td>
+        <td><b>${esc2(x.vendor)||'<span style=\"color:var(--text3)\">—</span>'}</b></td>
+        <td><span style="display:inline-flex;align-items:center;gap:6px"><span style="color:${col};display:inline-flex">${procIcon(x.proc,15)}</span>${shortProc(x.proc)}</span></td>
+        <td>${esc2(x.customer)||'—'}${x.job?' · <b>'+esc2(x.job)+'</b>':''}${x.part?' · '+esc2(x.part):''}${x.detail?`<div style="font-size:11px;color:var(--text3)">${esc2(x.detail)}</div>`:''}</td>
+        <td>${x.at?fmtDate(x.at):'<span style="color:var(--text3)">—</span>'}</td>
+        <td>${stat(x)}</td>
+        <td style="text-align:center"><button class="q-open-btn" title="Open order" onclick="window._openInOrders('${x.orderId}',event)"><i class="ti ti-external-link"></i></button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>
+  <div style="padding:9px 14px;font-size:12px;color:var(--text3)">${totalLabel}${q?` matching “${esc2(q)}”`:''}</div>`;
+}
+function esc2(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 
 
 window._toggleStep = (id, name, e) => {
