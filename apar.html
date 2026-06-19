@@ -122,6 +122,13 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .pay-log .pl:last-child{border-bottom:none}
 .pay-log .pl .rm{color:var(--red);cursor:pointer;font-size:11px}
 .m-foot{display:flex;justify-content:space-between;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+.ai-drop{border:2px dashed var(--border);border-radius:12px;padding:28px 16px;text-align:center;color:var(--text2);cursor:pointer;transition:.12s}
+.ai-drop:hover{border-color:#c4ccd8}
+.ai-drop.drag{border-color:var(--ar);background:#2f8f6b0d}
+.ai-drop i{font-size:30px;opacity:.5;display:block;margin-bottom:8px;color:var(--ar)}
+.ai-drop .d1{font-size:13px;font-weight:600;color:var(--text)}
+.ai-status{font-size:12px;color:var(--text2);margin-top:12px;white-space:pre-wrap;background:#f7f9fc;border:1px solid var(--border);border-radius:8px;padding:9px 11px;max-height:120px;overflow:auto}
+.ai-status.err{background:#A32D2D10;border-color:#A32D2D33;color:var(--red)}
 /* login */
 #login{position:fixed;inset:0;background:var(--navy);display:flex;align-items:center;justify-content:center;z-index:100}
 .login-box{background:#fff;border-radius:16px;padding:34px 30px;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
@@ -163,11 +170,12 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="sec-label">Tools</div>
     <div class="nav-item" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add receivable</div>
     <div class="nav-item" onclick="openManual('ap')"><i class="ti ti-plus"></i> Add payable</div>
+    <div class="nav-item" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</div>
     <div class="nav-item" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</div>
     <div class="side-foot">
       Bert's Sheet Metal Products
       <div class="so" onclick="doSignOut()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
-      <div class="ver">v0.1.2 · shares order-tracker data</div>
+      <div class="ver">v0.1.3 · shares order-tracker data</div>
     </div>
   </nav>
   <div class="main">
@@ -181,6 +189,40 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 
 <!-- Payment / detail modal -->
 <div class="modal-bg" id="pay-modal"><div class="modal"><div id="pay-body"></div></div></div>
+
+<!-- AI extract modal -->
+<div class="modal-bg" id="ai-modal">
+  <div class="modal">
+    <div class="m-head ar" id="ai-head">
+      <div class="m-t"><div class="t1">AI Extract</div><div class="t2">Drop an invoice or bill — Claude fills in the details</div></div>
+      <button class="m-x" onclick="closeAI()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="m-body">
+      <div class="seg" style="margin-bottom:12px;width:100%">
+        <button id="ai-t-ar" class="active" style="flex:1" onclick="setAIType('ar')">Receivable · customer invoice</button>
+        <button id="ai-t-ap" style="flex:1" onclick="setAIType('ap')">Payable · vendor bill</button>
+      </div>
+      <div class="ai-drop" id="ai-drop" onclick="document.getElementById('ai-file').click()"
+        ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+        ondrop="event.preventDefault();this.classList.remove('drag');aiHandle(event.dataTransfer.files[0])">
+        <i class="ti ti-cloud-upload"></i>
+        <div class="d1">Drag &amp; drop a document here, or click to choose</div>
+        <div style="font-size:11px;margin-top:4px">PDF, PNG, or JPG</div>
+      </div>
+      <input type="file" id="ai-file" accept="image/*,application/pdf" style="display:none" onchange="aiHandle(this.files[0])">
+      <div class="ai-status" id="ai-status" style="display:none"></div>
+      <div id="ai-preview" style="display:none">
+        <div class="m-sect">Review &amp; edit</div>
+        <div class="fld"><label id="ai-l-party">Customer</label><input id="ai-party"></div>
+        <div class="fld"><label id="ai-l-ref">Invoice #</label><input id="ai-ref"></div>
+        <div class="frow"><div class="fld"><label>Amount</label><input id="ai-amt" type="number" step="0.01"></div><div class="fld"><label>Issue date</label><input id="ai-issue" type="date"></div></div>
+        <div class="frow"><div class="fld"><label>Terms (net days)</label><input id="ai-terms" type="number"></div><div class="fld"><label>Due date</label><input id="ai-due" type="date"></div></div>
+        <div class="fld"><label>Description</label><input id="ai-desc"></div>
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn" onclick="closeAI()">Cancel</button><button class="btn green" id="ai-add" onclick="aiAdd()" style="display:none">Add entry</button></div>
+  </div>
+</div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -523,6 +565,63 @@ window.exportCSV=()=>{
 
 window.go=go;
 window.doSignOut=()=>signOut(auth);
+
+// ── AI Extract (drag & drop an invoice/bill) ─────────────────────────────────
+let aiType='ar';
+window.openAI=()=>{
+  setAIType('ar');
+  $('ai-status').style.display='none'; $('ai-preview').style.display='none'; $('ai-add').style.display='none';
+  $('ai-file').value=''; $('ai-modal').style.display='flex';
+};
+window.closeAI=()=>{ $('ai-modal').style.display='none'; };
+window.setAIType=(t)=>{
+  aiType=t;
+  $('ai-t-ar').classList.toggle('active',t==='ar');
+  $('ai-t-ap').classList.toggle('active',t==='ap');
+  $('ai-head').className='m-head '+t;
+  $('ai-l-party').textContent=(t==='ar')?'Customer':'Vendor';
+  $('ai-l-ref').textContent=(t==='ar')?'Invoice #':'Bill / PO #';
+};
+window.aiHandle=async(file)=>{
+  if(!file)return;
+  const st=$('ai-status'); st.style.display='block'; st.className='ai-status';
+  st.innerHTML='<i class="ti ti-loader"></i> Reading '+esc(file.name)+'…';
+  $('ai-preview').style.display='none'; $('ai-add').style.display='none';
+  const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
+  try{
+    const b64=await toB64(file); const isImg=(file.type||'').startsWith('image/');
+    const prompt = (aiType==='ar')
+      ? "This document is an INVOICE issued BY Bert's Sheet Metal Products (BSMP / Bert's Welding) TO a customer. Return ONE JSON object: party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON object, no markdown."
+      : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, description = a short summary such as the service/process or PO reference. Return ONLY the JSON object, no markdown.";
+    const content = isImg
+      ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
+      : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:2000,messages:[{role:'user',content}]})});
+    const data=await resp.json();
+    if(data.error){ st.className='ai-status err'; st.textContent='API error: '+(data.error.message||JSON.stringify(data.error)); return; }
+    const text=(data.content||[]).map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
+    let obj; try{ obj=JSON.parse(text); }catch{ st.className='ai-status err'; st.textContent="Couldn't read that document. Try a clearer scan, or enter it manually."; return; }
+    if(Array.isArray(obj)) obj=obj[0]||{};
+    $('ai-party').value=obj.party||''; $('ai-ref').value=obj.ref||'';
+    $('ai-amt').value=(obj.amount!=null&&obj.amount!=='')?obj.amount:'';
+    $('ai-issue').value=obj.issue||'';
+    $('ai-terms').value=(obj.terms!=null&&obj.terms!=='')?obj.terms:DEFAULT_TERMS;
+    $('ai-due').value=obj.due||'';
+    $('ai-desc').value=obj.description||obj.desc||'';
+    st.className='ai-status'; st.innerHTML='<i class="ti ti-check"></i> Got it — review the details below, then Add entry.';
+    $('ai-preview').style.display='block'; $('ai-add').style.display='inline-block';
+  }catch(err){ st.className='ai-status err'; st.textContent='Error: '+err.message; }
+};
+window.aiAdd=()=>{
+  const party=$('ai-party').value.trim();
+  if(!party){ alert('Enter the '+(aiType==='ar'?'customer':'vendor')+' name'); return; }
+  const id='m_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
+  const o={manual:true,type:aiType,party,ref:$('ai-ref').value.trim(),rel:$('ai-desc').value.trim(),
+    amount:Number($('ai-amt').value)||0,issue:$('ai-issue').value||'',
+    terms:Number($('ai-terms').value)||DEFAULT_TERMS,payments:[]};
+  const due=$('ai-due').value; if(due)o.dueDate=due;
+  writeOverlay(id,o); closeAI(); render(); openEntry(id);
+};
 
 // ── Auth + data wiring ───────────────────────────────────────────────────────
 $('lg-btn').onclick=async()=>{
