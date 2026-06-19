@@ -408,6 +408,7 @@ tr:hover .del-btn{opacity:1}
 .po-mini:hover{border-color:#c4ccd8;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .po-mini.active{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy) inset}
 .po-mini.done{opacity:.55}.po-mini.done:hover{opacity:1}
+.po-mini.done-soft{opacity:.8}.po-mini.done-soft:hover{opacity:1}
 .pm-accent{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
 .pm-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .pm-cust{font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -525,16 +526,16 @@ tr:hover .del-btn{opacity:1}
     <div class="sidebar-section-label op-only" style="display:none">Shop Floor</div>
     <div class="nav-item active mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
+    <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
+    <div class="nav-item mgr-only" id="nav-schedule" onclick="showPage('schedule')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 9h11"/><path d="M12 6l3 3-3 3"/><path d="M20 15H9"/><path d="M12 12l-3 3 3 3"/></svg> <span class="nav-label">Incoming / Outgoing</span></div>
     <div class="nav-item mgr-only" id="nav-ready" onclick="setFilter('Ready for Invoice')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 17v1m0-8v1"/><path d="M13.8 12.2a1.6 1.6 0 0 0-1.8-1.2 1.5 1.5 0 0 0-.2 3h.8a1.5 1.5 0 0 1 .2 3 1.6 1.6 0 0 1-1.8-1.2"/></svg> <span class="nav-label">Ready to Invoice</span><span class="nav-badge" id="badge-ready" style="display:none"></span></div>
     <div class="nav-item mgr-only" onclick="setFilter('Invoiced')"><i class="ti ti-circle-check"></i> Invoiced</div>
-    <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
   </div>
   <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
-    <div class="nav-item" id="nav-schedule" onclick="showPage('schedule')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 9h11"/><path d="M12 6l3 3-3 3"/><path d="M20 15H9"/><path d="M12 12l-3 3 3 3"/></svg> <span class="nav-label">Incoming / Outgoing</span></div>
-    <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
     <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
+    <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
   </div>
   <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Views</div>
@@ -555,7 +556,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.28.0</div>
+    <div class="ver">v2.30.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -1210,8 +1211,12 @@ function poGroups(){
     const newest=items.reduce((m,r)=>{const v=r.ordered||r.id||'';return v>m?v:m;},'');
     // line items ordered by due date then job for the expanded list
     const sortedItems=[...items].sort((a,b)=>((a.due||'9999')+'').localeCompare((b.due||'9999')+'')||((a.job||'')+'').localeCompare((b.job||''))); 
+    // sink tier: 0 = active, 1 = all completed (above invoiced), 2 = all invoiced (bottom)
+    const allDone=items.every(r=>['Completed','Invoiced'].includes(r.status));
+    const allInv=items.length>0 && items.every(r=>r.status==='Invoiced');
+    const doneRank=!allDone?0:(allInv?2:1);
     groups.push({gk,items:sortedItems,customer:items[0].customer||'',po:items[0].po||'verbal',
-      gtotal,gqty,statuses,overdue,gdue,gdays,dueOverdue,payRoll,newest,allInvoiced:isDoneGroup(items)});
+      gtotal,gqty,statuses,overdue,gdue,gdays,dueOverdue,payRoll,newest,doneRank,allInvoiced:isDoneGroup(items)});
   });
   return groups;
 }
@@ -1219,8 +1224,8 @@ function poGroups(){
 function sortGroups(groups){
   const dir=cardSortDir;
   return groups.sort((a,b)=>{
-    // fully-invoiced POs always sink to the bottom, whatever the sort
-    if(a.allInvoiced!==b.allInvoiced) return a.allInvoiced?1:-1;
+    // sink tier first: active → completed → invoiced, regardless of the chosen sort
+    if(a.doneRank!==b.doneRank) return a.doneRank-b.doneRank;
     let c=0;
     switch(cardSortKey){
       case 'customer': c=a.customer.localeCompare(b.customer); break;
@@ -1292,7 +1297,7 @@ function condensedCard(g){
   const ps=[...new Set(g.items.map(i=>(i.part||'').trim()).filter(Boolean))];
   const partChip=ps.length?`<span class="pm-part" title="${ps.join(', ').replace(/"/g,'&quot;')}"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
   const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
-  return `<div class="po-mini${g.gk===selectedPO?' active':''}${g.allInvoiced?' done':''}" onclick="window._selPO('${gkE}')">
+  return `<div class="po-mini${g.gk===selectedPO?' active':''}${g.allInvoiced?' done':(g.doneRank===1?' done-soft':'')}" onclick="window._selPO('${gkE}')">
     <div class="pm-accent" style="background:${accColor}"></div>
     <div class="pm-top"><span class="pm-cust">${g.customer||'—'}</span><span class="pm-po">#${g.po}</span></div>
     <div class="pm-mid">${partChip}<span class="pm-count">${g.items.length} item${g.items.length!==1?'s':''}</span></div>
