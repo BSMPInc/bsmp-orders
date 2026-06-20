@@ -378,6 +378,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
         <div class="fld"><label id="ai-l-ref">Invoice #</label><input id="ai-ref"></div>
         <div class="frow"><div class="fld"><label>Amount</label><input id="ai-amt" type="number" step="0.01"></div><div class="fld"><label>Issue date</label><input id="ai-issue" type="date"></div></div>
         <div class="frow"><div class="fld"><label>Terms (net days)</label><input id="ai-terms" type="number"></div><div class="fld"><label>Due date</label><input id="ai-due" type="date"></div></div>
+        <div class="fld" id="ai-account-wrap" style="display:none"><label>Account <span id="ai-account-hint" style="font-weight:600;font-size:11px;color:var(--text3)"></span></label><select id="ai-account"></select></div>
         <div class="fld"><label>Description</label><input id="ai-desc"></div>
       </div>
     </div>
@@ -425,6 +426,7 @@ let overlay = {};         // apar/entries node: payments + manual entries + edit
 let accounts = {};        // apar/accounts node: {id:{name,balance}} bank sub-accounts
 let recurring = {};       // apar/recurring node: recurring bill templates
 let depositBuckets = {};  // apar/depositBuckets node: Profit First allocation buckets
+let vendorAccounts = {};  // apar/vendorAccounts node: {vendorKey:accountId} learned assignments
 let page = 'dash';
 let DEFAULT_TERMS = 30;   // Net 30 default
 
@@ -1362,6 +1364,7 @@ let aiType='ar';
 window.openAI=()=>{
   setAIType('ar');
   $('ai-status').style.display='none'; $('ai-preview').style.display='none'; $('ai-add').style.display='none';
+  const aw=$('ai-account-wrap'); if(aw)aw.style.display='none';
   $('ai-file').value=''; $('ai-modal').style.display='flex';
 };
 window.closeAI=()=>{ $('ai-modal').style.display='none'; };
@@ -1408,9 +1411,13 @@ window.aiHandle=async(file)=>{
   const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
   try{
     const b64=await toB64(file); const isImg=(file.type||'').startsWith('image/');
+    const acctList=Object.entries(accounts).map(([id,a])=>a.name).filter(Boolean);
+    const acctClause = (aiType==='ap' && acctList.length)
+      ? ` Also return account = the single best-fit bank account for paying this bill, chosen ONLY from this exact list: [${acctList.map(n=>'"'+n+'"').join(', ')}]. Match on what the vendor is for (e.g. power/water/gas/internet → a utilities account, wages/payroll taxes → a payroll account, owner draws → an owner account). If none clearly fits, return account as an empty string. Use the exact account name from the list, nothing else.`
+      : '';
     const prompt = (aiType==='ar')
       ? "This document is an INVOICE issued BY Bert's Sheet Metal Products (BSMP / Bert's Welding) TO a customer. Return ONE JSON object: party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON object, no markdown."
-      : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, description = a short summary such as the service/process or PO reference. Return ONLY the JSON object, no markdown.";
+      : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON object, no markdown.";
     const content = isImg
       ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
       : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
@@ -1426,10 +1433,30 @@ window.aiHandle=async(file)=>{
     $('ai-terms').value=(obj.terms!=null&&obj.terms!=='')?obj.terms:DEFAULT_TERMS;
     $('ai-due').value=obj.due||'';
     $('ai-desc').value=obj.description||obj.desc||'';
+    // resolve account: vendor memory wins, else AI suggestion, else unassigned (AP only)
+    if(aiType==='ap'){
+      const memId=vendorAccounts[vendorKey(obj.party||'')]||'';
+      let chosen='', hint='';
+      if(memId&&accounts[memId]){ chosen=memId; hint='remembered from last time'; }
+      else if(obj.account){
+        const match=Object.entries(accounts).find(([id,a])=>(a.name||'').toLowerCase()===String(obj.account).toLowerCase());
+        if(match){ chosen=match[0]; hint='AI suggestion'; }
+      }
+      fillAccountSelect(chosen);
+      $('ai-account-hint').textContent=chosen?'· '+hint:'· not sure — left Unassigned';
+      $('ai-account-wrap').style.display='block';
+    } else {
+      $('ai-account-wrap').style.display='none';
+    }
     st.className='ai-status'; st.innerHTML='<i class="ti ti-check"></i> Got it — review the details below, then Add entry.';
     $('ai-preview').style.display='block'; $('ai-add').style.display='inline-block';
   }catch(err){ st.className='ai-status err'; st.textContent='Error: '+err.message; }
 };
+function vendorKey(name){ return (name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'_'; }
+function fillAccountSelect(selId){
+  const sel=$('ai-account'); if(!sel)return;
+  sel.innerHTML='<option value="">Unassigned</option>'+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${id===selId?'selected':''}>${esc(a.name)}</option>`).join('');
+}
 window.aiAdd=()=>{
   const party=$('ai-party').value.trim();
   if(!party){ alert('Enter the '+(aiType==='ar'?'customer':'vendor')+' name'); return; }
@@ -1438,6 +1465,13 @@ window.aiAdd=()=>{
     amount:Number($('ai-amt').value)||0,issue:$('ai-issue').value||'',
     terms:Number($('ai-terms').value)||DEFAULT_TERMS,payments:[]};
   const due=$('ai-due').value; if(due)o.dueDate=due;
+  if(aiType==='ap'){
+    const acctId=$('ai-account')?$('ai-account').value:'';
+    if(acctId){ o.account=acctId; o.payStatus='open'; }
+    // remember this vendor→account choice for next time (only when an account is chosen)
+    const vk=vendorKey(party);
+    if(acctId && vendorAccounts[vk]!==acctId){ vendorAccounts[vk]=acctId; set(ref(db,'apar/vendorAccounts/'+vk),acctId); }
+  }
   writeOverlay(id,o); closeAI(); render(); openEntry(id);
 };
 
@@ -1458,6 +1492,7 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
     onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
+    onValue(ref(db,'apar/vendorAccounts'),snap=>{ vendorAccounts=snap.val()||{}; });
   }else{
     $('login').style.display='flex'; $('app').style.display='none';
   }
