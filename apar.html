@@ -115,13 +115,19 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-bills-section h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
 .acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
 .acct-bills{font-size:12.5px}
-.acct-bill{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);cursor:pointer}
+.acct-bill-head{display:grid;grid-template-columns:1.6fr 1.1fr 1fr 0.8fr;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border)}
+.acct-bill-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);cursor:pointer;display:flex;align-items:center;gap:2px;user-select:none}
+.acct-bill-head span:hover{color:var(--text2)}
+.acct-bill-head i{font-size:12px}
+.acct-bill{display:grid;grid-template-columns:1.6fr 1.1fr 1fr 0.8fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
 .acct-bill:last-child{border-bottom:none}
-.acct-bill:hover .ab-party{text-decoration:underline}
-.acct-bill .ab-due{color:var(--text3);min-width:54px}
+.acct-bill .ab-party{cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-bill .ab-party:hover{text-decoration:underline}
+.acct-bill .ab-due{color:var(--text3);cursor:pointer}
 .acct-bill .ab-due.over{color:var(--red);font-weight:700}
+.acct-bill .ab-amt{cursor:pointer;text-align:right;font-weight:600}
 .acct-empty{color:var(--text3);font-size:12px;padding:8px 2px}
-.acct-sel{font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;font-family:inherit;background:#fff;color:var(--text)}
+.acct-sel{font-size:11.5px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:#fff;color:var(--text);width:100%;max-width:120px}
 /* buttons */
 .btn{font-size:13px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;cursor:pointer}
 .btn:hover{background:#f5f7fa}
@@ -356,7 +362,7 @@ function allEntries(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',void:!!o.void};
+    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',void:!!o.void};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -366,7 +372,7 @@ function allEntries(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:o.party||'—',ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',auto:false,void:!!o.void,manual:true});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',auto:false,void:!!o.void,manual:true});
     }
   });
   return merged.filter(e=>!e.void);
@@ -498,6 +504,31 @@ function renderAging(entries){
 }
 
 // ── Cash Flow (per-account AP drain projection) ────────────────────────────────
+const PAY_METHODS=['Check','Zelle','ACH/Debit','Credit Card','Cash','Wire','Other'];
+let cashSort={}; // {sectionKey:{key:'due'|'party'|'method'|'amount',dir:1|-1}}
+function sortBills(list,sectionKey){
+  const s=cashSort[sectionKey]||{key:'due',dir:1};
+  const arr=[...list];
+  arr.sort((a,b)=>{
+    let av,bv;
+    if(s.key==='party'){av=(a.party||'').toLowerCase();bv=(b.party||'').toLowerCase();}
+    else if(s.key==='method'){av=(a.planMethod||'').toLowerCase();bv=(b.planMethod||'').toLowerCase();}
+    else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
+    else{av=a.due||'9999-99-99';bv=b.due||'9999-99-99';}
+    if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
+  });
+  return arr;
+}
+window.sortCash=(sectionKey,key)=>{
+  const cur=cashSort[sectionKey]||{key:'due',dir:1};
+  cashSort[sectionKey]=(cur.key===key)?{key,dir:-cur.dir}:{key,dir:1};
+  render();
+};
+function sortArrow(sectionKey,key){
+  const s=cashSort[sectionKey]||{key:'due',dir:1};
+  if(s.key!==key)return'';
+  return `<i class="ti ti-chevron-${s.dir===1?'up':'down'}"></i>`;
+}
 function renderCash(entries){
   const ap=entries.filter(e=>e.type==='ap');
   const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
@@ -505,15 +536,27 @@ function renderCash(entries){
   const totalBal=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
   const totalSched=ap.filter(e=>e.account&&unpaid(e)>0.005).reduce((s,e)=>s+unpaid(e),0);
 
+  const methodSelect=(e)=>`<select class="acct-sel" onclick="event.stopPropagation()" onchange="setPlanMethod('${e.id}',this.value)">
+    <option value="">—</option>
+    ${PAY_METHODS.map(m=>`<option ${e.planMethod===m?'selected':''}>${m}</option>`).join('')}
+  </select>`;
+
   const billRow=e=>{
     const d=daysUntil(e.due);
     const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
-    return `<div class="acct-bill" onclick="openEntry('${e.id}')">
-      <span class="ab-party">${esc(e.party)}</span>
-      <span class="ab-due${d!=null&&d<0?' over':''}">${dueTxt}</span>
-      <span>${fmtMoney(unpaid(e))}</span>
+    return `<div class="acct-bill">
+      <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
+      <span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>
+      ${methodSelect(e)}
+      <span class="ab-amt" onclick="openEntry('${e.id}')">${fmtMoney(unpaid(e))}</span>
     </div>`;
   };
+  const billHead=(sectionKey)=>`<div class="acct-bill-head">
+    <span onclick="sortCash('${sectionKey}','party')">Vendor ${sortArrow(sectionKey,'party')}</span>
+    <span onclick="sortCash('${sectionKey}','due')">Due ${sortArrow(sectionKey,'due')}</span>
+    <span onclick="sortCash('${sectionKey}','method')">Method ${sortArrow(sectionKey,'method')}</span>
+    <span onclick="sortCash('${sectionKey}','amount')">Amount ${sortArrow(sectionKey,'amount')}</span>
+  </div>`;
 
   const acctTile=(id,a)=>{
     const bills=ap.filter(e=>e.account===id&&unpaid(e)>0.005);
@@ -532,18 +575,18 @@ function renderCash(entries){
   };
 
   const acctBillSection=(id,a)=>{
-    const bills=sortEntries(ap.filter(e=>e.account===id&&unpaid(e)>0.005));
+    const bills=sortBills(ap.filter(e=>e.account===id&&unpaid(e)>0.005),id);
     if(!bills.length)return'';
     const sched=bills.reduce((s,e)=>s+unpaid(e),0);
     return `<div class="acct-bills-section"><h3>${esc(a.name)}<span class="tot">${fmtMoney(sched)} scheduled</span></h3>
-      <div class="acct-bills">${bills.map(billRow).join('')}</div>
+      <div class="acct-bills">${billHead(id)}${bills.map(billRow).join('')}</div>
     </div>`;
   };
 
-  const unassigned=sortEntries(ap.filter(e=>!e.account&&unpaid(e)>0.005));
+  const unassigned=sortBills(ap.filter(e=>!e.account&&unpaid(e)>0.005),'unassigned');
   const unassignedTotal=unassigned.reduce((s,e)=>s+unpaid(e),0);
   const unassignedSection=`<div class="acct-bills-section"><h3>Unassigned<span class="tot">${fmtMoney(unassignedTotal)}</span></h3>
-    <div class="acct-bills">${unassigned.length?unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>
+    <div class="acct-bills">${unassigned.length?billHead('unassigned')+unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>
   </div>`;
 
   $('content').innerHTML=`
@@ -573,6 +616,20 @@ window.setAccountBalance=(id,val)=>{
 window.deleteAccount=(id,name)=>{
   if(!confirm(`Delete account "${name}"? Bills assigned to it will move to Unassigned.`))return;
   remove(ref(db,'apar/accounts/'+id));
+};
+window.setPlanMethod=(id,val)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  o.planMethod=val||'';
+  writeOverlay(id,o); render();
+};
+window.setRowAccount=(id,val)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  o.account=val||'';
+  writeOverlay(id,o); render();
 };
 
 // ── Entry / payment dialog ───────────────────────────────────────────────────
