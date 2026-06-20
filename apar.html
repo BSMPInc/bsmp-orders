@@ -112,6 +112,15 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-num .v.neg{color:var(--red)}
 .acct-num input{border:none;background:transparent;font-size:14px;font-weight:800;width:100%;padding:0;margin-top:2px;font-family:inherit;color:var(--text)}
 .acct-num input:focus{outline:none}
+.bal-hint{font-size:8px;font-weight:700;color:var(--navy);background:#2c57401a;border-radius:4px;padding:1px 4px;margin-left:4px;letter-spacing:.02em}
+.bal-edit{display:flex;align-items:center;gap:2px;margin-top:4px;border:1.5px solid var(--navy3);border-radius:7px;background:#fff;padding:4px 7px;transition:border-color .12s,box-shadow .12s}
+.bal-edit:hover{border-color:var(--navy)}
+.bal-edit:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px #2c574022}
+.bal-cur{font-size:14px;font-weight:800;color:var(--text3)}
+.bal-edit input{border:none;background:transparent;font-size:15px;font-weight:800;width:100%;min-width:0;padding:0;margin:0;font-family:inherit;color:var(--text)}
+.bal-edit input:focus{outline:none}
+.bal-pen{font-size:12px;color:var(--text3);flex-shrink:0}
+.bal-edit:hover .bal-pen,.bal-edit:focus-within .bal-pen{color:var(--navy)}
 .acct-bills-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
 .acct-bills-section h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
 .acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
@@ -135,6 +144,29 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-sel.status-attention{border-color:#A32D2D55;background:#A32D2D0d;color:var(--red);font-weight:700}
 .acct-sel.status-scheduled{border-color:#3a6ea555;background:#3a6ea50d;color:var(--blue);font-weight:700}
 .acct-sel.status-withdrawn{border-color:#2f8f6b55;background:#2f8f6b0d;color:var(--green);font-weight:700}
+.acct-bill .ab-due.wd-date input{border:1px solid #2f8f6b44;background:#2f8f6b0d;border-radius:6px;font-size:11px;font-family:inherit;color:var(--green);padding:3px 5px;width:100%;min-width:0}
+.acct-bill .ab-due.wd-date input:focus{outline:none;border-color:var(--green)}
+.acct-foot{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.acct-mini{font-size:9.5px;font-weight:700;color:var(--text3);background:#0000000a;border-radius:5px;padding:2px 6px}
+.paid-toggle{margin-left:6px;font-size:11px;font-weight:600;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.paid-toggle:hover{background:#f5f7fa;color:var(--text)}
+.paid-toggle i{font-size:13px}
+.acct-bills-section h3 .tot{margin-left:auto}
+.arch-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.arch-head{display:grid;grid-template-columns:1.6fr 1fr 1.1fr 0.9fr 0.9fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.arch-head span{cursor:pointer;display:flex;align-items:center;gap:2px;user-select:none}
+.arch-head span:nth-child(5){justify-content:flex-end}
+.arch-head i{font-size:12px}
+.arch-row{display:grid;grid-template-columns:1.6fr 1fr 1.1fr 0.9fr 0.9fr auto;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--border2);font-size:12.5px}
+.arch-row:last-child{border-bottom:none}
+.arch-party{font-weight:700;cursor:pointer}
+.arch-party:hover{text-decoration:underline}
+.arch-amt{text-align:right;font-weight:700}
+@media(max-width:720px){
+  .arch-head{display:none}
+  .arch-row{grid-template-columns:1fr 1fr;gap:6px}
+  .arch-amt{text-align:left}
+}
 /* recurring */
 .recur-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .recur-head{display:grid;grid-template-columns:2.4fr 1.2fr 0.9fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
@@ -280,6 +312,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" id="nav-cash" onclick="go('cash')"><i class="ti ti-building-bank"></i> Cash Flow</div>
     <div class="nav-item" id="nav-recur" onclick="go('recur')"><i class="ti ti-repeat"></i> Recurring <span class="nb" id="nb-recur" style="display:none"></span></div>
     <div class="nav-item" id="nav-deposit" onclick="go('deposit')"><i class="ti ti-pie-chart"></i> Deposits</div>
+    <div class="nav-item" id="nav-archive" onclick="go('archive')"><i class="ti ti-archive"></i> Archive</div>
     <div class="sec-label">Tools</div>
     <div class="nav-item" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add receivable</div>
     <div class="nav-item" onclick="openManual('ap')"><i class="ti ti-plus"></i> Add payable</div>
@@ -427,7 +460,7 @@ function allEntries(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',void:!!o.void};
+    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -437,7 +470,7 @@ function allEntries(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:o.party||'—',ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',auto:false,void:!!o.void,manual:true});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,manual:true});
     }
   });
   return merged.filter(e=>!e.void);
@@ -464,7 +497,8 @@ function go(p){
     aging:['Aging','Outstanding balances by age'],
     cash:['Cash Flow','Bank account balances vs. what\'s scheduled to come out'],
     recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
-    deposit:['Deposits','Split incoming money across your Profit First buckets']}[p];
+    deposit:['Deposits','Split incoming money across your Profit First buckets'],
+    archive:['Archive','Paid bills, auto-filed 45 days after withdrawal']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
   render();
 }
@@ -478,6 +512,7 @@ function render(){
   else if(page==='cash') renderCash(entries);
   else if(page==='recur') renderRecurring();
   else if(page==='deposit') renderDeposit();
+  else if(page==='archive') renderArchive();
 }
 function updateBadges(entries){
   const oa=entries.filter(e=>e.type==='ar'&&statusOf(e)==='over').length;
@@ -585,6 +620,7 @@ const PAY_STATUSES=[
 const STATUS_ORDER={open:0,attention:1,scheduled:2,withdrawn:3};
 const statusLabel=k=>(PAY_STATUSES.find(s=>s.k===k)||PAY_STATUSES[0]).label;
 let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'status'|'amount',dir:1|-1}}
+let hidePaid={}; // {sectionKey:true} -> hide withdrawn (paid) bills in that section
 function sortBills(list,sectionKey){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   const arr=[...list];
@@ -605,6 +641,7 @@ window.sortCash=(sectionKey,key)=>{
   cashSort[sectionKey]=(cur.key===key)?{key,dir:-cur.dir}:{key,dir:1};
   render();
 };
+window.toggleHidePaid=(sectionKey)=>{ hidePaid[sectionKey]=!hidePaid[sectionKey]; render(); };
 function sortArrow(sectionKey,key){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   if(s.key!==key)return'';
@@ -627,9 +664,10 @@ function renderCash(entries){
   ];
   const colorFor=id=>ACCT_COLORS[ids.indexOf(id)%ACCT_COLORS.length]||ACCT_COLORS[0];
   const totalBal=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
-  const assignedUnpaid=ap.filter(e=>e.account&&unpaid(e)>0.005);
-  const totalSched=assignedUnpaid.filter(e=>(e.payStatus||'open')!=='withdrawn').reduce((s,e)=>s+unpaid(e),0);
-  const totalWd=assignedUnpaid.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+  // only bills marked 'scheduled' reduce the balance; archived bills drop out entirely
+  const assignedActive=ap.filter(e=>e.account&&unpaid(e)>0.005&&!e.archived);
+  const totalSched=assignedActive.filter(e=>(e.payStatus||'open')==='scheduled').reduce((s,e)=>s+unpaid(e),0);
+  const totalWd=assignedActive.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
 
   const methodSelect=(e)=>`<select class="acct-sel" onclick="event.stopPropagation()" onchange="setPlanMethod('${e.id}',this.value)">
     <option value="">—</option>
@@ -647,9 +685,12 @@ function renderCash(entries){
     const d=daysUntil(e.due);
     const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
     const wd=(e.payStatus||'open')==='withdrawn';
+    const dueCell=wd
+      ? `<span class="ab-due wd-date"><input type="date" value="${e.withdrawnDate||''}" onclick="event.stopPropagation()" onchange="setWithdrawnDate('${e.id}',this.value)" title="Withdrawal date"></span>`
+      : `<span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>`;
     return `<div class="acct-bill${wd?' is-wd':''}">
       <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
-      <span class="ab-due${d!=null&&d<0&&!wd?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>
+      ${dueCell}
       ${accountSelect(e)}
       ${methodSelect(e)}
       ${statusSelect(e)}
@@ -666,9 +707,10 @@ function renderCash(entries){
   </div>`;
 
   const acctTile=(id,a)=>{
-    const bills=ap.filter(e=>e.account===id&&unpaid(e)>0.005);
-    const sched=bills.filter(e=>(e.payStatus||'open')!=='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const bills=ap.filter(e=>e.account===id&&unpaid(e)>0.005&&!e.archived);
+    const sched=bills.filter(e=>(e.payStatus||'open')==='scheduled').reduce((s,e)=>s+unpaid(e),0);
     const wd=bills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const pending=bills.filter(e=>['open','attention'].includes(e.payStatus||'open')).reduce((s,e)=>s+unpaid(e),0);
     const bal=Number(a.balance)||0;
     const proj=bal-sched;
     const c=colorFor(id);
@@ -678,26 +720,34 @@ function renderCash(entries){
         <input class="acct-name" value="${esc(a.name)}" onchange="renameAccount('${id}',this.value)">
         <span class="acct-del" onclick="deleteAccount('${id}','${esc(a.name)}')" title="Delete account"><i class="ti ti-trash"></i></span>
       </div>
-      <div class="acct-num"><div class="l">Balance</div><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"></div>
+      <div class="acct-num bal-row"><div class="l">Balance <span class="bal-hint">you enter</span></div>
+        <div class="bal-edit"><span class="bal-cur">$</span><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"><i class="ti ti-pencil bal-pen"></i></div>
+      </div>
       <div class="acct-num"><div class="l">Scheduled out</div><div class="v">${fmtMoney(sched)}</div></div>
-      <div class="acct-num"><div class="l">Withdrawn</div><div class="v" style="color:var(--text2)">${fmtMoney(wd)}</div></div>
       <div class="acct-num"><div class="l">Projected</div><div class="v${proj<0?' neg':''}">${fmtMoney(proj)}</div></div>
+      <div class="acct-foot">${pending>0.005?`<span class="acct-mini">${fmtMoney(pending)} assigned, not scheduled</span>`:''}${wd>0.005?`<span class="acct-mini">${fmtMoney(wd)} withdrawn</span>`:''}</div>
     </div>`;
   };
 
   const acctBillSection=(id,a)=>{
-    const bills=sortBills(ap.filter(e=>e.account===id&&unpaid(e)>0.005),id);
-    if(!bills.length)return'';
-    const sched=bills.filter(e=>(e.payStatus||'open')!=='withdrawn').reduce((s,e)=>s+unpaid(e),0);
-    const wd=bills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const allBills=ap.filter(e=>e.account===id&&unpaid(e)>0.005&&!e.archived);
+    if(!allBills.length)return'';
+    const paidCount=allBills.filter(e=>(e.payStatus||'open')==='withdrawn').length;
+    const hidden=!!hidePaid[id];
+    const shown=hidden?allBills.filter(e=>(e.payStatus||'open')!=='withdrawn'):allBills;
+    const bills=sortBills(shown,id);
+    const sched=allBills.filter(e=>(e.payStatus||'open')==='scheduled').reduce((s,e)=>s+unpaid(e),0);
+    const wd=allBills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
     const totTxt=`${fmtMoney(sched)} scheduled`+(wd>0.005?` · ${fmtMoney(wd)} withdrawn`:'');
     const c=colorFor(id);
-    return `<div class="acct-bills-section" style="border-left:4px solid ${c.bar}"><h3><span class="acct-dot" style="background:${c.bar}"></span>${esc(a.name)}<span class="tot">${totTxt}</span></h3>
-      <div class="acct-bills">${billHead(id)}${bills.map(billRow).join('')}</div>
+    const toggle=paidCount>0?`<button class="paid-toggle" onclick="toggleHidePaid('${id}')"><i class="ti ti-eye${hidden?'':'-off'}"></i> ${hidden?`Show ${paidCount} paid`:'Hide paid'}</button>`:'';
+    const body=bills.length?billHead(id)+bills.map(billRow).join(''):'<div class="acct-empty">All paid bills hidden.</div>';
+    return `<div class="acct-bills-section" style="border-left:4px solid ${c.bar}"><h3><span class="acct-dot" style="background:${c.bar}"></span>${esc(a.name)}<span class="tot">${totTxt}</span>${toggle}</h3>
+      <div class="acct-bills">${body}</div>
     </div>`;
   };
 
-  const unassigned=sortBills(ap.filter(e=>!e.account&&unpaid(e)>0.005),'unassigned');
+  const unassigned=sortBills(ap.filter(e=>!e.account&&unpaid(e)>0.005&&!e.archived),'unassigned');
   const unassignedTotal=unassigned.reduce((s,e)=>s+unpaid(e),0);
   const unassignedSection=`<div class="acct-bills-section"><h3>Unassigned<span class="tot">${fmtMoney(unassignedTotal)}</span></h3>
     <div class="acct-bills">${unassigned.length?billHead('unassigned')+unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>
@@ -706,8 +756,8 @@ function renderCash(entries){
   $('content').innerHTML=`
     <div class="stats">
       <div class="stat"><div class="l">Total balance</div><div class="v">${fmtMoney(totalBal)}</div><div class="s">across ${ids.length} account${ids.length!==1?'s':''}</div></div>
-      <div class="stat over"><div class="l">Scheduled out</div><div class="v">${fmtMoney(totalSched)}</div><div class="s">committed, not yet gone</div></div>
-      <div class="stat"><div class="l">Withdrawn</div><div class="v" style="color:var(--text2)">${fmtMoney(totalWd)}</div><div class="s">already left the account</div></div>
+      <div class="stat over"><div class="l">Scheduled out</div><div class="v">${fmtMoney(totalSched)}</div><div class="s">scheduled, not yet gone</div></div>
+      <div class="stat"><div class="l">Withdrawn</div><div class="v" style="color:var(--text2)">${fmtMoney(totalWd)}</div><div class="s">already left (last 45d)</div></div>
       <div class="stat"><div class="l">Projected total</div><div class="v" style="color:${(totalBal-totalSched)<0?'var(--red)':'var(--text)'}">${fmtMoney(totalBal-totalSched)}</div><div class="s">balance − scheduled</div></div>
     </div>
     <div class="toolbar"><button class="btn primary" onclick="addAccount()"><i class="ti ti-plus"></i> Add account</button></div>
@@ -751,8 +801,39 @@ window.setPayStatus=(id,val)=>{
   const o=ovl(id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
   o.payStatus=val||'open';
+  if(val==='withdrawn'){ if(!o.withdrawnDate) o.withdrawnDate=toISO(new Date()); }
+  else { delete o.withdrawnDate; }
   writeOverlay(id,o); render();
 };
+window.setWithdrawnDate=(id,val)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  o.withdrawnDate=val||'';
+  writeOverlay(id,o); render();
+};
+window.unarchiveBill=(id)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  o.archived=false; writeOverlay(id,o); render();
+};
+// auto-archive: withdrawn bills move to Archive once 45+ days past their withdrawal date
+let _archiveRan=false;
+function autoArchiveOld(){
+  if(_archiveRan)return; _archiveRan=true;
+  allEntries().forEach(e=>{
+    if(e.type==='ap'&&!e.archived&&(e.payStatus||'')==='withdrawn'&&e.withdrawnDate){
+      const days=daysSince(e.withdrawnDate);
+      if(days!=null&&days>=45){
+        const o=ovl(e.id);
+        if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+        o.archived=true; overlay[e.id]=o; set(ref(db,'apar/entries/'+e.id),o);
+      }
+    }
+  });
+}
+function daysSince(iso){ if(!iso)return null; const d=daysUntil(iso); return d==null?null:-d; }
 
 // ── Recurring bills (templates that generate payables each cycle) ──────────────
 // Template: {vendor, amount, account, method, autopay, cadence:'monthly'|'weekly',
@@ -1052,6 +1133,54 @@ window.normalizeBuckets=()=>{
   render();
 };
 
+// ── Archive (paid bills auto-filed 45 days after withdrawal) ──────────────────
+let archiveSort={key:'withdrawnDate',dir:-1};
+window.sortArchive=(key)=>{
+  archiveSort=(archiveSort.key===key)?{key,dir:-archiveSort.dir}:{key,dir:key==='withdrawnDate'?-1:1};
+  render();
+};
+function renderArchive(){
+  const arch=allEntries().filter(e=>e.type==='ap'&&e.archived);
+  const total=arch.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
+  const acctName=e=>e.account&&accounts[e.account]?accounts[e.account].name:'—';
+  const s=archiveSort;
+  const sorted=[...arch].sort((a,b)=>{
+    let av,bv;
+    if(s.key==='party'){av=(a.party||'').toLowerCase();bv=(b.party||'').toLowerCase();}
+    else if(s.key==='account'){av=acctName(a).toLowerCase();bv=acctName(b).toLowerCase();}
+    else if(s.key==='method'){av=(a.planMethod||'').toLowerCase();bv=(b.planMethod||'').toLowerCase();}
+    else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
+    else{av=a.withdrawnDate||'';bv=b.withdrawnDate||'';}
+    if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
+  });
+  const arrow=k=>s.key!==k?'':`<i class="ti ti-chevron-${s.dir===1?'up':'down'}"></i>`;
+  const row=e=>`<div class="arch-row">
+    <span onclick="openEntry('${e.id}')" class="arch-party">${esc(e.party)}</span>
+    <span>${e.withdrawnDate?fmtDate(e.withdrawnDate):'—'}</span>
+    <span>${esc(acctName(e))}</span>
+    <span>${esc(e.planMethod||'—')}</span>
+    <span class="arch-amt">${fmtMoney(Math.max(0,(e.amount||0)-(e.paid||0)))}</span>
+    <button class="btn sm" onclick="unarchiveBill('${e.id}')" title="Restore to Cash Flow"><i class="ti ti-arrow-back-up"></i></button>
+  </div>`;
+  $('content').innerHTML=`
+    <div class="stats">
+      <div class="stat"><div class="l">Archived bills</div><div class="v">${arch.length}</div><div class="s">paid & filed</div></div>
+      <div class="stat"><div class="l">Total archived</div><div class="v">${fmtMoney(total)}</div><div class="s">lifetime</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Paid bills move here automatically 45 days after their withdrawal date. Restore one anytime to send it back to Cash Flow.</div>
+    ${arch.length?`<div class="arch-list">
+      <div class="arch-head">
+        <span onclick="sortArchive('party')">Vendor ${arrow('party')}</span>
+        <span onclick="sortArchive('withdrawnDate')">Withdrawn ${arrow('withdrawnDate')}</span>
+        <span onclick="sortArchive('account')">Account ${arrow('account')}</span>
+        <span onclick="sortArchive('method')">Method ${arrow('method')}</span>
+        <span onclick="sortArchive('amount')">Amount ${arrow('amount')}</span>
+        <span></span>
+      </div>
+      ${sorted.map(row).join('')}
+    </div>`:'<div class="empty">Nothing archived yet. Once a withdrawn bill is 45 days past its withdrawal date, it lands here automatically.</div>'}`;
+}
+
 // ── Entry / payment dialog ───────────────────────────────────────────────────
 let _cur=null;
 window.openEntry=(id)=>{
@@ -1268,7 +1397,7 @@ onAuthStateChanged(auth,(user)=>{
   if(user){
     $('login').style.display='none'; $('app').style.display='flex';
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
-    onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; render(); });
+    onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; autoArchiveOld(); render(); });
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
     onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
