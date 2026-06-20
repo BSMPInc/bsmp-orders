@@ -620,7 +620,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.41.0</div>
+    <div class="ver">v2.41.1</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -1941,7 +1941,18 @@ window.saveOrder=()=>{
   const customer=document.getElementById('f-customer').value.trim();if(!customer){alert('Customer name is required.');return;}
   const qty=parseFloat(document.getElementById('f-qty').value)||0,cost=parseFloat(document.getElementById('f-cost').value)||0;
   const ex=editId?orders.find(o=>o.id===editId):{};
-  const order={id:editId||uid(),customer,po:document.getElementById('f-po').value.trim(),job:document.getElementById('f-job').value.trim(),part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),qty,cost,total:qty&&cost?qty*cost:0,ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),currentProcess:(ex||{}).currentProcess||'',completedProcesses:(ex||{}).completedProcesses||[],schedule:(ex||{}).schedule||null};
+  // Start from the existing record so fields the edit form doesn't touch — drawing,
+  // schedule, process state, priority, archive flags, timestamps — are preserved.
+  const order={...(ex||{}),
+    id:editId||uid(),customer,
+    po:document.getElementById('f-po').value.trim(),job:document.getElementById('f-job').value.trim(),
+    part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),
+    qty,cost,total:qty&&cost?qty*cost:0,
+    ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,
+    status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),
+    payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),
+    currentProcess:(ex||{}).currentProcess||'',completedProcesses:(ex||{}).completedProcesses||[],
+    schedule:(ex||{}).schedule||null};
   // if adding a part with copied process steps, seed its schedule
   if(!editId && _prefillSteps){ order.schedule = { steps: _prefillSteps }; }
   _prefillSteps = null;
