@@ -98,8 +98,9 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
 @media(max-width:1100px){.acct-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.acct-grid{grid-template-columns:repeat(2,1fr)}}
-.acct-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px;box-shadow:var(--shadow);min-width:0}
-.acct-top{display:flex;align-items:center;gap:4px;margin-bottom:8px}
+.acct-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px;box-shadow:var(--shadow);min-width:0;overflow:hidden}
+.acct-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block}
+.acct-top{display:flex;align-items:center;gap:6px;margin-bottom:8px}
 .acct-name{font-size:12.5px;font-weight:800;border:none;background:transparent;padding:2px 3px;border-radius:6px;flex:1;min-width:0}
 .acct-name:hover,.acct-name:focus{background:#f5f7fa;outline:none}
 .acct-del{color:var(--text3);cursor:pointer;font-size:12px;padding:3px 4px;border-radius:6px;flex-shrink:0}
@@ -115,11 +116,13 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-bills-section h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
 .acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
 .acct-bills{font-size:12.5px}
-.acct-bill-head{display:grid;grid-template-columns:1.5fr 1fr 1.1fr 1fr 0.8fr;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border)}
+.acct-bill-head{display:grid;grid-template-columns:1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;padding:0 0 6px;border-bottom:1px solid var(--border)}
 .acct-bill-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);cursor:pointer;display:flex;align-items:center;gap:2px;user-select:none}
 .acct-bill-head span:hover{color:var(--text2)}
 .acct-bill-head i{font-size:12px}
-.acct-bill{display:grid;grid-template-columns:1.5fr 1fr 1.1fr 1fr 0.8fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
+.acct-bill{display:grid;grid-template-columns:1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
+.acct-bill.is-wd{opacity:.62}
+.acct-bill.is-wd .ab-amt{text-decoration:line-through;text-decoration-color:var(--text3)}
 .acct-bill:last-child{border-bottom:none}
 .acct-bill .ab-party{cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acct-bill .ab-party:hover{text-decoration:underline}
@@ -128,6 +131,10 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-bill .ab-amt{cursor:pointer;text-align:right;font-weight:600}
 .acct-empty{color:var(--text3);font-size:12px;padding:8px 2px}
 .acct-sel{font-size:11.5px;padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:#fff;color:var(--text);width:100%;min-width:0;max-width:130px}
+.acct-sel.status-open{border-color:var(--border);color:var(--text2)}
+.acct-sel.status-attention{border-color:#A32D2D55;background:#A32D2D0d;color:var(--red);font-weight:700}
+.acct-sel.status-scheduled{border-color:#3a6ea555;background:#3a6ea50d;color:var(--blue);font-weight:700}
+.acct-sel.status-withdrawn{border-color:#2f8f6b55;background:#2f8f6b0d;color:var(--green);font-weight:700}
 /* recurring */
 .recur-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
 .recur-head{display:grid;grid-template-columns:2.4fr 1.2fr 0.9fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
@@ -420,7 +427,7 @@ function allEntries(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',void:!!o.void};
+    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',void:!!o.void};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -430,7 +437,7 @@ function allEntries(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:o.party||'—',ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',auto:false,void:!!o.void,manual:true});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',auto:false,void:!!o.void,manual:true});
     }
   });
   return merged.filter(e=>!e.void);
@@ -569,7 +576,15 @@ function renderAging(entries){
 
 // ── Cash Flow (per-account AP drain projection) ────────────────────────────────
 const PAY_METHODS=['Check','Zelle','ACH/Debit','Credit Card','Cash','Wire','Other'];
-let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'amount',dir:1|-1}}
+const PAY_STATUSES=[
+  {k:'open',label:'Open'},
+  {k:'attention',label:'Attention'},
+  {k:'scheduled',label:'Scheduled'},
+  {k:'withdrawn',label:'Withdrawn'}
+];
+const STATUS_ORDER={open:0,attention:1,scheduled:2,withdrawn:3};
+const statusLabel=k=>(PAY_STATUSES.find(s=>s.k===k)||PAY_STATUSES[0]).label;
+let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'status'|'amount',dir:1|-1}}
 function sortBills(list,sectionKey){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   const arr=[...list];
@@ -578,6 +593,7 @@ function sortBills(list,sectionKey){
     if(s.key==='party'){av=(a.party||'').toLowerCase();bv=(b.party||'').toLowerCase();}
     else if(s.key==='account'){av=(a.account&&accounts[a.account]?accounts[a.account].name:'').toLowerCase();bv=(b.account&&accounts[b.account]?accounts[b.account].name:'').toLowerCase();}
     else if(s.key==='method'){av=(a.planMethod||'').toLowerCase();bv=(b.planMethod||'').toLowerCase();}
+    else if(s.key==='status'){av=STATUS_ORDER[a.payStatus||'open'];bv=STATUS_ORDER[b.payStatus||'open'];}
     else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
     else{av=a.due||'9999-99-99';bv=b.due||'9999-99-99';}
     if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
@@ -598,8 +614,22 @@ function renderCash(entries){
   const ap=entries.filter(e=>e.type==='ap');
   const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
   const ids=Object.keys(accounts);
+  // soft, bright color scheme to visually distinguish accounts (cycles after 8)
+  const ACCT_COLORS=[
+    {bar:'#3a8ddd',tint:'#3a8ddd14'}, // blue
+    {bar:'#2faf74',tint:'#2faf7414'}, // green
+    {bar:'#b07cd6',tint:'#b07cd614'}, // purple
+    {bar:'#e0883a',tint:'#e0883a14'}, // amber
+    {bar:'#e06a9a',tint:'#e06a9a14'}, // pink
+    {bar:'#33b6c4',tint:'#33b6c414'}, // teal
+    {bar:'#e0653f',tint:'#e0653f14'}, // coral
+    {bar:'#8aa83a',tint:'#8aa83a14'}, // lime
+  ];
+  const colorFor=id=>ACCT_COLORS[ids.indexOf(id)%ACCT_COLORS.length]||ACCT_COLORS[0];
   const totalBal=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
-  const totalSched=ap.filter(e=>e.account&&unpaid(e)>0.005).reduce((s,e)=>s+unpaid(e),0);
+  const assignedUnpaid=ap.filter(e=>e.account&&unpaid(e)>0.005);
+  const totalSched=assignedUnpaid.filter(e=>(e.payStatus||'open')!=='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+  const totalWd=assignedUnpaid.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
 
   const methodSelect=(e)=>`<select class="acct-sel" onclick="event.stopPropagation()" onchange="setPlanMethod('${e.id}',this.value)">
     <option value="">—</option>
@@ -609,15 +639,20 @@ function renderCash(entries){
     <option value="">Unassigned</option>
     ${ids.map(id=>`<option value="${id}" ${e.account===id?'selected':''}>${esc(accounts[id].name)}</option>`).join('')}
   </select>`;
+  const statusSelect=(e)=>`<select class="acct-sel status-${e.payStatus||'open'}" onclick="event.stopPropagation()" onchange="setPayStatus('${e.id}',this.value)">
+    ${PAY_STATUSES.map(s=>`<option value="${s.k}" ${(e.payStatus||'open')===s.k?'selected':''}>${s.label}</option>`).join('')}
+  </select>`;
 
   const billRow=e=>{
     const d=daysUntil(e.due);
     const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
-    return `<div class="acct-bill">
+    const wd=(e.payStatus||'open')==='withdrawn';
+    return `<div class="acct-bill${wd?' is-wd':''}">
       <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
-      <span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>
+      <span class="ab-due${d!=null&&d<0&&!wd?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>
       ${accountSelect(e)}
       ${methodSelect(e)}
+      ${statusSelect(e)}
       <span class="ab-amt" onclick="openEntry('${e.id}')">${fmtMoney(unpaid(e))}</span>
     </div>`;
   };
@@ -626,21 +661,26 @@ function renderCash(entries){
     <span onclick="sortCash('${sectionKey}','due')">Due ${sortArrow(sectionKey,'due')}</span>
     <span onclick="sortCash('${sectionKey}','account')">Account ${sortArrow(sectionKey,'account')}</span>
     <span onclick="sortCash('${sectionKey}','method')">Method ${sortArrow(sectionKey,'method')}</span>
+    <span onclick="sortCash('${sectionKey}','status')">Status ${sortArrow(sectionKey,'status')}</span>
     <span onclick="sortCash('${sectionKey}','amount')">Amount ${sortArrow(sectionKey,'amount')}</span>
   </div>`;
 
   const acctTile=(id,a)=>{
     const bills=ap.filter(e=>e.account===id&&unpaid(e)>0.005);
-    const sched=bills.reduce((s,e)=>s+unpaid(e),0);
+    const sched=bills.filter(e=>(e.payStatus||'open')!=='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const wd=bills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
     const bal=Number(a.balance)||0;
     const proj=bal-sched;
-    return `<div class="acct-card">
+    const c=colorFor(id);
+    return `<div class="acct-card" style="border-top:3px solid ${c.bar};background:linear-gradient(${c.tint},${c.tint})">
       <div class="acct-top">
+        <span class="acct-dot" style="background:${c.bar}"></span>
         <input class="acct-name" value="${esc(a.name)}" onchange="renameAccount('${id}',this.value)">
         <span class="acct-del" onclick="deleteAccount('${id}','${esc(a.name)}')" title="Delete account"><i class="ti ti-trash"></i></span>
       </div>
       <div class="acct-num"><div class="l">Balance</div><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"></div>
       <div class="acct-num"><div class="l">Scheduled out</div><div class="v">${fmtMoney(sched)}</div></div>
+      <div class="acct-num"><div class="l">Withdrawn</div><div class="v" style="color:var(--text2)">${fmtMoney(wd)}</div></div>
       <div class="acct-num"><div class="l">Projected</div><div class="v${proj<0?' neg':''}">${fmtMoney(proj)}</div></div>
     </div>`;
   };
@@ -648,8 +688,11 @@ function renderCash(entries){
   const acctBillSection=(id,a)=>{
     const bills=sortBills(ap.filter(e=>e.account===id&&unpaid(e)>0.005),id);
     if(!bills.length)return'';
-    const sched=bills.reduce((s,e)=>s+unpaid(e),0);
-    return `<div class="acct-bills-section"><h3>${esc(a.name)}<span class="tot">${fmtMoney(sched)} scheduled</span></h3>
+    const sched=bills.filter(e=>(e.payStatus||'open')!=='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const wd=bills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const totTxt=`${fmtMoney(sched)} scheduled`+(wd>0.005?` · ${fmtMoney(wd)} withdrawn`:'');
+    const c=colorFor(id);
+    return `<div class="acct-bills-section" style="border-left:4px solid ${c.bar}"><h3><span class="acct-dot" style="background:${c.bar}"></span>${esc(a.name)}<span class="tot">${totTxt}</span></h3>
       <div class="acct-bills">${billHead(id)}${bills.map(billRow).join('')}</div>
     </div>`;
   };
@@ -663,7 +706,8 @@ function renderCash(entries){
   $('content').innerHTML=`
     <div class="stats">
       <div class="stat"><div class="l">Total balance</div><div class="v">${fmtMoney(totalBal)}</div><div class="s">across ${ids.length} account${ids.length!==1?'s':''}</div></div>
-      <div class="stat over"><div class="l">Scheduled out</div><div class="v">${fmtMoney(totalSched)}</div><div class="s">unpaid, assigned bills</div></div>
+      <div class="stat over"><div class="l">Scheduled out</div><div class="v">${fmtMoney(totalSched)}</div><div class="s">committed, not yet gone</div></div>
+      <div class="stat"><div class="l">Withdrawn</div><div class="v" style="color:var(--text2)">${fmtMoney(totalWd)}</div><div class="s">already left the account</div></div>
       <div class="stat"><div class="l">Projected total</div><div class="v" style="color:${(totalBal-totalSched)<0?'var(--red)':'var(--text)'}">${fmtMoney(totalBal-totalSched)}</div><div class="s">balance − scheduled</div></div>
     </div>
     <div class="toolbar"><button class="btn primary" onclick="addAccount()"><i class="ti ti-plus"></i> Add account</button></div>
@@ -700,6 +744,13 @@ window.setRowAccount=(id,val)=>{
   const o=ovl(id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
   o.account=val||'';
+  writeOverlay(id,o); render();
+};
+window.setPayStatus=(id,val)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  o.payStatus=val||'open';
   writeOverlay(id,o); render();
 };
 
