@@ -115,11 +115,11 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-bills-section h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
 .acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
 .acct-bills{font-size:12.5px}
-.acct-bill-head{display:grid;grid-template-columns:1.6fr 1.1fr 1fr 0.8fr;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border)}
+.acct-bill-head{display:grid;grid-template-columns:1.5fr 1fr 1.1fr 1fr 0.8fr;gap:8px;padding:0 0 6px;border-bottom:1px solid var(--border)}
 .acct-bill-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);cursor:pointer;display:flex;align-items:center;gap:2px;user-select:none}
 .acct-bill-head span:hover{color:var(--text2)}
 .acct-bill-head i{font-size:12px}
-.acct-bill{display:grid;grid-template-columns:1.6fr 1.1fr 1fr 0.8fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
+.acct-bill{display:grid;grid-template-columns:1.5fr 1fr 1.1fr 1fr 0.8fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
 .acct-bill:last-child{border-bottom:none}
 .acct-bill .ab-party{cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acct-bill .ab-party:hover{text-decoration:underline}
@@ -127,7 +127,61 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-bill .ab-due.over{color:var(--red);font-weight:700}
 .acct-bill .ab-amt{cursor:pointer;text-align:right;font-weight:600}
 .acct-empty{color:var(--text3);font-size:12px;padding:8px 2px}
-.acct-sel{font-size:11.5px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:#fff;color:var(--text);width:100%;max-width:120px}
+.acct-sel{font-size:11.5px;padding:4px 5px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:#fff;color:var(--text);width:100%;min-width:0;max-width:130px}
+/* recurring */
+.recur-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.recur-head{display:grid;grid-template-columns:2.4fr 1.2fr 0.9fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.recur-head span:nth-child(3){text-align:right}
+.recur-row{display:grid;grid-template-columns:2.4fr 1.2fr 0.9fr auto;gap:10px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border2)}
+.recur-row:last-child{border-bottom:none}
+.recur-row.paused{opacity:.55}
+.rr-vendor{font-weight:700;font-size:13.5px}
+.rr-sub{font-size:11.5px;color:var(--text3);margin-top:2px}
+.rr-tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--text3)}
+.rr-tag.info{color:var(--blue);border-color:#3a6ea533}
+.rr-due{font-size:12.5px;color:var(--text2)}
+.rr-due.due{color:var(--red);font-weight:700}
+.rr-amt{font-weight:700;text-align:right;font-size:13.5px}
+.rr-actions{display:flex;gap:5px;justify-content:flex-end}
+.rr-actions .btn.sm{padding:5px 8px}
+@media(max-width:720px){
+  .recur-head{display:none}
+  .recur-row{grid-template-columns:1fr;gap:6px}
+  .rr-amt,.rr-due{text-align:left}
+  .rr-actions{justify-content:flex-start}
+}
+/* deposit allocation */
+.dep-calc{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:16px;margin-bottom:16px;max-width:420px}
+.dep-calc label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px}
+.dep-calc-in{display:flex;align-items:center;border:1px solid var(--border);border-radius:9px;padding:0 12px;background:#fff}
+.dep-calc-in:focus-within{border-color:var(--navy)}
+.dep-cur{font-size:22px;font-weight:800;color:var(--text3);margin-right:4px}
+.dep-calc-in input{flex:1;border:none;outline:none;font-size:24px;font-weight:800;font-family:inherit;padding:10px 0;color:var(--text);background:transparent}
+.dep-calc-note{font-size:11.5px;color:var(--text3);margin-top:8px}
+.dep-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.dep-head{display:grid;grid-template-columns:1.8fr 0.9fr 1.4fr 1.1fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.dep-head span:nth-child(4){text-align:right}
+.dep-row{display:grid;grid-template-columns:1.8fr 0.9fr 1.4fr 1.1fr auto;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--border2)}
+.dep-name{border:1px solid transparent;background:transparent;font-size:13.5px;font-weight:600;font-family:inherit;padding:5px 7px;border-radius:6px;color:var(--text);min-width:0}
+.dep-name:hover{background:#f5f7fa}.dep-name:focus{background:#fff;border-color:var(--border);outline:none}
+.dep-pct-wrap{display:flex;align-items:center;gap:3px}
+.dep-pct{width:54px;border:1px solid var(--border);background:#fff;font-size:13px;font-weight:700;font-family:inherit;padding:5px 6px;border-radius:6px;color:var(--text);text-align:right}
+.dep-pct:focus{outline:none;border-color:var(--navy)}
+.dep-pct-wrap span{font-size:12px;color:var(--text3)}
+.dep-acct{font-size:12px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:#fff;color:var(--text);width:100%;min-width:0}
+.dep-split{text-align:right;font-weight:800;font-size:14px;color:var(--green)}
+.dep-del{color:var(--text3);cursor:pointer;font-size:13px;padding:4px;border-radius:6px;text-align:center}
+.dep-del:hover{color:var(--red);background:#A32D2D0d}
+.dep-foot{display:grid;grid-template-columns:1.8fr 0.9fr 1.4fr 1.1fr auto;gap:10px;align-items:center;padding:11px 16px;background:#fafbfd;font-weight:800;font-size:13px}
+.dep-foot-pct{color:var(--green);display:flex;align-items:center;gap:4px}
+.dep-foot.off .dep-foot-pct{color:var(--amber)}
+.dep-foot-amt{text-align:right}
+.dep-warn{margin-top:12px;background:#BA75170d;border:1px solid #BA751733;color:var(--amber);border-radius:10px;padding:10px 14px;font-size:12.5px;display:flex;align-items:center;gap:8px}
+@media(max-width:720px){
+  .dep-head{display:none}
+  .dep-row{grid-template-columns:1fr 1fr;gap:8px}
+  .dep-split{text-align:left}
+}
 /* buttons */
 .btn{font-size:13px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;cursor:pointer}
 .btn:hover{background:#f5f7fa}
@@ -217,6 +271,8 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" id="nav-ap" onclick="go('ap')"><i class="ti ti-arrow-up-right"></i> Payables <span class="nb" id="nb-ap" style="display:none"></span></div>
     <div class="nav-item" id="nav-aging" onclick="go('aging')"><i class="ti ti-clock-hour-4"></i> Aging</div>
     <div class="nav-item" id="nav-cash" onclick="go('cash')"><i class="ti ti-building-bank"></i> Cash Flow</div>
+    <div class="nav-item" id="nav-recur" onclick="go('recur')"><i class="ti ti-repeat"></i> Recurring <span class="nb" id="nb-recur" style="display:none"></span></div>
+    <div class="nav-item" id="nav-deposit" onclick="go('deposit')"><i class="ti ti-pie-chart"></i> Deposits</div>
     <div class="sec-label">Tools</div>
     <div class="nav-item" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add receivable</div>
     <div class="nav-item" onclick="openManual('ap')"><i class="ti ti-plus"></i> Add payable</div>
@@ -297,6 +353,8 @@ const auth = getAuth(app);
 let orders = {};          // raw orders node (shared with the order tracker)
 let overlay = {};         // apar/entries node: payments + manual entries + edits
 let accounts = {};        // apar/accounts node: {id:{name,balance}} bank sub-accounts
+let recurring = {};       // apar/recurring node: recurring bill templates
+let depositBuckets = {};  // apar/depositBuckets node: Profit First allocation buckets
 let page = 'dash';
 let DEFAULT_TERMS = 30;   // Net 30 default
 
@@ -397,7 +455,9 @@ function go(p){
     ar:['Receivables','Money customers owe you — auto-built from invoiced orders'],
     ap:['Payables','Money you owe vendors — auto-built from your vendor POs'],
     aging:['Aging','Outstanding balances by age'],
-    cash:['Cash Flow','Bank account balances vs. what\'s scheduled to come out']}[p];
+    cash:['Cash Flow','Bank account balances vs. what\'s scheduled to come out'],
+    recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
+    deposit:['Deposits','Split incoming money across your Profit First buckets']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
   render();
 }
@@ -409,12 +469,16 @@ function render(){
   else if(page==='ap') renderList(entries.filter(e=>e.type==='ap'),'ap');
   else if(page==='aging') renderAging(entries);
   else if(page==='cash') renderCash(entries);
+  else if(page==='recur') renderRecurring();
+  else if(page==='deposit') renderDeposit();
 }
 function updateBadges(entries){
   const oa=entries.filter(e=>e.type==='ar'&&statusOf(e)==='over').length;
   const op=entries.filter(e=>e.type==='ap'&&statusOf(e)==='over').length;
   const set=(id,n)=>{const el=$(id);if(!el)return;if(n>0){el.textContent=n;el.style.display='';}else el.style.display='none';};
   set('nb-ar',oa);set('nb-ap',op);
+  const due=Object.values(recurring).filter(r=>r&&!r.paused&&daysUntil(r.nextDue)!=null&&daysUntil(r.nextDue)<=0).length;
+  set('nb-recur',due);
 }
 function entryCard(e){
   const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
@@ -505,13 +569,14 @@ function renderAging(entries){
 
 // ── Cash Flow (per-account AP drain projection) ────────────────────────────────
 const PAY_METHODS=['Check','Zelle','ACH/Debit','Credit Card','Cash','Wire','Other'];
-let cashSort={}; // {sectionKey:{key:'due'|'party'|'method'|'amount',dir:1|-1}}
+let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'amount',dir:1|-1}}
 function sortBills(list,sectionKey){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   const arr=[...list];
   arr.sort((a,b)=>{
     let av,bv;
     if(s.key==='party'){av=(a.party||'').toLowerCase();bv=(b.party||'').toLowerCase();}
+    else if(s.key==='account'){av=(a.account&&accounts[a.account]?accounts[a.account].name:'').toLowerCase();bv=(b.account&&accounts[b.account]?accounts[b.account].name:'').toLowerCase();}
     else if(s.key==='method'){av=(a.planMethod||'').toLowerCase();bv=(b.planMethod||'').toLowerCase();}
     else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
     else{av=a.due||'9999-99-99';bv=b.due||'9999-99-99';}
@@ -540,6 +605,10 @@ function renderCash(entries){
     <option value="">—</option>
     ${PAY_METHODS.map(m=>`<option ${e.planMethod===m?'selected':''}>${m}</option>`).join('')}
   </select>`;
+  const accountSelect=(e)=>`<select class="acct-sel" onclick="event.stopPropagation()" onchange="setRowAccount('${e.id}',this.value)">
+    <option value="">Unassigned</option>
+    ${ids.map(id=>`<option value="${id}" ${e.account===id?'selected':''}>${esc(accounts[id].name)}</option>`).join('')}
+  </select>`;
 
   const billRow=e=>{
     const d=daysUntil(e.due);
@@ -547,6 +616,7 @@ function renderCash(entries){
     return `<div class="acct-bill">
       <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
       <span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>
+      ${accountSelect(e)}
       ${methodSelect(e)}
       <span class="ab-amt" onclick="openEntry('${e.id}')">${fmtMoney(unpaid(e))}</span>
     </div>`;
@@ -554,6 +624,7 @@ function renderCash(entries){
   const billHead=(sectionKey)=>`<div class="acct-bill-head">
     <span onclick="sortCash('${sectionKey}','party')">Vendor ${sortArrow(sectionKey,'party')}</span>
     <span onclick="sortCash('${sectionKey}','due')">Due ${sortArrow(sectionKey,'due')}</span>
+    <span onclick="sortCash('${sectionKey}','account')">Account ${sortArrow(sectionKey,'account')}</span>
     <span onclick="sortCash('${sectionKey}','method')">Method ${sortArrow(sectionKey,'method')}</span>
     <span onclick="sortCash('${sectionKey}','amount')">Amount ${sortArrow(sectionKey,'amount')}</span>
   </div>`;
@@ -630,6 +701,304 @@ window.setRowAccount=(id,val)=>{
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
   o.account=val||'';
   writeOverlay(id,o); render();
+};
+
+// ── Recurring bills (templates that generate payables each cycle) ──────────────
+// Template: {vendor, amount, account, method, autopay, cadence:'monthly'|'weekly',
+//            day (1-31 for monthly), weekday (0-6 for weekly), nextDue (ISO),
+//            notes, paused, lastGenerated (ISO)}
+function advanceDue(iso,cadence,day,weekday){
+  // returns the next due date strictly after `iso` for the given cadence
+  const d=new Date(iso+'T00:00:00');
+  if(cadence==='weekly'){
+    d.setDate(d.getDate()+7);
+    return toISO(d);
+  }
+  // monthly: jump to next month, clamp day to month length
+  const targetDay=day||d.getDate();
+  let y=d.getFullYear(), m=d.getMonth()+1;
+  if(m>11){m=0;y++;}
+  const lastOfMonth=new Date(y,m+1,0).getDate();
+  const dd=Math.min(targetDay,lastOfMonth);
+  return toISO(new Date(y,m,dd));
+}
+function recurMethodNote(r){
+  return [r.autopay?'AutoPay':'', r.method||''].filter(Boolean).join(' · ');
+}
+function generateRecurring(id,opts){
+  const r=recurring[id]; if(!r)return;
+  const eid='rec_'+id+'_'+(r.nextDue||toISO(new Date())).replace(/-/g,'');
+  // don't double-create the same cycle
+  if(overlay[eid]&&!opts.force) return;
+  const o={manual:true,type:'ap',party:r.vendor||'(recurring)',
+    ref:r.autopay?'AutoPay':'Recurring',
+    rel:r.notes||'',
+    amount:Number(r.amount)||0,
+    issue:toISO(new Date()),
+    dueDate:r.nextDue||toISO(new Date()),
+    terms:0,
+    account:r.account||'',
+    planMethod:r.method||'',
+    recurringId:id,
+    payments:[]};
+  set(ref(db,'apar/entries/'+eid),o); overlay[eid]=o;
+  // advance the template to the next cycle
+  const next=advanceDue(r.nextDue,r.cadence,r.day,r.weekday);
+  update(ref(db,'apar/recurring/'+id),{nextDue:next,lastGenerated:r.nextDue});
+  recurring[id]={...r,nextDue:next,lastGenerated:r.nextDue};
+}
+let _autoRan=false;
+function autoGenerateDue(){
+  // auto-create bills for any active template whose nextDue is today or past
+  if(_autoRan)return; // run once per load to avoid loops with the listener
+  let did=false;
+  Object.entries(recurring).forEach(([id,r])=>{
+    if(!r||r.paused||!r.nextDue)return;
+    let guard=0;
+    while(daysUntil(r.nextDue)<=0 && guard<24){
+      generateRecurring(id,{}); r=recurring[id]; guard++; did=true;
+    }
+  });
+  if(did)_autoRan=true; else _autoRan=true;
+}
+window.genRecurringNow=(id)=>{
+  const r=recurring[id]; if(!r)return;
+  generateRecurring(id,{force:false}); render();
+};
+window.toggleRecurPause=(id)=>{
+  const r=recurring[id]; if(!r)return;
+  update(ref(db,'apar/recurring/'+id),{paused:!r.paused});
+  recurring[id]={...r,paused:!r.paused}; render();
+};
+window.deleteRecurring=(id)=>{
+  const r=recurring[id]; if(!r)return;
+  if(!confirm(`Delete recurring template "${r.vendor}"? Bills already generated stay in your payables.`))return;
+  remove(ref(db,'apar/recurring/'+id)); delete recurring[id]; render();
+};
+function renderRecurring(){
+  const ids=Object.keys(recurring);
+  const monthlyTotal=ids.filter(id=>recurring[id]&&!recurring[id].paused).reduce((s,id)=>{
+    const r=recurring[id]; const amt=Number(r.amount)||0;
+    return s+(r.cadence==='weekly'?amt*52/12:amt); // normalize weekly to monthly
+  },0);
+  const dueNow=ids.filter(id=>{const r=recurring[id];return r&&!r.paused&&daysUntil(r.nextDue)!=null&&daysUntil(r.nextDue)<=0;}).length;
+
+  const cadenceTxt=r=>{
+    if(r.cadence==='weekly'){const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][r.weekday||0];return `Weekly · ${wd}`;}
+    return `Monthly · day ${r.day||1}`;
+  };
+  const sorted=ids.slice().sort((a,a2)=>(recurring[a].nextDue||'9999').localeCompare(recurring[a2].nextDue||'9999'));
+  const rowFor=id=>{
+    const r=recurring[id]; const d=daysUntil(r.nextDue);
+    const dueTxt=r.nextDue?fmtDate(r.nextDue)+(d!=null?` (${d<0?Math.abs(d)+'d late':d===0?'today':d+'d'})`:''):'—';
+    const acctName=r.account&&accounts[r.account]?accounts[r.account].name:'—';
+    const note=recurMethodNote(r);
+    const isDue=!r.paused&&d!=null&&d<=0;
+    return `<div class="recur-row${r.paused?' paused':''}">
+      <div class="rr-main">
+        <div class="rr-vendor">${esc(r.vendor||'(unnamed)')}${r.paused?' <span class="rr-tag">paused</span>':''}${note?` <span class="rr-tag info">${esc(note)}</span>`:''}</div>
+        <div class="rr-sub">${cadenceTxt(r)} · ${esc(acctName)}${r.notes?' · '+esc(r.notes):''}</div>
+      </div>
+      <div class="rr-due${isDue?' due':''}">${dueTxt}</div>
+      <div class="rr-amt">${fmtMoney(Number(r.amount)||0)}</div>
+      <div class="rr-actions">
+        <button class="btn sm ${isDue?'primary':''}" onclick="genRecurringNow('${id}')" title="Create this cycle's payable now">Generate</button>
+        <button class="btn sm" onclick="editRecurring('${id}')" title="Edit"><i class="ti ti-edit"></i></button>
+        <button class="btn sm" onclick="toggleRecurPause('${id}')" title="${r.paused?'Resume':'Pause'}"><i class="ti ti-player-${r.paused?'play':'pause'}"></i></button>
+        <button class="btn sm" onclick="deleteRecurring('${id}')" title="Delete" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  };
+
+  $('content').innerHTML=`
+    <div class="stats">
+      <div class="stat"><div class="l">Templates</div><div class="v">${ids.length}</div><div class="s">${ids.filter(id=>recurring[id].paused).length} paused</div></div>
+      <div class="stat"><div class="l">Est. monthly</div><div class="v">${fmtMoney(monthlyTotal)}</div><div class="s">weekly normalized to /mo</div></div>
+      <div class="stat over"><div class="l">Due now</div><div class="v">${dueNow}</div><div class="s">ready to generate</div></div>
+    </div>
+    <div class="toolbar"><button class="btn primary" onclick="openRecurEdit()"><i class="ti ti-plus"></i> Add recurring bill</button>
+      <div style="margin-left:auto;font-size:12px;color:var(--text3)">Bills auto-generate on their due date, or generate early anytime.</div>
+    </div>
+    ${ids.length? `<div class="recur-list">
+      <div class="recur-head"><span>Vendor</span><span>Next due</span><span>Amount</span><span></span></div>
+      ${sorted.map(rowFor).join('')}
+    </div>` : '<div class="empty">No recurring bills yet. Add templates for rent, utilities, loan payments, software — anything that repeats — and they\'ll create payables automatically each cycle.</div>'}`;
+}
+
+// ── Recurring template editor ─────────────────────────────────────────────────
+let _recurEditId=null;
+window.openRecurEdit=()=>{ _recurEditId=null; showRecurEditor({}); };
+window.editRecurring=(id)=>{ _recurEditId=id; showRecurEditor(recurring[id]||{}); };
+function showRecurEditor(r){
+  const accOpts=`<option value="">Unassigned</option>`+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${r.account===id?'selected':''}>${esc(a.name)}</option>`).join('');
+  const methOpts=`<option value="">—</option>`+PAY_METHODS.map(m=>`<option ${r.method===m?'selected':''}>${m}</option>`).join('');
+  const cadence=r.cadence||'monthly';
+  const wd=r.weekday!=null?r.weekday:1;
+  const day=r.day||1;
+  $('pay-body').innerHTML=`
+    <div class="m-head ap"><div class="m-t"><div class="t1">${_recurEditId?'Edit':'New'} recurring bill</div><div class="t2">Template — generates a payable each cycle</div></div><button class="m-x" onclick="closePay()"><i class="ti ti-x"></i></button></div>
+    <div class="m-body">
+      <div class="fld"><label>Vendor</label><input id="rc-vendor" type="text" value="${esc(r.vendor||'')}" placeholder="e.g. Rent, LADWP, Intuit"></div>
+      <div class="frow">
+        <div class="fld"><label>Amount (typical)</label><input id="rc-amount" type="number" step="0.01" value="${r.amount!=null?r.amount:''}"></div>
+        <div class="fld"><label>Account</label><select id="rc-account">${accOpts}</select></div>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>Cadence</label><select id="rc-cadence" onchange="recurCadenceToggle()">
+          <option value="monthly" ${cadence==='monthly'?'selected':''}>Monthly</option>
+          <option value="weekly" ${cadence==='weekly'?'selected':''}>Weekly</option>
+        </select></div>
+        <div class="fld" id="rc-day-wrap" style="${cadence==='weekly'?'display:none':''}"><label>Day of month</label><input id="rc-day" type="number" min="1" max="31" value="${day}"></div>
+        <div class="fld" id="rc-wd-wrap" style="${cadence==='weekly'?'':'display:none'}"><label>Weekday</label><select id="rc-weekday">
+          ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((n,i)=>`<option value="${i}" ${wd===i?'selected':''}>${n}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>Next due date</label><input id="rc-nextdue" type="date" value="${r.nextDue||toISO(new Date())}"></div>
+        <div class="fld"><label>Default method</label><select id="rc-method">${methOpts}</select></div>
+      </div>
+      <div class="fld"><label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input id="rc-autopay" type="checkbox" ${r.autopay?'checked':''} style="width:auto"> AutoPay (leaves the account automatically)</label></div>
+      <div class="fld"><label>Notes</label><input id="rc-notes" type="text" value="${esc(r.notes||'')}" placeholder="optional"></div>
+    </div>
+    <div class="m-foot">
+      <button class="btn" onclick="closePay()">Cancel</button>
+      <button class="btn primary" onclick="saveRecurring()">${_recurEditId?'Save':'Add'}</button>
+    </div>`;
+  $('pay-modal').style.display='flex';
+}
+window.recurCadenceToggle=()=>{
+  const c=$('rc-cadence').value;
+  $('rc-day-wrap').style.display=c==='weekly'?'none':'';
+  $('rc-wd-wrap').style.display=c==='weekly'?'':'none';
+};
+window.saveRecurring=()=>{
+  const vendor=$('rc-vendor').value.trim(); if(!vendor){alert('Enter a vendor name');return;}
+  const cadence=$('rc-cadence').value;
+  const r={
+    vendor,
+    amount:Number($('rc-amount').value)||0,
+    account:$('rc-account').value||'',
+    cadence,
+    day:cadence==='monthly'?(Number($('rc-day').value)||1):null,
+    weekday:cadence==='weekly'?(Number($('rc-weekday').value)||0):null,
+    nextDue:$('rc-nextdue').value||toISO(new Date()),
+    method:$('rc-method').value||'',
+    autopay:$('rc-autopay').checked,
+    notes:$('rc-notes').value||'',
+    paused:_recurEditId?(recurring[_recurEditId]?.paused||false):false,
+    lastGenerated:_recurEditId?(recurring[_recurEditId]?.lastGenerated||''):''
+  };
+  const id=_recurEditId||('r_'+Date.now().toString(36)+Math.floor(Math.random()*1000));
+  set(ref(db,'apar/recurring/'+id),r); recurring[id]=r;
+  closePay(); render();
+};
+
+// ── Deposit allocation (Profit First splitter) ────────────────────────────────
+// Bucket: {name, pct (0-100), account, order}
+let _depositSeeded=false;
+function seedDepositBuckets(){
+  if(_depositSeeded)return; _depositSeeded=true;
+  if(Object.keys(depositBuckets).length>0)return; // already has data
+  const seed=[
+    ['Profit',2],['Tax',1],['Payroll',20],['Owners Comp',20],
+    ['Utilities',30],['Operating- Debit',13],['Operating- Credit',14]
+  ];
+  seed.forEach(([name,pct],i)=>{
+    const id='b_'+Date.now().toString(36)+i+Math.floor(Math.random()*1000);
+    const b={name,pct,account:'',order:i};
+    depositBuckets[id]=b; set(ref(db,'apar/depositBuckets/'+id),b);
+  });
+}
+function bucketList(){
+  return Object.entries(depositBuckets).map(([id,b])=>({id,...b}))
+    .sort((a,b)=>(a.order||0)-(b.order||0));
+}
+window.calcDeposit=()=>{
+  const amt=Number($('dep-amount').value)||0;
+  _depAmount=amt;
+  bucketList().forEach(b=>{
+    const cell=$('dep-split-'+b.id);
+    if(cell) cell.textContent=fmtMoney(amt*(Number(b.pct)||0)/100);
+  });
+  const leftEl=$('dep-leftover');
+  if(leftEl){
+    const allocated=bucketList().reduce((s,b)=>s+amt*(Number(b.pct)||0)/100,0);
+    leftEl.textContent=fmtMoney(amt-allocated);
+  }
+};
+let _depAmount=0;
+function renderDeposit(){
+  const buckets=bucketList();
+  const totalPct=buckets.reduce((s,b)=>s+(Number(b.pct)||0),0);
+  const pctOff=Math.abs(totalPct-100)>0.01;
+  const liveEl=document.getElementById('dep-amount');
+  if(liveEl) _depAmount=Number(liveEl.value)||0;
+  const amt=_depAmount;
+
+  const bucketRow=b=>{
+    const acctOpts=`<option value="">No account</option>`+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${b.account===id?'selected':''}>${esc(a.name)}</option>`).join('');
+    return `<div class="dep-row">
+      <input class="dep-name" value="${esc(b.name)}" onchange="setBucket('${b.id}','name',this.value)">
+      <div class="dep-pct-wrap"><input class="dep-pct" type="number" step="0.1" min="0" value="${b.pct}" onchange="setBucket('${b.id}','pct',this.value)"><span>%</span></div>
+      <select class="dep-acct" onchange="setBucket('${b.id}','account',this.value)">${acctOpts}</select>
+      <div class="dep-split" id="dep-split-${b.id}">${fmtMoney(amt*(Number(b.pct)||0)/100)}</div>
+      <span class="dep-del" onclick="deleteBucket('${b.id}','${esc(b.name)}')" title="Delete bucket"><i class="ti ti-trash"></i></span>
+    </div>`;
+  };
+
+  $('content').innerHTML=`
+    <div class="dep-calc">
+      <label>Deposit amount</label>
+      <div class="dep-calc-in">
+        <span class="dep-cur">$</span>
+        <input id="dep-amount" type="number" step="0.01" placeholder="0.00" value="${amt||''}" oninput="calcDeposit()" autocomplete="off">
+      </div>
+      <div class="dep-calc-note">Type an amount to see how it splits across your buckets.</div>
+    </div>
+    <div class="dep-list">
+      <div class="dep-head">
+        <span>Bucket</span><span>%</span><span>Account</span><span>This deposit</span><span></span>
+      </div>
+      ${buckets.length?buckets.map(bucketRow).join(''):'<div class="acct-empty" style="padding:16px">No buckets yet. Add your allocation categories below.</div>'}
+      <div class="dep-foot ${pctOff?'off':''}">
+        <span>Total</span>
+        <span class="dep-foot-pct">${(Math.round(totalPct*10)/10)}%${pctOff?` <i class="ti ti-alert-triangle"></i>`:` <i class="ti ti-check"></i>`}</span>
+        <span></span>
+        <span class="dep-foot-amt" id="dep-leftover">${fmtMoney(amt - buckets.reduce((s,b)=>s+amt*(Number(b.pct)||0)/100,0))}</span>
+        <span></span>
+      </div>
+    </div>
+    ${pctOff?`<div class="dep-warn"><i class="ti ti-alert-triangle"></i> Your percentages add up to ${(Math.round(totalPct*10)/10)}%, not 100%. ${totalPct<100?'The remainder stays unallocated.':'You\'re over 100% — splits will exceed the deposit.'}</div>`:''}
+    <div class="toolbar" style="margin-top:14px"><button class="btn primary" onclick="addBucket()"><i class="ti ti-plus"></i> Add bucket</button>
+      <button class="btn" onclick="normalizeBuckets()" title="Scale all percentages so they total 100%">Balance to 100%</button>
+    </div>`;
+}
+window.setBucket=(id,field,val)=>{
+  const b=depositBuckets[id]; if(!b)return;
+  if(field==='pct') val=Number(val)||0;
+  const nb={...b,[field]:val};
+  depositBuckets[id]=nb; update(ref(db,'apar/depositBuckets/'+id),{[field]:val});
+  render();
+};
+window.addBucket=()=>{
+  const order=bucketList().length;
+  const id='b_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
+  const b={name:'New bucket',pct:0,account:'',order};
+  depositBuckets[id]=b; set(ref(db,'apar/depositBuckets/'+id),b); render();
+};
+window.deleteBucket=(id,name)=>{
+  if(!confirm(`Delete bucket "${name}"?`))return;
+  delete depositBuckets[id]; remove(ref(db,'apar/depositBuckets/'+id)); render();
+};
+window.normalizeBuckets=()=>{
+  const bs=bucketList(); const total=bs.reduce((s,b)=>s+(Number(b.pct)||0),0);
+  if(total<=0){alert('Set some percentages first.');return;}
+  bs.forEach(b=>{
+    const scaled=Math.round((Number(b.pct)||0)/total*1000)/10; // one decimal
+    depositBuckets[b.id]={...depositBuckets[b.id],pct:scaled};
+    update(ref(db,'apar/depositBuckets/'+b.id),{pct:scaled});
+  });
+  render();
 };
 
 // ── Entry / payment dialog ───────────────────────────────────────────────────
@@ -850,6 +1219,8 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
     onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; render(); });
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
+    onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
+    onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
   }else{
     $('login').style.display='flex'; $('app').style.display='none';
   }
