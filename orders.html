@@ -308,6 +308,28 @@ tr:hover .del-btn{opacity:1}
 .iod-drawhint{font-size:10.5px;color:var(--text3);display:inline-flex;align-items:center;gap:3px}
 /* Need PO page */
 .np-empty{text-align:center;color:var(--text3);padding:50px 16px}
+.np-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:13px;flex-wrap:wrap}
+.np-toolbar-hint{font-size:12px;color:var(--text3)}
+/* vendor-grouped Need PO view */
+.npv-card{background:#fff;border:1px solid var(--border2);border-radius:13px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+.npv-head{display:flex;align-items:center;gap:10px;padding:12px 15px;background:#fafbfd;border-bottom:1px solid var(--border2);flex-wrap:wrap}
+.npv-vendor{font-size:15px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px}
+.npv-vendor i{color:var(--text3);font-size:16px}
+.npv-procbadge{font-size:11px;font-weight:700;border:1px solid;border-radius:20px;padding:2px 9px;display:inline-flex;align-items:center;gap:5px}
+.npv-count{font-size:11.5px;color:var(--text2);background:#eef2f8;border-radius:20px;padding:2px 10px;font-weight:700}
+.npv-qty{font-size:11.5px;color:var(--text2);font-weight:700;margin-left:auto}
+.npv-rows{padding:4px 15px 6px}
+.npv-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f1f3f7;font-size:12.5px}
+.npv-row:last-child{border-bottom:none}
+.npv-proc{display:inline-flex;align-items:center;gap:6px;font-weight:700;min-width:108px;flex-shrink:0}
+.npv-from{color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.npv-item{color:var(--text);flex:1.4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.npv-qtycell{font-weight:700;color:var(--text);width:50px;text-align:right;flex-shrink:0}
+.npv-due{font-size:11px;color:var(--text3);width:64px;text-align:right;flex-shrink:0}
+.npv-due.over{color:var(--red);font-weight:700}
+.npv-po-row{display:flex;align-items:center;gap:9px;padding:10px 15px;background:#fafbfd;border-top:1px solid var(--border2)}
+.npv-po-row input{flex:1;min-width:90px;font-size:12.5px;padding:7px 10px;border:1px solid var(--border);border-radius:7px}
+.npv-noassign{font-size:10px;font-weight:700;color:#BA7517;text-transform:uppercase;letter-spacing:.04em;background:#BA751714;border-radius:5px;padding:2px 7px}
 .np-empty i{font-size:34px;opacity:.5;display:block;margin-bottom:10px;color:var(--green)}
 .np-empty div{font-size:15px;font-weight:700;color:var(--text2);margin-bottom:4px}
 .np-empty span{font-size:12px}
@@ -573,7 +595,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.37.1</div>
+    <div class="ver">v2.38.1</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -709,6 +731,13 @@ tr:hover .del-btn{opacity:1}
 
   <!-- Need PO Page -->
   <div id="needpo-page" style="display:none">
+    <div class="np-toolbar">
+      <div class="view-toggle">
+        <button id="npv-order" onclick="setNeedPOView('order')"><i class="ti ti-clipboard-list"></i> By Order</button>
+        <button id="npv-vendor" onclick="setNeedPOView('vendor')"><i class="ti ti-truck-delivery"></i> Group for PO</button>
+      </div>
+      <span class="np-toolbar-hint" id="np-toolbar-hint"></span>
+    </div>
     <div id="needpo-body"></div>
   </div>
 
@@ -2114,7 +2143,7 @@ window.showPage = (page) => {
   if(page==='queues') renderQueues();
   if(page==='customers') renderCustomers();
   if(page==='schedule') renderSchedule();
-  if(page==='needpo') renderNeedPO();
+  if(page==='needpo'){ document.getElementById('npv-order')?.classList.toggle('active',needPOView==='order'); document.getElementById('npv-vendor')?.classList.toggle('active',needPOView==='vendor'); renderNeedPO(); }
   if(page==='issuedpos') renderIssuedPOs();
   if(page==='archive') renderArchive();
   if(page==='settings') renderDurationSettings();
@@ -2630,7 +2659,19 @@ window._iodRecv = (id,name)=>{ _iodSaveVendor(id,name); markReceived(id,name); c
 window._iodUndo = (id,name)=>{ undoSent(id,name); openStepDetail(id,name); };
 
 // ── Need PO page: assign vendor + our PO# for outside steps ───────────────────
+let needPOView='order'; // 'order' | 'vendor'
+window.setNeedPOView=(v)=>{
+  needPOView=v;
+  document.getElementById('npv-order')?.classList.toggle('active',v==='order');
+  document.getElementById('npv-vendor')?.classList.toggle('active',v==='vendor');
+  const hint=document.getElementById('np-toolbar-hint');
+  if(hint) hint.textContent = v==='vendor'
+    ? 'Steps with the same vendor/process are pooled so you can see everything that belongs on one PO.'
+    : '';
+  renderNeedPO();
+};
 function renderNeedPO(){
+  if(needPOView==='vendor'){ renderNeedPOByVendor(); return; }
   const host=document.getElementById('needpo-body'); if(!host) return;
   const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order')
     .sort((a,b)=>((a.priority==null?2:a.priority)-(b.priority==null?2:b.priority)) || (a.due||'').localeCompare(b.due||''));
@@ -2672,6 +2713,91 @@ function renderNeedPO(){
     </div>`;
   }).join('');
 }
+
+// ── Need PO, grouped for purchasing: pools un-assigned steps so one PO can cover everything from a vendor ──
+function renderNeedPOByVendor(){
+  const host=document.getElementById('needpo-body'); if(!host) return;
+  const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order');
+  // gather every external step still missing a PO number, tagged with its order context
+  const items=[];
+  list.forEach(r=>{
+    const ext=enabledOrdered(ensureSchedule(r)).filter(s=>isExternal(s.name));
+    ext.forEach((s,i)=>{
+      if(s.vendorPO&&s.vendorPO.trim()) return; // already has a PO — not pending
+      items.push({
+        orderId:r.id, stepIdx:i, name:s.name, vendor:(s.vendor||'').trim(),
+        item:s.itemsPurchased||'', qty:s.qtyNeeded||'', detail:s.detail||'',
+        customer:r.customer||'', job:r.job||'', part:r.part||r.desc||'', due:r.due||'',
+        priority:(r.priority==null?2:r.priority)
+      });
+    });
+  });
+  if(!items.length){
+    host.innerHTML=`<div class="np-empty"><i class="ti ti-checks"></i><div>Nothing waiting on a PO</div><span>Every outside step on “Need Purchase Order” orders already has a vendor PO assigned.</span></div>`;
+    return;
+  }
+  // bucket: vendor + process together — same vendor doing two different processes
+  // (e.g. Plating vs Anodize) needs two separate POs, so they stay in separate groups.
+  const buckets=new Map();
+  items.forEach(x=>{
+    const key = x.vendor ? ('v:'+x.vendor.toLowerCase()+'|'+x.name) : ('p:'+x.name);
+    if(!buckets.has(key)) buckets.set(key, {vendor:x.vendor, proc:x.name, rows:[]});
+    buckets.get(key).rows.push(x);
+  });
+  let groups=[...buckets.values()];
+  // vendor-named buckets first (most actionable), then by row count desc, then vendor/process name
+  groups.sort((a,b)=> (!!b.vendor-!!a.vendor) || (b.rows.length-a.rows.length) || (a.vendor||a.proc).localeCompare(b.vendor||b.proc));
+  host.innerHTML = groups.map((g,gi)=>{
+    const totalQty=g.rows.reduce((s,x)=>s+(Number(x.qty)||0),0);
+    const today=new Date(new Date().toDateString());
+    const procCol=PROCESS_COLORS[g.proc]||'#888';
+    const rowsHtml=g.rows.map(x=>{
+      const over = x.due && new Date(x.due+'T00:00:00')<today;
+      return `<div class="npv-row">
+        <span class="npv-from">${esc(x.customer)}${x.job?' · '+esc(x.job):''}${x.part?' · '+esc(x.part):''}</span>
+        <span class="npv-item">${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.detail?` <span style="color:var(--text3)">— ${esc(x.detail)}</span>`:''}</span>
+        <span class="npv-qtycell">${x.qty?'×'+esc(x.qty):''}</span>
+        <span class="npv-due${over?' over':''}">${x.due?fmtDate(x.due):'—'}</span>
+      </div>`;
+    }).join('');
+    const noVendor=!g.vendor;
+    return `<div class="npv-card">
+      <div class="npv-head">
+        <span class="npv-vendor"><i class="ti ti-${noVendor?'help-circle':'truck-delivery'}"></i>${noVendor?shortProc(g.proc):esc(g.vendor)}</span>
+        <span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(g.proc,12)} ${shortProc(g.proc)}</span>
+        ${noVendor?`<span class="npv-noassign">choose vendor</span>`:''}
+        <span class="npv-count">${g.rows.length} item${g.rows.length!==1?'s':''}</span>
+        ${totalQty?`<span class="npv-qty">Total qty ${totalQty}</span>`:''}
+      </div>
+      <div class="npv-rows">${rowsHtml}</div>
+      <div class="npv-po-row">
+        ${noVendor?`<input id="npv-vend-${gi}" placeholder="Vendor for this group" style="max-width:220px">`:''}
+        <input id="npv-po-${gi}" placeholder="Our PO # — applies to all ${g.rows.length} item${g.rows.length!==1?'s':''} above">
+        <button class="btn sm blue" onclick="window._npvAssignAll(${gi})">Assign to all</button>
+      </div>
+    </div>`;
+  }).join('');
+  window._npvGroups = groups; // stash for the assign-all handler
+}
+window._npvAssignAll=(gi)=>{
+  const g=window._npvGroups && window._npvGroups[gi]; if(!g) return;
+  const poEl=document.getElementById(`npv-po-${gi}`);
+  const po=(poEl&&poEl.value||'').trim();
+  if(!po){ alert('Enter the PO # first'); return; }
+  const vendEl=document.getElementById(`npv-vend-${gi}`);
+  const vendor = vendEl ? (vendEl.value||'').trim() : g.vendor;
+  if(!vendor){ alert('Enter a vendor for this group first'); return; }
+  g.rows.forEach(x=>{
+    const r=orders.find(o=>o.id===x.orderId); if(!r) return;
+    const s=_extStep(x.orderId, x.name); if(!s) return;
+    s.vendor=vendor; s.vendorPO=po;
+    if(!s.poAt) s.poAt=toISO(new Date());
+  });
+  saveDB(); invalidateSched(); render(); renderSchedule(); updateNavBadges();
+  renderNeedPOByVendor();
+};
+
 window.assignVendorPO=(id,name,i)=>{
   const s=_extStep(id,name); if(!s) return;
   const v=document.getElementById(`np-v-${id}-${i}`), p=document.getElementById(`np-p-${id}-${i}`), d=document.getElementById(`np-d-${id}-${i}`);
