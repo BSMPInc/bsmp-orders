@@ -96,6 +96,32 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .e-act{margin-left:auto;font-size:11px;font-weight:700;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;color:#fff;background:var(--blue)}
 .e-act:hover{filter:brightness(.94)}
 .bal{font-size:11px;color:var(--text3);margin-left:6px}
+/* list: checkbox + selection */
+.entry.has-chk{padding-left:42px}
+.e-chk{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:17px;height:17px;cursor:pointer;accent-color:var(--navy);margin:0}
+.entry.sel{border-color:var(--navy);box-shadow:0 0 0 2px #2c574022}
+.entry.ar.sel{border-left-color:var(--ar)}.entry.ap.sel{border-left-color:var(--ap)}
+/* list search box */
+.list-search{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 11px;min-width:240px}
+.list-search:focus-within{border-color:var(--navy)}
+.list-search i{color:var(--text3);font-size:15px}
+.list-search input{border:none;outline:none;font-family:inherit;font-size:13px;width:100%;background:transparent;color:var(--text)}
+/* vendor groups */
+.vgroup{margin-bottom:12px}
+.vgroup-head{display:flex;align-items:center;gap:9px;padding:8px 12px;background:#eef2f7;border:1px solid var(--border);border-radius:10px;cursor:pointer;user-select:none;margin-bottom:8px}
+.vgroup-head:hover{background:#e6ebf3}
+.vgroup-head i{font-size:15px;color:var(--text2);flex-shrink:0}
+.vg-name{font-weight:800;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vg-cnt{font-size:11px;font-weight:700;color:#46506a;background:#dde4ee;border-radius:11px;padding:1px 8px;flex-shrink:0}
+.vg-sum{font-size:12.5px;font-weight:700;color:var(--text2);flex-shrink:0}
+.vgroup-body{padding-left:6px;border-left:2px solid var(--border2);margin-left:6px}
+/* sticky selected-total bar */
+.selbar{position:fixed;left:240px;right:0;bottom:0;z-index:40;display:flex;align-items:center;gap:16px;background:var(--navy);color:#fff;padding:12px 26px;box-shadow:0 -3px 14px rgba(16,24,40,.18)}
+.sb-count{font-weight:800;font-size:14px}
+.sb-tot{font-size:14px;font-weight:600;color:#dfeee6}
+.sb-clear{margin-left:auto;background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:6px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.sb-clear:hover{background:rgba(255,255,255,.28)}
+@media(max-width:720px){.selbar{left:0}}
 .empty{text-align:center;color:var(--text3);padding:30px 14px;border:1px dashed var(--border);border-radius:12px;background:#fafbfd;font-size:12.5px}
 .auto-tag{font-size:9px;font-weight:700;color:#8a93a5;text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:6px}
 /* aging */
@@ -492,7 +518,7 @@ function allEntries(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void};
+    return {...e,ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -554,14 +580,20 @@ function updateBadges(entries){
   const due=Object.values(recurring).filter(r=>r&&!r.paused&&daysUntil(r.nextDue)!=null&&daysUntil(r.nextDue)<=0).length;
   set('nb-recur',due);
 }
-function entryCard(e){
+// list view state (per side): search text, group-by-vendor, selected ids
+const listState={ar:{q:'',group:false,sel:new Set()},ap:{q:'',group:false,sel:new Set()}};
+let _curSide='ap';
+function entryCard(e,opts){
+  opts=opts||{};
   const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
   const dleft=daysUntil(e.due);
   const dueCls=(st==='over')?' over':'';
   const dueTxt=e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due date';
   const amtTxt=e.amount!=null?fmtMoney(e.amount):'<span style="color:var(--text3)">set amount</span>';
   const balTxt=(e.paid>0.005&&e.amount!=null)?`<span class="bal">bal ${fmtMoney(bal)}</span>`:'';
-  return `<div class="entry ${e.type}${st==='paid'?' paid':''}" onclick="openEntry('${e.id}')">
+  const chk=opts.selectable?`<input type="checkbox" class="e-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
+  return `<div class="entry ${e.type}${st==='paid'?' paid':''}${opts.checked?' sel':''}${opts.selectable?' has-chk':''}" onclick="openEntry('${e.id}')">
+    ${chk}
     <div class="e-top"><span class="e-party">${esc(e.party)}</span><span class="e-ref">${esc(e.ref)}</span><span class="e-amt">${amtTxt}${balTxt}</span></div>
     <div class="e-mid"><span class="e-rel">${esc(e.rel||(e.process||''))}</span>${e.auto?'<span class="auto-tag">auto</span>':''}</div>
     <div class="e-bot">
@@ -611,15 +643,80 @@ function renderDash(entries){
     <div class="board">${colHtml('ar',entries)}${colHtml('ap',entries)}</div>`;
 }
 function renderList(entries,side){
-  const list=sortEntries(entries);
-  const outstanding=list.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
+  _curSide=side;
+  const S=listState[side];
+  const isAR=side==='ar';
+  const all=sortEntries(entries);
+  // prune selections that no longer exist
+  const ids=new Set(all.map(e=>e.id));
+  S.sel.forEach(id=>{ if(!ids.has(id)) S.sel.delete(id); });
+  // apply search filter
+  const q=S.q.trim().toLowerCase();
+  const match=e=>!q||[e.party,e.ref,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q));
+  const list=all.filter(match);
+  const outstanding=all.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
+  const selArr=all.filter(e=>S.sel.has(e.id));
+  const selTotal=selArr.reduce((s,e)=>s+(e.amount||0),0);
+  const selBal=selArr.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
+
+  const card=e=>entryCard(e,{selectable:true,checked:S.sel.has(e.id)});
+
+  let body;
+  if(!list.length){
+    body=`<div class="empty">${q?'No matches for “'+esc(S.q)+'”.':'Nothing here yet.'}</div>`;
+  } else if(S.group){
+    // group by party name
+    const groups={};
+    list.forEach(e=>{ const k=e.party||'—'; (groups[k]=groups[k]||[]).push(e); });
+    const names=Object.keys(groups).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+    body=names.map(name=>{
+      const g=groups[name];
+      const gOut=g.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
+      const gid='grp_'+hash(name);
+      // expanded if searching (so matches are visible) or not manually collapsed
+      const collapsed=!q && S.collapsed && S.collapsed[name];
+      return `<div class="vgroup">
+        <div class="vgroup-head" onclick="toggleGroup('${esc(name).replace(/'/g,"\\'")}')">
+          <i class="ti ti-chevron-${collapsed?'right':'down'}"></i>
+          <span class="vg-name">${esc(name)}</span>
+          <span class="vg-cnt">${g.length}</span>
+          <span class="vg-sum">${fmtMoney(gOut)} out</span>
+        </div>
+        ${collapsed?'':`<div class="vgroup-body">${g.map(card).join('')}</div>`}
+      </div>`;
+    }).join('');
+  } else {
+    body=list.map(card).join('');
+  }
+
+  const selBar=S.sel.size?`<div class="selbar">
+    <span class="sb-count">${S.sel.size} selected</span>
+    <span class="sb-tot">Total ${fmtMoney(selTotal)}${Math.abs(selTotal-selBal)>0.005?` · ${fmtMoney(selBal)} unpaid`:''}</span>
+    <button class="sb-clear" onclick="clearSel()">Clear</button>
+  </div>`:'';
+
   $('content').innerHTML=`
     <div class="toolbar">
-      <button class="btn ${side==='ar'?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${side==='ar'?'receivable':'payable'}</button>
-      <div style="margin-left:auto;font-weight:800">${fmtMoney(outstanding)} outstanding · ${list.length} item${list.length!==1?'s':''}</div>
+      <button class="btn ${isAR?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button>
+      <button class="btn ${S.group?'primary':''}" onclick="toggleGroupMode()"><i class="ti ti-layout-list"></i> ${S.group?'Grouped':'Group by '+(isAR?'customer':'vendor')}</button>
+      <div class="list-search"><i class="ti ti-search"></i><input id="list-q" placeholder="Search ${isAR?'customer':'vendor'}, invoice #, description…" value="${esc(S.q)}"></div>
+      <div style="margin-left:auto;font-weight:800">${fmtMoney(outstanding)} outstanding · ${all.length} item${all.length!==1?'s':''}</div>
     </div>
-    <div style="max-width:720px">${list.length?list.map(entryCard).join(''):'<div class="empty">Nothing here yet.</div>'}</div>`;
+    <div style="max-width:760px;padding-bottom:${S.sel.size?'64px':'0'}">${body}</div>
+    ${selBar}`;
+
+  // wire up search input (preserve focus + caret)
+  const qi=$('list-q');
+  if(qi){
+    qi.oninput=()=>{ const pos=qi.selectionStart; S.q=qi.value; renderList(allEntries().filter(e=>e.type===side),side);
+      const nq=$('list-q'); if(nq){ nq.focus(); try{nq.setSelectionRange(pos,pos);}catch(e){} } };
+  }
 }
+window.toggleGroupMode=()=>{ listState[_curSide].group=!listState[_curSide].group; rerenderList(); };
+window.toggleGroup=(name)=>{ const S=listState[_curSide]; S.collapsed=S.collapsed||{}; S.collapsed[name]=!S.collapsed[name]; rerenderList(); };
+window.toggleSel=(id)=>{ const S=listState[_curSide]; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); rerenderList(); };
+window.clearSel=()=>{ listState[_curSide].sel.clear(); rerenderList(); };
+function rerenderList(){ renderList(allEntries().filter(e=>e.type===_curSide),_curSide); }
 function bucketize(entries){
   const b={cur:0,b30:0,b60:0,b90:0,b90p:0};
   entries.forEach(e=>{
@@ -1230,6 +1327,7 @@ window.openEntry=(id)=>{
     </div>
     <div class="m-body">
       <div class="m-sect">Details</div>
+      <div class="m-row"><span class="k">${isAR?'Invoice #':'Invoice #'}</span><span class="v">${e.ref?esc(e.ref):'—'}</span></div>
       ${e.rel?`<div class="m-row"><span class="k">${isAR?'Items':'For'}</span><span class="v">${esc(e.rel)}</span></div>`:''}
       ${e.process?`<div class="m-row"><span class="k">Process</span><span class="v">${esc(e.process)}</span></div>`:''}
       ${e.detail?`<div class="m-row"><span class="k">Spec</span><span class="v">${esc(e.detail)}</span></div>`:''}
@@ -1239,6 +1337,7 @@ window.openEntry=(id)=>{
       <div class="m-row"><span class="k">Status</span><span class="v"><span class="pill ${st}">${STATUS_LABEL[st]}</span></span></div>
 
       <div class="m-sect">Invoice / terms</div>
+      <div class="fld"><label>${isAR?'Invoice #':'Vendor invoice #'}</label><input id="d-ref" type="text" value="${esc(e.ref||'')}" placeholder="${isAR?'e.g. INV-1042':'e.g. 62366512'}"></div>
       <div class="frow">
         <div class="fld"><label>${isAR?'Invoice':'Bill'} amount</label><input id="d-amt" type="number" step="0.01" value="${e.amount!=null?e.amount:''}" ${(isAR&&e.auto)?'':''}></div>
         <div class="fld"><label>Issue date</label><input id="d-issue" type="date" value="${e.issue||''}"></div>
@@ -1283,6 +1382,7 @@ function writeOverlay(id,o){ overlay[id]=o; set(ref(db,'apar/entries/'+id),o); }
 window.saveMeta=()=>{
   if(!_cur)return; const e=_cur; const o=ovl(e.id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  const refEl=$('d-ref'); if(refEl) o.ref=refEl.value.trim();
   const amt=$('d-amt').value; if(amt!=='') o.amount=Number(amt); else if(e.type==='ap'||e.manual) o.amount=0;
   o.issue=$('d-issue').value||''; o.terms=Number($('d-terms').value)||DEFAULT_TERMS;
   const due=$('d-due').value; if(due)o.dueDate=due; else delete o.dueDate;
@@ -1472,7 +1572,11 @@ window.aiAdd=()=>{
     const vk=vendorKey(party);
     if(acctId && vendorAccounts[vk]!==acctId){ vendorAccounts[vk]=acctId; set(ref(db,'apar/vendorAccounts/'+vk),acctId); }
   }
-  writeOverlay(id,o); closeAI(); render(); openEntry(id);
+  writeOverlay(id,o); render();
+  // brief inline confirmation, then close — no second dialog
+  const st=$('ai-status');
+  if(st){ st.style.display='block'; st.className='ai-status'; st.innerHTML='<i class="ti ti-check"></i> Added '+esc(party)+'. Closing…'; }
+  setTimeout(closeAI, 650);
 };
 
 // ── Auth + data wiring ───────────────────────────────────────────────────────
