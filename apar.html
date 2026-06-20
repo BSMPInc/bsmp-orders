@@ -95,21 +95,27 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .aging-b .ab-v{font-size:17px;font-weight:800;margin-top:4px}
 .aging-b.warn{background:#BA75170d}.aging-b.bad{background:#A32D2D0d}
 /* cash flow */
-.acct-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
-.acct-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.acct-name{font-size:15px;font-weight:800;border:none;background:transparent;padding:2px 4px;border-radius:6px;flex:1;min-width:0}
+.acct-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+@media(max-width:1100px){.acct-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:680px){.acct-grid{grid-template-columns:repeat(2,1fr)}}
+.acct-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px;box-shadow:var(--shadow);min-width:0}
+.acct-top{display:flex;align-items:center;gap:4px;margin-bottom:8px}
+.acct-name{font-size:12.5px;font-weight:800;border:none;background:transparent;padding:2px 3px;border-radius:6px;flex:1;min-width:0}
 .acct-name:hover,.acct-name:focus{background:#f5f7fa;outline:none}
-.acct-del{color:var(--text3);cursor:pointer;font-size:13px;padding:4px 6px;border-radius:6px}
+.acct-del{color:var(--text3);cursor:pointer;font-size:12px;padding:3px 4px;border-radius:6px;flex-shrink:0}
 .acct-del:hover{color:var(--red);background:#A32D2D0d}
-.acct-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
-.acct-num{border:1px solid var(--border);border-radius:9px;padding:9px 11px}
-.acct-num .l{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
-.acct-num .v{font-size:17px;font-weight:800;margin-top:3px}
+.acct-num{border-top:1px solid var(--border2);padding:6px 0 0;margin-top:6px}
+.acct-num:first-of-type{border-top:none;margin-top:0;padding-top:0}
+.acct-num .l{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.acct-num .v{font-size:14px;font-weight:800;margin-top:2px}
 .acct-num .v.neg{color:var(--red)}
-.acct-num input{border:none;background:transparent;font-size:17px;font-weight:800;width:100%;padding:0;margin-top:2px;font-family:inherit;color:var(--text)}
+.acct-num input{border:none;background:transparent;font-size:14px;font-weight:800;width:100%;padding:0;margin-top:2px;font-family:inherit;color:var(--text)}
 .acct-num input:focus{outline:none}
+.acct-bills-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
+.acct-bills-section h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
+.acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
 .acct-bills{font-size:12.5px}
-.acct-bill{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);cursor:pointer}
+.acct-bill{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);cursor:pointer}
 .acct-bill:last-child{border-bottom:none}
 .acct-bill:hover .ab-party{text-decoration:underline}
 .acct-bill .ab-due{color:var(--text3);min-width:54px}
@@ -499,50 +505,45 @@ function renderCash(entries){
   const totalBal=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
   const totalSched=ap.filter(e=>e.account&&unpaid(e)>0.005).reduce((s,e)=>s+unpaid(e),0);
 
-  const acctCard=(id,a)=>{
-    const bills=sortEntries(ap.filter(e=>e.account===id&&unpaid(e)>0.005));
+  const billRow=e=>{
+    const d=daysUntil(e.due);
+    const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
+    return `<div class="acct-bill" onclick="openEntry('${e.id}')">
+      <span class="ab-party">${esc(e.party)}</span>
+      <span class="ab-due${d!=null&&d<0?' over':''}">${dueTxt}</span>
+      <span>${fmtMoney(unpaid(e))}</span>
+    </div>`;
+  };
+
+  const acctTile=(id,a)=>{
+    const bills=ap.filter(e=>e.account===id&&unpaid(e)>0.005);
     const sched=bills.reduce((s,e)=>s+unpaid(e),0);
     const bal=Number(a.balance)||0;
     const proj=bal-sched;
-    const billRows=bills.length?bills.map(e=>{
-      const d=daysUntil(e.due);
-      const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
-      return `<div class="acct-bill" onclick="openEntry('${e.id}')">
-        <span class="ab-party">${esc(e.party)}</span>
-        <span class="ab-due${d!=null&&d<0?' over':''}">${dueTxt}</span>
-        <span>${fmtMoney(unpaid(e))}</span>
-      </div>`;
-    }).join(''):'<div class="acct-empty">No unpaid bills assigned to this account.</div>';
     return `<div class="acct-card">
       <div class="acct-top">
         <input class="acct-name" value="${esc(a.name)}" onchange="renameAccount('${id}',this.value)">
         <span class="acct-del" onclick="deleteAccount('${id}','${esc(a.name)}')" title="Delete account"><i class="ti ti-trash"></i></span>
       </div>
-      <div class="acct-nums">
-        <div class="acct-num"><div class="l">Current balance</div><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"></div>
-        <div class="acct-num"><div class="l">Scheduled out</div><div class="v">${fmtMoney(sched)}</div></div>
-        <div class="acct-num"><div class="l">Projected</div><div class="v${proj<0?' neg':''}">${fmtMoney(proj)}</div></div>
-      </div>
-      <div class="acct-bills">${billRows}</div>
+      <div class="acct-num"><div class="l">Balance</div><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"></div>
+      <div class="acct-num"><div class="l">Scheduled out</div><div class="v">${fmtMoney(sched)}</div></div>
+      <div class="acct-num"><div class="l">Projected</div><div class="v${proj<0?' neg':''}">${fmtMoney(proj)}</div></div>
+    </div>`;
+  };
+
+  const acctBillSection=(id,a)=>{
+    const bills=sortEntries(ap.filter(e=>e.account===id&&unpaid(e)>0.005));
+    if(!bills.length)return'';
+    const sched=bills.reduce((s,e)=>s+unpaid(e),0);
+    return `<div class="acct-bills-section"><h3>${esc(a.name)}<span class="tot">${fmtMoney(sched)} scheduled</span></h3>
+      <div class="acct-bills">${bills.map(billRow).join('')}</div>
     </div>`;
   };
 
   const unassigned=sortEntries(ap.filter(e=>!e.account&&unpaid(e)>0.005));
   const unassignedTotal=unassigned.reduce((s,e)=>s+unpaid(e),0);
-  const unassignedCard=`<div class="acct-card">
-    <div class="acct-top"><span style="font-weight:800;font-size:15px">Unassigned</span></div>
-    <div class="acct-nums" style="grid-template-columns:1fr">
-      <div class="acct-num"><div class="l">Not yet assigned to an account</div><div class="v">${fmtMoney(unassignedTotal)}</div></div>
-    </div>
-    <div class="acct-bills">${unassigned.length?unassigned.map(e=>{
-      const d=daysUntil(e.due);
-      const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
-      return `<div class="acct-bill" onclick="openEntry('${e.id}')">
-        <span class="ab-party">${esc(e.party)}</span>
-        <span class="ab-due${d!=null&&d<0?' over':''}">${dueTxt}</span>
-        <span>${fmtMoney(unpaid(e))}</span>
-      </div>`;
-    }).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>
+  const unassignedSection=`<div class="acct-bills-section"><h3>Unassigned<span class="tot">${fmtMoney(unassignedTotal)}</span></h3>
+    <div class="acct-bills">${unassigned.length?unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>
   </div>`;
 
   $('content').innerHTML=`
@@ -552,9 +553,10 @@ function renderCash(entries){
       <div class="stat"><div class="l">Projected total</div><div class="v" style="color:${(totalBal-totalSched)<0?'var(--red)':'var(--text)'}">${fmtMoney(totalBal-totalSched)}</div><div class="s">balance − scheduled</div></div>
     </div>
     <div class="toolbar"><button class="btn primary" onclick="addAccount()"><i class="ti ti-plus"></i> Add account</button></div>
-    ${ids.map(id=>acctCard(id,accounts[id])).join('')}
+    <div class="acct-grid">${ids.map(id=>acctTile(id,accounts[id])).join('')}</div>
     ${ids.length===0?'<div class="empty">No accounts yet. Add your bank sub-accounts (Operating, Payroll, Utilities, etc.) to start tracking what\'s scheduled to drain from each one.</div>':''}
-    ${unassignedCard}`;
+    ${ids.map(id=>acctBillSection(id,accounts[id])).join('')}
+    ${unassignedSection}`;
 }
 window.addAccount=()=>{
   const name=prompt('Account name (e.g. Operating, Payroll, Utilities):'); if(!name||!name.trim())return;
