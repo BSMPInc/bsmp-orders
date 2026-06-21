@@ -324,6 +324,17 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .m-row{display:flex;gap:12px;padding:3px 0;font-size:13px}
 .m-row .k{width:110px;color:var(--text2);flex-shrink:0}
 .m-row .v{flex:1;font-weight:600;word-break:break-word}
+.li-table{border:1px solid var(--border);border-radius:9px;overflow:hidden;font-size:12.5px}
+.li-head,.li-row,.li-foot{display:grid;grid-template-columns:2fr .7fr 1fr 1fr;gap:8px;padding:6px 10px;align-items:center}
+.li-head{background:#f5f7fa;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
+.li-head span:nth-child(2),.li-head span:nth-child(3),.li-head span:nth-child(4),
+.li-row span:nth-child(2),.li-row span:nth-child(3),.li-row span:nth-child(4),
+.li-foot span:nth-child(2),.li-foot span:nth-child(3),.li-foot span:nth-child(4){text-align:right}
+.li-row{border-top:1px solid var(--border2)}
+.li-part{font-weight:600;word-break:break-word}
+.li-tot{font-weight:700}
+.li-foot{border-top:1px solid var(--border);background:#fafbfd;font-weight:700}
+.li-foot span:first-child{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
 .fld{margin:9px 0}
 .fld label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px}
 .fld input,.fld select,.fld textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:7px}
@@ -560,7 +571,7 @@ function allEntries(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void};
+    return {...e,ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null)};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -570,7 +581,7 @@ function allEntries(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:o.party||'—',ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,manual:true});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null});
     }
   });
   return merged.filter(e=>!e.void);
@@ -1545,6 +1556,19 @@ window.openEntry=(id)=>{
       <div class="m-row"><span class="k">Paid</span><span class="v">${fmtMoney(e.paid)}</span></div>
       <div class="m-row"><span class="k">Balance</span><span class="v" style="color:${bal>0.005?'var(--red)':'var(--ar)'}">${fmtMoney(bal)}</span></div>
       <div class="m-row"><span class="k">Status</span><span class="v"><span class="pill ${st}">${STATUS_LABEL[st]}</span></span></div>
+      ${(isAR && Array.isArray(e.lineItems) && e.lineItems.length)?`
+      <div class="m-sect">Line items</div>
+      <div class="li-table">
+        <div class="li-head"><span>Part #</span><span>Qty</span><span>Unit</span><span>Total</span></div>
+        ${e.lineItems.map(li=>`<div class="li-row">
+          <span class="li-part">${esc(li.part||'—')}</span>
+          <span>${li.qty!=null?li.qty:'—'}</span>
+          <span>${li.unit!=null?fmtMoney(li.unit):'—'}</span>
+          <span class="li-tot">${li.total!=null?fmtMoney(li.total):'—'}</span>
+        </div>`).join('')}
+        ${(()=>{const sum=e.lineItems.reduce((s,li)=>s+(Number(li.total)||0),0);
+          return sum>0.005?`<div class="li-foot"><span>Items total</span><span></span><span></span><span class="li-tot">${fmtMoney(sum)}</span></div>`:'';})()}
+      </div>`:''}
 
       <div class="m-sect">Invoice / terms</div>
       <div class="fld"><label>${isAR?'Invoice #':'Vendor invoice #'}</label><input id="d-ref" type="text" value="${esc(e.ref||'')}" placeholder="${isAR?'e.g. INV-1042':'e.g. 62366512'}"></div>
@@ -1681,8 +1705,10 @@ window.doSignOut=()=>signOut(auth);
 // ── AI Extract (drag & drop an invoice/bill) ─────────────────────────────────
 let aiType='ar';
 let _aiDiscount='';
+let _aiLineItems=[];
 window.openAI=()=>{
   setAIType('ar');
+  _aiDiscount=''; _aiLineItems=[];
   $('ai-status').style.display='none'; $('ai-preview').style.display='none'; $('ai-add').style.display='none';
   const aw=$('ai-account-wrap'); if(aw)aw.style.display='none';
   $('ai-file').value=''; $('ai-modal').style.display='flex';
@@ -1736,7 +1762,7 @@ window.aiHandle=async(file)=>{
       ? ` Also return account = the single best-fit bank account for paying this bill, chosen ONLY from this exact list: [${acctList.map(n=>'"'+n+'"').join(', ')}]. Match on what the vendor is for (e.g. power/water/gas/internet → a utilities account, wages/payroll taxes → a payroll account, owner draws → an owner account). If none clearly fits, return account as an empty string. Use the exact account name from the list, nothing else.`
       : '';
     const prompt = (aiType==='ar')
-      ? "This document is an INVOICE issued BY Bert's Sheet Metal Products (BSMP / Bert's Welding) TO a customer. Return ONE JSON object: party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON object, no markdown."
+      ? "This document is an INVOICE issued BY Bert's Sheet Metal Products (BSMP / Bert's Welding) TO a customer. Return ONE JSON object: party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, lineItems = an array of the invoice's line items, each as {part: the part/product/SKU number as a string, qty: the quantity as a number, unit: the unit price as a plain number, total: the line total as a plain number}; include every line item row; if the invoice has no itemized lines return an empty array, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON object, no markdown."
       : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, discountTerms = the early-payment discount terms exactly as written if any (e.g. '2% 10, Net 30' or '2/10 net 30') else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON object, no markdown.";
     const content = isImg
       ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
@@ -1754,6 +1780,12 @@ window.aiHandle=async(file)=>{
     $('ai-due').value=obj.due||'';
     $('ai-desc').value=obj.description||obj.desc||'';
     _aiDiscount=obj.discountTerms||'';
+    _aiLineItems=(aiType==='ar'&&Array.isArray(obj.lineItems))?obj.lineItems.map(li=>({
+      part:String(li.part!=null?li.part:'').trim(),
+      qty:(li.qty!=null&&li.qty!=='')?Number(li.qty):null,
+      unit:(li.unit!=null&&li.unit!=='')?Number(li.unit):null,
+      total:(li.total!=null&&li.total!=='')?Number(li.total):null
+    })).filter(li=>li.part||li.qty||li.unit||li.total):[];
     // resolve account: vendor memory wins, else AI suggestion, else unassigned (AP only)
     if(aiType==='ap'){
       const memId=vendorAccounts[vendorKey(obj.party||'')]||'';
@@ -1787,6 +1819,7 @@ window.aiAdd=()=>{
     amount:Number($('ai-amt').value)||0,issue:$('ai-issue').value||'',
     terms:aiTermsRaw===''?DEFAULT_TERMS:Number(aiTermsRaw),payments:[]};
   if(_aiDiscount) o.discountTerms=_aiDiscount;
+  if(_aiLineItems&&_aiLineItems.length) o.lineItems=_aiLineItems;
   const due=$('ai-due').value; if(due)o.dueDate=due;
   if(aiType==='ap'){
     const acctId=$('ai-account')?$('ai-account').value:'';
