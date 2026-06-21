@@ -608,6 +608,10 @@ tr:hover .del-btn{opacity:1}
     <div class="nav-item" onclick="setGroupMode('none')"><i class="ti ti-table"></i> All Line Items</div>
   </div>
   <div class="sidebar-section mgr-only">
+    <div class="sidebar-section-label">Tools</div>
+    <div class="nav-item" id="nav-cutlist" onclick="showPage('cutlist')"><i class="ti ti-ruler-2"></i> Tube Cut List</div>
+  </div>
+  <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Export</div>
     <div class="nav-item" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</div>
     <div class="nav-item" onclick="exportExcel()"><i class="ti ti-table-export"></i> Export Excel</div>
@@ -620,7 +624,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.41.1</div>
+    <div class="ver">v2.43.1</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -775,6 +779,99 @@ tr:hover .del-btn{opacity:1}
       </div>
       <div id="issuedpos-body"></div>
     </div>
+  </div>
+
+  <!-- Tube Cut List Page -->
+  <style>
+  #cutlist-page .cl-panel{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 1px 2px rgba(16,24,40,.05);padding:18px;margin-bottom:18px}
+  #cutlist-page .cl-h{margin:0 0 14px;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);display:flex;align-items:center;gap:7px}
+  #cutlist-page .cl-h i{font-size:17px;color:var(--navy)}
+  #cutlist-page .cl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+  #cutlist-page .cl-fld label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px}
+  #cutlist-page .cl-fld input,#cutlist-page .cl-fld select{width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:#fff}
+  #cutlist-page .cl-fld .cl-hint{font-size:10.5px;color:var(--text3);margin-top:3px}
+  #cutlist-page table.cl-cuts{width:100%;border-collapse:collapse;margin-top:4px}
+  #cutlist-page table.cl-cuts th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);text-align:left;padding:4px 8px;font-weight:700}
+  #cutlist-page table.cl-cuts td{padding:4px}
+  #cutlist-page table.cl-cuts input{width:100%;box-sizing:border-box;font-family:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--border);border-radius:7px}
+  #cutlist-page .cl-rm{background:none;border:none;color:var(--red);cursor:pointer;font-size:17px;padding:4px}
+  #cutlist-page .cl-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  #cutlist-page .cl-note{font-size:12px;color:var(--text3);margin-top:10px;line-height:1.5}
+  #cutlist-page .cl-drop{border:2px dashed var(--border2);border-radius:12px;padding:20px;text-align:center;background:#fafbfd;cursor:pointer;transition:all .15s}
+  #cutlist-page .cl-drop:hover,#cutlist-page .cl-drop.drag{border-color:var(--navy);background:#f4f0f1}
+  #cutlist-page .cl-drop i{font-size:30px;color:var(--navy)}
+  #cutlist-page .cl-drop .cl-dt{font-weight:700;margin-top:6px}
+  #cutlist-page .cl-drop .cl-ds{font-size:12px;color:var(--text3);margin-top:3px}
+  #cutlist-page .cl-aistat{margin-top:12px;font-size:13px;padding:11px 13px;border-radius:9px;display:none}
+  #cutlist-page .cl-aistat.show{display:block}
+  #cutlist-page .cl-aistat.work{background:#eef4fb;border:1px solid #cfe0f3;color:#1e5fa8}
+  #cutlist-page .cl-aistat.ok{background:#eaf5d8;border:1px solid #cfe3b3;color:#3B6D11}
+  #cutlist-page .cl-aistat.err{background:#fbeaea;border:1px solid #f0c9c9;color:var(--red)}
+  #cutlist-page .cl-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:12px;margin-bottom:18px}
+  #cutlist-page .cl-stat{background:#eef1f6;border:1px solid var(--border);border-radius:11px;padding:12px 14px}
+  #cutlist-page .cl-stat .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3)}
+  #cutlist-page .cl-stat .v{font-size:21px;font-weight:800;margin-top:3px}
+  #cutlist-page .cl-stat.good .v{color:var(--green)}#cutlist-page .cl-stat.warn .v{color:var(--amber)}#cutlist-page .cl-stat.bad .v{color:var(--red)}
+  #cutlist-page .cl-tube{background:#fff;border:1px solid var(--border2);border-radius:11px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+  #cutlist-page .cl-tube-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fafbfd;border-bottom:1px solid var(--border2);flex-wrap:wrap}
+  #cutlist-page .cl-tnum{font-size:14px;font-weight:800}
+  #cutlist-page .cl-tmeta{font-size:11.5px;color:var(--text2)}
+  #cutlist-page .cl-tutil{margin-left:auto;font-size:11.5px;font-weight:700}
+  #cutlist-page .cl-bar{display:flex;height:30px;border-radius:6px;overflow:hidden;margin:10px 14px 4px;border:1px solid var(--border)}
+  #cutlist-page .cl-bar .seg{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;min-width:2px;overflow:hidden;white-space:nowrap}
+  #cutlist-page .cl-bar .drop{background:repeating-linear-gradient(45deg,#e7ebf1,#e7ebf1 6px,#dde3ee 6px,#dde3ee 12px);color:var(--text3)}
+  #cutlist-page .cl-cutlist{display:flex;flex-wrap:wrap;gap:6px;padding:6px 14px 12px}
+  #cutlist-page .cl-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;border:1px solid var(--border);border-radius:7px;padding:4px 9px;background:#fff}
+  #cutlist-page .cl-chip .box{width:13px;height:13px;border:1.5px solid var(--text3);border-radius:3px;flex-shrink:0}
+  #cutlist-page .cl-chip .lab{color:var(--text3)}
+  #cutlist-page .cl-sw{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:4px;vertical-align:middle}
+  #cutlist-page .cl-recap{width:100%;border-collapse:collapse;margin-top:6px}
+  #cutlist-page .cl-recap th,#cutlist-page .cl-recap td{text-align:left;font-size:12.5px;padding:7px 10px;border-bottom:1px solid var(--border)}
+  #cutlist-page .cl-recap th{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--text3)}
+  #cutlist-page .cl-warn{background:#fbeaea;border:1px solid #f0c9c9;color:var(--red);border-radius:9px;padding:11px 13px;font-size:13px;margin-bottom:14px;display:flex;gap:8px;align-items:flex-start}
+  #cutlist-page .cl-empty{text-align:center;color:var(--text3);padding:30px 16px}
+  </style>
+  <div id="cutlist-page" style="display:none">
+    <div class="cl-panel">
+      <div class="cl-h"><i class="ti ti-sparkles"></i> AI extract from drawing</div>
+      <div class="cl-drop" id="cl-drop" onclick="document.getElementById('cl-file').click()">
+        <i class="ti ti-cloud-upload"></i>
+        <div class="cl-dt">Drop a drawing here, or click to choose a file</div>
+        <div class="cl-ds">PDF or image — Claude reads the cut dimensions and fills in the list below</div>
+        <input type="file" id="cl-file" accept="image/*,application/pdf" style="display:none" onchange="clAiHandle(this)">
+      </div>
+      <div class="cl-aistat" id="cl-aistat"></div>
+    </div>
+
+    <div class="cl-panel">
+      <div class="cl-h"><i class="ti ti-settings"></i> Stock &amp; job</div>
+      <div class="cl-grid">
+        <div class="cl-fld"><label>Job / part name</label><input id="cl-job" placeholder="e.g. U41 frame rails"></div>
+        <div class="cl-fld"><label>Material / profile</label><input id="cl-material" placeholder="e.g. 1×1 14ga square tube"></div>
+        <div class="cl-fld"><label>Units</label>
+          <select id="cl-unit"><option value="in">inches</option><option value="ft">feet</option><option value="mm">mm</option><option value="cm">cm</option></select></div>
+        <div class="cl-fld"><label>Stock length (per tube)</label><input id="cl-stock" type="number" step="any" min="0" placeholder="240">
+          <div class="cl-hint">Length of one full tube you buy</div></div>
+        <div class="cl-fld"><label>Saw kerf (cut loss)</label><input id="cl-kerf" type="number" step="any" min="0" placeholder="0.125">
+          <div class="cl-hint">Material lost per cut</div></div>
+        <div class="cl-fld"><label>Trim / end loss (each tube)</label><input id="cl-trim" type="number" step="any" min="0" placeholder="0">
+          <div class="cl-hint">Usable length removed from every stick</div></div>
+      </div>
+
+      <div class="cl-h" style="margin-top:20px"><i class="ti ti-ruler-2"></i> Pieces needed</div>
+      <table class="cl-cuts">
+        <thead><tr><th style="width:34%">Length</th><th style="width:18%">Qty</th><th style="width:40%">Label (optional)</th><th></th></tr></thead>
+        <tbody id="cl-rows"></tbody>
+      </table>
+      <div class="cl-actions">
+        <button class="btn" onclick="clAddRow()"><i class="ti ti-plus"></i> Add piece</button>
+        <button class="btn green" onclick="clCalculate()"><i class="ti ti-calculator"></i> Calculate cut list</button>
+        <button class="btn" onclick="clReset()"><i class="ti ti-refresh"></i> Reset</button>
+      </div>
+      <div class="cl-note">Pieces are packed largest-first into as few sticks as possible (first-fit decreasing). Each cut consumes one kerf width.</div>
+    </div>
+
+    <div id="cl-results"></div>
   </div>
 
   <!-- Archive Page -->
@@ -2190,12 +2287,13 @@ const PAGE_META = {
   schedule: {title:'Incoming / Outgoing', sub:'External steps — parts out to vendors and material/POs coming in'},
   needpo:   {title:'Need PO',         sub:'Assign the vendor and our PO number for outside processes'},
   issuedpos:{title:'Issued POs',      sub:'History of every purchase order assigned to a vendor'},
+  cutlist:  {title:'Tube Cut List',   sub:'Optimize tube/bar cuts for maximum material utilization'},
   archive:  {title:'Archive',        sub:'Completed orders you have archived'},
   settings: {title:'Process Times',  sub:'Lead times for outside processes'}
 };
 window.showPage = (page) => {
   if(userRole==='operator') page='queues';   // operators are locked to Work Queues
-  ['orders','queues','customers','schedule','needpo','issuedpos','archive','settings'].forEach(p=>{
+  ['orders','queues','customers','schedule','needpo','issuedpos','cutlist','archive','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -2211,6 +2309,7 @@ window.showPage = (page) => {
   if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
   if(page==='needpo') document.getElementById('nav-needpo')?.classList.add('active');
   if(page==='issuedpos') document.getElementById('nav-issuedpos')?.classList.add('active');
+  if(page==='cutlist') document.getElementById('nav-cutlist')?.classList.add('active');
   if(page==='archive') document.getElementById('nav-archive')?.classList.add('active');
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
   if(page==='queues') renderQueues();
@@ -2218,6 +2317,7 @@ window.showPage = (page) => {
   if(page==='schedule') renderSchedule();
   if(page==='needpo'){ document.getElementById('npv-order')?.classList.toggle('active',needPOView==='order'); document.getElementById('npv-vendor')?.classList.toggle('active',needPOView==='vendor'); renderNeedPO(); }
   if(page==='issuedpos') renderIssuedPOs();
+  if(page==='cutlist') clInit();
   if(page==='archive') renderArchive();
   if(page==='settings') renderDurationSettings();
 };
@@ -2971,6 +3071,188 @@ function renderIssuedPOs(){
   <div style="padding:9px 14px;font-size:12px;color:var(--text3)">${totalLabel}${q?` matching “${esc2(q)}”`:''}</div>`;
 }
 function esc2(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+// ══════════════ TUBE CUT LIST OPTIMIZER (embedded page) ══════════════
+const CL_DEF={stock:240,kerf:0.125,trim:0,unit:'in'};
+let _clInited=false;
+function clInit(){
+  if(!_clInited){
+    _clInited=true;
+    try{
+      const d=JSON.parse(localStorage.getItem('bsmp_cutlist_def')||'{}');
+      document.getElementById('cl-stock').value=d.stock??CL_DEF.stock;
+      document.getElementById('cl-kerf').value=d.kerf??CL_DEF.kerf;
+      document.getElementById('cl-trim').value=d.trim??CL_DEF.trim;
+      document.getElementById('cl-unit').value=d.unit||CL_DEF.unit;
+      if(d.material) document.getElementById('cl-material').value=d.material;
+    }catch{ document.getElementById('cl-stock').value=CL_DEF.stock; document.getElementById('cl-kerf').value=CL_DEF.kerf; }
+    if(!document.getElementById('cl-rows').children.length) for(let i=0;i<4;i++) clAddRow();
+    clWireDrop();
+  }
+}
+function clSaveDefaults(){
+  try{ localStorage.setItem('bsmp_cutlist_def', JSON.stringify({
+    stock:document.getElementById('cl-stock').value, kerf:document.getElementById('cl-kerf').value,
+    trim:document.getElementById('cl-trim').value, unit:document.getElementById('cl-unit').value,
+    material:document.getElementById('cl-material').value })); }catch{}
+}
+function clRowHtml(len='',qty='',label=''){
+  return `<tr>
+    <td><input type="number" step="any" min="0" class="cl-len" placeholder="length" value="${esc2(len)}"></td>
+    <td><input type="number" step="1" min="1" class="cl-qty" placeholder="qty" value="${esc2(qty)}"></td>
+    <td><input type="text" class="cl-lab" placeholder="part / note" value="${esc2(label)}"></td>
+    <td style="text-align:center"><button class="cl-rm" title="Remove" onclick="this.closest('tr').remove()"><i class="ti ti-x"></i></button></td>
+  </tr>`;
+}
+window.clAddRow=(len,qty,label)=>{ document.getElementById('cl-rows').insertAdjacentHTML('beforeend', clRowHtml(len,qty,label)); };
+window.clReset=()=>{ document.getElementById('cl-rows').innerHTML=''; for(let i=0;i<4;i++) clAddRow(); document.getElementById('cl-results').innerHTML=''; document.getElementById('cl-job').value=''; const s=document.getElementById('cl-aistat'); s.className='cl-aistat'; };
+function clFmt(n){ const r=Math.round(n*1000)/1000; return (Number.isInteger(r)?r:r.toFixed(3).replace(/0+$/,'').replace(/\.$/,'')); }
+function clPack(pieces, stockUsable, kerf){
+  const sorted=[...pieces].sort((a,b)=>b.len-a.len); const bins=[];
+  sorted.forEach(p=>{ const need=p.len+kerf; let placed=false;
+    for(const b of bins){ if(b.rem+1e-9>=need){ b.rem-=need; b.cuts.push(p); placed=true; break; } }
+    if(!placed){ bins.push({rem:stockUsable-need, cuts:[p]}); }
+  });
+  return bins;
+}
+const CL_PAL=['#3a6ea5','#2f8f6b','#a8553a','#7a5cc0','#b0852a','#3f7d7a','#9c4567','#5a7d2a'];
+window.clCalculate=()=>{
+  clSaveDefaults();
+  const unit=document.getElementById('cl-unit').value;
+  const stock=parseFloat(document.getElementById('cl-stock').value)||0;
+  const kerf=parseFloat(document.getElementById('cl-kerf').value)||0;
+  const trim=parseFloat(document.getElementById('cl-trim').value)||0;
+  const stockUsable=stock-trim;
+  const job=document.getElementById('cl-job').value.trim();
+  const material=document.getElementById('cl-material').value.trim();
+  const pieces=[];
+  document.querySelectorAll('#cl-rows tr').forEach(tr=>{
+    const len=parseFloat(tr.querySelector('.cl-len').value)||0;
+    const qty=parseInt(tr.querySelector('.cl-qty').value)||0;
+    const lab=tr.querySelector('.cl-lab').value.trim();
+    if(len>0&&qty>0){ for(let i=0;i<qty;i++) pieces.push({len,label:lab}); }
+  });
+  const R=document.getElementById('cl-results');
+  if(stockUsable<=0){ R.innerHTML=`<div class="cl-warn"><i class="ti ti-alert-triangle"></i> Enter a valid stock length (and make sure trim isn't larger than the stock).</div>`; return; }
+  if(!pieces.length){ R.innerHTML=`<div class="cl-empty"><i class="ti ti-ruler-2" style="font-size:30px"></i><p>Add at least one piece (length &amp; qty), then Calculate.</p></div>`; return; }
+  let warn='';
+  const tooLong=pieces.filter(p=>p.len+kerf>stockUsable);
+  if(tooLong.length){ const mx=Math.max(...tooLong.map(p=>p.len)); warn=`${tooLong.length} piece(s) are longer than one usable stick (${clFmt(mx)} ${unit} needed, ${clFmt(stockUsable)} ${unit} available). Split the part or use longer stock.`; }
+  const cuttable=pieces.filter(p=>p.len+kerf<=stockUsable);
+  const bins=clPack(cuttable, stockUsable, kerf);
+  const totalPieceLen=cuttable.reduce((s,p)=>s+p.len,0);
+  const tubes=bins.length, totalStock=tubes*stock, totalUsable=tubes*stockUsable;
+  const totalCuts=cuttable.length, kerfLoss=totalCuts*kerf;
+  const drop=totalUsable-totalPieceLen-kerfLoss;
+  const util=totalStock>0?(totalPieceLen/totalStock*100):0;
+  const utilClass=util>=85?'good':util>=70?'warn':'bad';
+  const lenColors={}; let ci=0; const colorFor=(L)=>{ const k=L.toFixed(3); if(!(k in lenColors)){ lenColors[k]=CL_PAL[ci%CL_PAL.length]; ci++; } return lenColors[k]; };
+  const recapMap=new Map();
+  cuttable.forEach(p=>{ const k=p.len.toFixed(4); if(!recapMap.has(k)) recapMap.set(k,{len:p.len,labels:new Set(),qty:0}); const e=recapMap.get(k); e.qty++; if(p.label)e.labels.add(p.label); });
+  const recap=[...recapMap.values()].sort((a,b)=>b.len-a.len);
+  const tubeHtml=bins.map((b,i)=>{
+    const used=stockUsable-b.rem, usedPct=(used/stockUsable*100);
+    const segs=b.cuts.map(c=>{ const w=(c.len/stockUsable*100); return `<div class="seg" style="width:${w}%;background:${colorFor(c.len)}" title="${clFmt(c.len)} ${unit}${c.label?' · '+esc2(c.label):''}">${w>7?clFmt(c.len):''}</div>`; }).join('');
+    const dropPct=Math.max(0,100-usedPct);
+    const dropSeg=dropPct>0.2?`<div class="seg drop" style="width:${dropPct}%" title="Drop ${clFmt(b.rem)} ${unit}">${dropPct>9?('drop '+clFmt(b.rem)):''}</div>`:'';
+    const cg=new Map(); b.cuts.forEach(c=>{ const k=c.len.toFixed(4)+'|'+(c.label||''); if(!cg.has(k))cg.set(k,{len:c.len,label:c.label,n:0}); cg.get(k).n++; });
+    const chips=[...cg.values()].sort((a,b)=>b.len-a.len).map(c=>{ const reps=Array.from({length:c.n},()=>`<span class="box"></span>`).join(''); return `<span class="cl-chip"><span class="cl-sw" style="background:${colorFor(c.len)}"></span>${reps}<b>${clFmt(c.len)} ${unit}</b>${c.n>1?` × ${c.n}`:''}${c.label?`<span class="lab">${esc2(c.label)}</span>`:''}</span>`; }).join('');
+    return `<div class="cl-tube">
+      <div class="cl-tube-head"><span class="cl-tnum">Tube ${i+1} <span style="color:var(--text3);font-weight:600">of ${tubes}</span></span>
+        <span class="cl-tmeta">· ${b.cuts.length} cut${b.cuts.length!==1?'s':''} · used ${clFmt(used)} ${unit} · drop <b style="color:${b.rem>stockUsable*0.15?'var(--amber)':'var(--text2)'}">${clFmt(b.rem)} ${unit}</b></span>
+        <span class="cl-tutil" style="color:${usedPct>=85?'var(--green)':usedPct>=70?'var(--amber)':'var(--text2)'}">${usedPct.toFixed(0)}% used</span></div>
+      <div class="cl-bar">${segs}${dropSeg}</div>
+      <div class="cl-cutlist">${chips}</div></div>`;
+  }).join('');
+  R.innerHTML=`${warn?`<div class="cl-warn"><i class="ti ti-alert-triangle"></i><div>${warn}</div></div>`:''}
+    <div class="cl-panel">
+      <div class="cl-h"><i class="ti ti-clipboard-check"></i> Cut plan${job?` — ${esc2(job)}`:''}</div>
+      <div class="cl-stats">
+        <div class="cl-stat"><div class="l">Stock tubes</div><div class="v">${tubes}</div></div>
+        <div class="cl-stat"><div class="l">Total pieces</div><div class="v">${totalCuts}</div></div>
+        <div class="cl-stat ${utilClass}"><div class="l">Utilization</div><div class="v">${util.toFixed(1)}%</div></div>
+        <div class="cl-stat"><div class="l">Material used</div><div class="v" style="font-size:17px">${clFmt(totalPieceLen)} <small style="font-size:11px;color:var(--text3)">${unit}</small></div></div>
+        <div class="cl-stat"><div class="l">Total drop</div><div class="v" style="font-size:17px;color:${drop>totalUsable*0.15?'var(--amber)':'var(--text)'}">${clFmt(drop)} <small style="font-size:11px;color:var(--text3)">${unit}</small></div></div>
+        <div class="cl-stat"><div class="l">To purchase</div><div class="v" style="font-size:17px">${tubes} × ${clFmt(stock)} <small style="font-size:11px;color:var(--text3)">${unit}</small></div></div>
+      </div>
+      <div class="cl-actions" style="margin-bottom:14px"><button class="btn blue" onclick="clPrint()"><i class="ti ti-printer"></i> Print cut sheet</button></div>
+      ${tubeHtml}
+      <div class="cl-h" style="margin-top:18px"><i class="ti ti-list-numbers"></i> Pieces required</div>
+      <table class="cl-recap"><thead><tr><th>Length</th><th>Qty</th><th>Label(s)</th></tr></thead><tbody>
+        ${recap.map(e=>`<tr><td><b>${clFmt(e.len)} ${unit}</b></td><td>${e.qty}</td><td>${[...e.labels].map(esc2).join(', ')||'<span style="color:var(--text3)">—</span>'}</td></tr>`).join('')}
+      </tbody></table>
+    </div>`;
+  _clLast={job,material,unit,stock,kerf,trim,bins,recap,tubes,util,totalPieceLen,drop,colorFor};
+};
+let _clLast=null;
+window.clPrint=()=>{
+  if(!_clLast) return;
+  const L=_clLast, dateStr=new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'});
+  const su=L.stock-L.trim;
+  const seg=(c)=>`<div style="display:inline-flex;align-items:center;justify-content:center;width:${(c.len/su*100)}%;background:${L.colorFor(c.len)};color:#fff;font-size:9px;font-weight:700;overflow:hidden">${(c.len/su*100)>7?clFmt(c.len):''}</div>`;
+  const tubeBlocks=L.bins.map((b,i)=>{
+    const used=su-b.rem, usedPct=used/su*100;
+    const bar=b.cuts.map(c=>seg(c)).join('')+(100-usedPct>0.2?`<div style="display:inline-flex;align-items:center;justify-content:center;width:${100-usedPct}%;background:#e7ebf1;color:#888;font-size:9px">drop ${clFmt(b.rem)}</div>`:'');
+    const cg=new Map(); b.cuts.forEach(c=>{ const k=c.len.toFixed(4)+'|'+(c.label||''); if(!cg.has(k))cg.set(k,{len:c.len,label:c.label,n:0}); cg.get(k).n++; });
+    const chips=[...cg.values()].sort((a,b)=>b.len-a.len).map(c=>{ const boxes=Array.from({length:c.n},()=>'<span style="display:inline-block;width:12px;height:12px;border:1.5px solid #555;border-radius:2px;margin-right:2px"></span>').join(''); return `<span style="display:inline-flex;align-items:center;gap:4px;border:1px solid #ccc;border-radius:6px;padding:3px 8px;font-size:12px;margin:3px 4px 0 0">${boxes}<b>${clFmt(c.len)} ${L.unit}</b>${c.n>1?' × '+c.n:''}${c.label?` <span style="color:#888">${esc2(c.label)}</span>`:''}</span>`; }).join('');
+    return `<div style="border:1px solid #999;border-radius:8px;margin-bottom:10px;page-break-inside:avoid">
+      <div style="padding:7px 11px;background:#f3f3f3;border-bottom:1px solid #ccc;font-size:13px"><b>Tube ${i+1}</b> of ${L.tubes} · ${b.cuts.length} cuts · used ${clFmt(used)} ${L.unit} · drop ${clFmt(b.rem)} ${L.unit} · ${usedPct.toFixed(0)}%</div>
+      <div style="display:flex;height:26px;margin:8px 11px 4px;border:1px solid #bbb;border-radius:4px;overflow:hidden">${bar}</div>
+      <div style="padding:4px 11px 9px">${chips}</div></div>`;
+  }).join('');
+  const recapRows=L.recap.map(e=>`<tr><td style="padding:5px 9px;border-bottom:1px solid #ddd"><b>${clFmt(e.len)} ${L.unit}</b></td><td style="padding:5px 9px;border-bottom:1px solid #ddd">${e.qty}</td><td style="padding:5px 9px;border-bottom:1px solid #ddd">${[...e.labels].map(esc2).join(', ')||'—'}</td></tr>`).join('');
+  const doc=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Cut List${L.job?' — '+esc2(L.job):''}</title>
+    <style>body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:24px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .hd{display:flex;align-items:flex-end;gap:12px;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px}
+    .wm{font-size:24px;font-weight:800;letter-spacing:1px}.wm small{display:block;font-size:10px;font-weight:600;letter-spacing:2px;color:#444}
+    .meta{font-size:12px;color:#444}</style></head><body>
+    <div class="hd"><div class="wm" style="flex:1">BERT'S<small>SHEET METAL PRODUCTS INC.</small></div>
+      <div style="text-align:right"><div style="font-size:17px;font-weight:800">Tube Cut List</div>
+        <div class="meta">${L.job?('Job: '+esc2(L.job)+' · '):''}${L.material?(esc2(L.material)+' · '):''}${dateStr}</div></div></div>
+    <div class="meta" style="margin-bottom:12px">Stock: ${clFmt(L.stock)} ${L.unit}${L.trim?` (−${clFmt(L.trim)} trim)`:''} · Kerf: ${clFmt(L.kerf)} ${L.unit} · Tubes needed: <b>${L.tubes}</b> · Utilization: <b>${L.util.toFixed(1)}%</b></div>
+    ${tubeBlocks}
+    <div style="font-size:13px;font-weight:800;margin:16px 0 6px;text-transform:uppercase;letter-spacing:.5px">Pieces required</div>
+    <table style="border-collapse:collapse;width:100%"><thead><tr><th style="text-align:left;font-size:11px;color:#666;padding:5px 9px">Length</th><th style="text-align:left;font-size:11px;color:#666;padding:5px 9px">Qty</th><th style="text-align:left;font-size:11px;color:#666;padding:5px 9px">Label(s)</th></tr></thead><tbody>${recapRows}</tbody></table>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`;
+  const w=window.open('','_blank'); if(!w){ alert('Allow pop-ups to print the cut sheet.'); return; }
+  w.document.write(doc); w.document.close();
+};
+// ── AI extract from a drawing ──
+function clWireDrop(){
+  const dz=document.getElementById('cl-drop'); if(!dz||dz._wired) return; dz._wired=true;
+  ['dragover','dragenter'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
+  ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
+  dz.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) clAiExtract(f); });
+}
+window.clAiHandle=(input)=>{ const f=input.files[0]; if(f) clAiExtract(f); input.value=''; };
+const CL_PROMPT="You are reading a fabrication / weldment drawing from a metal shop (Bert's Sheet Metal Products). Produce a TUBE / BAR CUT LIST: the straight linear stock pieces that must be cut to build the part(s) shown. Most of these drawings show overall and reference dimensions across multiple views (orthographic + an isometric) rather than an itemized cut table — infer the members from the dimensioned lengths. MATERIAL: read the title-block material/thickness callout for the stock profile, wall, and grade (e.g. '1.5\\\" Sq w/ 1/8\\\" Wall', 'CRS Tubing') and combine them into one 'material' string. PIECES: list each distinct straight member as {length:number, qty:number, label:string} using the actual dimension values shown (inches unless the drawing states otherwise). Give each a short label for what it appears to be when discernible ('long rail','leg/upright','base','cross arm','top rail','foot'). For quantity, count how many of that member appear across the whole assembly, including multiplying by the number of identical end frames or sides (a two-ended frame ⇒ ×2). If a member is drawn on an angle, use the dimensioned length given. IGNORE: wall thickness/gauge, hole and slot sizes, perimeters, number-of-bends, weights, tolerances, scale, and flat-pattern envelope numbers that are not actual cut lengths. unit: one of 'in','ft','mm','cm' (default 'in'). stock: the raw mill length if the drawing states one, otherwise null. These are best-guess candidates for a human to verify and adjust. Return ONLY valid JSON, no markdown: {\"unit\":\"in\",\"material\":\"\",\"stock\":null,\"pieces\":[{\"length\":number,\"qty\":number,\"label\":\"\"}]}.";
+function clAiStatus(cls,msg){ const s=document.getElementById('cl-aistat'); s.className='cl-aistat show '+cls; s.textContent=msg; }
+async function clAiExtract(file){
+  clAiStatus('work','Reading the drawing with AI…');
+  const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
+  try{
+    const b64=await toB64(file);
+    const isImg=file.type.startsWith('image/');
+    const content=isImg
+      ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:CL_PROMPT}]
+      : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:CL_PROMPT}];
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:2000,messages:[{role:'user',content}]})});
+    const data=await resp.json();
+    if(data.error){ clAiStatus('err','API error: '+(data.error.message||JSON.stringify(data.error))); return; }
+    const text=(data.content||[]).map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    let parsed; try{ parsed=JSON.parse(text); }catch{ clAiStatus('err','Could not read a cut list from that drawing. Try a clearer image, or enter the pieces manually below.'); return; }
+    const pieces=(parsed.pieces||[]).filter(p=>parseFloat(p.length)>0);
+    if(!pieces.length){ clAiStatus('err','No cut lengths were found on that drawing. Enter the pieces manually below.'); return; }
+    if(parsed.unit && ['in','ft','mm','cm'].includes(parsed.unit)) document.getElementById('cl-unit').value=parsed.unit;
+    if(parsed.material && !document.getElementById('cl-material').value) document.getElementById('cl-material').value=parsed.material;
+    if(parsed.stock && parseFloat(parsed.stock)>0) document.getElementById('cl-stock').value=parseFloat(parsed.stock);
+    if(file.name) document.getElementById('cl-job').value=document.getElementById('cl-job').value||file.name.replace(/\.[^.]+$/,'');
+    document.getElementById('cl-rows').innerHTML='';
+    pieces.forEach(p=>clAddRow(clFmt(parseFloat(p.length)), parseInt(p.qty)||1, p.label||''));
+    clAiStatus('ok',`Found ${pieces.length} cut length${pieces.length!==1?'s':''} — review below, then Calculate. Adjust anything the drawing didn't make clear.`);
+    clCalculate();
+  }catch(err){ clAiStatus('err','Error: '+err.message); }
+}
 
 
 window._toggleStep = (id, name, e) => {
