@@ -259,6 +259,47 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
   .dep-row{grid-template-columns:1fr 1fr;gap:8px}
   .dep-split{text-align:left}
 }
+/* pay run planner */
+.pr-top{display:flex;gap:14px;align-items:stretch;margin-bottom:16px;flex-wrap:wrap}
+.pr-cashbox{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:16px;min-width:260px;display:flex;flex-direction:column;justify-content:center}
+.pr-cashbox label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:8px}
+.pr-cash-in{display:flex;align-items:center;border:1.5px solid var(--navy3);border-radius:9px;padding:2px 12px;background:#fff}
+.pr-cash-in:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px #2c574022}
+.pr-cash-in span{font-size:22px;font-weight:800;color:var(--text3);margin-right:4px}
+.pr-cash-in input{flex:1;border:none;outline:none;font-size:26px;font-weight:800;font-family:inherit;padding:8px 0;color:var(--text);background:transparent;min-width:0}
+.pr-legend{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text2);background:#eef2f7;border-radius:9px;padding:9px 13px;margin-bottom:14px}
+.pr-legend i{color:var(--blue);flex-shrink:0;margin-top:1px}
+.pr-section{margin-bottom:16px}
+.pr-sec-head{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px;display:flex;align-items:baseline;gap:10px}
+.pr-sec-note{font-size:11px;font-weight:600;color:var(--text3);text-transform:none;letter-spacing:0}
+.pr-rows{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.pr-rowhead,.pr-row{display:grid;grid-template-columns:2.4fr 1fr 1fr 1.1fr;gap:10px;align-items:center;padding:9px 15px}
+.pr-rowhead{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);border-bottom:1px solid var(--border)}
+.pr-rowhead span:nth-child(3),.pr-rowhead span:nth-child(4){text-align:right}
+.pr-row{border-bottom:1px solid var(--border2);cursor:pointer}
+.pr-row:last-child{border-bottom:none}
+.pr-row:hover{background:#fafbfd}
+.pr-name{font-weight:700;font-size:13px}
+.pr-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.pr-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;border-radius:4px;padding:1px 5px;vertical-align:1px}
+.pr-tag.disc{background:#2f8f6b1a;color:var(--green)}
+.pr-tag.over{background:#A32D2D1a;color:var(--red)}
+.pr-owed{text-align:right;font-weight:600;font-size:13px;color:var(--text2)}
+.pr-pay{text-align:right;font-weight:800;font-size:14px}
+.pr-pay.full{color:var(--green)}
+.pr-pay.part{color:var(--amber)}
+.pr-pay.zero{color:var(--text3)}
+.pr-paidtag{font-size:8.5px;font-weight:800;text-transform:uppercase;border-radius:4px;padding:1px 4px;background:#2f8f6b1a;color:var(--green);vertical-align:1px}
+.pr-paidtag.part{background:#BA75171a;color:var(--amber)}
+.pr-left{font-size:12.5px;color:var(--green);font-weight:600;background:#2f8f6b0d;border-radius:9px;padding:9px 13px;display:flex;align-items:center;gap:8px}
+.acct-sel.pri-critical{border-color:#A32D2D55;background:#A32D2D0d;color:var(--red);font-weight:700}
+.acct-sel.pri-normal{border-color:var(--border);color:var(--text2)}
+.acct-sel.pri-wait{border-color:var(--border);background:#f5f7fa;color:var(--text3)}
+@media(max-width:720px){
+  .pr-rowhead{display:none}
+  .pr-row{grid-template-columns:1fr 1fr;gap:6px}
+  .pr-owed,.pr-pay{text-align:left}
+}
 /* buttons */
 .btn{font-size:13px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;cursor:pointer}
 .btn:hover{background:#f5f7fa}
@@ -349,6 +390,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" id="nav-ap" onclick="go('ap')"><i class="ti ti-arrow-up-right"></i> Payables <span class="nb" id="nb-ap" style="display:none"></span></div>
     <div class="nav-item" id="nav-aging" onclick="go('aging')"><i class="ti ti-clock-hour-4"></i> Aging</div>
     <div class="nav-item" id="nav-cash" onclick="go('cash')"><i class="ti ti-building-bank"></i> Cash Flow</div>
+    <div class="nav-item" id="nav-payrun" onclick="go('payrun')"><i class="ti ti-cash"></i> Pay Run</div>
     <div class="nav-item" id="nav-recur" onclick="go('recur')"><i class="ti ti-repeat"></i> Recurring <span class="nb" id="nb-recur" style="display:none"></span></div>
     <div class="nav-item" id="nav-deposit" onclick="go('deposit')"><i class="ti ti-pie-chart"></i> Deposits</div>
     <div class="nav-item" id="nav-archive" onclick="go('archive')"><i class="ti ti-archive"></i> Archive</div>
@@ -454,6 +496,7 @@ let accounts = {};        // apar/accounts node: {id:{name,balance}} bank sub-ac
 let recurring = {};       // apar/recurring node: recurring bill templates
 let depositBuckets = {};  // apar/depositBuckets node: Profit First allocation buckets
 let vendorAccounts = {};  // apar/vendorAccounts node: {vendorKey:accountId} learned assignments
+let vendorPriority = {};  // apar/vendorPriority node: {vendorKey:'critical'|'normal'|'wait'}
 let page = 'dash';
 let DEFAULT_TERMS = 30;   // Net 30 default
 
@@ -557,7 +600,8 @@ function go(p){
     cash:['Cash Flow','Bank account balances vs. what\'s scheduled to come out'],
     recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
     deposit:['Deposits','Split incoming money across your Profit First buckets'],
-    archive:['Archive','Paid bills, auto-filed 45 days after withdrawal']}[p];
+    archive:['Archive','Paid bills, auto-filed 45 days after withdrawal'],
+    payrun:['Pay Run','Enter cash available — get a suggested split across your bills']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
   render();
 }
@@ -572,6 +616,7 @@ function render(){
   else if(page==='recur') renderRecurring();
   else if(page==='deposit') renderDeposit();
   else if(page==='archive') renderArchive();
+  else if(page==='payrun') renderPayRun();
 }
 function updateBadges(entries){
   const oa=entries.filter(e=>e.type==='ar'&&statusOf(e)==='over').length;
@@ -1311,6 +1356,150 @@ function renderArchive(){
     </div>`:'<div class="empty">Nothing archived yet. Once a withdrawn bill is 45 days past its withdrawal date, it lands here automatically.</div>'}`;
 }
 
+// ── Pay Run planner (suggest how to split available cash) ──────────────────────
+const PRIORITIES=[{k:'critical',label:'Critical'},{k:'normal',label:'Normal'},{k:'wait',label:'Can wait'}];
+function priOf(party){ return vendorPriority[vendorKey(party||'')]||'normal'; }
+window.setVendorPriority=(party,val)=>{
+  const vk=vendorKey(party||''); vendorPriority[vk]=val;
+  set(ref(db,'apar/vendorPriority/'+vk),val); render();
+};
+// Detect an early-pay discount in terms text like "2% 10, Net 30" or "2/10 net 30".
+// Returns {pct, days} or null. We scan the entry's notes/rel/terms fields.
+function parseDiscount(e){
+  const txt=[e.notes,e.rel,e.discountTerms].filter(Boolean).join(' ');
+  if(!txt)return null;
+  // pattern A: "2/10" or "2 / 10"
+  let m=txt.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+)/);
+  if(m)return {pct:parseFloat(m[1]),days:parseInt(m[2],10)};
+  // pattern B: "2% 10" or "2% in 10" or "2 percent 10 days"
+  m=txt.match(/(\d+(?:\.\d+)?)\s*%[^0-9]{0,8}(\d+)\s*(?:day|d\b)?/i);
+  if(m)return {pct:parseFloat(m[1]),days:parseInt(m[2],10)};
+  return null;
+}
+function discountActive(e){
+  const d=parseDiscount(e); if(!d||!e.issue)return null;
+  const deadline=addDays(e.issue,d.days);
+  const left=daysUntil(deadline);
+  if(left==null||left<0)return null;            // window passed
+  return {...d,deadline,daysLeft:left};
+}
+let _payCash='';
+window.calcPayRun=()=>{
+  const el=$('pr-cash'); const pos=el?el.selectionStart:null;
+  _payCash=el?el.value:_payCash; renderPayRun();
+  const ne=$('pr-cash'); if(ne){ ne.focus(); if(pos!=null){try{ne.setSelectionRange(pos,pos);}catch(e){}} }
+};
+function renderPayRun(){
+  const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  const bills=allEntries().filter(e=>e.type==='ap'&&!e.archived&&unpaid(e)>0.005);
+  const cash=Number(_payCash)||0;
+  const totalOwed=bills.reduce((s,e)=>s+unpaid(e),0);
+
+  // classify each bill
+  const annotated=bills.map(e=>{
+    const bal=unpaid(e);
+    const over=statusOf(e)==='over';
+    const pri=priOf(e.party);
+    const disc=discountActive(e);
+    const protect = pri==='critical' || over || !!disc;
+    return {e,bal,over,pri,disc,protect};
+  });
+
+  // Tier 1: protect bills get funded in full first (most urgent first: discount expiring soonest, then most overdue)
+  const tier1=annotated.filter(a=>a.protect && a.pri!=='wait')
+    .sort((a,b)=>{
+      // discounts expiring soonest first
+      const ad=a.disc?a.disc.daysLeft:9999, bd=b.disc?b.disc.daysLeft:9999;
+      if(ad!==bd)return ad-bd;
+      const ao=a.over?(daysUntil(a.e.due)||0):9999, bo=b.over?(daysUntil(b.e.due)||0):9999;
+      return ao-bo;
+    });
+  // Tier 2: everyone else (normal, not protected). 'wait' vendors come last/only if cash remains.
+  const tier2=annotated.filter(a=>!a.protect && a.pri==='normal');
+  const tier3=annotated.filter(a=>a.pri==='wait' && !a.protect);
+
+  let remaining=cash;
+  const alloc=new Map();
+  // fund tier 1 in full (in order) until cash runs out
+  for(const a of tier1){
+    const pay=Math.min(a.bal,remaining);
+    alloc.set(a.e.id,pay); remaining-=pay;
+    if(remaining<=0.005)break;
+  }
+  // tier 2: spread proportionally to balance owed
+  if(remaining>0.005 && tier2.length){
+    const owe2=tier2.reduce((s,a)=>s+a.bal,0);
+    if(owe2>0){
+      let used=0;
+      tier2.forEach((a,i)=>{
+        let share = i===tier2.length-1 ? (remaining-used) : (remaining*a.bal/owe2);
+        share=Math.min(share,a.bal);             // never overpay a bill
+        share=Math.round(share*100)/100;
+        alloc.set(a.e.id,(alloc.get(a.e.id)||0)+share); used+=share;
+      });
+      remaining-=used;
+    }
+  }
+  // tier 3 (can-wait): only if money is still left, proportional
+  if(remaining>0.005 && tier3.length){
+    const owe3=tier3.reduce((s,a)=>s+a.bal,0);
+    if(owe3>0){ let used=0;
+      tier3.forEach((a,i)=>{
+        let share=i===tier3.length-1?(remaining-used):(remaining*a.bal/owe3);
+        share=Math.min(share,a.bal); share=Math.round(share*100)/100;
+        alloc.set(a.e.id,(alloc.get(a.e.id)||0)+share); used+=share;
+      });
+      remaining-=used;
+    }
+  }
+
+  const planned=cash-Math.max(0,remaining);
+  const vendorsPaid=[...alloc.values()].filter(v=>v>0.005).length;
+
+  const priSelect=(party)=>`<select class="acct-sel pri-${priOf(party)}" onclick="event.stopPropagation()" onchange="setVendorPriority('${esc(party).replace(/'/g,"\\'")}',this.value)">
+    ${PRIORITIES.map(p=>`<option value="${p.k}" ${priOf(party)===p.k?'selected':''}>${p.label}</option>`).join('')}
+  </select>`;
+
+  const rowFor=(a,tier)=>{
+    const pay=alloc.get(a.e.id)||0;
+    const d=daysUntil(a.e.due);
+    const dueTxt=a.e.due?fmtDate(a.e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
+    const tags=[];
+    if(a.disc) tags.push(`<span class="pr-tag disc" title="${a.disc.pct}% off if paid within ${a.disc.days} days of issue">save ${a.disc.pct}% · ${a.disc.daysLeft}d left</span>`);
+    if(a.over) tags.push(`<span class="pr-tag over">overdue</span>`);
+    const full=pay>=a.bal-0.005 && pay>0.005;
+    const payCls=pay<=0.005?'zero':(full?'full':'part');
+    return `<div class="pr-row" onclick="openEntry('${a.e.id}')">
+      <div class="pr-v"><span class="pr-name">${esc(a.e.party)}</span> ${tags.join(' ')}<div class="pr-sub">${esc(a.e.ref||'')} · due ${dueTxt}</div></div>
+      ${priSelect(a.e.party)}
+      <span class="pr-owed">${fmtMoney(a.bal)}</span>
+      <span class="pr-pay ${payCls}">${pay>0.005?fmtMoney(pay):'—'}${full?' <span class="pr-paidtag">full</span>':(pay>0.005?' <span class="pr-paidtag part">partial</span>':'')}</span>
+    </div>`;
+  };
+
+  const section=(title,arr,note)=>arr.length?`<div class="pr-section"><div class="pr-sec-head">${title}<span class="pr-sec-note">${note}</span></div>
+    <div class="pr-rows"><div class="pr-rowhead"><span>Vendor</span><span>Priority</span><span>Owed</span><span>Suggested</span></div>${arr.map(a=>rowFor(a)).join('')}</div></div>`:'';
+
+  $('content').innerHTML=`
+    <div class="pr-top">
+      <div class="pr-cashbox">
+        <label>Cash available for this run</label>
+        <div class="pr-cash-in"><span>$</span><input id="pr-cash" type="number" step="0.01" placeholder="0.00" value="${_payCash}" oninput="calcPayRun()" autocomplete="off"></div>
+      </div>
+      <div class="stats" style="flex:1;margin:0">
+        <div class="stat"><div class="l">Total owed</div><div class="v">${fmtMoney(totalOwed)}</div><div class="s">${bills.length} unpaid bills</div></div>
+        <div class="stat"><div class="l">This run covers</div><div class="v">${fmtMoney(planned)}</div><div class="s">${vendorsPaid} vendor${vendorsPaid!==1?'s':''} get paid</div></div>
+        <div class="stat ${(totalOwed-planned)>0.005?'over':''}"><div class="l">Still owed after</div><div class="v">${fmtMoney(Math.max(0,totalOwed-planned))}</div><div class="s">remaining balance</div></div>
+      </div>
+    </div>
+    ${cash<=0?'<div class="empty">Enter the cash you have available and the planner will suggest how to split it — protecting your critical, overdue, and discount-eligible bills first, then spreading the rest so every vendor gets something.</div>':''}
+    ${cash>0?`<div class="pr-legend"><i class="ti ti-info-circle"></i> Suggestion only — nothing is recorded. Protected bills (critical vendors, overdue, expiring discounts) are funded first; the rest is spread proportionally so everyone gets something. Tag a vendor's priority on their row.</div>`:''}
+    ${cash>0?section('Protect — pay in full first', tier1, 'critical vendors · overdue · discounts about to expire'):''}
+    ${cash>0?section('Spread the rest', tier2, 'proportional to what each is owed'):''}
+    ${cash>0&&tier3.length?section('Can wait — only if cash remains', tier3, 'lowest priority'):''}
+    ${cash>0&&remaining>0.005?`<div class="pr-left"><i class="ti ti-check"></i> ${fmtMoney(remaining)} left over after covering everything above.</div>`:''}`;
+}
+
 // ── Entry / payment dialog ───────────────────────────────────────────────────
 let _cur=null;
 window.openEntry=(id)=>{
@@ -1471,6 +1660,7 @@ window.doSignOut=()=>signOut(auth);
 
 // ── AI Extract (drag & drop an invoice/bill) ─────────────────────────────────
 let aiType='ar';
+let _aiDiscount='';
 window.openAI=()=>{
   setAIType('ar');
   $('ai-status').style.display='none'; $('ai-preview').style.display='none'; $('ai-add').style.display='none';
@@ -1527,7 +1717,7 @@ window.aiHandle=async(file)=>{
       : '';
     const prompt = (aiType==='ar')
       ? "This document is an INVOICE issued BY Bert's Sheet Metal Products (BSMP / Bert's Welding) TO a customer. Return ONE JSON object: party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON object, no markdown."
-      : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON object, no markdown.";
+      : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, discountTerms = the early-payment discount terms exactly as written if any (e.g. '2% 10, Net 30' or '2/10 net 30') else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON object, no markdown.";
     const content = isImg
       ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
       : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
@@ -1543,6 +1733,7 @@ window.aiHandle=async(file)=>{
     $('ai-terms').value=(obj.terms!=null&&obj.terms!=='')?obj.terms:DEFAULT_TERMS;
     $('ai-due').value=obj.due||'';
     $('ai-desc').value=obj.description||obj.desc||'';
+    _aiDiscount=obj.discountTerms||'';
     // resolve account: vendor memory wins, else AI suggestion, else unassigned (AP only)
     if(aiType==='ap'){
       const memId=vendorAccounts[vendorKey(obj.party||'')]||'';
@@ -1575,6 +1766,7 @@ window.aiAdd=()=>{
   const o={manual:true,type:aiType,party,ref:$('ai-ref').value.trim(),rel:$('ai-desc').value.trim(),
     amount:Number($('ai-amt').value)||0,issue:$('ai-issue').value||'',
     terms:aiTermsRaw===''?DEFAULT_TERMS:Number(aiTermsRaw),payments:[]};
+  if(_aiDiscount) o.discountTerms=_aiDiscount;
   const due=$('ai-due').value; if(due)o.dueDate=due;
   if(aiType==='ap'){
     const acctId=$('ai-account')?$('ai-account').value:'';
@@ -1608,6 +1800,7 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
     onValue(ref(db,'apar/vendorAccounts'),snap=>{ vendorAccounts=snap.val()||{}; });
+    onValue(ref(db,'apar/vendorPriority'),snap=>{ vendorPriority=snap.val()||{}; if(page==='payrun')render(); });
   }else{
     $('login').style.display='flex'; $('app').style.display='none';
   }
