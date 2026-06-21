@@ -260,25 +260,24 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
   .dep-split{text-align:left}
 }
 /* pay run planner */
-.pr-top{display:flex;gap:14px;align-items:stretch;margin-bottom:16px;flex-wrap:wrap}
-.pr-cashbox{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:16px;min-width:260px;display:flex;flex-direction:column;justify-content:center}
-.pr-cashbox label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:8px}
-.pr-cash-in{display:flex;align-items:center;border:1.5px solid var(--navy3);border-radius:9px;padding:2px 12px;background:#fff}
-.pr-cash-in:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px #2c574022}
-.pr-cash-in span{font-size:22px;font-weight:800;color:var(--text3);margin-right:4px}
-.pr-cash-in input{flex:1;border:none;outline:none;font-size:26px;font-weight:800;font-family:inherit;padding:8px 0;color:var(--text);background:transparent;min-width:0}
-.pr-legend{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text2);background:#eef2f7;border-radius:9px;padding:9px 13px;margin-bottom:14px}
+.pr-legend{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text2);background:#eef2f7;border-radius:9px;padding:9px 13px;margin-bottom:16px}
 .pr-legend i{color:var(--blue);flex-shrink:0;margin-top:1px}
-.pr-section{margin-bottom:16px}
-.pr-sec-head{font-size:13px;font-weight:800;color:var(--navy);margin-bottom:8px;display:flex;align-items:baseline;gap:10px}
-.pr-sec-note{font-size:11px;font-weight:600;color:var(--text3);text-transform:none;letter-spacing:0}
-.pr-rows{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
-.pr-rowhead,.pr-row{display:grid;grid-template-columns:2.4fr 1fr 1fr 1.1fr;gap:10px;align-items:center;padding:9px 15px}
+.pr-acct{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.pr-acct-head{display:flex;align-items:center;gap:14px;padding:12px 15px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.pr-acct-name{font-size:15px;font-weight:800;flex-shrink:0}
+.pr-acct-fig{font-size:14px;font-weight:800;color:var(--text);display:flex;align-items:baseline;gap:5px}
+.pr-acct-fig .l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.pr-commit{margin-left:auto;flex-shrink:0}
+.pr-commit:disabled{opacity:.4;cursor:not-allowed}
+.pr-already{font-size:11.5px;color:var(--text3);padding:7px 15px;background:#fafbfd;border-bottom:1px solid var(--border2)}
+.pr-rows{}
+.pr-rowhead,.pr-row{display:grid;grid-template-columns:2.4fr 1fr 1fr 1.3fr;gap:10px;align-items:center;padding:9px 15px}
 .pr-rowhead{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);border-bottom:1px solid var(--border)}
 .pr-rowhead span:nth-child(3),.pr-rowhead span:nth-child(4){text-align:right}
 .pr-row{border-bottom:1px solid var(--border2);cursor:pointer}
 .pr-row:last-child{border-bottom:none}
 .pr-row:hover{background:#fafbfd}
+.pr-row.skip{opacity:.5}
 .pr-name{font-weight:700;font-size:13px}
 .pr-sub{font-size:11px;color:var(--text3);margin-top:2px}
 .pr-tag{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;border-radius:4px;padding:1px 5px;vertical-align:1px}
@@ -287,11 +286,10 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .pr-owed{text-align:right;font-weight:600;font-size:13px;color:var(--text2)}
 .pr-pay{text-align:right;font-weight:800;font-size:14px}
 .pr-pay.full{color:var(--green)}
-.pr-pay.part{color:var(--amber)}
 .pr-pay.zero{color:var(--text3)}
-.pr-paidtag{font-size:8.5px;font-weight:800;text-transform:uppercase;border-radius:4px;padding:1px 4px;background:#2f8f6b1a;color:var(--green);vertical-align:1px}
-.pr-paidtag.part{background:#BA75171a;color:var(--amber)}
-.pr-left{font-size:12.5px;color:var(--green);font-weight:600;background:#2f8f6b0d;border-radius:9px;padding:9px 13px;display:flex;align-items:center;gap:8px}
+.pr-paidtag{font-size:8.5px;font-weight:800;text-transform:uppercase;border-radius:4px;padding:1px 4px;background:#3a6ea51a;color:var(--blue);vertical-align:1px}
+.pr-skip{font-size:11px;font-weight:600;color:var(--text3)}
+.pr-leftnote{font-size:11.5px;color:var(--text3);padding:8px 15px;background:#fafbfd;border-top:1px solid var(--border2)}
 .acct-sel.pri-critical{border-color:#A32D2D55;background:#A32D2D0d;color:var(--red);font-weight:700}
 .acct-sel.pri-normal{border-color:var(--border);color:var(--text2)}
 .acct-sel.pri-wait{border-color:var(--border);background:#f5f7fa;color:var(--text3)}
@@ -601,7 +599,7 @@ function go(p){
     recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
     deposit:['Deposits','Split incoming money across your Profit First buckets'],
     archive:['Archive','Paid bills, auto-filed 45 days after withdrawal'],
-    payrun:['Pay Run','Enter cash available — get a suggested split across your bills']}[p];
+    payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
   render();
 }
@@ -794,6 +792,18 @@ const PAY_STATUSES=[
 ];
 const STATUS_ORDER={open:0,attention:1,scheduled:2,withdrawn:3};
 const statusLabel=k=>(PAY_STATUSES.find(s=>s.k===k)||PAY_STATUSES[0]).label;
+// soft, bright color scheme to visually distinguish accounts (cycles after 8)
+const ACCT_COLORS=[
+  {bar:'#3a8ddd',tint:'#3a8ddd14'}, // blue
+  {bar:'#2faf74',tint:'#2faf7414'}, // green
+  {bar:'#b07cd6',tint:'#b07cd614'}, // purple
+  {bar:'#e0883a',tint:'#e0883a14'}, // amber
+  {bar:'#e06a9a',tint:'#e06a9a14'}, // pink
+  {bar:'#33b6c4',tint:'#33b6c414'}, // teal
+  {bar:'#e0653f',tint:'#e0653f14'}, // coral
+  {bar:'#8aa83a',tint:'#8aa83a14'}, // lime
+];
+function colorFor(id){ const ids=Object.keys(accounts); return ACCT_COLORS[ids.indexOf(id)%ACCT_COLORS.length]||ACCT_COLORS[0]; }
 let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'status'|'amount',dir:1|-1}}
 let hidePaid={}; // {sectionKey:true} -> hide withdrawn (paid) bills in that section
 function sortBills(list,sectionKey){
@@ -826,18 +836,6 @@ function renderCash(entries){
   const ap=entries.filter(e=>e.type==='ap');
   const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
   const ids=Object.keys(accounts);
-  // soft, bright color scheme to visually distinguish accounts (cycles after 8)
-  const ACCT_COLORS=[
-    {bar:'#3a8ddd',tint:'#3a8ddd14'}, // blue
-    {bar:'#2faf74',tint:'#2faf7414'}, // green
-    {bar:'#b07cd6',tint:'#b07cd614'}, // purple
-    {bar:'#e0883a',tint:'#e0883a14'}, // amber
-    {bar:'#e06a9a',tint:'#e06a9a14'}, // pink
-    {bar:'#33b6c4',tint:'#33b6c414'}, // teal
-    {bar:'#e0653f',tint:'#e0653f14'}, // coral
-    {bar:'#8aa83a',tint:'#8aa83a14'}, // lime
-  ];
-  const colorFor=id=>ACCT_COLORS[ids.indexOf(id)%ACCT_COLORS.length]||ACCT_COLORS[0];
   const totalBal=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
   // only bills marked 'scheduled' reduce the balance; archived bills drop out entirely
   const assignedActive=ap.filter(e=>e.account&&unpaid(e)>0.005&&!e.archived);
@@ -1383,121 +1381,137 @@ function discountActive(e){
   if(left==null||left<0)return null;            // window passed
   return {...d,deadline,daysLeft:left};
 }
-let _payCash='';
-window.calcPayRun=()=>{
-  const el=$('pr-cash'); const pos=el?el.selectionStart:null;
-  _payCash=el?el.value:_payCash; renderPayRun();
-  const ne=$('pr-cash'); if(ne){ ne.focus(); if(pos!=null){try{ne.setSelectionRange(pos,pos);}catch(e){}} }
-};
-function renderPayRun(){
+// Per-account pay-run planning.
+// Within an account, choose WHOLE invoices to schedule with this priority:
+//   1) Protect: critical-vendor / overdue / expiring-discount invoices (whole), most urgent first
+//   2) Maximize vendor coverage: give each remaining vendor their SMALLEST open invoice first
+//   3) Use any leftover cash on additional whole invoices (smallest-first to fit the most)
+// "Available" cash for an account = its manually-entered balance − already-scheduled bills.
+function planAccount(accId){
   const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
-  const bills=allEntries().filter(e=>e.type==='ap'&&!e.archived&&unpaid(e)>0.005);
-  const cash=Number(_payCash)||0;
-  const totalOwed=bills.reduce((s,e)=>s+unpaid(e),0);
+  const bills=allEntries().filter(e=>e.type==='ap'&&!e.archived&&e.account===accId
+    && ['open','attention'].includes(e.payStatus||'open') && unpaid(e)>0.005);
+  const bal=Number((accounts[accId]||{}).balance)||0;
+  const alreadySched=allEntries().filter(e=>e.type==='ap'&&!e.archived&&e.account===accId&&(e.payStatus||'')==='scheduled')
+    .reduce((s,e)=>s+unpaid(e),0);
+  const avail=Math.max(0,bal-alreadySched);
 
-  // classify each bill
-  const annotated=bills.map(e=>{
-    const bal=unpaid(e);
+  const ann=bills.map(e=>{
+    const amt=unpaid(e);
     const over=statusOf(e)==='over';
     const pri=priOf(e.party);
     const disc=discountActive(e);
-    const protect = pri==='critical' || over || !!disc;
-    return {e,bal,over,pri,disc,protect};
+    const protect=(pri==='critical'||over||!!disc)&&pri!=='wait';
+    return {e,amt,over,pri,disc,protect,vk:vendorKey(e.party)};
   });
 
-  // Tier 1: protect bills get funded in full first (most urgent first: discount expiring soonest, then most overdue)
-  const tier1=annotated.filter(a=>a.protect && a.pri!=='wait')
-    .sort((a,b)=>{
-      // discounts expiring soonest first
-      const ad=a.disc?a.disc.daysLeft:9999, bd=b.disc?b.disc.daysLeft:9999;
-      if(ad!==bd)return ad-bd;
-      const ao=a.over?(daysUntil(a.e.due)||0):9999, bo=b.over?(daysUntil(b.e.due)||0):9999;
-      return ao-bo;
-    });
-  // Tier 2: everyone else (normal, not protected). 'wait' vendors come last/only if cash remains.
-  const tier2=annotated.filter(a=>!a.protect && a.pri==='normal');
-  const tier3=annotated.filter(a=>a.pri==='wait' && !a.protect);
+  let remaining=avail;
+  const chosen=new Set();
+  const fund=a=>{ if(a.amt<=remaining+0.005 && !chosen.has(a.e.id)){ chosen.add(a.e.id); remaining-=a.amt; return true;} return false; };
 
-  let remaining=cash;
-  const alloc=new Map();
-  // fund tier 1 in full (in order) until cash runs out
-  for(const a of tier1){
-    const pay=Math.min(a.bal,remaining);
-    alloc.set(a.e.id,pay); remaining-=pay;
-    if(remaining<=0.005)break;
-  }
-  // tier 2: spread proportionally to balance owed
-  if(remaining>0.005 && tier2.length){
-    const owe2=tier2.reduce((s,a)=>s+a.bal,0);
-    if(owe2>0){
-      let used=0;
-      tier2.forEach((a,i)=>{
-        let share = i===tier2.length-1 ? (remaining-used) : (remaining*a.bal/owe2);
-        share=Math.min(share,a.bal);             // never overpay a bill
-        share=Math.round(share*100)/100;
-        alloc.set(a.e.id,(alloc.get(a.e.id)||0)+share); used+=share;
-      });
-      remaining-=used;
-    }
-  }
-  // tier 3 (can-wait): only if money is still left, proportional
-  if(remaining>0.005 && tier3.length){
-    const owe3=tier3.reduce((s,a)=>s+a.bal,0);
-    if(owe3>0){ let used=0;
-      tier3.forEach((a,i)=>{
-        let share=i===tier3.length-1?(remaining-used):(remaining*a.bal/owe3);
-        share=Math.min(share,a.bal); share=Math.round(share*100)/100;
-        alloc.set(a.e.id,(alloc.get(a.e.id)||0)+share); used+=share;
-      });
-      remaining-=used;
-    }
-  }
+  // 1) protect — whole invoices, most urgent first (discount expiring soonest, then most overdue)
+  ann.filter(a=>a.protect).sort((a,b)=>{
+    const ad=a.disc?a.disc.daysLeft:9999,bd=b.disc?b.disc.daysLeft:9999; if(ad!==bd)return ad-bd;
+    const ao=a.over?(daysUntil(a.e.due)||0):9999,bo=b.over?(daysUntil(b.e.due)||0):9999; return ao-bo;
+  }).forEach(fund);
 
-  const planned=cash-Math.max(0,remaining);
-  const vendorsPaid=[...alloc.values()].filter(v=>v>0.005).length;
+  // 2) maximize vendor coverage — each not-yet-funded vendor's smallest open invoice
+  const byVendor={};
+  ann.filter(a=>a.pri!=='wait').forEach(a=>{ (byVendor[a.vk]=byVendor[a.vk]||[]).push(a); });
+  // vendors that already got something in protect are "covered"
+  const covered=new Set(ann.filter(a=>chosen.has(a.e.id)).map(a=>a.vk));
+  // order uncovered vendors by their smallest invoice ascending (so we cover the most vendors)
+  const uncovered=Object.keys(byVendor).filter(vk=>!covered.has(vk))
+    .map(vk=>({vk,min:Math.min(...byVendor[vk].map(a=>a.amt))}))
+    .sort((a,b)=>a.min-b.min);
+  uncovered.forEach(({vk})=>{
+    const smallest=byVendor[vk].filter(a=>!chosen.has(a.e.id)).sort((a,b)=>a.amt-b.amt)[0];
+    if(smallest)fund(smallest);
+  });
+
+  // 3) leftover — additional whole invoices, smallest first (incl. wait vendors last)
+  const rest=ann.filter(a=>!chosen.has(a.e.id)&&a.pri!=='wait').sort((a,b)=>a.amt-b.amt);
+  rest.forEach(fund);
+  const waitRest=ann.filter(a=>!chosen.has(a.e.id)&&a.pri==='wait').sort((a,b)=>a.amt-b.amt);
+  waitRest.forEach(fund);
+
+  const scheduledNow=avail-remaining;
+  return {accId,bal,alreadySched,avail,remaining,bills:ann,chosen,scheduledNow,
+    vendorsCovered:new Set(ann.filter(a=>chosen.has(a.e.id)).map(a=>a.vk)).size,
+    totalVendors:new Set(ann.map(a=>a.vk)).size};
+}
+window.commitAccountPlan=(accId)=>{
+  const plan=planAccount(accId);
+  const ids=[...plan.chosen];
+  if(!ids.length){alert('Nothing to schedule for this account.');return;}
+  const name=(accounts[accId]||{}).name||'this account';
+  if(!confirm(`Schedule ${ids.length} invoice${ids.length!==1?'s':''} (${fmtMoney(plan.scheduledNow)}) on ${name}? They'll show as Scheduled in Cash Flow. You can change any back there.`))return;
+  ids.forEach(id=>{
+    const e=allEntries().find(x=>x.id===id); if(!e)return;
+    const o=ovl(id);
+    if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+    o.payStatus='scheduled';
+    overlay[id]=o; set(ref(db,'apar/entries/'+id),o);
+  });
+  render();
+};
+function renderPayRun(){
+  const ids=Object.keys(accounts);
+  if(!ids.length){ $('content').innerHTML='<div class="empty">No bank accounts yet. Add them in Cash Flow first — the Pay Run plans each account using the balance you enter there.</div>'; return; }
+  const plans=ids.map(planAccount);
+  const totalAvail=plans.reduce((s,p)=>s+p.avail,0);
+  const totalSched=plans.reduce((s,p)=>s+p.scheduledNow,0);
+  const totalCandidates=plans.reduce((s,p)=>s+p.bills.length,0);
 
   const priSelect=(party)=>`<select class="acct-sel pri-${priOf(party)}" onclick="event.stopPropagation()" onchange="setVendorPriority('${esc(party).replace(/'/g,"\\'")}',this.value)">
     ${PRIORITIES.map(p=>`<option value="${p.k}" ${priOf(party)===p.k?'selected':''}>${p.label}</option>`).join('')}
   </select>`;
 
-  const rowFor=(a,tier)=>{
-    const pay=alloc.get(a.e.id)||0;
+  const rowFor=(a,picked)=>{
     const d=daysUntil(a.e.due);
     const dueTxt=a.e.due?fmtDate(a.e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
     const tags=[];
-    if(a.disc) tags.push(`<span class="pr-tag disc" title="${a.disc.pct}% off if paid within ${a.disc.days} days of issue">save ${a.disc.pct}% · ${a.disc.daysLeft}d left</span>`);
+    if(a.disc) tags.push(`<span class="pr-tag disc" title="${a.disc.pct}% off if paid within ${a.disc.days} days">save ${a.disc.pct}% · ${a.disc.daysLeft}d left</span>`);
     if(a.over) tags.push(`<span class="pr-tag over">overdue</span>`);
-    const full=pay>=a.bal-0.005 && pay>0.005;
-    const payCls=pay<=0.005?'zero':(full?'full':'part');
-    return `<div class="pr-row" onclick="openEntry('${a.e.id}')">
+    return `<div class="pr-row${picked?'':' skip'}" onclick="openEntry('${a.e.id}')">
       <div class="pr-v"><span class="pr-name">${esc(a.e.party)}</span> ${tags.join(' ')}<div class="pr-sub">${esc(a.e.ref||'')} · due ${dueTxt}</div></div>
       ${priSelect(a.e.party)}
-      <span class="pr-owed">${fmtMoney(a.bal)}</span>
-      <span class="pr-pay ${payCls}">${pay>0.005?fmtMoney(pay):'—'}${full?' <span class="pr-paidtag">full</span>':(pay>0.005?' <span class="pr-paidtag part">partial</span>':'')}</span>
+      <span class="pr-owed">${fmtMoney(a.amt)}</span>
+      <span class="pr-pay ${picked?'full':'zero'}">${picked?fmtMoney(a.amt)+' <span class="pr-paidtag">schedule</span>':'<span class="pr-skip">not this run</span>'}</span>
     </div>`;
   };
 
-  const section=(title,arr,note)=>arr.length?`<div class="pr-section"><div class="pr-sec-head">${title}<span class="pr-sec-note">${note}</span></div>
-    <div class="pr-rows"><div class="pr-rowhead"><span>Vendor</span><span>Priority</span><span>Owed</span><span>Suggested</span></div>${arr.map(a=>rowFor(a)).join('')}</div></div>`:'';
+  const cardFor=p=>{
+    const c=colorFor(p.accId); const a=accounts[p.accId];
+    const picked=p.bills.filter(b=>p.chosen.has(b.e.id));
+    const notpicked=p.bills.filter(b=>!p.chosen.has(b.e.id));
+    const ordered=[...picked,...notpicked];
+    const body = p.bills.length
+      ? `<div class="pr-rows"><div class="pr-rowhead"><span>Vendor</span><span>Priority</span><span>Invoice</span><span>This run</span></div>${ordered.map(b=>rowFor(b,p.chosen.has(b.e.id))).join('')}</div>`
+      : '<div class="acct-empty" style="padding:14px">No open invoices assigned to this account.</div>';
+    return `<div class="pr-acct" style="border-top:3px solid ${c.bar}">
+      <div class="pr-acct-head">
+        <span class="acct-dot" style="background:${c.bar}"></span>
+        <span class="pr-acct-name">${esc(a.name)}</span>
+        <span class="pr-acct-fig"><span class="l">Available</span> ${fmtMoney(p.avail)}</span>
+        <span class="pr-acct-fig"><span class="l">Scheduling</span> ${fmtMoney(p.scheduledNow)}</span>
+        <span class="pr-acct-fig"><span class="l">Vendors</span> ${p.vendorsCovered}/${p.totalVendors}</span>
+        <button class="btn sm primary pr-commit" onclick="event.stopPropagation();commitAccountPlan('${p.accId}')" ${picked.length?'':'disabled'}><i class="ti ti-calendar-check"></i> Commit ${picked.length||''}</button>
+      </div>
+      ${p.alreadySched>0.005?`<div class="pr-already">${fmtMoney(p.alreadySched)} already scheduled on this account (excluded from available)</div>`:''}
+      ${body}
+      ${p.bills.length&&p.remaining>0.005?`<div class="pr-leftnote">${fmtMoney(p.remaining)} left over — not enough to add another whole invoice from a new vendor.</div>`:''}
+    </div>`;
+  };
 
   $('content').innerHTML=`
-    <div class="pr-top">
-      <div class="pr-cashbox">
-        <label>Cash available for this run</label>
-        <div class="pr-cash-in"><span>$</span><input id="pr-cash" type="number" step="0.01" placeholder="0.00" value="${_payCash}" oninput="calcPayRun()" autocomplete="off"></div>
-      </div>
-      <div class="stats" style="flex:1;margin:0">
-        <div class="stat"><div class="l">Total owed</div><div class="v">${fmtMoney(totalOwed)}</div><div class="s">${bills.length} unpaid bills</div></div>
-        <div class="stat"><div class="l">This run covers</div><div class="v">${fmtMoney(planned)}</div><div class="s">${vendorsPaid} vendor${vendorsPaid!==1?'s':''} get paid</div></div>
-        <div class="stat ${(totalOwed-planned)>0.005?'over':''}"><div class="l">Still owed after</div><div class="v">${fmtMoney(Math.max(0,totalOwed-planned))}</div><div class="s">remaining balance</div></div>
-      </div>
+    <div class="stats">
+      <div class="stat"><div class="l">Available across accounts</div><div class="v">${fmtMoney(totalAvail)}</div><div class="s">balance − already scheduled</div></div>
+      <div class="stat"><div class="l">This plan schedules</div><div class="v">${fmtMoney(totalSched)}</div><div class="s">whole invoices</div></div>
+      <div class="stat"><div class="l">Open candidates</div><div class="v">${totalCandidates}</div><div class="s">unpaid, assigned bills</div></div>
     </div>
-    ${cash<=0?'<div class="empty">Enter the cash you have available and the planner will suggest how to split it — protecting your critical, overdue, and discount-eligible bills first, then spreading the rest so every vendor gets something.</div>':''}
-    ${cash>0?`<div class="pr-legend"><i class="ti ti-info-circle"></i> Suggestion only — nothing is recorded. Protected bills (critical vendors, overdue, expiring discounts) are funded first; the rest is spread proportionally so everyone gets something. Tag a vendor's priority on their row.</div>`:''}
-    ${cash>0?section('Protect — pay in full first', tier1, 'critical vendors · overdue · discounts about to expire'):''}
-    ${cash>0?section('Spread the rest', tier2, 'proportional to what each is owed'):''}
-    ${cash>0&&tier3.length?section('Can wait — only if cash remains', tier3, 'lowest priority'):''}
-    ${cash>0&&remaining>0.005?`<div class="pr-left"><i class="ti ti-check"></i> ${fmtMoney(remaining)} left over after covering everything above.</div>`:''}`;
+    <div class="pr-legend"><i class="ti ti-info-circle"></i> Each account is planned from the balance you set in Cash Flow, minus what's already scheduled. Invoices are paid <b>whole</b> — never split — and the plan spreads across vendors so the most vendors get at least one invoice paid. Protected bills (critical vendors, overdue, expiring discounts) come first. <b>Commit</b> marks the chosen invoices as Scheduled in Cash Flow; change any back there anytime.</div>
+    ${plans.map(cardFor).join('')}`;
 }
 
 // ── Entry / payment dialog ───────────────────────────────────────────────────
