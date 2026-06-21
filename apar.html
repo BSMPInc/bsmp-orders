@@ -1364,14 +1364,20 @@ window.setVendorPriority=(party,val)=>{
 // Detect an early-pay discount in terms text like "2% 10, Net 30" or "2/10 net 30".
 // Returns {pct, days} or null. We scan the entry's notes/rel/terms fields.
 function parseDiscount(e){
-  const txt=[e.notes,e.rel,e.discountTerms].filter(Boolean).join(' ');
+  // Prefer the explicit discountTerms field; fall back to notes. Do NOT scan rel/description,
+  // which often contains PO numbers, dimensions, or fractions that look like "n/n".
+  const txt=[e.discountTerms,e.notes].filter(Boolean).join(' ');
   if(!txt)return null;
-  // pattern A: "2/10" or "2 / 10"
-  let m=txt.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+)/);
-  if(m)return {pct:parseFloat(m[1]),days:parseInt(m[2],10)};
-  // pattern B: "2% 10" or "2% in 10" or "2 percent 10 days"
-  m=txt.match(/(\d+(?:\.\d+)?)\s*%[^0-9]{0,8}(\d+)\s*(?:day|d\b)?/i);
-  if(m)return {pct:parseFloat(m[1]),days:parseInt(m[2],10)};
+  const sane=d=>d&&d.pct>0&&d.pct<=50&&d.days>0&&d.days<=120?d:null; // real early-pay terms only
+  // pattern A: slash form, but ONLY when discount context is present ("net", "%", or "disc")
+  // and the surrounding text actually looks like terms — e.g. "2/10 net 30", "2/10 n30".
+  if(/\bnet\b|%|disc/i.test(txt)){
+    let m=txt.match(/(?:^|[^0-9.])(\d{1,2}(?:\.\d+)?)\s*\/\s*(\d{1,2})(?![0-9])/);
+    if(m){ const d=sane({pct:parseFloat(m[1]),days:parseInt(m[2],10)}); if(d)return d; }
+  }
+  // pattern B: percent form: "2% 10", "2% in 10 days", "2 percent 10"
+  let m=txt.match(/(\d{1,2}(?:\.\d+)?)\s*(?:%|percent)[^0-9]{0,8}(\d{1,2})\s*(?:day|d\b)?/i);
+  if(m){ const d=sane({pct:parseFloat(m[1]),days:parseInt(m[2],10)}); if(d)return d; }
   return null;
 }
 function discountActive(e){
