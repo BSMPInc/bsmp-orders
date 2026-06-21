@@ -1706,10 +1706,12 @@ window.doSignOut=()=>signOut(auth);
 let aiType='ar';
 let _aiDiscount='';
 let _aiLineItems=[];
+let _aiQueue=[]; let _aiIdx=0; let _aiAddedCount=0;
 window.openAI=()=>{
   setAIType('ar');
-  _aiDiscount=''; _aiLineItems=[];
-  $('ai-status').style.display='none'; $('ai-preview').style.display='none'; $('ai-add').style.display='none';
+  _aiDiscount=''; _aiLineItems=[]; _aiQueue=[]; _aiIdx=0; _aiAddedCount=0;
+  $('ai-status').style.display='none'; $('ai-preview').style.display='none';
+  const ab=$('ai-add'); ab.style.display='none'; ab.textContent='Add entry';
   const aw=$('ai-account-wrap'); if(aw)aw.style.display='none';
   $('ai-file').value=''; $('ai-modal').style.display='flex';
 };
@@ -1761,50 +1763,74 @@ window.aiHandle=async(file)=>{
     const acctClause = (aiType==='ap' && acctList.length)
       ? ` Also return account = the single best-fit bank account for paying this bill, chosen ONLY from this exact list: [${acctList.map(n=>'"'+n+'"').join(', ')}]. Match on what the vendor is for (e.g. power/water/gas/internet → a utilities account, wages/payroll taxes → a payroll account, owner draws → an owner account). If none clearly fits, return account as an empty string. Use the exact account name from the list, nothing else.`
       : '';
+    const multiClause=" A single PDF may contain MORE THAN ONE separate invoice (e.g. a statement with several invoices, or several invoices concatenated). Return a JSON ARRAY with one object per distinct invoice found — if there is only one invoice, return an array with a single object. Each object has these fields:";
     const prompt = (aiType==='ar')
-      ? "This document is an INVOICE issued BY Bert's Sheet Metal Products (BSMP / Bert's Welding) TO a customer. Return ONE JSON object: party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, lineItems = an array of the invoice's line items, each as {part: the part/product/SKU number as a string, qty: the quantity as a number, unit: the unit price as a plain number, total: the line total as a plain number}; include every line item row; if the invoice has no itemized lines return an empty array, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON object, no markdown."
-      : "This document is a BILL or INVOICE RECEIVED BY Bert's Sheet Metal Products (BSMP) FROM a vendor or supplier. Return ONE JSON object: party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, discountTerms = the early-payment discount terms exactly as written if any (e.g. '2% 10, Net 30' or '2/10 net 30') else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON object, no markdown.";
+      ? "This document is from Bert's Sheet Metal Products (BSMP / Bert's Welding) and contains one or more INVOICES issued BY BSMP TO customers."+multiClause+" party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, lineItems = an array of that invoice's line items, each as {part: the part/product/SKU number as a string, qty: the quantity as a number, unit: the unit price as a plain number, total: the line total as a plain number}; include every line item row; if the invoice has no itemized lines return an empty array, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON array, no markdown."
+      : "This document is received BY Bert's Sheet Metal Products (BSMP) and contains one or more BILLS/INVOICES FROM vendors or suppliers."+multiClause+" party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, discountTerms = the early-payment discount terms exactly as written if any (e.g. '2% 10, Net 30' or '2/10 net 30') else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON array, no markdown.";
     const content = isImg
       ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
       : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
-    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:2000,messages:[{role:'user',content}]})});
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:4000,messages:[{role:'user',content}]})});
     const data=await resp.json();
     if(data.error){ st.className='ai-status err'; st.textContent='API error: '+(data.error.message||JSON.stringify(data.error)); return; }
     const text=(data.content||[]).map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
     let obj; try{ obj=JSON.parse(text); }catch{ st.className='ai-status err'; st.textContent="Couldn't read that document. Try a clearer scan, or enter it manually."; return; }
-    if(Array.isArray(obj)) obj=obj[0]||{};
-    $('ai-party').value=obj.party||''; $('ai-ref').value=obj.ref||'';
-    $('ai-amt').value=(obj.amount!=null&&obj.amount!=='')?obj.amount:'';
-    $('ai-issue').value=obj.issue||'';
-    $('ai-terms').value=(obj.terms!=null&&obj.terms!=='')?obj.terms:DEFAULT_TERMS;
-    $('ai-due').value=obj.due||'';
-    $('ai-desc').value=obj.description||obj.desc||'';
-    _aiDiscount=obj.discountTerms||'';
-    _aiLineItems=(aiType==='ar'&&Array.isArray(obj.lineItems))?obj.lineItems.map(li=>({
-      part:String(li.part!=null?li.part:'').trim(),
-      qty:(li.qty!=null&&li.qty!=='')?Number(li.qty):null,
-      unit:(li.unit!=null&&li.unit!=='')?Number(li.unit):null,
-      total:(li.total!=null&&li.total!=='')?Number(li.total):null
-    })).filter(li=>li.part||li.qty||li.unit||li.total):[];
-    // resolve account: vendor memory wins, else AI suggestion, else unassigned (AP only)
-    if(aiType==='ap'){
-      const memId=vendorAccounts[vendorKey(obj.party||'')]||'';
-      let chosen='', hint='';
-      if(memId&&accounts[memId]){ chosen=memId; hint='remembered from last time'; }
-      else if(obj.account){
-        const match=Object.entries(accounts).find(([id,a])=>(a.name||'').toLowerCase()===String(obj.account).toLowerCase());
-        if(match){ chosen=match[0]; hint='AI suggestion'; }
-      }
-      fillAccountSelect(chosen);
-      $('ai-account-hint').textContent=chosen?'· '+hint:'· not sure — left Unassigned';
-      $('ai-account-wrap').style.display='block';
-    } else {
-      $('ai-account-wrap').style.display='none';
-    }
-    st.className='ai-status'; st.innerHTML='<i class="ti ti-check"></i> Got it — review the details below, then Add entry.';
+    let arr;
+    try{ const parsed=JSON.parse(text); arr=Array.isArray(parsed)?parsed:[parsed]; }
+    catch{ st.className='ai-status err'; st.textContent="Couldn't read that document. Try a clearer scan, or enter it manually."; return; }
+    arr=arr.filter(o=>o&&(o.party||o.amount!=null||o.ref)); // drop empties
+    if(!arr.length){ st.className='ai-status err'; st.textContent="No invoice details found in that document."; return; }
+    _aiQueue=arr; _aiIdx=0; _aiAddedCount=0;
+    fillPreview(_aiQueue[0]);
     $('ai-preview').style.display='block'; $('ai-add').style.display='inline-block';
   }catch(err){ st.className='ai-status err'; st.textContent='Error: '+err.message; }
 };
+// Fill the review form from one extracted invoice object, resolving account + line items.
+function fillPreview(obj){
+  obj=obj||{};
+  $('ai-party').value=obj.party||''; $('ai-ref').value=obj.ref||'';
+  $('ai-amt').value=(obj.amount!=null&&obj.amount!=='')?obj.amount:'';
+  $('ai-issue').value=obj.issue||'';
+  $('ai-terms').value=(obj.terms!=null&&obj.terms!=='')?obj.terms:DEFAULT_TERMS;
+  $('ai-due').value=obj.due||'';
+  $('ai-desc').value=obj.description||obj.desc||'';
+  _aiDiscount=obj.discountTerms||'';
+  _aiLineItems=(aiType==='ar'&&Array.isArray(obj.lineItems))?obj.lineItems.map(li=>({
+    part:String(li.part!=null?li.part:'').trim(),
+    qty:(li.qty!=null&&li.qty!=='')?Number(li.qty):null,
+    unit:(li.unit!=null&&li.unit!=='')?Number(li.unit):null,
+    total:(li.total!=null&&li.total!=='')?Number(li.total):null
+  })).filter(li=>li.part||li.qty||li.unit||li.total):[];
+  if(aiType==='ap'){
+    const memId=vendorAccounts[vendorKey(obj.party||'')]||'';
+    let chosen='', hint='';
+    if(memId&&accounts[memId]){ chosen=memId; hint='remembered from last time'; }
+    else if(obj.account){
+      const match=Object.entries(accounts).find(([id,a])=>(a.name||'').toLowerCase()===String(obj.account).toLowerCase());
+      if(match){ chosen=match[0]; hint='AI suggestion'; }
+    }
+    fillAccountSelect(chosen);
+    $('ai-account-hint').textContent=chosen?'· '+hint:'· not sure — left Unassigned';
+    $('ai-account-wrap').style.display='block';
+  } else {
+    $('ai-account-wrap').style.display='none';
+  }
+  updateAiStatus();
+}
+// Status line reflects single vs multi (Invoice N of M) and how many added so far.
+function updateAiStatus(){
+  const st=$('ai-status'); if(!st)return; st.style.display='block'; st.className='ai-status';
+  const total=_aiQueue.length;
+  const addBtn=$('ai-add');
+  if(total>1){
+    const added=_aiAddedCount?` · ${_aiAddedCount} added`:'';
+    st.innerHTML=`<i class="ti ti-files"></i> Found <b>${total}</b> invoices in this file. Reviewing <b>${_aiIdx+1} of ${total}</b>${added}. Add this one to continue.`;
+    if(addBtn) addBtn.textContent=(_aiIdx<total-1)?'Add & next':'Add last';
+  } else {
+    st.innerHTML='<i class="ti ti-check"></i> Got it — review the details below, then Add entry.';
+    if(addBtn) addBtn.textContent='Add entry';
+  }
+}
 function vendorKey(name){ return (name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'_'; }
 function fillAccountSelect(selId){
   const sel=$('ai-account'); if(!sel)return;
@@ -1829,10 +1855,19 @@ window.aiAdd=()=>{
     if(acctId && vendorAccounts[vk]!==acctId){ vendorAccounts[vk]=acctId; set(ref(db,'apar/vendorAccounts/'+vk),acctId); }
   }
   writeOverlay(id,o); render();
-  // brief inline confirmation, then close — no second dialog
+  _aiAddedCount++;
   const st=$('ai-status');
-  if(st){ st.style.display='block'; st.className='ai-status'; st.innerHTML='<i class="ti ti-check"></i> Added '+esc(party)+'. Closing…'; }
-  setTimeout(closeAI, 650);
+  // multi-invoice: advance to the next one instead of closing
+  if(_aiIdx < _aiQueue.length-1){
+    _aiIdx++;
+    if(st){ st.style.display='block'; st.className='ai-status'; st.innerHTML='<i class="ti ti-check"></i> Added '+esc(party)+'. Next invoice…'; }
+    setTimeout(()=>{ fillPreview(_aiQueue[_aiIdx]); }, 450);
+    return;
+  }
+  // last (or only) one — confirm and close
+  if(st){ st.style.display='block'; st.className='ai-status';
+    const n=_aiAddedCount; st.innerHTML='<i class="ti ti-check"></i> '+(n>1?('Added all '+n+' invoices.'):('Added '+esc(party)+'.'))+' Closing…'; }
+  setTimeout(closeAI, 700);
 };
 
 // ── Auth + data wiring ───────────────────────────────────────────────────────
