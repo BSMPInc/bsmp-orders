@@ -211,7 +211,7 @@ tr.detail-row td{padding:0;background:#f7f9fc;border-bottom:1px solid var(--bord
 tr:last-child td{border-bottom:none}
 
 /* detail expand */
-.detail-inner{padding:14px 16px 16px 52px;display:grid;grid-template-columns:2fr 1fr;gap:16px}
+.detail-inner{padding:14px 16px 16px 52px;display:grid;grid-template-columns:auto minmax(0,2fr) minmax(0,1fr);gap:14px}
 .detail-section{display:flex;flex-direction:column;gap:6px}
 .detail-label{font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px}
 .process-grid{display:flex;flex-wrap:wrap;gap:6px}
@@ -224,18 +224,13 @@ tr:last-child td{border-bottom:none}
 .proc-btn.icon-btn.add{position:relative;color:var(--text3)}
 .proc-btn.icon-btn.add:hover{color:var(--green2)}
 .proc-btn.icon-btn.add .add-badge{position:absolute;top:-5px;right:-5px;font-size:10px;background:var(--green);color:#fff;border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;line-height:1;border:1.5px solid #fff}
-/* Current Process — vertical progress strip on the side */
-.proc-vstrip{display:flex;flex-direction:column;gap:4px}
-.pv-group-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:7px 0 1px}
-.pv-row{display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid var(--border2);border-radius:9px;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);font-family:inherit;text-align:left;width:100%;transition:all .12s}
-.pv-row:hover{border-color:var(--green)}
-.pv-ico{display:inline-flex;align-items:center;justify-content:center;width:18px;flex-shrink:0}
-.pv-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pv-st{margin-left:auto;font-size:14px;flex-shrink:0}
-.pv-row.active{background:#fff8e6;color:#8a5c00;border-color:#d4880a}
-.pv-row.active .pv-ico{color:#8a5c00}
-.pv-row.done{background:#f0f8e8;color:#3a6b10;border-color:var(--green)}
-.pv-row.done .pv-ico{color:#3a6b10}
+/* Current Process — vertical column of small icon bubbles on the left */
+.proc-vcol{display:flex;flex-direction:column;align-items:center;gap:6px}
+.pv-group-label{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);margin:6px 0 1px;text-align:center}
+.pv-bubble{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);transition:all .12s;flex-shrink:0;padding:0}
+.pv-bubble:hover{border-color:var(--green);color:var(--green2)}
+.pv-bubble.active{background:#fff8e6;color:#8a5c00;border-color:#d4880a}
+.pv-bubble.done{background:#f0f8e8;color:#3a6b10;border-color:var(--green)}
 .ss-ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:20px;height:20px}
 .notes-input{width:100%;font-size:12px;border:1px solid var(--border2);border-radius:10px;padding:8px 10px;background:#fff;color:var(--text);resize:none;min-height:56px;font-family:inherit}
 .notes-input:focus{outline:none;border-color:var(--green)}
@@ -690,6 +685,7 @@ tr:hover .del-btn{opacity:1}
 
 @media(max-width:900px){
   .detail-inner{grid-template-columns:1fr}
+  .proc-vcol{flex-direction:row;flex-wrap:wrap;align-items:flex-start;justify-content:flex-start}
   .ci-row{grid-template-columns:50px 1fr 50px 88px;gap:6px}
   .ci-row .ci-due,.ci-row .status-badge{display:none}
 }
@@ -777,7 +773,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.54.0</div>
+    <div class="ver">v2.54.1</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -2038,20 +2034,25 @@ function detailInner(r){
   const addBtns=(list)=>list.filter(p=>!sch.steps.find(s=>s.name===p&&s.enabled))
     .map(p=>`<button class="proc-btn icon-btn add" title="Add ${p}" aria-label="Add ${p}" onclick="window._toggleStep('${r.id}','${p}',event)">${procIcon(p)}<i class="ti ti-plus add-badge"></i></button>`).join('');
   const subLabel=(t)=>`<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:8px 0 4px">${t}</div>`;
-  // vertical Current Process row (progress-strip style)
-  const procRowV=(p)=>{
+  // Current Process — a small icon bubble (no label)
+  const procBubble=(p)=>{
     const st=procState(r,p);
-    return`<button class="pv-row${st==='done'?' done':st==='active'?' active':''}" title="${p}${st?' — '+(st==='done'?'done':'in progress'):''}" aria-label="${p}" onclick="window._tp('${r.id}','${p}',event)">
-      <span class="pv-ico" style="${st?'':`color:${PROCESS_COLORS[p]||'#888'}`}">${procIcon(p,16)}</span>
-      <span class="pv-name">${shortProc(p)}</span>
-      ${st==='done'?'<i class="ti ti-check pv-st"></i>':st==='active'?'<i class="ti ti-player-play-filled pv-st"></i>':''}
-    </button>`;
+    return`<button class="pv-bubble${st==='done'?' done':st==='active'?' active':''}" title="${p}${st?' — '+(st==='done'?'done':'in progress'):''}" aria-label="${p}" onclick="window._tp('${r.id}','${p}',event)">${procIcon(p,18)}</button>`;
   };
   return`<div class="detail-inner">
+    <div class="detail-section proc-col">
+      <div class="detail-label" style="text-align:center">Process</div>
+      <div class="proc-vcol">
+        <div class="pv-group-label">Internal</div>
+        ${INTERNAL_PROCESSES.map(procBubble).join('')}
+        <div class="pv-group-label">External</div>
+        ${EXTERNAL_PROCESSES.map(procBubble).join('')}
+      </div>
+    </div>
     <div class="detail-section">
       <div class="detail-label">Production Schedule${progressPill}${msInfo&&HEALTH_META[msInfo.state]?`<span style="margin-left:8px">${healthBadge(msInfo)}</span>`:''}</div>
       ${msInfo&&HEALTH_META[msInfo.state]?`<div style="font-size:11.5px;color:${HEALTH_META[msInfo.state].color};margin-bottom:6px">${healthTip(msInfo)}.</div>`:''}
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps are tracked on the Work Queues page (check off or enter parts completed). External steps are lead-time gates in business days that drive the calendar/Gantt; set a date to pin one as a fixed anchor (📌).</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps are tracked on the Work Queues page (check off or enter parts completed). External steps are lead-time gates in business days that drive the calendar/Gantt; set a date to pin one as a fixed anchor (📌). Tap a bubble on the left to mark a process active or done.</div>
       ${ord.length ? `<div class="sched-steps">${seqRows}</div>` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them below in the order they should run.</div>`}
       ${subLabel('Add internal step')}
       <div class="process-grid">${addBtns(INTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
@@ -2064,15 +2065,7 @@ function detailInner(r){
       </div>
     </div>
     <div class="detail-section">
-      <div class="detail-label">Current Process</div>
-      <div class="proc-vstrip">
-        <div class="pv-group-label">Internal</div>
-        ${INTERNAL_PROCESSES.map(procRowV).join('')}
-        <div class="pv-group-label">External</div>
-        ${EXTERNAL_PROCESSES.map(procRowV).join('')}
-      </div>
-      <div style="margin-top:5px;font-size:11px;color:var(--text3)">Tap → active · tap again → done · tap done to clear</div>
-      <div class="detail-label" style="margin-top:16px">Drawing</div>
+      <div class="detail-label">Drawing</div>
       ${drawingBlock(r)}
       <div class="detail-label" style="margin-top:14px">Notes</div>
       <textarea class="notes-input" placeholder="Add notes…" onchange="window._sn('${r.id}',this.value)" onclick="event.stopPropagation()">${r.notes||''}</textarea>
