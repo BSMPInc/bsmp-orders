@@ -21,7 +21,7 @@
   --radius:10px;--radius-lg:14px;
   --shadow:0 1px 4px rgba(0,0,0,0.08),0 2px 12px rgba(0,0,0,0.06);
 }
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--text);background:var(--bg);display:flex;min-height:100vh}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--text);background:var(--bg);display:flex;height:100vh;overflow:hidden}
 
 /* ── Sidebar ── */
 .sidebar{width:240px;min-width:240px;background:var(--navy);display:flex;flex-direction:column;min-height:100vh;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;transition:width .18s ease,min-width .18s ease;z-index:40}
@@ -69,12 +69,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .sync-label{font-size:11px;color:#f0d8dc}
 
 /* ── Main ── */
-.main{flex:1;overflow-x:auto}
-.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+#app-root{height:100vh;overflow:hidden}
+.main{flex:1;min-width:0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .topbar-title{font-size:20px;font-weight:700;color:var(--text)}
 .topbar-sub{font-size:13px;color:var(--text2);margin-top:1px}
 .topbar-actions{display:flex;gap:8px;align-items:center}
-.content{padding:20px 24px}
+.content{padding:20px 24px;flex:1;min-height:0;overflow:auto}
 
 /* ── Summary cards ── */
 .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px}
@@ -125,7 +126,26 @@ select:focus{border-color:var(--green)}
 .q-row{cursor:pointer}
 .q-row:hover{background:var(--bg)}
 .q-row.q-done{opacity:.6}
-/* Work Queues interactive controls — comfortable defaults, big on touch */
+/* ── Team / people ── */
+.pc-dot{width:22px;height:22px;border-radius:50%;color:#fff;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;letter-spacing:.2px}
+.pc-dot.lg{width:34px;height:34px;font-size:13px}
+.pc-dot.sm{width:17px;height:17px;font-size:8.5px}
+.person-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text)}
+.person-chip .pc-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.tm-proc{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;background:#f3f5f9;border:1px solid var(--border);border-radius:6px;padding:2px 7px}
+.tm-check{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:8px;padding:6px 10px;cursor:pointer;background:#fff;color:var(--text2);user-select:none}
+.tm-check:hover{border-color:var(--navy)}
+.tm-check.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tm-check.on span{color:#fff !important}
+.ss-assignee{font-family:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;background:#fff;max-width:140px}
+.q-personbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--border)}
+.q-pb-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3)}
+.q-pchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:18px;padding:5px 11px;background:#fff;color:var(--text2);cursor:pointer}
+.q-pchip:hover{border-color:var(--navy)}
+.q-pchip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.q-pchip-n{background:rgba(0,0,0,.12);border-radius:9px;padding:0 6px;font-size:10px;font-weight:800}
+.q-pchip.on .q-pchip-n{background:rgba(255,255,255,.25)}
+@media (pointer: coarse){ .q-pchip{padding:9px 14px;font-size:13px} .ss-assignee{font-size:14px;padding:9px 8px} }
 .q-check{background:none;border:none;cursor:pointer;padding:6px;border-radius:9px;line-height:0;display:inline-flex;align-items:center;justify-content:center}
 .q-check:hover{background:var(--bg)}
 .q-qty{width:64px;font-family:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;text-align:center}
@@ -473,8 +493,8 @@ tr:hover .del-btn{opacity:1}
 .po-master{display:block}
 .po-split{display:grid;grid-template-columns:320px minmax(0,1fr);gap:16px;align-items:start}
 @media(max-width:900px){.po-split{grid-template-columns:1fr}}
-.po-list{display:flex;flex-direction:column;gap:9px;min-width:0}
-.po-detail{position:sticky;top:8px;min-width:0}
+.po-list{display:flex;flex-direction:column;gap:9px;min-width:0;overflow-x:hidden}
+.po-detail{min-width:0}
 @media(max-width:900px){.po-detail{position:static}}
 .po-mini{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 12px 10px 15px;cursor:pointer;box-shadow:var(--shadow);transition:border-color .12s,box-shadow .12s}
 .po-mini:hover{border-color:#b7c1d1;box-shadow:0 2px 8px rgba(0,0,0,.08)}
@@ -621,6 +641,7 @@ tr:hover .del-btn{opacity:1}
   <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
+    <div class="nav-item" id="nav-team" onclick="showPage('team')"><i class="ti ti-users-group"></i> Team</div>
     <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
     <div class="nav-item" id="nav-issuedpos" onclick="showPage('issuedpos')"><i class="ti ti-receipt"></i> Issued POs</div>
     <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
@@ -648,7 +669,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.45.0</div>
+    <div class="ver">v2.47.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -748,6 +769,23 @@ tr:hover .del-btn{opacity:1}
         <input type="text" id="customer-search" placeholder="Search customers…" oninput="renderCustomers()" style="width:100%;height:34px;font-size:13px;padding:0 12px;border:1px solid var(--border2);border-radius:10px;background:#f7f9fc;color:var(--text);outline:none;font-family:inherit">
       </div>
       <div id="customer-list" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
+    </div>
+  </div>
+
+  <!-- Team Page -->
+  <div id="team-page" style="display:none">
+    <div class="table-card" style="margin-top:0">
+      <div class="table-card-header" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <i class="ti ti-users-group" style="font-size:16px;color:var(--green)"></i>
+          <span>Team</span>
+        </div>
+        <button class="btn green" onclick="openAddPerson()"><i class="ti ti-plus"></i> Add Person</button>
+      </div>
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text3)">
+        Add each person and check the processes they can run. You can then assign any job step to a person, and they'll see their work on the Work Queues page.
+      </div>
+      <div id="team-list" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
     </div>
   </div>
 
@@ -1033,6 +1071,24 @@ tr:hover .del-btn{opacity:1}
   </div>
 </div>
 
+<!-- Add / Edit Person -->
+<div class="modal-bg" id="person-modal" style="display:none;z-index:96">
+  <div class="modal" style="width:560px">
+    <div class="modal-header"><i class="ti ti-user-plus"></i><h2 id="person-modal-title">Add Person</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('person-modal')"><i class="ti ti-x"></i></button></div>
+    <div class="fld" style="margin-bottom:14px">
+      <label style="display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px">Name</label>
+      <input id="person-name" type="text" placeholder="e.g. Mike R." style="width:100%;box-sizing:border-box;font-size:14px;padding:9px 11px;border:1px solid var(--border);border-radius:8px">
+    </div>
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">Processes this person can run</div>
+    <div id="person-procs" style="display:flex;flex-wrap:wrap;gap:7px"></div>
+    <div style="margin-top:20px;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn" onclick="closeModal('person-modal')">Cancel</button>
+      <button class="btn green" id="person-save-btn" onclick="savePerson()">Add Person</button>
+    </div>
+  </div>
+</div>
+
 <!-- Customer Confirmation Ticket Modal -->
 <div class="modal-bg" id="confirm-modal" style="display:none">
   <div class="modal" style="max-width:640px;padding:0;overflow:hidden">
@@ -1272,6 +1328,7 @@ function startDataListeners(){
     if(document.getElementById('archive-page')?.style.display==='block') renderArchive();
   }, () => setSyncStatus('error'));
   startCustomerListener();
+  startTeamListener();
   startDurationsListener();
   startJobCounterListener();
 }
@@ -1644,7 +1701,25 @@ function renderCards(){
   const left=groups.map(condensedCard).join('');
   const sel=groups.find(g=>g.gk===selectedPO);
   cg.innerHTML=`<div class="po-split"><div class="po-list">${left}</div><div class="po-detail">${sel?poDetailHtml(sel):''}</div></div>`;
+  sizeCardPanes();
 }
+// Give the list and detail their own bounded height so the list scrolls while the
+// opened card stays in view. Only on wide (two-column) layouts; narrow screens flow normally.
+function sizeCardPanes(){
+  const list=document.querySelector('.po-list'); const det=document.querySelector('.po-detail');
+  if(!list) return;
+  if(window.innerWidth<=900){
+    [list,det].forEach(el=>{ if(el){ el.style.maxHeight=''; el.style.overflowY=''; } });
+    return;
+  }
+  requestAnimationFrame(()=>{
+    const top=list.getBoundingClientRect().top;
+    const h=Math.max(240, Math.round(window.innerHeight - top - 14));
+    list.style.maxHeight=h+'px'; list.style.overflowY='auto';
+    if(det){ det.style.maxHeight=h+'px'; det.style.overflowY='auto'; }
+  });
+}
+window.addEventListener('resize', ()=>{ if(document.querySelector('.po-list')) sizeCardPanes(); });
 window._selPO=(gk)=>{
   selectedPO=gk; renderCards();
   if(window.innerWidth<=900){ setTimeout(()=>document.querySelector('.po-detail')?.scrollIntoView({behavior:'smooth',block:'start'}),30); }
@@ -1753,6 +1828,7 @@ function detailInner(r){
       <span style="font-size:10px;font-weight:700;color:var(--text2);min-width:14px;text-align:center">${idx+1}</span>
       <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,20)}</span>
       <span class="ss-name" style="flex:1;${done?'text-decoration:line-through;color:var(--text3)':''}">${p}${anchorIcon}</span>
+      ${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}
       ${rightControls}
       <span style="font-size:10px;color:${done?'var(--green)':'var(--text2)'};min-width:96px;text-align:right;${done?'font-weight:600':''}">${dateLabel}</span>
       <i class="ti ti-x" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
@@ -2234,6 +2310,102 @@ function saveCustomersDB() {
   set(ref(db, 'customers'), obj);
 }
 
+// ══════════════ TEAM (people) ══════════════
+const teamRef = ref(db, 'team');
+let team = [];
+let editPersonId = null;
+const PERSON_COLORS = ['#3a6ea5','#2f8f6b','#a8553a','#7a5cc0','#b0852a','#3f7d7a','#9c4567','#5a7d2a','#b5532f','#2c6e8f'];
+function startTeamListener(){
+  onValue(teamRef, (snap)=>{ const d=snap.val(); team = d?Object.values(d):[]; renderTeam(); refreshActivePage(); });
+}
+function saveTeamDB(){ const o={}; team.forEach(p=>o[p.id]=p); set(ref(db,'team'),o); }
+function personById(id){ return team.find(p=>p.id===id)||null; }
+function personInitials(name){ return (name||'').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
+function personChip(id, withName=true){
+  const p=personById(id); if(!p) return '';
+  return `<span class="person-chip" title="${esc2(p.name)}"><span class="pc-dot" style="background:${p.color||'#888'}">${personInitials(p.name)}</span>${withName?`<span class="pc-name">${esc2(p.name)}</span>`:''}</span>`;
+}
+const ALL_PROCESSES = ()=>[...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
+// dropdown options for assigning a step — people who can run this process first
+function assigneeOptions(p, current){
+  const can=team.filter(pp=>(pp.processes||[]).includes(p)).sort((a,b)=>a.name.localeCompare(b.name));
+  const others=team.filter(pp=>!(pp.processes||[]).includes(p)).sort((a,b)=>a.name.localeCompare(b.name));
+  let html=`<option value="">— unassigned —</option>`;
+  if(can.length) html+=`<optgroup label="Can run this">`+can.map(pp=>`<option value="${pp.id}" ${pp.id===current?'selected':''}>${esc2(pp.name)}</option>`).join('')+`</optgroup>`;
+  if(others.length) html+=`<optgroup label="Others">`+others.map(pp=>`<option value="${pp.id}" ${pp.id===current?'selected':''}>${esc2(pp.name)}</option>`).join('')+`</optgroup>`;
+  return html;
+}
+
+function renderTeam(){
+  const host=document.getElementById('team-list'); if(!host) return;
+  if(!team.length){
+    host.innerHTML='<div style="grid-column:1/-1;padding:32px;text-align:center;color:var(--text2);font-size:13px"><i class="ti ti-users-group" style="font-size:28px;display:block;margin-bottom:8px;opacity:.4"></i>No team members yet — click “Add Person” to start.</div>';
+    return;
+  }
+  host.innerHTML = team.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{
+    const procs=(p.processes||[]);
+    const openAssigned = orders.filter(o=>!o.archived && (o.schedule&&o.schedule.steps||[]).some(s=>s.enabled&&!s.done&&s.assignee===p.id)).length;
+    const chips = procs.length ? procs.map(pr=>`<span class="tm-proc" style="color:${PROCESS_COLORS[pr]||'#888'}">${procIcon(pr,13)} ${shortProc(pr)}</span>`).join('') : '<span style="font-size:11px;color:var(--text3)">No processes set</span>';
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <span class="pc-dot lg" style="background:${p.color||'#888'}">${personInitials(p.name)}</span>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${esc2(p.name)}</div>
+          ${openAssigned?`<div style="font-size:11px;color:var(--text2)">${openAssigned} open step${openAssigned!==1?'s':''} assigned</div>`:'<div style="font-size:11px;color:var(--text3)">No open steps assigned</div>'}</div>
+        <button class="btn sm" onclick="openEditPerson('${p.id}')"><i class="ti ti-edit"></i></button>
+        <button class="btn sm" style="color:var(--red)" onclick="deletePerson('${p.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+    </div>`;
+  }).join('');
+}
+function renderPersonProcCheckboxes(selected){
+  const host=document.getElementById('person-procs'); if(!host) return;
+  host.innerHTML = ALL_PROCESSES().map(pr=>{
+    const on=selected.includes(pr);
+    return `<label class="tm-check${on?' on':''}">
+      <input type="checkbox" value="${esc2(pr)}" ${on?'checked':''} style="display:none" onchange="this.closest('label').classList.toggle('on',this.checked)">
+      <span style="color:${PROCESS_COLORS[pr]||'#555'};display:inline-flex">${procIcon(pr,13)}</span> ${shortProc(pr)}</label>`;
+  }).join('');
+}
+window.openAddPerson = ()=>{
+  editPersonId=null;
+  document.getElementById('person-modal-title').textContent='Add Person';
+  document.getElementById('person-save-btn').textContent='Add Person';
+  document.getElementById('person-name').value='';
+  renderPersonProcCheckboxes([]);
+  document.getElementById('person-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('person-name').focus(),50);
+};
+window.openEditPerson = (id)=>{
+  const p=personById(id); if(!p) return;
+  editPersonId=id;
+  document.getElementById('person-modal-title').textContent='Edit Person';
+  document.getElementById('person-save-btn').textContent='Save changes';
+  document.getElementById('person-name').value=p.name||'';
+  renderPersonProcCheckboxes(p.processes||[]);
+  document.getElementById('person-modal').style.display='flex';
+};
+window.savePerson = ()=>{
+  const name=document.getElementById('person-name').value.trim();
+  if(!name){ alert('Enter a name.'); return; }
+  const procs=[...document.querySelectorAll('#person-procs input:checked')].map(c=>c.value);
+  if(editPersonId){
+    const p=personById(editPersonId); if(p){ p.name=name; p.processes=procs; }
+  } else {
+    const color=PERSON_COLORS[team.length % PERSON_COLORS.length];
+    team.push({id:uid(), name, color, processes:procs});
+  }
+  saveTeamDB(); renderTeam(); closeModal('person-modal');
+};
+window.deletePerson = (id)=>{
+  const p=personById(id); if(!p) return;
+  if(!confirm(`Remove ${p.name} from the team? Their name will be cleared from any assigned steps.`)) return;
+  // unassign from any steps
+  orders.forEach(o=>{ (o.schedule&&o.schedule.steps||[]).forEach(s=>{ if(s.assignee===id) delete s.assignee; }); });
+  team=team.filter(x=>x.id!==id);
+  saveTeamDB(); saveDB(); renderTeam(); refreshActivePage();
+};
+
 function renderCustomers() {
   const q = (document.getElementById('customer-search')?.value || '').toLowerCase();
   const list = document.getElementById('customer-list');
@@ -2336,6 +2508,7 @@ const PAGE_META = {
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   queues:   {title:'Work Queues',    sub:'Shop-floor task lists grouped by process'},
   customers:{title:'Customers',      sub:'Customer index & PO format notes'},
+  team:     {title:'Team',           sub:'Your people and the processes each one runs'},
   schedule: {title:'Incoming / Outgoing', sub:'External steps — parts out to vendors and material/POs coming in'},
   needpo:   {title:'Need PO',         sub:'Assign the vendor and our PO number for outside processes'},
   issuedpos:{title:'Issued POs',      sub:'History of every purchase order assigned to a vendor'},
@@ -2345,7 +2518,7 @@ const PAGE_META = {
 };
 window.showPage = (page) => {
   if(userRole==='operator') page='queues';   // operators are locked to Work Queues
-  ['orders','queues','customers','schedule','needpo','issuedpos','cutlist','archive','settings'].forEach(p=>{
+  ['orders','queues','customers','team','schedule','needpo','issuedpos','cutlist','archive','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -2358,6 +2531,7 @@ window.showPage = (page) => {
   if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
   if(page==='queues') document.getElementById('nav-queues')?.classList.add('active');
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
+  if(page==='team') document.getElementById('nav-team')?.classList.add('active');
   if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
   if(page==='needpo') document.getElementById('nav-needpo')?.classList.add('active');
   if(page==='issuedpos') document.getElementById('nav-issuedpos')?.classList.add('active');
@@ -2366,6 +2540,7 @@ window.showPage = (page) => {
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
   if(page==='queues') renderQueues();
   if(page==='customers') renderCustomers();
+  if(page==='team') renderTeam();
   if(page==='schedule') renderSchedule();
   if(page==='needpo'){ document.getElementById('npv-order')?.classList.toggle('active',needPOView==='order'); document.getElementById('npv-vendor')?.classList.toggle('active',needPOView==='vendor'); renderNeedPO(); }
   if(page==='issuedpos') renderIssuedPOs();
@@ -2376,6 +2551,8 @@ window.showPage = (page) => {
 
 // ── Work Queues (per internal process, priority-ordered) ─────────────────────
 let _activeQueue = INTERNAL_PROCESSES[0];
+let _queuePerson = ''; // '' = everyone
+window.setQueuePerson = (id) => { _queuePerson = id; renderQueues(); };
 window.selectQueue = (name) => { _activeQueue = name; renderQueues(); };
 function renderQueues(){
   const tabsEl=document.getElementById('queue-tabs'); if(!tabsEl) return;
@@ -2413,6 +2590,18 @@ function renderQueues(){
     return {r, step, status};
   });
 
+  // person filter bar (built from unfiltered items so we know who has work here)
+  const personBar = team.length ? `<div class="q-personbar">
+    <span class="q-pb-label">Show</span>
+    <button class="q-pchip${_queuePerson===''?' on':''}" onclick="setQueuePerson('')">Everyone</button>
+    ${team.filter(pp=>(pp.processes||[]).includes(proc) || items.some(i=>i.step.assignee===pp.id))
+        .sort((a,b)=>a.name.localeCompare(b.name))
+        .map(pp=>{ const n=items.filter(i=>i.step.assignee===pp.id && i.status!=='completed').length;
+          return `<button class="q-pchip${_queuePerson===pp.id?' on':''}" onclick="setQueuePerson('${pp.id}')"><span class="pc-dot sm" style="background:${pp.color||'#888'}">${personInitials(pp.name)}</span>${esc2(pp.name)}${n?`<span class="q-pchip-n">${n}</span>`:''}</button>`; }).join('')}
+  </div>` : '';
+  if(_queuePerson && !team.some(p=>p.id===_queuePerson)) _queuePerson='';
+  if(_queuePerson) items = items.filter(i => (i.step.assignee||'')===_queuePerson);
+
   const openItems = items.filter(i=>i.status!=='completed');
   const doneItems = items.filter(i=>i.status==='completed');
 
@@ -2432,7 +2621,7 @@ function renderQueues(){
   const body=document.getElementById('queue-body');
   const rowsToShow = showDone ? [...openItems, ...doneItems] : openItems;
   if(!rowsToShow.length){
-    body.innerHTML=`<div class="empty-state"><i class="ti ti-checks"></i><p>Nothing waiting in the ${proc} queue${showDone?'':' — tick “Show completed” to see finished items'}.</p></div>`;
+    body.innerHTML=`${personBar}<div class="empty-state"><i class="ti ti-checks"></i><p>${_queuePerson?'Nothing assigned to this person in the '+proc+' queue.':'Nothing waiting in the '+proc+' queue'+(showDone?'':' — tick “Show completed” to see finished items')}.</p></div>`;
     return;
   }
 
@@ -2474,6 +2663,9 @@ function renderQueues(){
       drawCell = `<span style="color:var(--text3);font-size:11px" title="No drawing attached">—</span>`;
     }
     const prioCell = (done || op) ? `<span style="color:var(--text3)">${PRIORITY_LABEL[prio(r)]}</span>` : prioSelect(r);
+    const assignCell = op
+      ? `<td>${step.assignee?personChip(step.assignee):'<span style="color:var(--text3);font-size:11px">—</span>'}</td>`
+      : `<td>${team.length?`<select class="ss-assignee" title="Assigned to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${proc.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(proc, step.assignee||'')}</select>`:'<span style="color:var(--text3);font-size:11px">—</span>'}</td>`;
     // managers get an "Open" button to jump to the order; operators don't have that page
     const openCell = op ? '' : `<td style="text-align:center"><button class="q-open-btn" title="Open in Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button></td>`;
     return `<tr class="q-row${done?' q-done':''}">
@@ -2481,6 +2673,7 @@ function renderQueues(){
       <td>${prioCell}</td>
       <td><b>${r.job||'—'}</b></td>
       <td>${r.part?`<b>${r.part}</b>`:''}${r.part&&r.desc?' · ':''}${r.desc||''}</td>
+      ${assignCell}
       <td style="text-align:center">${drawCell}</td>
       <td style="${overdue&&!done?'color:var(--red);font-weight:600':''}">${dueTxt}</td>
       <td style="text-align:center">${needByCell}</td>
@@ -2494,12 +2687,13 @@ function renderQueues(){
   }).join('');
 
   const openHead = op ? '' : `<th style="width:56px;text-align:center">Open</th>`;
-  body.innerHTML=`<div class="table-scroll"><table class="q-table">
+  body.innerHTML=`${personBar}<div class="table-scroll"><table class="q-table">
     <thead><tr>
       <th style="width:96px">Status</th>
       <th style="width:92px">Priority</th>
       <th style="width:80px">Job #</th>
       <th>Part Number / Description</th>
+      <th style="width:130px">Assigned</th>
       <th style="width:72px;text-align:center">Drawing</th>
       <th style="width:96px">Due Date</th>
       <th style="width:110px;text-align:center">Need By</th>
@@ -3404,6 +3598,13 @@ window._stepNeedBy = (id, name, val) => {
   step.needBy = val||'';
   saveDB();
   if(document.getElementById('queues-page')?.style.display !== 'none') renderQueues();
+};
+window._stepAssignee = (id, name, personId) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const sch = ensureSchedule(r);
+  const step = sch.steps.find(s=>s.name===name); if(!step) return;
+  if(personId) step.assignee = personId; else delete step.assignee;
+  saveDB(); refreshActivePage();
 };
 window._stepQty = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
