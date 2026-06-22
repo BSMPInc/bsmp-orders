@@ -1119,6 +1119,101 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
   </div>
 
+  <!-- ===================== CNC MILL ESTIMATOR ===================== -->
+  <div class="card" id="cnc-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <div class="card-title" style="margin-bottom:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>
+        CNC Mill Estimator
+        <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:4px">— billet material + machining time. CAM &amp; setup amortized over the run. Works alone or with other ops.</span>
+      </div>
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="cnc-enabled" onchange="toggleCnc();calculate()" style="width:auto">
+        This is a CNC milled part
+      </label>
+    </div>
+
+    <div id="cnc-section" style="display:none;margin-top:12px">
+
+      <!-- Stock / billet -->
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Stock / billet <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— material priced by volume</span></div>
+      <div class="grid4">
+        <div class="field"><label>Stock form</label>
+          <select id="cnc-stock-form" onchange="onCncStockChange();calculate()" style="font-size:13px">
+            <option value="block">Plate / block (rect)</option>
+            <option value="round">Round billet</option>
+            <option value="customer">Customer-furnished (free)</option>
+          </select>
+        </div>
+        <div class="field"><label>Material</label>
+          <select id="cnc-material" onchange="onCncMaterialChange();calculate()" style="font-size:13px">
+            <option value="aluminum">Aluminum (6061/7075)</option>
+            <option value="steel">Steel (mild / 4140)</option>
+            <option value="stainless">Stainless (303/304/316/17-4)</option>
+            <option value="titanium">Titanium</option>
+            <option value="brass">Brass</option>
+            <option value="copper">Copper</option>
+          </select>
+        </div>
+        <div class="field"><label>$ / lb</label><input id="cnc-lb" type="number" value="6" min="0" step="0.25" onchange="markCncLbManual();calculate()"></div>
+        <div class="field"><label>Drop / saw allowance (%)</label><input id="cnc-drop" type="number" value="25" min="0" step="5" onchange="calculate()"></div>
+      </div>
+      <div class="grid4" id="cnc-stock-dims" style="margin-top:8px">
+        <div class="field"><label id="cnc-d1-lbl">Length L (in)</label><input id="cnc-d1" type="number" value="0" min="0" step="0.0625" onchange="calculate()"></div>
+        <div class="field"><label id="cnc-d2-lbl">Width W (in)</label><input id="cnc-d2" type="number" value="0" min="0" step="0.0625" onchange="calculate()"></div>
+        <div class="field" id="cnc-d3-wrap"><label id="cnc-d3-lbl">Thickness H (in)</label><input id="cnc-d3" type="number" value="0" min="0" step="0.0625" onchange="calculate()"></div>
+        <div class="field" style="display:flex;align-items:flex-end"><div id="cnc-stock-info" style="font-size:11px;color:var(--text3);line-height:1.4"></div></div>
+      </div>
+
+      <!-- Programming & setup -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Programming &amp; setup <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— one-time, amortized over order qty</span></div>
+        <div class="grid4">
+          <div class="field"><label>CAM programming (min)</label><input id="cnc-prog-min" type="number" value="0" min="0" step="5" onchange="calculate()"></div>
+          <div class="field"><label>Programming rate</label><select id="cnc-prog-rate" onchange="calculate()" style="font-size:13px"></select></div>
+          <div class="field"><label># of setups / ops <span style="font-weight:400;color:var(--text3)" title="Each time the part is re-fixtured (e.g. flip to machine the back) is a setup.">ⓘ</span></label><input id="cnc-ops" type="number" value="1" min="1" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Setup min per op</label><input id="cnc-setup-min" type="number" value="0" min="0" step="5" onchange="calculate()"></div>
+        </div>
+        <div class="grid4" style="margin-top:8px">
+          <div class="field"><label>Setup rate</label><select id="cnc-setup-rate" onchange="calculate()" style="font-size:13px"></select></div>
+          <div class="field" style="grid-column:span 3;display:flex;align-items:flex-end"><div id="cnc-oh-info" style="font-size:11px;color:var(--text3);line-height:1.4"></div></div>
+        </div>
+      </div>
+
+      <!-- Run / cycle -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Run / cycle time <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— per part (every piece)</span></div>
+        <div class="grid4">
+          <div class="field"><label>Run time / part (min)</label><input id="cnc-run-min" type="number" value="0" min="0" step="1" onchange="markCncRunManual();calculate()"></div>
+          <div class="field"><label>Machine rate</label><select id="cnc-run-rate" onchange="calculate()" style="font-size:13px"></select></div>
+          <div class="field"><label>Tooling / consumables ($/part)</label><input id="cnc-tooling" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field" style="display:flex;align-items:flex-end"><div id="cnc-run-info" style="font-size:11px;color:var(--text3);line-height:1.4"></div></div>
+        </div>
+      </div>
+
+      <!-- Cycle estimator -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Cycle-time estimator <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— optional assist; computes a suggested run time you can apply</span></div>
+        <div class="grid4">
+          <div class="field"><label>Material removed (% of stock)</label><input id="cnc-removed" type="number" value="40" min="0" max="95" step="5" onchange="calculate()"></div>
+          <div class="field"><label>Removal rate (in³/min) <span style="font-weight:400;color:var(--text3)" title="Roughing MRR for your machine/material. Aluminum ~4, steel ~1, stainless ~0.6, titanium ~0.3.">ⓘ</span></label><input id="cnc-mrr" type="number" value="4" min="0.05" step="0.25" onchange="markCncMrrManual();calculate()"></div>
+          <div class="field"><label>Finishing (% of roughing)</label><input id="cnc-finish" type="number" value="60" min="0" step="10" onchange="calculate()"></div>
+          <div class="field" style="display:flex;align-items:flex-end"><div id="cnc-est-info" style="font-size:11px;color:var(--text3);line-height:1.4"></div></div>
+        </div>
+        <div class="grid4" style="margin-top:8px">
+          <div class="field"><label>Drilled holes</label><input id="cnc-drills" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Tapped holes</label><input id="cnc-taps" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Reamed / bored</label><input id="cnc-reams" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>C'sink / c'bore / chamfer</label><input id="cnc-csinks" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+        </div>
+        <button class="btn btn-sm" onclick="applyCncEstimate()" style="margin-top:8px">Use estimate as run time</button>
+        <button class="btn btn-sm" onclick="loadResmedExample(false)" style="margin-top:8px;margin-left:6px">Load ResMed example</button>
+      </div>
+
+      <div id="cnc-readout" style="margin-top:12px;padding:8px 12px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1e40af;font-family:'DM Mono',monospace;line-height:1.6"></div>
+    </div>
+  </div>
+
   <!-- Hardware -->
   <div class="card">
     <div class="card-title">
@@ -1774,6 +1869,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">CNC Mill Estimator</div>
+        <ul class="changelog-list">
+          <li>New CNC Mill card — prices billet material by volume instead of sheet nesting (fixes $0 material on machined parts)</li>
+          <li>CAM programming and machine setups captured as one-time costs, amortized over the order quantity</li>
+          <li>Run/cycle time per part at a chosen mill rate code, plus tooling/consumables allowance</li>
+          <li>Number of setups/ops field — handles multi-op parts (e.g. flip to machine the back)</li>
+          <li>Optional cycle-time estimator: roughing from material-removal rate + hole/feature counts, applied to the run-time field</li>
+          <li>Stock forms: plate/block, round billet, or customer-furnished (free)</li>
+          <li>Flows through the same markup, finance, and quantity logic as the rest of the quote</li>
+          <li>Shows clearly why low-qty machined parts are expensive: programming + setup + first-article dominate at qty 1–2 and amortize away at volume</li>
+          <li>Worked example pre-loaded: ResMed NEST, PLATE (6061, tight-tolerance, 2-op)</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">Welding Estimator</div>
@@ -2454,7 +2564,8 @@ function init(){
   addOp(); addOp(); addOp();
   addHw(); addOut();
   populateWeldRateCodes();
-  loadCargoHookExample(true);
+  populateCncRateCodes();
+  loadResmedExample(true);
   calculate();
   // Setup drag-drop for main dropzone
   const dz = document.getElementById('dropzone');
@@ -2767,6 +2878,7 @@ function loadCargoHookExample(auto){
   if(auto && localStorage.getItem('bsmp_cargohook_shown')) return;
   if(auto) localStorage.setItem('bsmp_cargohook_shown','1');
   const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v;};
+  const _cnc=document.getElementById('cnc-enabled'); if(_cnc){ _cnc.checked=false; if(typeof toggleCnc==='function') toggleCnc(); }
   set('partnum','1010957'); set('revision','-'); set('qty','5');
   set('notes','CARGO HOOK, TIE DOWN — weldment per AWS D17.1/D17.1M Class A, filler 4130. '
     +'Welds magnetic-particle (MT) inspected. Post-weld stress relieve per AMS 2759/11; normalize per AMS 2759/1 Type III. '
@@ -2786,6 +2898,162 @@ function loadCargoHookExample(auto){
   set('weld-ndt-type','mpi'); weldNdtManual=true; set('weld-ndt-cost','35');
   set('weld-ht-cost','140'); set('weld-finish-cost','95');
   set('weld-mark-min','10'); set('weld-cert-min','25'); set('weld-cert-rate','1100 Inspection');
+  calculate();
+}
+
+// ===================== CNC MILL ESTIMATOR =====================
+const CNC_DENSITY  = {aluminum:0.098, steel:0.283, stainless:0.286, titanium:0.163, brass:0.307, copper:0.324}; // lb/in^3
+const CNC_LB       = {aluminum:6, steel:1.2, stainless:3.5, titanium:25, brass:5, copper:6};                    // $/lb starting points
+const CNC_MRR      = {aluminum:4, steel:1.0, stainless:0.6, titanium:0.3, brass:2.5, copper:2.0};               // in^3/min roughing
+const CNC_FEAT_MIN = {drill:0.4, tap:0.6, ream:1.0, csink:0.3};  // minutes per feature (low-qty, incl positioning)
+let cncRunManual=false, cncLbManual=false, cncMrrManual=false;
+let window_cncEstMin=0;
+
+function toggleCnc(){
+  const on=document.getElementById('cnc-enabled').checked;
+  document.getElementById('cnc-section').style.display = on?'block':'none';
+  if(on) onCncStockChange();
+}
+function onCncStockChange(){
+  const form=document.getElementById('cnc-stock-form').value;
+  const d3=document.getElementById('cnc-d3-wrap');
+  const l1=document.getElementById('cnc-d1-lbl'), l2=document.getElementById('cnc-d2-lbl');
+  if(form==='round'){ l1.textContent='Diameter Ø (in)'; l2.textContent='Length (in)'; if(d3) d3.style.visibility='hidden'; }
+  else if(form==='customer'){ l1.textContent='Length L (in)'; l2.textContent='Width W (in)'; if(d3){ d3.style.visibility='visible'; document.getElementById('cnc-d3-lbl').textContent='Thickness H (in)'; } }
+  else { l1.textContent='Length L (in)'; l2.textContent='Width W (in)'; if(d3){ d3.style.visibility='visible'; document.getElementById('cnc-d3-lbl').textContent='Thickness H (in)'; } }
+}
+function onCncMaterialChange(){
+  const m=document.getElementById('cnc-material').value;
+  if(!cncLbManual && CNC_LB[m]!=null) document.getElementById('cnc-lb').value=CNC_LB[m];
+  if(!cncMrrManual && CNC_MRR[m]!=null) document.getElementById('cnc-mrr').value=CNC_MRR[m];
+}
+function markCncRunManual(){ cncRunManual=true; }
+function markCncLbManual(){ cncLbManual=true; }
+function markCncMrrManual(){ cncMrrManual=true; }
+function applyCncEstimate(){
+  if(window_cncEstMin>0){ document.getElementById('cnc-run-min').value=window_cncEstMin.toFixed(1); cncRunManual=true; calculate(); }
+}
+function populateCncRateCodes(){
+  const mills = Object.keys(RATES).filter(k=>/CNC Mill|Machine/i.test(k));
+  const mkOpts = (preferred)=>{
+    let h=''; const seen=new Set();
+    mills.forEach(k=>{ h+=`<option value="${k}"${k===preferred?' selected':''}>${k} ($${RATES[k]}/hr)</option>`; seen.add(k); });
+    h+='<optgroup label="Other">';
+    Object.keys(RATES).filter(k=>!seen.has(k)).forEach(k=> h+=`<option value="${k}">${k} ($${RATES[k]}/hr)</option>`);
+    h+='</optgroup>';
+    return h;
+  };
+  const setSel=(id,pref)=>{ const s=document.getElementById(id); if(!s) return; const prev=s.value; s.innerHTML=mkOpts(pref); if(prev&&RATES[prev]) s.value=prev; };
+  setSel('cnc-prog-rate', RATES['1001 CNC Mill- Programing']?'1001 CNC Mill- Programing':mills[0]);
+  setSel('cnc-setup-rate', RATES['1002 CNC Mill- Set Up']?'1002 CNC Mill- Set Up':mills[0]);
+  setSel('cnc-run-rate', RATES['1004 CNC Mill- Level 2']?'1004 CNC Mill- Level 2':mills[0]);
+}
+function cncStockVolume(){
+  const form=document.getElementById('cnc-stock-form').value;
+  const d1=parseFloat(document.getElementById('cnc-d1').value)||0;
+  const d2=parseFloat(document.getElementById('cnc-d2').value)||0;
+  const d3=parseFloat(document.getElementById('cnc-d3').value)||0;
+  if(form==='round') return (Math.PI/4)*d1*d1*d2;
+  return d1*d2*d3;
+}
+
+function computeCnc(qty, finance){
+  const en=document.getElementById('cnc-enabled');
+  if(!en || !en.checked) return {enabled:false, totalPart:0, bdLines:[]};
+  qty=qty||1; finance=finance||0;
+  const gv=id=>parseFloat(document.getElementById(id)?.value)||0;
+  const form=document.getElementById('cnc-stock-form').value;
+  const mat=document.getElementById('cnc-material').value;
+  const dens=CNC_DENSITY[mat]||0.098;
+  const vol=cncStockVolume();
+  const wt=vol*dens;
+  const lb=gv('cnc-lb'), drop=gv('cnc-drop');
+  const stockCost = form==='customer' ? 0 : wt*lb*(1+drop/100);
+
+  const progRate=RATES[document.getElementById('cnc-prog-rate').value]||100;
+  const setupRate=RATES[document.getElementById('cnc-setup-rate').value]||100;
+  const runRate=RATES[document.getElementById('cnc-run-rate').value]||80;
+  const progPart=(gv('cnc-prog-min')/60)*progRate/qty;
+  const ops=Math.max(1,gv('cnc-ops'));
+  const setupPart=(ops*gv('cnc-setup-min')/60)*setupRate/qty;
+  const runPart=(gv('cnc-run-min')/60)*runRate;
+  const toolPart=gv('cnc-tooling');
+
+  const totalPart=(stockCost+progPart+setupPart+runPart+toolPart)*(1+finance);
+
+  // Cycle-time estimator (suggestion only)
+  const removedVol=vol*(gv('cnc-removed')/100);
+  const mrr=Math.max(0.05, gv('cnc-mrr'));
+  const roughMin=removedVol/mrr;
+  const holesMin=gv('cnc-drills')*CNC_FEAT_MIN.drill + gv('cnc-taps')*CNC_FEAT_MIN.tap
+               + gv('cnc-reams')*CNC_FEAT_MIN.ream + gv('cnc-csinks')*CNC_FEAT_MIN.csink;
+  const estMin=roughMin*(1+gv('cnc-finish')/100)+holesMin;
+  window_cncEstMin=estMin;
+
+  // Inline infos
+  const si=document.getElementById('cnc-stock-info');
+  if(si) si.innerHTML = form==='customer' ? 'Customer-furnished — $0 stock'
+    : `Stock: <strong>${vol.toFixed(2)} in³</strong> · <strong>${wt.toFixed(2)} lb</strong> → $${stockCost.toFixed(2)}/part`;
+  const oi=document.getElementById('cnc-oh-info');
+  if(oi) oi.innerHTML = `Prog $${progPart.toFixed(2)}/part · setup ${ops}×${gv('cnc-setup-min')}min = $${setupPart.toFixed(2)}/part (÷ ${qty})`;
+  const ri=document.getElementById('cnc-run-info');
+  if(ri) ri.innerHTML = `Run $${runPart.toFixed(2)}/part @ $${runRate}/hr`;
+  const ei=document.getElementById('cnc-est-info');
+  if(ei) ei.innerHTML = `≈ <strong>${estMin.toFixed(1)} min/part</strong> (rough ${roughMin.toFixed(1)} + holes ${holesMin.toFixed(1)})`;
+
+  const ro=document.getElementById('cnc-readout');
+  if(ro){
+    const f=v=>'$'+v.toFixed(2);
+    ro.innerHTML = `Stock ${vol.toFixed(2)} in³ · ${wt.toFixed(2)} lb${form==='customer'?' (furnished)':''}`
+      + ` · run ${gv('cnc-run-min')} min/part @ $${runRate}/hr`
+      + `<br>Stock ${f(stockCost)} · CAM ${f(progPart)} · setup ${f(setupPart)} · run ${f(runPart)}` + (toolPart?` · tooling ${f(toolPart)}`:'')
+      + ` <span style="color:var(--text3)">(÷ ${qty} where one-time)</span>`
+      + `<br><strong>CNC cost/part: ${f(totalPart)}</strong>`;
+  }
+
+  const bdLines=[];
+  if(stockCost>0) bdLines.push({label:'Billet / stock', val:stockCost*(1+finance), sub:`${wt.toFixed(2)} lb @ $${lb}/lb +${drop}% drop`});
+  if(progPart>0) bdLines.push({label:'CAM programming', val:progPart*(1+finance), sub:`one-time ÷ ${qty} parts`});
+  if(setupPart>0) bdLines.push({label:'Machine setup', val:setupPart*(1+finance), sub:`${ops} op${ops>1?'s':''} ÷ ${qty} parts`});
+  if(runPart>0) bdLines.push({label:'Machining run time', val:runPart*(1+finance), sub:`${gv('cnc-run-min')}min/part @ $${runRate}/hr`});
+  if(toolPart>0) bdLines.push({label:'Tooling / consumables', val:toolPart*(1+finance), sub:'per part'});
+
+  return {enabled:true, totalPart, stockCost, progPart, setupPart, runPart, toolPart, bdLines};
+}
+
+// Pre-fill a CNC milling quote for the ResMed NEST, PLATE part (eLB2074-007.5-1).
+// 6061 aluminum, tight tolerance + GD&T, tapped holes both faces → 2 ops. qty 2.
+// All values are reasonable estimates — tune to your shop's real hours and rates.
+function loadResmedExample(auto){
+  if(auto && localStorage.getItem('bsmp_resmed_shown')) return;
+  if(auto) localStorage.setItem('bsmp_resmed_shown','1');
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v;};
+  const chk=(id,v)=>{const el=document.getElementById(id); if(el) el.checked=v;};
+  // turn welding off so the two modes don't stack
+  chk('weld-enabled',false); if(typeof toggleWelding==='function') toggleWelding();
+  set('partnum','eLB2074-007.5-1'); set('revision','A'); set('qty','2'); set('markup','45'); set('finance','10');
+  set('notes','NEST, PLATE — 6061 aluminum, dims in mm. Tight tolerances incl Ø6.00 +/-0.01 mm precision bore and 0.05 A-B GD&T → CMM first article. '
+    +'Tapped holes both faces (M3/M4/M6) → 2 ops (flip). At qty 2 the cost is dominated by amortized CAM, setup, and first-article inspection. '
+    +'Stock/hours/rates are estimates — tune to your actuals. Customer: ResMed.');
+  // CNC card
+  chk('cnc-enabled',true); toggleCnc(); populateCncRateCodes();
+  set('cnc-stock-form','round'); onCncStockChange();
+  set('cnc-material','aluminum'); onCncMaterialChange();
+  set('cnc-lb','6'); cncLbManual=true; set('cnc-drop','25');
+  set('cnc-d1','3.8'); set('cnc-d2','0.95'); set('cnc-d3','0');   // round Ø3.8 × 0.95 long
+  set('cnc-prog-rate','1001 CNC Mill- Programing'); set('cnc-prog-min','250');
+  set('cnc-ops','2'); set('cnc-setup-min','65'); set('cnc-setup-rate','1002 CNC Mill- Set Up');
+  set('cnc-run-min','75'); cncRunManual=true; set('cnc-run-rate','1004 CNC Mill- Level 2');
+  set('cnc-tooling','15');
+  set('cnc-removed','45'); set('cnc-mrr','4'); cncMrrManual=true; set('cnc-finish','60');
+  set('cnc-drills','6'); set('cnc-taps','8'); set('cnc-reams','1'); set('cnc-csinks','4');
+  // Existing cards: deburr op + first-article inspection; programming card OFF (CNC card carries CAM)
+  const oc=document.getElementById('ops-container'); if(oc){ oc.innerHTML=''; opCount=0; addOp('501 De-Burr, Orbital','5'); }
+  set('prog-apply','no'); if(typeof calcProgramming==='function'){}
+  set('insp-apply','yes'); set('insp-type','1101'); set('insp-complexity','custom'); set('insp-custom-mins','230');
+  set('material','');
+  set('costsheet','0');
+  if(typeof calcInspection==='function') calcInspection();
   calculate();
 }
 
@@ -3232,7 +3500,10 @@ function calculate(){
   // Welding estimator (works standalone for welding-only jobs, or adds to fab)
   const weld = computeWelding(qty, finance);
   const weldCostPart = weld.enabled ? weld.totalPart : 0;
-  const totalCostPart = matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart;
+  // CNC mill estimator (billet + machining; standalone or alongside other ops)
+  const cnc = computeCnc(qty, finance);
+  const cncCostPart = cnc.enabled ? cnc.totalPart : 0;
+  const totalCostPart = matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart+cncCostPart;
   const markupCost = totalCostPart*markup;
   const finalPrice = roundPrice(totalCostPart+markupCost);
   const jobTotal = finalPrice*qty;
@@ -3304,12 +3575,16 @@ function calculate(){
     bd+=`<div class="breakdown-row"><span class="breakdown-label" style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Welding</span></div>`;
     weld.bdLines.forEach(l=> bd+=br(l.label, fmt(l.val), l.sub));
   }
+  if(cnc.enabled && cnc.bdLines.length){
+    bd+=`<div class="breakdown-row"><span class="breakdown-label" style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">CNC milling</span></div>`;
+    cnc.bdLines.forEach(l=> bd+=br(l.label, fmt(l.val), l.sub));
+  }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Total cost / part</span><span class="breakdown-val">${fmt(totalCostPart)}</span></div>`;
   bd+=br(`Markup (${(markup*100).toFixed(0)}% + ${(finance*100).toFixed(1)}% finance)`,fmt(markupCost));
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Job total (×${qty})</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('breakdown').innerHTML=bd;
 
-  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld};
+  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc};
 }
 
 // ===================== FILE HANDLING =====================
@@ -3758,6 +4033,7 @@ function copyQuote(){
   d.hwLines.forEach(l=>txt+=`\nHardware — ${l.desc}: ${fmt(l.total)}`);
   d.outLines.forEach(l=>txt+=`\nOutsource — ${l.desc}: ${fmt(l.total)}`);
   if(d.weld && d.weld.enabled){ d.weld.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
+  if(d.cnc && d.cnc.enabled){ d.cnc.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
   txt+=`\n\nCost/part: ${fmt(d.totalCostPart)}\nMarkup (${(d.markup*100).toFixed(0)}%): ${fmt(d.markupCost)}\nPrice/part: ${fmt(d.finalPricePart||d.finalPrice)}\nJob total (×${d.qty}): ${fmt(d.jobTotal)}`;
   if(notes) txt+=`\n\nNotes: ${notes}`;
   navigator.clipboard.writeText(txt).then(()=>{
@@ -4272,6 +4548,7 @@ function saveRates(){
   });
   localStorage.setItem('bsmp_rates',JSON.stringify(RATES));
   if(typeof populateWeldRateCodes==='function') populateWeldRateCodes();
+  if(typeof populateCncRateCodes==='function') populateCncRateCodes();
   alert('Rates saved.');
 }
 
