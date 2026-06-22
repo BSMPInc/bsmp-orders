@@ -564,6 +564,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <div class="field"><label>Finance %</label><input id="finance" type="number" value="7" step="0.5" onchange="calculate()"></div>
       <div class="field"><label>Purchasing ($)</label><input id="purchasing" type="number" value="0" step="0.01" onchange="calculate()"></div>
     </div>
+    <div class="grid3" style="margin-top:4px">
+      <div class="field">
+        <label>Due date</label>
+        <input id="due-date" type="date" onchange="checkRushDue()">
+      </div>
+      <div class="field">
+        <label>PO / Job #</label>
+        <input id="po-number" type="text" placeholder="optional">
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <div id="rush-alert" style="display:none;padding:6px 10px;background:#fee2e2;border:1px solid #fca5a5;border-radius:var(--radius);font-size:12px;font-weight:600;color:#991b1b;width:100%">
+          ⚡ Tight due date — consider Rush tier
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Material -->
@@ -681,6 +696,19 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <div class="field"><label>Part length (in)</label><input id="partl" type="number" step="0.001" placeholder="0.000" onchange="calculate();calcOrbital()"></div>
       <div class="field"><label>Perimeter (in)</label><input id="perim" type="number" step="0.001" placeholder="from DXF" onchange="calculate()"></div>
       <div class="field"><label>Pierces</label><input id="pierces" type="number" value="1" min="0" onchange="calculate()"></div>
+    </div>
+    <div class="grid4" style="margin-top:8px">
+      <div class="field">
+        <label>Nesting efficiency <span style="font-weight:400;color:var(--text3)">%</span></label>
+        <input id="nesting-efficiency" type="number" value="85" min="10" max="100" step="1" onchange="calculate()" title="How efficiently parts actually nest vs theoretical max. Simple rectangles ~95%, complex shapes ~70-80%.">
+      </div>
+      <div class="field">
+        <label>Scrap allowance <span style="font-weight:400;color:var(--text3)">%</span></label>
+        <input id="scrap-allowance" type="number" value="0" min="0" max="50" step="1" onchange="calculate()" title="Extra parts to run to cover expected rejects. Adds to effective qty for material + setup cost. Use 3-5% on precision parts.">
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <div id="nesting-hint" style="font-size:11px;color:var(--text3);line-height:1.4"></div>
+      </div>
     </div>
     </div><!-- end sheet-fields-wrapper -->
     <div id="cut-info" class="cut-info" style="display:none"></div>
@@ -867,6 +895,33 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div id="sheetload-result" style="display:none;padding:10px 14px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1e40af;font-family:'DM Mono',monospace;line-height:1.8"></div>
   </div>
 
+  <!-- Form Complexity Helper -->
+  <div class="card" id="form-complexity-card" style="display:none">
+    <div class="card-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6l9-4 9 4v6c0 5-9 10-9 10S3 17 3 12V6z"/></svg>
+      Form Complexity
+      <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:4px">— sets default min/bend for form ops</span>
+    </div>
+    <div class="grid2" style="margin-bottom:10px">
+      <div class="field">
+        <label>Complexity</label>
+        <select id="form-complexity" onchange="applyFormComplexity()">
+          <option value="">— select to set min/bend —</option>
+          <option value="0.3">Simple — 0.3 min/bend</option>
+          <option value="0.8" selected>Standard — 0.8 min/bend</option>
+          <option value="1.5">Complex — 1.5 min/bend</option>
+          <option value="3.0">Precision — 3.0 min/bend</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Bends detected</label>
+        <input id="form-bend-count" type="number" min="0" step="1" placeholder="from drawing" onchange="applyFormComplexity()">
+      </div>
+    </div>
+    <div id="form-complexity-result" style="display:none;padding:8px 12px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1e40af;font-family:'DM Mono',monospace"></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px">Simple = flat flanges, easy single hits. Standard = typical 90° bends. Complex = tight radius, multi-step, hard to hold. Precision = datum-referenced, tight angular tolerance (±0.5° or tighter).</div>
+  </div>
+
   <!-- Programming Calculator -->
   <div class="card">
     <div class="card-title">
@@ -993,6 +1048,30 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <div class="card">
     <div class="card-title">Notes</div>
     <textarea id="notes" placeholder="Internal notes, drawing callouts, special instructions…"></textarea>
+  </div>
+
+  <!-- Gang / Shared Nest -->
+  <div class="card" id="gang-nest-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div class="card-title" style="margin-bottom:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" width="14" height="14"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Gang / Shared Nest
+      </div>
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="gang-enabled" onchange="toggleGangNest()" style="width:auto">
+        Enable shared nest with other parts
+      </label>
+    </div>
+    <div id="gang-section" style="display:none">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px;line-height:1.5">Add other parts that will share this sheet run. Material cost is calculated once for the combined nest and split proportionally by blank area. Each part still has its own labor and overhead.</div>
+      <div id="gang-parts-list" style="margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="gang-search" placeholder="Search saved parts to add…" style="flex:1;min-width:160px" oninput="renderGangSearch()">
+        <button class="btn btn-sm" onclick="document.getElementById('gang-search').value='';renderGangSearch()">Clear</button>
+      </div>
+      <div id="gang-search-results" style="margin-top:8px;max-height:180px;overflow-y:auto"></div>
+      <div id="gang-result" style="display:none;margin-top:10px;padding:8px 12px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1e40af;font-family:'DM Mono',monospace;line-height:1.6"></div>
+    </div>
   </div>
 
   <!-- Results -->
@@ -1195,14 +1274,30 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <p>API key and shop configuration</p>
   </div>
   <div class="card">
-    <div class="card-title">Anthropic API Key</div>
-    <div class="api-notice">Required for AI drawing extraction. Your key is saved only in this browser and is never sent anywhere except directly to Anthropic's API.</div>
-    <div class="api-key-row">
-      <input type="password" id="api-key-input" placeholder="sk-ant-…" style="flex:1;font-family:'DM Mono',monospace;font-size:12px">
-      <button class="btn btn-primary" onclick="saveApiKey()">Save key</button>
-      <button class="btn" onclick="testApiKey()">Test connection</button>
+    <div class="card-title">AI Connection</div>
+    <div class="api-notice">Required for AI drawing extraction. Two ways to connect — the Proxy method is more secure for a hosted/shared tool.</div>
+
+    <div style="margin-bottom:14px;padding:12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">★ Recommended: AI Proxy URL</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;line-height:1.5">Your API key lives on a server (Cloudflare Worker), never in the browser. Paste your Worker URL here. When set, this is used instead of the key below. See the setup guide for the one-time 10-minute setup.</div>
+      <div class="api-key-row">
+        <input type="text" id="proxy-url-input" placeholder="https://bsmp-ai-proxy.yourname.workers.dev" style="flex:1;font-family:'DM Mono',monospace;font-size:12px">
+        <button class="btn btn-primary" onclick="saveProxyUrl()">Save URL</button>
+        <button class="btn" onclick="testProxyConnection()">Test</button>
+      </div>
+      <div id="proxy-status" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
     </div>
-    <div id="api-key-status" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
+
+    <div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">Alternative: Direct API Key</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px;line-height:1.5">Key saved in this browser only. Simpler, but the key is readable by anyone with access to this computer's browser. Only used if no Proxy URL is set above.</div>
+      <div class="api-key-row">
+        <input type="password" id="api-key-input" placeholder="sk-ant-…" style="flex:1;font-family:'DM Mono',monospace;font-size:12px">
+        <button class="btn btn-primary" onclick="saveApiKey()">Save key</button>
+        <button class="btn" onclick="testApiKey()">Test connection</button>
+      </div>
+      <div id="api-key-status" style="margin-top:8px;font-size:12px;color:var(--text2)"></div>
+    </div>
   </div>
   <div class="card">
     <div class="card-title">Shop Info</div>
@@ -1248,6 +1343,28 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <button class="btn btn-primary" onclick="saveTierMarkups()">Save tier markups</button>
     </div>
   </div>
+  <div class="card">
+    <div class="card-title">Default Quote Assumptions</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Text printed below the totals on every customer quote. Edit to match your standard shop terms.</p>
+    <div class="field">
+      <label>Assumptions / Exclusions text</label>
+      <textarea id="settings-assumptions" rows="4" style="width:100%;font-size:13px;resize:vertical"></textarea>
+    </div>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-primary" onclick="saveDefaultAssumptions()">Save</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Time Standards (min/part)</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:14px">Default minutes per part auto-filled when you select an operation. Based on your actual shop times — tune these as you track real run times. Leave blank to require manual entry.</p>
+    <div id="time-standards-body" style="max-height:400px;overflow-y:auto"></div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn" onclick="resetTimeStandards()">Reset to defaults</button>
+      <button class="btn btn-primary" onclick="saveTimeStandards()">Save time standards</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Data</div>
     <p style="font-size:13px;color:var(--text2);margin-bottom:12px">Export all quotes, rates, and customers as a JSON backup file. Import to restore on any machine.</p>
@@ -1979,6 +2096,60 @@ const SETUP_HRS = {
 
 // ===================== STATE =====================
 let RATES = JSON.parse(localStorage.getItem('bsmp_rates') || 'null') || {...DEFAULT_RATES};
+
+// ── ITEM 7: Time Standards Library ──
+// Default minutes-per-part for each operation code.
+// null = no default (field stays blank, user must enter).
+// These are starting points — edit them in Settings → Time Standards to match
+// your actual observed shop times.
+const DEFAULT_TIME_STANDARDS = {
+  '101 Saw': null,
+  '102 Shear': null,
+  '500 Remove Parts': 0.5,
+  '501 De-Burr, Orbital': 1.0,
+  '502 De-Burr, Edges': 1.5,
+  '503 De-Burr, Tumbler': 0.5,
+  '504 De-Burr, Time Saver': 1.1,
+  '505 Finish, Orbital': 2.0,
+  '506 Finish, Time Saver': 1.0,
+  '507 Finish, Polish': 3.0,
+  '508 Finish, Pasivate': 0.5,
+  '509 Packaging': 1.0,
+  '510 Grind and Smooth': 2.0,
+  '602 Form- Level 1': 0.8,
+  '603 Form- Level 2': 1.5,
+  '604 Form- Level 3': 2.5,
+  '702 TIG- Level 1': 5.0,
+  '703 TIG- Level 2': 10.0,
+  '704 TIG- Level 3': 20.0,
+  '706 MIG- Level 1': 3.0,
+  '707 MIG- Level 2': 6.0,
+  '708 MIG- Level 3': 12.0,
+  '800 Hardware- Level 1': 0.5,
+  '801 Hardware- Level 2': 1.0,
+  '802 Hardware- Level 3': 2.0,
+  "901 Machine- C'sinks": 0.3,
+  '902 Machine- Drill': 0.3,
+  '903 Machine- Tap': 0.5,
+  '904 Machine- Ream': 0.5,
+  '905 Machine- Custom': null,
+  '1003 CNC Mill- Level 1': null,
+  '1004 CNC Mill- Level 2': null,
+  '1005 CNC Mill- Level 3': null,
+  '1100 Inspection': 5.0,
+  '1101 First Article': 30.0,
+};
+
+// Load any saved overrides
+let TIME_STANDARDS = JSON.parse(localStorage.getItem('bsmp_time_standards') || 'null') || {};
+
+// Get the effective time standard for a code (override > default > null)
+function getTimeStandard(code){
+  if(code in TIME_STANDARDS) return TIME_STANDARDS[code]; // saved override (can be null)
+  if(code in DEFAULT_TIME_STANDARDS) return DEFAULT_TIME_STANDARDS[code];
+  return null;
+}
+
 let CUSTOMERS = JSON.parse(localStorage.getItem('bsmp_customers') || 'null') || [...DEFAULT_CUSTOMERS];
 let HISTORY = JSON.parse(localStorage.getItem('bsmp_history') || '[]');
 // Permanent archive of every printed quote/invoice for future reference.
@@ -2097,6 +2268,56 @@ let opCount=0, hwCount=0, outCount=0;
 let currentPartImg = null;
 
 function getApiKey(){ return localStorage.getItem('bsmp_apikey')||''; }
+function getProxyUrl(){ return (localStorage.getItem('bsmp_proxy_url')||'').trim(); }
+
+// Unified Anthropic call — routes through the proxy if a URL is set (key stays
+// server-side), otherwise calls Anthropic directly with the browser-stored key.
+async function callAnthropic(payload){
+  const proxy = getProxyUrl();
+  if(proxy){
+    // Proxy mode — no key in the browser
+    return fetch(proxy, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+  }
+  // Direct mode — key from localStorage
+  const apiKey = getApiKey();
+  if(!apiKey) throw new Error('No AI connection configured — set a Proxy URL or API key in Settings.');
+  return fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify(payload)
+  });
+}
+
+// True if either connection method is configured.
+function hasAIConnection(){ return !!(getProxyUrl() || getApiKey()); }
+
+function saveProxyUrl(){
+  const url = document.getElementById('proxy-url-input').value.trim();
+  localStorage.setItem('bsmp_proxy_url', url);
+  const status = document.getElementById('proxy-status');
+  if(status){ status.textContent = url ? '✓ Proxy URL saved — this will be used for AI extraction.' : 'Proxy URL cleared — will use direct API key instead.'; status.style.color = url ? 'var(--success)' : 'var(--text2)'; }
+}
+
+async function testProxyConnection(){
+  const status = document.getElementById('proxy-status');
+  const url = document.getElementById('proxy-url-input').value.trim();
+  if(!url){ if(status){ status.textContent='Enter a proxy URL first.'; status.style.color='var(--danger)'; } return; }
+  // Temporarily save so callAnthropic uses it
+  localStorage.setItem('bsmp_proxy_url', url);
+  if(status){ status.textContent='Testing proxy…'; status.style.color='var(--text2)'; }
+  try{
+    const r = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Hi'}]})});
+    const d = await r.json();
+    if(d.error) throw new Error(d.error.message);
+    if(status){ status.textContent='✓ Proxy working — AI extraction is secured server-side.'; status.style.color='var(--success)'; }
+  }catch(e){
+    if(status){ status.textContent='✗ Proxy test failed: '+e.message; status.style.color='var(--danger)'; }
+  }
+}
 
 // ===================== INIT =====================
 function init(){
@@ -2110,6 +2331,9 @@ function init(){
   renderHistory();
   renderTierButtons();
   renderTierSettings();
+  renderTimeStandards();
+  const asmEl = document.getElementById('settings-assumptions');
+  if(asmEl) asmEl.value = getDefaultAssumptions();
   addOp(); addOp(); addOp();
   addHw(); addOut();
   calculate();
@@ -2132,6 +2356,8 @@ function init(){
   if(sl) document.getElementById('shop-location').value = sl;
   const ak = getApiKey();
   if(ak) document.getElementById('api-key-input').value = ak;
+  const pu = getProxyUrl();
+  if(pu){ const pe=document.getElementById('proxy-url-input'); if(pe) pe.value=pu; }
   // Set minimum material dropdown to saved value
   const msEl = document.getElementById('min-sheet-fraction');
   if(msEl) msEl.value = String(MIN_SHEET);
@@ -2173,9 +2399,31 @@ function updateCustomerRates(){
 
 // ===================== OPS / HW / OUT =====================
 function makeOpSelect(id, val=''){
-  let h = `<select id="op-sel-${id}" onchange="calculate()" style="font-size:13px"><option value="">— operation —</option>`;
+  let h = `<select id="op-sel-${id}" onchange="onOpCodeChange(${id})" style="font-size:13px"><option value="">— operation —</option>`;
   Object.entries(RATES).forEach(([k,v])=> h+=`<option value="${k}"${k===val?' selected':''}>${k} ($${v}/hr)</option>`);
   return h+'</select>';
+}
+
+// When an op code is selected, auto-fill the time field from the time-standards library
+// (only if the field is currently empty — never overwrite a value the user typed)
+function onOpCodeChange(id){
+  const sel = document.getElementById('op-sel-'+id);
+  const minsEl = document.getElementById('op-hrs-'+id);
+  if(!sel || !minsEl) return;
+  const code = sel.value;
+  // Only auto-fill if the field is blank (don't overwrite existing times, and skip
+  // laser ops since they're calculated from perimeter automatically)
+  const isLaser = code && code.match(/^4[0-9][1-9]/);
+  if(!isLaser && minsEl.value==='' && code){
+    const std = getTimeStandard(code);
+    if(std !== null){
+      minsEl.value = std.toFixed(3);
+      minsEl.style.background='#f0fdf4'; // brief green flash to show it was auto-filled
+      setTimeout(()=>minsEl.style.background='',2000);
+    }
+  }
+  updateFormComplexityVisibility();
+  calculate();
 }
 
 function addOp(code='', hrs=''){
@@ -2470,8 +2718,20 @@ function calculate(){
     sheetsReq = window._barBarsNeeded || 0;
     pps = window._barPartsPerBar || 1;
   } else {
-    pps = (ph&&pl) ? Math.max(1,Math.floor((w-2*border+web)/(ph+web))*Math.floor((h-2*border+web)/(pl+web))) : 1;
-    sheetsReq = billableSheets(qty/pps);
+    const rawPps = (ph&&pl) ? Math.max(1,Math.floor((w-2*border+web)/(ph+web))*Math.floor((h-2*border+web)/(pl+web))) : 1;
+    // Apply nesting efficiency — actual nest is typically less than theoretical max
+    const nestEff = Math.min(1, Math.max(0.1, (parseFloat(document.getElementById('nesting-efficiency')?.value)||85)/100));
+    pps = Math.max(1, Math.floor(rawPps * nestEff));
+    // Scrap allowance — run extra parts to cover expected rejects
+    const scrapPct = parseFloat(document.getElementById('scrap-allowance')?.value)||0;
+    const effectiveQty = qty * (1 + scrapPct/100);
+    sheetsReq = billableSheets(effectiveQty/pps);
+    // Show nesting hint
+    const hint = document.getElementById('nesting-hint');
+    if(hint && ph && pl){
+      const theoretical = (ph&&pl) ? Math.max(1,Math.floor((w-2*border+web)/(ph+web))*Math.floor((h-2*border+web)/(pl+web))) : 1;
+      hint.textContent = theoretical!==pps ? `${theoretical} theoretical → ${pps} effective (${(nestEff*100).toFixed(0)}% efficiency)` : '';
+    }
     // Use price break if enabled, otherwise use costSheet field
     const breakPrice = getMatBreakPrice(sheetsReq);
     const effectiveSheetCost = breakPrice !== null ? breakPrice : costSheet;
@@ -2480,7 +2740,11 @@ function calculate(){
       if(activeEl){ activeEl.style.display='block'; activeEl.textContent = sheetsReq+' sheets → $'+breakPrice.toFixed(2)+'/sheet (from price breaks)'; }
     }
 
-    if(matPriceMode === 'weight'){
+    // Check gang/shared nest — overrides normal material calc if enabled
+    const gangMat = calcGangMaterial(ph, pl, effectiveQty, effectiveSheetCost, finance, w, h);
+    if(gangMat !== null){
+      matCostPart = gangMat;
+    } else if(matPriceMode === 'weight'){
       // ---- WEIGHT-BASED MATERIAL PRICING ----
       // Density for the selected material type.
       const matType = document.getElementById('material-type').value;
@@ -2520,6 +2784,8 @@ function calculate(){
       matCostPart = sheetsReq*effectiveSheetCost*(1+finance)/qty;
     }
   }
+  // Gang mode: hide the gang result if disabled
+  if(!gangEnabled){ const r=document.getElementById('gang-result'); if(r) r.style.display='none'; }
 
   // Laser cut time from perimeter
   const spd = LASER_SPEEDS[mat];
@@ -2755,9 +3021,8 @@ function setAIStatus(type,msg){
 }
 
 async function analyzeDrawing(file, ext){
-  const apiKey = getApiKey();
-  if(!apiKey){
-    setAIStatus('error','No API key set — go to Settings to add your Anthropic API key, then retry.');
+  if(!hasAIConnection()){
+    setAIStatus('error','No AI connection configured — go to Settings and set a Proxy URL (recommended) or API key, then retry.');
     return;
   }
   setAIStatus('loading','Reading drawing with AI — extracting title block and dimensions…');
@@ -2769,13 +3034,9 @@ async function analyzeDrawing(file, ext){
       ? {type:'image',source:{type:'base64',media_type:mediaType,data:b64}}
       : {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}};
     const promptText = 'You are analyzing an engineering drawing for a sheet metal fabrication shop. Extract all information from the title block and drawing views. Respond with ONLY a valid JSON object - no markdown, no comments, no extra text.\n\nReturn this exact structure with null for missing fields:\n{"part_number":null,"revision":null,"material":null,"thickness":null,"units":null,"quantity":null,"part_height":null,"part_length":null,"customer":null,"po_number":null,"job_number":null,"due_date":null,"finish":null,"bend_count":null,"hole_count":null,"tapped_holes":null,"perimeter_estimate":null,"notes":null,"operations":[]}\n\nField rules: units=detect the measurement system of the drawing dimensions — return "inch" or "mm". Look for explicit notes like "DIMENSIONS ARE IN INCHES", "DIMENSIONS ARE IN MM", "UNITS: MM", or a metric/SI callout. If no explicit note, infer from the dimension magnitudes and style: values like 14.180, 7.363, .688, .090 with 2-3 decimal places are INCHES; whole or one-decimal values like 360, 187.5, 25.4, 9.5 for overall part sizes are typically MM. Thread callouts like M6 or M3 indicate metric; callouts like 1/4-20 or #8-32 indicate inch. A thickness like 1.5 or 2.0 or 3.0 (mm) vs .060 .090 .104 (inch) is a strong signal. When genuinely unsure, default to "inch". ALL numeric dimension fields you return (thickness, part_height, part_length, perimeter_estimate) must be reported in the drawing ORIGINAL units as shown — do NOT convert; just tell us the units and the app will convert. thickness=decimal inches as a number e.g. 0.104 — look for a standalone decimal like .104 .060 .250 near the word Thickness in the title block, also convert gauge: 14ga=0.074 13ga=0.090 12ga=0.104 11ga=0.118 10ga=0.134 7ga=0.187. quantity=number from Qty field. part_height/part_length=flat pattern overall dimensions in inches as numbers — use the FLAT PATTERN dimensions not the formed/finished dimensions. hole_count=total laser-cut holes and cutouts as a number — count all circles slots and cutouts including patterns like "144X" or "8 PER ROW 18 ROWS". perimeter_estimate=calculate as a single number in inches: (1) outer rectangle perimeter 2×(H+L), (2) circumference of each hole type × count e.g. 144 × pi × 0.688, (3) any slots or cutouts, (4) if laser cut lettering is specified add estimated cut path per character × character count at roughly 6-8 inches per character at 0.25" tall. Do NOT double-count. Give a realistic total — for a 14"×7" part with 144 Ø.688 holes the hole perimeters alone are ~311 inches. bend_count=count ALL bends carefully — look for: (1) bend lines in flat pattern views, (2) formed profile/section views showing stepped or angled profiles, (3) flange indicators with arrows, (4) any angle callouts like 90° 132° etc. A tray or box shape typically has 4 bends, a channel has 2, a hat section has 4. For this drawing examine ALL views including side profiles.\n\nFor operations array, each item: {"step":1,"process":"from drawing","detail":"from drawing","operation_code":"best match from: 201 Program Level 1, 400 Laser Sheet Loading, 401 Laser SA Level 1, 402 Laser SA Level 2, 403 Laser SA Level 3, 407 Laser O2 Level 1, 501 De-Burr Orbital, 504 De-Burr Time Saver, 601 Form Set up, 602 Form Level 1, 603 Form Level 2, 702 TIG Level 1, 706 MIG Level 1, 903 Machine Tap, 902 Machine Drill, 1100 Inspection","run_minutes_estimate":0,"setup_hours_estimate":0}\n\nRun times: laser operations (401-409) always set run_minutes_estimate=0 — the app calculates laser time from perimeter automatically. deburr timesaver=1.1, form per bend=0.2, tap per hole=0.5, csink per hole=0.3, drill per hole=0.3. Setup hours: programming=0.25, form setup=0.25, machine setup=0.25, else 0.';
-    const resp = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-6', max_tokens:1500,
-        messages:[{role:'user',content:[contentBlock,{type:'text',text:promptText}]}]
-      })
+    const resp = await callAnthropic({
+      model:'claude-sonnet-4-6', max_tokens:1500,
+      messages:[{role:'user',content:[contentBlock,{type:'text',text:promptText}]}]
     });
     const data = await resp.json();
     if(data.error) throw new Error(data.error.message);
@@ -2910,6 +3171,12 @@ function applyExtracted(d, file){
   if(matGuess){document.getElementById('material').value=matGuess;syncMaterialSelects(matGuess);onMaterialChange();extracted.push({l:'Material',v:matGuess,a:true});}
   else if(d.material){missing.push('material match');}
   if(d.hole_count){document.getElementById('pierces').value=d.hole_count;extracted.push({l:'Pierces',v:d.hole_count,a:true});}
+  if(d.bend_count){
+    const bcEl=document.getElementById('form-bend-count');
+    if(bcEl) bcEl.value=d.bend_count;
+    extracted.push({l:'Bends',v:d.bend_count,a:true});
+    updateFormComplexityVisibility();
+  }
   if(d.customer){
     const match=CUSTOMERS.find(c=>c.name.toLowerCase().includes((d.customer||'').toLowerCase().split(' ')[0]));
     if(match){document.getElementById('customer').value=match.name;updateCustomerRates();extracted.push({l:'Customer',v:match.name,a:true});}
@@ -2989,7 +3256,19 @@ function applyExtracted(d, file){
   const jobInfo=[];
   if(d.po_number) jobInfo.push('PO: '+d.po_number);
   if(d.job_number) jobInfo.push('Job#: '+d.job_number);
-  if(d.due_date) jobInfo.push('Due: '+d.due_date);
+  if(d.due_date){
+    const ddEl = document.getElementById('due-date');
+    if(ddEl){
+      const cleaned = String(d.due_date).trim();
+      const mdy = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+      if(mdy){
+        let yr = parseInt(mdy[3]); if(yr<100) yr+=2000;
+        const iso = yr+'-'+String(mdy[1]).padStart(2,'0')+'-'+String(mdy[2]).padStart(2,'0');
+        ddEl.value = iso; checkRushDue();
+      }
+    }
+    jobInfo.push('Due: '+d.due_date);
+  }
   if(d.tapped_holes) jobInfo.push('Tapped: '+d.tapped_holes);
   if(jobInfo.length>0){
     const existing=document.getElementById('notes').value;
@@ -3210,6 +3489,12 @@ function saveQuote(){
     // ---- Full snapshot for accurate reload ----
     matMode: matMode,
     matPriceMode: matPriceMode,
+    nestingEfficiency: document.getElementById('nesting-efficiency')?.value || '85',
+    scrapAllowance: document.getElementById('scrap-allowance')?.value || '0',
+    dueDate: document.getElementById('due-date')?.value || '',
+    poNumber: document.getElementById('po-number')?.value || '',
+    formComplexity: document.getElementById('form-complexity')?.value || '',
+    formBendCount: document.getElementById('form-bend-count')?.value || '',
     matwArea: gv('matw-area'), matwPerlb: gv('matw-perlb'), matwScrap: gv('matw-scrap'),
     matwAreaManual: matwAreaManual, matwPerlbManual: matwPerlbManual,
     // Sheet metal fields
@@ -3254,6 +3539,11 @@ function saveQuote(){
 
 function resetForm(){
   currentTier=''; markupManual=false;
+  gangEnabled=false; gangParts=[];
+  const gc=document.getElementById('gang-enabled'); if(gc) gc.checked=false;
+  const gs=document.getElementById('gang-section'); if(gs) gs.style.display='none';
+  const gr=document.getElementById('gang-result'); if(gr) gr.style.display='none';
+  renderGangParts();
   const th=document.getElementById('tier-hint'); if(th) th.innerHTML='';
   if(typeof renderTierButtons==='function') renderTierButtons();
   if(!confirm('Clear this quote and start a new one?')) return;
@@ -3520,6 +3810,15 @@ function reloadQuote(id){
   sv('matw-area', q.matwArea); sv('matw-perlb', q.matwPerlb);
   if(q.matwScrap!==undefined && q.matwScrap!=='') sv('matw-scrap', q.matwScrap);
   setMatPriceMode(q.matPriceMode === 'weight' ? 'weight' : 'sheet');
+  const sv2 = (id,val) => { const el=document.getElementById(id); if(el && val!==undefined && val!==null && val!=='') el.value=val; };
+  sv2('nesting-efficiency', q.nestingEfficiency || '85');
+  sv2('scrap-allowance', q.scrapAllowance || '0');
+  sv2('due-date', q.dueDate || '');
+  sv2('po-number', q.poNumber || '');
+  sv2('form-complexity', q.formComplexity || '');
+  sv2('form-bend-count', q.formBendCount || '');
+  if(q.dueDate) checkRushDue();
+  updateFormComplexityVisibility();
 
   // ---- Part image / header ----
   if(q.img){
@@ -3703,7 +4002,7 @@ function saveShopSettings(){
 }
 
 function exportData(){
-  const data={rates:RATES,customers:CUSTOMERS,history:HISTORY,prices:PRICE_INDEX,laserSpeeds:JSON.parse(localStorage.getItem('bsmp_laser_speeds')||'{}'),minSheet:MIN_SHEET,quoteCounter:QUOTE_COUNTER,archive:ARCHIVE,tierMarkups:TIER_MARKUPS,exported:new Date().toISOString()};
+  const data={rates:RATES,customers:CUSTOMERS,history:HISTORY,prices:PRICE_INDEX,laserSpeeds:JSON.parse(localStorage.getItem('bsmp_laser_speeds')||'{}'),minSheet:MIN_SHEET,quoteCounter:QUOTE_COUNTER,archive:ARCHIVE,tierMarkups:TIER_MARKUPS,timeStandards:TIME_STANDARDS,exported:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`bsmp-quotes-${new Date().toISOString().slice(0,10)}.json`; a.click();
@@ -3732,6 +4031,11 @@ function importData(input){
       if(data.archive){
         ARCHIVE = [...data.archive];
         localStorage.setItem('bsmp_archive', JSON.stringify(ARCHIVE));
+      }
+      if(data.timeStandards){
+        TIME_STANDARDS = {...data.timeStandards};
+        localStorage.setItem('bsmp_time_standards', JSON.stringify(TIME_STANDARDS));
+        if(typeof renderTimeStandards==='function') renderTimeStandards();
       }
       if(data.tierMarkups){
         TIER_MARKUPS = {...data.tierMarkups};
@@ -3834,8 +4138,20 @@ function calcBreakForQty(qty){
     sheetsReq = window._barBarsNeeded || 0;
     pps = window._barPartsPerBar || 1;
   } else {
-    pps = (ph&&pl) ? Math.max(1,Math.floor((w-2*border+web)/(ph+web))*Math.floor((h-2*border+web)/(pl+web))) : 1;
-    sheetsReq = billableSheets(qty/pps);
+    const rawPps = (ph&&pl) ? Math.max(1,Math.floor((w-2*border+web)/(ph+web))*Math.floor((h-2*border+web)/(pl+web))) : 1;
+    // Apply nesting efficiency — actual nest is typically less than theoretical max
+    const nestEff = Math.min(1, Math.max(0.1, (parseFloat(document.getElementById('nesting-efficiency')?.value)||85)/100));
+    pps = Math.max(1, Math.floor(rawPps * nestEff));
+    // Scrap allowance — run extra parts to cover expected rejects
+    const scrapPct = parseFloat(document.getElementById('scrap-allowance')?.value)||0;
+    const effectiveQty = qty * (1 + scrapPct/100);
+    sheetsReq = billableSheets(effectiveQty/pps);
+    // Show nesting hint
+    const hint = document.getElementById('nesting-hint');
+    if(hint && ph && pl){
+      const theoretical = (ph&&pl) ? Math.max(1,Math.floor((w-2*border+web)/(ph+web))*Math.floor((h-2*border+web)/(pl+web))) : 1;
+      hint.textContent = theoretical!==pps ? `${theoretical} theoretical → ${pps} effective (${(nestEff*100).toFixed(0)}% efficiency)` : '';
+    }
     // Use price break if enabled, otherwise use costSheet field
     const breakPrice = getMatBreakPrice(sheetsReq);
     const effectiveSheetCost = breakPrice !== null ? breakPrice : costSheet;
@@ -4545,9 +4861,8 @@ let pendingPriceItems = [];
 
 function handlePriceFile(file) {
   if (!file) return;
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    setPriceStatus('error', 'No API key — add it in Settings.');
+  if (!hasAIConnection()) {
+    setPriceStatus('error', 'No AI connection — set a Proxy URL or API key in Settings.');
     return;
   }
   setPriceStatus('loading', 'Reading vendor quote with AI…');
@@ -4563,19 +4878,10 @@ function handlePriceFile(file) {
 
     const promptText = 'You are reading a material vendor price quote for a metal fabrication shop. Extract every line item — each unique material with its price. Return ONLY valid JSON array, no markdown:\n[{"vendor":"company name or null","quote_date":"date as MM/DD/YY or null","material_type":"sheet or bar","material_grade":"e.g. 1008 CRS or 6061 Aluminum","thickness_or_size":"e.g. 0.104 or 1.0 OD or 2x1x0.125 tube","sheet_size":"e.g. 48x120 or null for bar","quantity":0,"unit":"per sheet, per bar, per foot, per pound","price":0.00,"notes":"any relevant notes or null"}]\n\nImportant: extract ALL line items you can find. For sheet metal look for thickness + size + price. For bar stock look for size/shape + price. Prices should be numbers only.';
 
-    return fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{role:'user', content:[contentBlock, {type:'text', text:promptText}]}]
-      })
+    return callAnthropic({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2000,
+      messages: [{role:'user', content:[contentBlock, {type:'text', text:promptText}]}]
     });
   }).then(r => r.json()).then(data => {
     if (data.error) throw new Error(data.error.message);
@@ -4884,6 +5190,167 @@ function selectTier(key){
   calculate();
 }
 
+// ── ITEM 8: Default assumptions text for printed quotes ──
+const DEFAULT_ASSUMPTIONS_TEXT = "Price based on provided flat pattern dimensions. Any design changes may affect pricing. Quote valid for 30 days. Customer to provide approved PO before scheduling.";
+
+// ── ITEM 9: Gang / Shared Nest ──
+let gangEnabled = false;
+let gangParts = []; // [{quoteId, partNum, customer, mat, ph, pl, qty, costPerPart}]
+
+function toggleGangNest(){
+  gangEnabled = document.getElementById('gang-enabled').checked;
+  document.getElementById('gang-section').style.display = gangEnabled ? 'block' : 'none';
+  if(!gangEnabled){ gangParts=[]; renderGangParts(); }
+  calculate();
+}
+
+function addGangPart(quoteId){
+  const q = HISTORY.find(h=>h.id===quoteId);
+  if(!q) return;
+  if(gangParts.find(p=>p.quoteId===quoteId)) return; // already added
+  gangParts.push({
+    quoteId, partNum:q.partNum, customer:q.customer, mat:q.material,
+    ph:parseFloat(q.parth)||0, pl:parseFloat(q.partl)||0,
+    qty:q.qty||1, costPerPart:q.costPerPart||0
+  });
+  document.getElementById('gang-search').value='';
+  document.getElementById('gang-search-results').innerHTML='';
+  renderGangParts();
+  calculate();
+}
+
+function removeGangPart(quoteId){
+  gangParts = gangParts.filter(p=>p.quoteId!==quoteId);
+  renderGangParts();
+  calculate();
+}
+
+function renderGangParts(){
+  const list = document.getElementById('gang-parts-list');
+  if(!list) return;
+  if(!gangParts.length){ list.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px 0">No gang parts added yet — search below to add parts sharing this sheet.</div>'; return; }
+  list.innerHTML = gangParts.map(p=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;background:var(--surface)">
+      <div style="flex:1;font-size:12px">
+        <strong>${p.partNum}</strong> <span style="color:var(--text3)">${p.customer} · ${p.mat} · ${p.ph}×${p.pl}"</span>
+      </div>
+      <button onclick="removeGangPart(${p.quoteId})" class="del-btn" style="flex-shrink:0">×</button>
+    </div>`).join('');
+}
+
+function renderGangSearch(){
+  const q = (document.getElementById('gang-search').value||'').toLowerCase().trim();
+  const res = document.getElementById('gang-search-results');
+  if(!q){ res.innerHTML=''; return; }
+  const matches = HISTORY.filter(h=>
+    !h.isAssembly &&
+    !gangParts.find(p=>p.quoteId===h.id) &&
+    (h.partNum.toLowerCase().includes(q) || h.customer.toLowerCase().includes(q) || (h.material||'').toLowerCase().includes(q))
+  ).slice(0,8);
+  if(!matches.length){ res.innerHTML='<div style="font-size:12px;color:var(--text3);padding:4px">No matching saved quotes found</div>'; return; }
+  const fmt = v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  res.innerHTML = matches.map(h=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:12px;cursor:pointer" onclick="addGangPart(${h.id})" onmouseenter="this.style.background='var(--sky-light)'" onmouseleave="this.style.background=''">
+      <div style="flex:1"><strong>${h.partNum}</strong> <span style="color:var(--text3)">${h.customer} · ${h.material} · qty ${h.qty}</span></div>
+      <div style="color:var(--navy);font-weight:600">${fmt(h.pricePerPart)}/ea</div>
+      <button class="btn btn-sm" style="font-size:11px;padding:2px 8px">Add</button>
+    </div>`).join('');
+}
+
+// Calculate shared material cost. Returns adjusted matCostPart for the current part.
+// Logic: pool all blank areas, calculate total sheets needed, split material cost by area fraction.
+function calcGangMaterial(currentPh, currentPl, currentQty, costSheet, finance, w, h){
+  if(!gangEnabled || !gangParts.length) return null;
+  // Current part area
+  const curArea = currentPh * currentPl;
+  if(curArea <= 0) return null;
+  const sheetArea = w * h;
+  if(sheetArea <= 0) return null;
+  // All parts in gang: current + gang parts
+  const all = [{ph:currentPh, pl:currentPl, qty:currentQty}, ...gangParts];
+  const totalArea = all.reduce((s,p)=>s+(p.ph*p.pl*p.qty), 0);
+  // Sheets needed for the whole gang (no minimum — gang the remnants!)
+  const totalSheets = Math.ceil(totalArea / sheetArea);
+  const effectiveCostSheet = costSheet * (1+finance);
+  const totalMatCost = totalSheets * effectiveCostSheet;
+  // Split by area fraction
+  const curTotalArea = curArea * currentQty;
+  const curFraction = curTotalArea / totalArea;
+  const matCostJob = totalMatCost * curFraction;
+  const matCostPart = matCostJob / currentQty;
+  // Update result display
+  const resEl = document.getElementById('gang-result');
+  if(resEl){
+    const fmt = v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    resEl.style.display='block';
+    resEl.innerHTML = `Gang nest: ${all.length} parts · ${totalArea.toFixed(1)} in² total → ${totalSheets} sheet${totalSheets!==1?'s':''} @ ${fmt(effectiveCostSheet)}/sheet<br>` +
+      `This part: ${(curFraction*100).toFixed(1)}% of area → ${fmt(matCostJob)} material → ${fmt(matCostPart)}/part`;
+  }
+  return matCostPart;
+}
+
+function getDefaultAssumptions(){
+  return localStorage.getItem('bsmp_assumptions') || DEFAULT_ASSUMPTIONS_TEXT;
+}
+
+function saveDefaultAssumptions(){
+  const el = document.getElementById('settings-assumptions');
+  if(el){ localStorage.setItem('bsmp_assumptions', el.value); }
+  const btn = event.target.closest('button');
+  if(btn){ const o=btn.innerHTML; btn.innerHTML='✓ Saved'; setTimeout(()=>btn.innerHTML=o,1500); }
+}
+
+function renderTimeStandards(){
+  const wrap = document.getElementById('time-standards-body');
+  if(!wrap) return;
+  // Show all ops that have a default standard (skip laser run ops — calculated from perimeter)
+  const rows = Object.entries(DEFAULT_TIME_STANDARDS)
+    .filter(([k]) => !k.match(/^4[0-9][1-9]/)) // exclude laser run ops
+    .map(([code, def]) => {
+      const current = getTimeStandard(code);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;font-size:12px;color:var(--text)">${code}</div>
+        <input type="number" id="ts-${code.replace(/[^a-zA-Z0-9]/g,'_')}"
+          value="${current!==null&&current!==undefined?current:''}"
+          placeholder="${def!==null?def:'manual'}"
+          step="0.1" min="0" style="width:80px;text-align:center">
+        <span style="font-size:11px;color:var(--text3);width:50px">min/part</span>
+        <button onclick="clearTimeStandard('${code}')" style="border:none;background:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px" title="Clear to default">↺</button>
+      </div>`;
+    }).join('');
+  wrap.innerHTML = rows;
+}
+
+function clearTimeStandard(code){
+  // Remove override so it falls back to default
+  delete TIME_STANDARDS[code];
+  const safeId = 'ts-'+code.replace(/[^a-zA-Z0-9]/g,'_');
+  const el = document.getElementById(safeId);
+  const def = DEFAULT_TIME_STANDARDS[code];
+  if(el) el.value = def!==null&&def!==undefined ? def : '';
+}
+
+function saveTimeStandards(){
+  Object.entries(DEFAULT_TIME_STANDARDS).forEach(([code, def])=>{
+    const safeId = 'ts-'+code.replace(/[^a-zA-Z0-9]/g,'_');
+    const el = document.getElementById(safeId);
+    if(!el) return;
+    const v = el.value.trim();
+    if(v === '') TIME_STANDARDS[code] = null; // explicit null = blank, require manual
+    else { const n = parseFloat(v); if(!isNaN(n)) TIME_STANDARDS[code] = n; }
+  });
+  localStorage.setItem('bsmp_time_standards', JSON.stringify(TIME_STANDARDS));
+  const btn = event.target.closest('button');
+  if(btn){ const o=btn.innerHTML; btn.innerHTML='✓ Saved'; setTimeout(()=>btn.innerHTML=o,1500); }
+}
+
+function resetTimeStandards(){
+  if(!confirm('Reset all time standards to factory defaults?')) return;
+  TIME_STANDARDS = {};
+  localStorage.removeItem('bsmp_time_standards');
+  renderTimeStandards();
+}
+
 function renderTierSettings(){
   const wrap = document.getElementById('tier-settings');
   if(!wrap) return;
@@ -4925,6 +5392,67 @@ function resetTierMarkups(){
 let matPriceMode = 'sheet';   // 'sheet' or 'weight'
 let matwAreaManual = false;   // user typed a blank area override
 let matwPerlbManual = false;  // user typed a $/lb override
+
+// ── ITEM 2: Rush due date detection ──
+const RUSH_THRESHOLD_DAYS = 7; // configurable: flag as rush if due within this many days
+function checkRushDue(){
+  const dueDateEl = document.getElementById('due-date');
+  const alertEl = document.getElementById('rush-alert');
+  if(!dueDateEl || !alertEl) return;
+  const val = dueDateEl.value;
+  if(!val){ alertEl.style.display='none'; return; }
+  const due = new Date(val);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diffDays = Math.round((due - today) / 86400000);
+  if(diffDays >= 0 && diffDays <= RUSH_THRESHOLD_DAYS){
+    alertEl.style.display = 'block';
+    alertEl.textContent = `⚡ Due in ${diffDays} day${diffDays!==1?'s':''} — consider Rush tier`;
+    // Auto-suggest Rush tier if no tier is selected yet
+    if(!currentTier){ selectTier('rush'); }
+  } else {
+    alertEl.style.display = 'none';
+  }
+}
+
+// ── ITEM 3: Form complexity helper ──
+function applyFormComplexity(){
+  const complexEl = document.getElementById('form-complexity');
+  const bendCountEl = document.getElementById('form-bend-count');
+  const resultEl = document.getElementById('form-complexity-result');
+  if(!complexEl) return;
+  const minsPerBend = parseFloat(complexEl.value) || 0;
+  const bendCount = parseInt(bendCountEl?.value) || 0;
+  if(!minsPerBend){ if(resultEl) resultEl.style.display='none'; return; }
+  const totalFormMins = minsPerBend * bendCount;
+  // Find form op rows and update their times
+  let updatedCount = 0;
+  for(let i=1;i<=opCount;i++){
+    const sel = document.getElementById('op-sel-'+i);
+    const minsEl = document.getElementById('op-hrs-'+i);
+    if(sel && minsEl && sel.value && sel.value.match(/^6[0-9][2-9]|^60[2-9]/)){
+      // It's a Form op (602, 603, 604)
+      minsEl.value = minsPerBend.toFixed(1);
+      updatedCount++;
+    }
+  }
+  if(resultEl && bendCount > 0){
+    resultEl.style.display = 'block';
+    resultEl.textContent = `${bendCount} bends × ${minsPerBend} min = ${totalFormMins.toFixed(1)} min total${updatedCount?' — applied to '+updatedCount+' form op(s)':''}`;
+  }
+  calculate();
+}
+
+// Show/hide form complexity card when form ops are present
+function updateFormComplexityVisibility(){
+  const card = document.getElementById('form-complexity-card');
+  if(!card) return;
+  let hasFormOp = false;
+  for(let i=1;i<=opCount;i++){
+    const sel = document.getElementById('op-sel-'+i);
+    if(sel && sel.value && (sel.value.startsWith('60') || sel.value.startsWith('601') || sel.value.startsWith('602') || sel.value.startsWith('603') || sel.value.startsWith('604'))) { hasFormOp=true; break; }
+  }
+  card.style.display = hasFormOp ? 'block' : 'none';
+}
 
 function setMatPriceMode(mode){
   matPriceMode = mode;
@@ -5780,6 +6308,10 @@ function printCustomerQuote(sourceId){
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Tax (%)</label>
           <input id="cq-tax" type="number" step="0.01" value="0" style="width:120px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
         </div>
+        <div style="grid-column:1/3">
+          <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Assumptions / Exclusions <span style="font-weight:400;text-transform:none">(prints below totals)</span></label>
+          <textarea id="cq-assumptions" rows="3" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:12px;font-family:inherit;resize:vertical;color:#475569">${getDefaultAssumptions()}</textarea>
+        </div>
       </div>
       <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
         <button id="cq-cancel" style="border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
@@ -5834,7 +6366,7 @@ function printCustomerQuote(sourceId){
     const total = subtotal + tax;
 
     overlay.remove();
-    openPrintWindow({billto, shipto, quoteno, date, leadtime, items, subtotal, tax, total});
+    openPrintWindow({billto, shipto, quoteno, date, leadtime, items, subtotal, tax, total, assumptions});
   };
 }
 
@@ -6168,6 +6700,7 @@ function openPrintWindow(q){
         <tr class="grand"><td class="tot-label">TOTAL</td><td class="tot-val">$${fmt(q.total)}</td></tr>
       </table>
     </div>
+    ${q.assumptions?'<div style="margin-top:14px;font-size:10.5px;color:#666;line-height:1.5;border-top:1px solid #ddd;padding-top:8px">'+esc(q.assumptions).replace(/\\n/g,'<br>')+'</div>':''}
     </div><!-- /body-content -->
     <div class="footer">
       <div class="sig">Accepted By</div>
