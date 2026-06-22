@@ -1018,6 +1018,107 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </button>
   </div>
 
+  <!-- ===================== WELDING ESTIMATOR ===================== -->
+  <div class="card" id="weld-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <div class="card-title" style="margin-bottom:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l6-6m0 0l8.5-8.5a2.12 2.12 0 013 3L12 18m-3-3l3 3"/><path d="M14 4l6 6"/></svg>
+        Welding Estimator
+        <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:4px">— computes weld time from joint geometry. Works alone (welding-only job) or alongside fab ops.</span>
+      </div>
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" id="weld-enabled" onchange="toggleWelding();calculate()" style="width:auto">
+        This job includes welding
+      </label>
+    </div>
+
+    <div id="weld-section" style="display:none;margin-top:12px">
+
+      <!-- Global weld parameters -->
+      <div class="grid4" style="margin-bottom:6px">
+        <div class="field"><label>Welder rate code</label>
+          <select id="weld-rate-code" onchange="calculate()" style="font-size:13px"></select>
+        </div>
+        <div class="field"><label>Filler / base metal</label>
+          <select id="weld-filler" onchange="onWeldFillerChange();calculate()" style="font-size:13px">
+            <option value="steel">Carbon / 4130 steel</option>
+            <option value="stainless">Stainless steel</option>
+            <option value="aluminum">Aluminum</option>
+          </select>
+        </div>
+        <div class="field"><label>Arc-on factor (%) <span style="font-weight:400;color:var(--text3)" title="Share of clock time the arc is actually burning. Hand TIG ~20-25%, MIG ~35-40%. The rest is positioning, cleaning, inspecting.">ⓘ</span></label>
+          <input id="weld-of" type="number" value="22" min="5" max="90" step="1" onchange="calculate()">
+        </div>
+        <div class="field"><label>Setup / fixture (min) <span style="font-weight:400;color:var(--text3)">one-time</span></label>
+          <input id="weld-setup-min" type="number" value="0" min="0" step="1" onchange="calculate()">
+        </div>
+      </div>
+
+      <!-- Weld list -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Welds on this part</div>
+        <div style="display:grid;grid-template-columns:1.1fr 1.1fr 70px 70px 56px 1fr 1.4fr 28px;gap:8px;align-items:center;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;padding:0 2px">
+          <span>Process</span><span>Joint</span><span>Size in</span><span>Length in</span><span>× welds</span><span>Position</span><span style="text-align:right">Deposit · arc · pass</span><span></span>
+        </div>
+        <div id="weld-rows"></div>
+        <button class="btn btn-sm" onclick="addWeldRow()" style="margin-top:6px">+ Add weld</button>
+        <button class="btn btn-sm" onclick="loadCargoHookExample(false)" style="margin-top:6px;margin-left:6px">Load Cargo Hook example</button>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.4">Size = fillet leg, or groove throat/depth. For square butt welds enter the plate thickness. Arc time and filler are computed from weld cross-section × length × passes, derated for welding position.</div>
+      </div>
+
+      <!-- Prep & finishing -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Prep &amp; finishing <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— minutes per part</span></div>
+        <div class="grid3">
+          <div class="field"><label>Fit-up &amp; tack</label><input id="weld-fitup-min" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Interpass clean / wire-brush</label><input id="weld-interpass-min" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Grind / blend / dress</label><input id="weld-grind-min" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+        </div>
+      </div>
+
+      <!-- Consumables -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Consumables</div>
+        <div class="grid3">
+          <div class="field"><label>Filler wire/rod ($/lb)</label><input id="weld-filler-lb" type="number" value="3.5" min="0" step="0.25" onchange="calculate()"></div>
+          <div class="field"><label>Shielding gas ($/arc-hr) <span style="font-weight:400;color:var(--text3)" title="Argon/mix cost per hour of arc time. 0 for stick.">ⓘ</span></label><input id="weld-gas-hr" type="number" value="5" min="0" step="0.5" onchange="calculate()"></div>
+          <div class="field" style="display:flex;align-items:flex-end"><div id="weld-consum-info" style="font-size:11px;color:var(--text3);line-height:1.4"></div></div>
+        </div>
+      </div>
+
+      <!-- Post-weld services & inspection -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Post-weld services &amp; inspection <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— per assembly unless noted</span></div>
+        <div class="grid4">
+          <div class="field"><label>NDT / weld inspection</label>
+            <select id="weld-ndt-type" onchange="onWeldNdtChange();calculate()" style="font-size:13px">
+              <option value="none">None</option>
+              <option value="visual">Visual (VT) only</option>
+              <option value="dye">Dye penetrant (PT)</option>
+              <option value="mpi">Magnetic particle (MT)</option>
+              <option value="xray">Radiographic (RT)</option>
+            </select>
+          </div>
+          <div class="field"><label>NDT cost ($/part)</label><input id="weld-ndt-cost" type="number" value="0" min="0" step="1" onchange="markWeldNdtManual();calculate()"></div>
+          <div class="field"><label>Heat treat — stress relieve / normalize ($/assy)</label><input id="weld-ht-cost" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Finish / plating / paint ($/assy)</label><input id="weld-finish-cost" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+        </div>
+        <div class="grid3" style="margin-top:8px">
+          <div class="field"><label>Marking / engrave fill (min/part)</label><input id="weld-mark-min" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Final inspect / cert docs (min/part)</label><input id="weld-cert-min" type="number" value="0" min="0" step="1" onchange="calculate()"></div>
+          <div class="field"><label>Inspection rate code</label>
+            <select id="weld-cert-rate" onchange="calculate()" style="font-size:13px">
+              <option value="1100 Inspection">1100 Inspection</option>
+              <option value="1101 First Article">1101 First Article</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="weld-readout" style="margin-top:12px;padding:8px 12px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1e40af;font-family:'DM Mono',monospace;line-height:1.6"></div>
+    </div>
+  </div>
+
   <!-- Hardware -->
   <div class="card">
     <div class="card-title">
@@ -1673,6 +1774,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">Welding Estimator</div>
+        <ul class="changelog-list">
+          <li>New Welding card on the quote — runs standalone for welding-only jobs or adds to a fab quote</li>
+          <li>Weld time computed from joint geometry: process, joint type, size, length, weld count, and position</li>
+          <li>Deposited weight and arc time derived from weld cross-section × length × passes, derated for out-of-position welding</li>
+          <li>Process library: TIG/GTAW, MIG/GMAW, flux-core/FCAW, stick/SMAW with deposition rates and efficiencies</li>
+          <li>Arc-on (operating) factor converts arc time to real labor hours</li>
+          <li>Consumables: filler wire/rod by the pound and shielding gas by arc-hour</li>
+          <li>Prep &amp; finishing: fit-up/tack, interpass cleaning, grind/blend minutes</li>
+          <li>Post-weld services: NDT (VT/PT/MT/RT), heat treat (stress relieve/normalize), finish/plating, marking, and cert/inspection docs</li>
+          <li>All welding cost flows through the same markup, finance, and quantity logic as the rest of the quote</li>
+          <li>Worked example pre-loaded: H-60 Cargo Hook tie-down weldment (AWS D17.1 Class A)</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">Initial Release</div>
@@ -2336,6 +2453,8 @@ function init(){
   if(asmEl) asmEl.value = getDefaultAssumptions();
   addOp(); addOp(); addOp();
   addHw(); addOut();
+  populateWeldRateCodes();
+  loadCargoHookExample(true);
   calculate();
   // Setup drag-drop for main dropzone
   const dz = document.getElementById('dropzone');
@@ -2462,6 +2581,213 @@ function addOut(desc='',qty='',cost=''){
 }
 
 function removeRow(id){ const el=document.getElementById(id); if(el){el.remove();calculate();} }
+
+// ===================== WELDING ESTIMATOR =====================
+// Deposition rates (lb/hr, arc-on, flat position) and process efficiencies.
+const WELD_PROCESS = {
+  GTAW: {label:'TIG (GTAW)',       dep:0.9,  eff:0.98, defOF:22, defGas:5},
+  GMAW: {label:'MIG (GMAW)',       dep:6.5,  eff:0.95, defOF:38, defGas:3},
+  FCAW: {label:'Flux-core (FCAW)', dep:10.0, eff:0.82, defOF:40, defGas:2},
+  SMAW: {label:'Stick (SMAW)',     dep:3.2,  eff:0.62, defOF:30, defGas:0}
+};
+// Position derates effective deposition (out-of-position is slower & more careful).
+const WELD_POS = { flat:{label:'Flat / 1F',f:1.0}, horiz:{label:'Horizontal / 2F',f:0.85}, vert:{label:'Vertical / 3F',f:0.65}, oh:{label:'Overhead / 4F',f:0.55} };
+// Filler metal density (lb/in^3) and a default $/lb starting point.
+const WELD_FILLER = {
+  steel:     {label:'Carbon / 4130 steel', dens:0.283, lb:3.5},
+  stainless: {label:'Stainless steel',     dens:0.289, lb:13},
+  aluminum:  {label:'Aluminum',            dens:0.098, lb:9}
+};
+// Default NDT cost per part by method (editable).
+const WELD_NDT = { none:0, visual:0, dye:18, mpi:32, xray:75 };
+let weldNdtManual = false;
+
+// Weld cross-sectional area (in^2) from joint type and characteristic size (in).
+function weldArea(joint, s){
+  if(!s || s<=0) return 0;
+  switch(joint){
+    case 'fillet': return 0.5*s*s*1.15;          // triangle leg^2/2 + ~15% convexity
+    case 'vgroove':return 0.58*s*s + 0.06*s;     // 60° single-V + root pass
+    case 'bevel':  return 0.29*s*s + 0.06*s;     // single bevel ≈ half-V
+    case 'butt':   return 0.10*s;                // square-groove: thickness × gap + reinforcement
+    case 'lap':    return 0.5*s*s*1.15;          // ≈ fillet
+    case 'corner': return 0.5*s*s*1.15;          // ≈ fillet
+    case 'plug':   return 0.785*s*s;             // round plug, size = dia, length = depth
+    default:       return 0.5*s*s*1.15;
+  }
+}
+function weldPasses(area){ return Math.max(1, Math.round(area/0.035)); }
+
+let weldRowCount = 0;
+function addWeldRow(process='GTAW', joint='fillet', size='', length='', count='1', position='flat'){
+  weldRowCount++;
+  const n = weldRowCount;
+  const d = document.createElement('div');
+  d.id = 'weld-row-'+n;
+  d.style.cssText = 'display:grid;grid-template-columns:1.1fr 1.1fr 70px 70px 56px 1fr 1.4fr 28px;gap:8px;align-items:center;margin-bottom:6px';
+  const procOpts = Object.entries(WELD_PROCESS).map(([k,v])=>`<option value="${k}"${k===process?' selected':''}>${v.label}</option>`).join('');
+  const jointOpts = [['fillet','Fillet'],['vgroove','V-groove'],['bevel','Bevel'],['butt','Square butt'],['lap','Lap'],['corner','Corner'],['plug','Plug/slot']]
+    .map(([k,l])=>`<option value="${k}"${k===joint?' selected':''}>${l}</option>`).join('');
+  const posOpts = Object.entries(WELD_POS).map(([k,v])=>`<option value="${k}"${k===position?' selected':''}>${v.label}</option>`).join('');
+  d.innerHTML = `
+    <select class="weld-proc" onchange="calculate()" style="font-size:13px">${procOpts}</select>
+    <select class="weld-joint" onchange="calculate()" style="font-size:13px">${jointOpts}</select>
+    <input class="weld-size" type="number" value="${size}" min="0" step="0.0625" placeholder="0.000" onchange="calculate()">
+    <input class="weld-len" type="number" value="${length}" min="0" step="0.1" placeholder="0.0" onchange="calculate()">
+    <input class="weld-count" type="number" value="${count}" min="1" step="1" onchange="calculate()">
+    <select class="weld-pos" onchange="calculate()" style="font-size:13px">${posOpts}</select>
+    <span class="weld-readrow" style="font-size:11px;color:var(--text3);text-align:right;font-family:'DM Mono',monospace">—</span>
+    <button class="del-btn" onclick="document.getElementById('weld-row-${n}').remove();calculate()" title="Remove">×</button>`;
+  document.getElementById('weld-rows').appendChild(d);
+}
+
+function toggleWelding(){
+  const on = document.getElementById('weld-enabled').checked;
+  document.getElementById('weld-section').style.display = on ? 'block' : 'none';
+  if(on && !document.querySelector('#weld-rows .weld-proc')) addWeldRow();
+}
+function onWeldFillerChange(){
+  if(weldNdtManual) return; // don't stomp manual edits elsewhere
+  const f = WELD_FILLER[document.getElementById('weld-filler').value];
+  const el = document.getElementById('weld-filler-lb');
+  if(f && el) el.value = f.lb;
+}
+function onWeldNdtChange(){
+  const t = document.getElementById('weld-ndt-type').value;
+  const el = document.getElementById('weld-ndt-cost');
+  if(el && !weldNdtManual) el.value = WELD_NDT[t] ?? 0;
+}
+function markWeldNdtManual(){ weldNdtManual = true; }
+
+// Populate the welder rate-code dropdown from RATES (TIG/MIG codes first).
+function populateWeldRateCodes(){
+  const sel = document.getElementById('weld-rate-code');
+  if(!sel) return;
+  const prev = sel.value;
+  const weldCodes = Object.keys(RATES).filter(k=>/TIG|MIG|Weld/i.test(k));
+  const otherCodes = Object.keys(RATES).filter(k=>!/TIG|MIG|Weld/i.test(k));
+  let h='';
+  weldCodes.forEach(k=> h+=`<option value="${k}">${k} ($${RATES[k]}/hr)</option>`);
+  h+='<optgroup label="Other rate codes">';
+  otherCodes.forEach(k=> h+=`<option value="${k}">${k} ($${RATES[k]}/hr)</option>`);
+  h+='</optgroup>';
+  sel.innerHTML = h;
+  if(prev && RATES[prev]) sel.value = prev;
+  else if(RATES['702 TIG- Level 1']) sel.value='702 TIG- Level 1';
+}
+
+// Core: read the welding card and return all per-part cost components.
+function computeWelding(qty, finance){
+  const enabledEl = document.getElementById('weld-enabled');
+  if(!enabledEl || !enabledEl.checked) return {enabled:false, totalPart:0, bdLines:[]};
+  qty = qty||1; finance = finance||0;
+  const gv = id => parseFloat(document.getElementById(id)?.value)||0;
+  const filler = WELD_FILLER[document.getElementById('weld-filler').value] || WELD_FILLER.steel;
+  const ofPct = Math.min(0.95, Math.max(0.05, gv('weld-of')/100 || 0.22));
+  const rateCode = document.getElementById('weld-rate-code').value;
+  const rate = RATES[rateCode] || 80;
+  const fillerLbCost = gv('weld-filler-lb');
+  const gasHrCost = gv('weld-gas-hr');
+
+  let totalArcHr=0, totalDepLb=0, totalFillerLb=0, weldRunMin=0;
+  const rows = document.querySelectorAll('#weld-rows > div');
+  rows.forEach(row=>{
+    const proc = WELD_PROCESS[row.querySelector('.weld-proc').value] || WELD_PROCESS.GTAW;
+    const joint = row.querySelector('.weld-joint').value;
+    const size = parseFloat(row.querySelector('.weld-size').value)||0;
+    const len = parseFloat(row.querySelector('.weld-len').value)||0;
+    const cnt = parseFloat(row.querySelector('.weld-count').value)||0;
+    const pos = WELD_POS[row.querySelector('.weld-pos').value] || WELD_POS.flat;
+    const area = weldArea(joint, size);
+    const vol = area*len*cnt;                       // in^3 deposited
+    const depLb = vol*filler.dens;                  // lb deposited
+    const fillerLb = proc.eff>0 ? depLb/proc.eff : depLb; // lb purchased
+    const effDep = proc.dep*pos.f;                  // lb/hr in position
+    const arcHr = effDep>0 ? depLb/effDep : 0;
+    const rowLaborMin = ofPct>0 ? (arcHr/ofPct)*60 : 0;
+    weldRunMin += rowLaborMin;
+    totalArcHr += arcHr; totalDepLb += depLb; totalFillerLb += fillerLb;
+    const rdEl = row.querySelector('.weld-readrow');
+    if(rdEl) rdEl.textContent = (depLb>0)
+      ? `${depLb.toFixed(3)}lb · ${(arcHr*60).toFixed(1)}min · ${weldPasses(area)}p`
+      : '—';
+  });
+
+  // Prep / finishing minutes (per part)
+  const prepMin = gv('weld-fitup-min') + gv('weld-interpass-min') + gv('weld-grind-min');
+  const markMin = gv('weld-mark-min');
+  const totalLaborMin = weldRunMin + prepMin + markMin;
+
+  const laborRun = (totalLaborMin/60)*rate*(1+finance);
+  const setupPart = (gv('weld-setup-min')/60)*rate*(1+finance)/qty;
+  const consumPart = (totalFillerLb*fillerLbCost + totalArcHr*gasHrCost)*(1+finance);
+
+  // Post-weld services
+  const ndtPart    = gv('weld-ndt-cost')*(1+finance);
+  const htPart     = gv('weld-ht-cost')*(1+finance);
+  const finishPart = gv('weld-finish-cost')*(1+finance);
+  const certRate   = RATES[document.getElementById('weld-cert-rate').value] || 60;
+  const certPart   = (gv('weld-cert-min')/60)*certRate*(1+finance);
+
+  const totalPart = laborRun + setupPart + consumPart + ndtPart + htPart + finishPart + certPart;
+
+  // Inline consumable info
+  const ci = document.getElementById('weld-consum-info');
+  if(ci) ci.innerHTML = `Filler: <strong>${totalFillerLb.toFixed(3)} lb</strong> · Arc: <strong>${(totalArcHr*60).toFixed(1)} min</strong>`;
+
+  // Readout
+  const ro = document.getElementById('weld-readout');
+  if(ro){
+    const fmt=v=>'$'+v.toFixed(2);
+    ro.innerHTML = `Weld labor ${totalLaborMin.toFixed(1)} min/part @ $${rate}/hr`
+      + ` · arc ${(totalArcHr*60).toFixed(1)} min · deposit ${totalDepLb.toFixed(3)} lb`
+      + `<br>Labor ${fmt(laborRun)} · setup ${fmt(setupPart)} · consumables ${fmt(consumPart)}`
+      + (ndtPart?` · NDT ${fmt(ndtPart)}`:'') + (htPart?` · heat-treat ${fmt(htPart)}`:'')
+      + (finishPart?` · finish ${fmt(finishPart)}`:'') + (certPart?` · cert ${fmt(certPart)}`:'')
+      + `<br><strong>Welding cost/part: ${fmt(totalPart)}</strong>`;
+  }
+
+  // Breakdown lines for the main summary
+  const bdLines=[];
+  if(laborRun>0) bdLines.push({label:'Weld labor', val:laborRun, sub:`${totalLaborMin.toFixed(1)}min/part @ $${rate}/hr`});
+  if(setupPart>0) bdLines.push({label:'Weld setup / fixture', val:setupPart, sub:`one-time ÷ ${qty} parts`});
+  if(consumPart>0) bdLines.push({label:'Weld consumables', val:consumPart, sub:`${totalFillerLb.toFixed(2)}lb filler + gas`});
+  if(ndtPart>0){ const t=document.getElementById('weld-ndt-type').value; bdLines.push({label:'NDT — '+(t==='mpi'?'magnetic particle':t==='dye'?'dye penetrant':t==='xray'?'radiographic':t), val:ndtPart, sub:'per part'}); }
+  if(htPart>0) bdLines.push({label:'Heat treat (stress relieve / normalize)', val:htPart, sub:'per assembly'});
+  if(finishPart>0) bdLines.push({label:'Finish / plating / paint', val:finishPart, sub:'per assembly'});
+  if(certPart>0) bdLines.push({label:'Final inspect / cert docs', val:certPart, sub:'per part'});
+
+  return {enabled:true, totalPart, laborRun, setupPart, consumPart, ndtPart, htPart, finishPart, certPart,
+          weldRunMin, totalLaborMin, totalArcHr, totalDepLb, totalFillerLb, bdLines};
+}
+
+// Pre-fill the welding-only quote for the H-60 Cargo Hook tie-down weldment (P/N 1010957).
+// Weld sizes/lengths are reasonable estimates from the drawing — verify against the print.
+function loadCargoHookExample(auto){
+  if(auto && localStorage.getItem('bsmp_cargohook_shown')) return;
+  if(auto) localStorage.setItem('bsmp_cargohook_shown','1');
+  const set=(id,v)=>{const el=document.getElementById(id); if(el) el.value=v;};
+  set('partnum','1010957'); set('revision','-'); set('qty','5');
+  set('notes','CARGO HOOK, TIE DOWN — weldment per AWS D17.1/D17.1M Class A, filler 4130. '
+    +'Welds magnetic-particle (MT) inspected. Post-weld stress relieve per AMS 2759/11; normalize per AMS 2759/1 Type III. '
+    +'Finish: cadmium plate + epoxy primer + paint. Engraved P/N ink-filled. '
+    +'EXPORT CONTROLLED — Distribution Statement C / ITAR. Weld sizes & lengths are estimates — verify against the print.');
+  const we=document.getElementById('weld-enabled'); if(we){ we.checked=true; toggleWelding(); }
+  populateWeldRateCodes();
+  set('weld-rate-code', RATES['704 TIG- Level 3'] ? '704 TIG- Level 3' : '702 TIG- Level 1');
+  set('weld-filler','steel'); set('weld-of','22'); set('weld-setup-min','45');
+  const rowsEl=document.getElementById('weld-rows'); if(rowsEl){ rowsEl.innerHTML=''; weldRowCount=0; }
+  // Adapter-to-tube circumferential fillets, both ends (≈ π × 2.74" OD)
+  addWeldRow('GTAW','fillet','0.1875','8.6','2','flat');
+  // Clevis / lug to tube fillets — drawing "GTAW 2X"
+  addWeldRow('GTAW','fillet','0.1875','3.0','2','horiz');
+  set('weld-fitup-min','25'); set('weld-interpass-min','15'); set('weld-grind-min','12');
+  set('weld-filler-lb','6'); set('weld-gas-hr','5');
+  set('weld-ndt-type','mpi'); weldNdtManual=true; set('weld-ndt-cost','35');
+  set('weld-ht-cost','140'); set('weld-finish-cost','95');
+  set('weld-mark-min','10'); set('weld-cert-min','25'); set('weld-cert-rate','1100 Inspection');
+  calculate();
+}
 
 // ===================== MATERIAL / LASER =====================
 
@@ -2903,7 +3229,10 @@ function calculate(){
     const progRate = RATES[progRateCode]||70;
     progCostPart = (progMins/60)*progRate*(1+finance)/qty;
   }
-  const totalCostPart = matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart;
+  // Welding estimator (works standalone for welding-only jobs, or adds to fab)
+  const weld = computeWelding(qty, finance);
+  const weldCostPart = weld.enabled ? weld.totalPart : 0;
+  const totalCostPart = matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart;
   const markupCost = totalCostPart*markup;
   const finalPrice = roundPrice(totalCostPart+markupCost);
   const jobTotal = finalPrice*qty;
@@ -2971,12 +3300,16 @@ function calculate(){
     const inspLabel = inspTypeCode2==='1101'?'First Article Report':'Inspection';
     bd+=br(inspLabel, fmt(inspCostPart), 'one-time ÷ '+qty+' parts');
   }
+  if(weld.enabled && weld.bdLines.length){
+    bd+=`<div class="breakdown-row"><span class="breakdown-label" style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.05em">Welding</span></div>`;
+    weld.bdLines.forEach(l=> bd+=br(l.label, fmt(l.val), l.sub));
+  }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Total cost / part</span><span class="breakdown-val">${fmt(totalCostPart)}</span></div>`;
   bd+=br(`Markup (${(markup*100).toFixed(0)}% + ${(finance*100).toFixed(1)}% finance)`,fmt(markupCost));
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Job total (×${qty})</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('breakdown').innerHTML=bd;
 
-  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance};
+  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld};
 }
 
 // ===================== FILE HANDLING =====================
@@ -3424,6 +3757,7 @@ function copyQuote(){
   d.laborLines.forEach(l=>txt+=`\n${l.op} (${l.mins}min): ${fmt(l.perPart)}`);
   d.hwLines.forEach(l=>txt+=`\nHardware — ${l.desc}: ${fmt(l.total)}`);
   d.outLines.forEach(l=>txt+=`\nOutsource — ${l.desc}: ${fmt(l.total)}`);
+  if(d.weld && d.weld.enabled){ d.weld.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
   txt+=`\n\nCost/part: ${fmt(d.totalCostPart)}\nMarkup (${(d.markup*100).toFixed(0)}%): ${fmt(d.markupCost)}\nPrice/part: ${fmt(d.finalPricePart||d.finalPrice)}\nJob total (×${d.qty}): ${fmt(d.jobTotal)}`;
   if(notes) txt+=`\n\nNotes: ${notes}`;
   navigator.clipboard.writeText(txt).then(()=>{
@@ -3937,6 +4271,7 @@ function saveRates(){
     if(el) RATES[code]=parseFloat(el.value)||RATES[code];
   });
   localStorage.setItem('bsmp_rates',JSON.stringify(RATES));
+  if(typeof populateWeldRateCodes==='function') populateWeldRateCodes();
   alert('Rates saved.');
 }
 
