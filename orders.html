@@ -513,6 +513,9 @@ tr:hover .del-btn{opacity:1}
 .po-mini.active{border-color:var(--navy);box-shadow:0 0 0 2px var(--navy) inset}
 .po-mini.done{opacity:.55}.po-mini.done:hover{opacity:1}
 .po-mini.done-soft{opacity:.8}.po-mini.done-soft:hover{opacity:1}
+/* alternate tile shades so adjacent orders are easy to tell apart */
+.po-list .po-mini:nth-child(even){background:#e9f0fb}
+.po-list .po-mini.active{background:#fff}
 .pm-accent{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
 .pm-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .pm-cust{font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -778,7 +781,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.54.2</div>
+    <div class="ver">v2.54.3</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
