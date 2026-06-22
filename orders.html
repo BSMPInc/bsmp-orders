@@ -31,6 +31,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-siz
 .sidebar.auto-hide{position:relative}
 .sidebar.auto-hide:not(:hover){background:linear-gradient(90deg,var(--navy),var(--navy) 3px,transparent 3px)}
 .sidebar-pin{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,.08);border:none;color:#e8c9cf;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:1 !important;pointer-events:auto !important;z-index:2}
+.menu-toggle{flex-shrink:0;width:40px;height:40px;border-radius:9px;background:#fff;border:1px solid var(--border);color:var(--navy);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:21px}
+.menu-toggle:hover{background:var(--bg);border-color:var(--border2)}
+.menu-toggle.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+/* when collapsed, the whole sliver is tappable to open (matters on touch where hover never fires) */
+.sidebar.auto-hide:not(:hover){cursor:pointer}
 .sidebar-pin:hover{background:rgba(255,255,255,.16);color:#fff}
 .sidebar-pin.active{color:#fff;background:rgba(122,182,72,.35)}
 .sidebar.auto-hide:not(:hover) .sidebar-pin{opacity:0 !important}
@@ -120,6 +125,22 @@ select:focus{border-color:var(--green)}
 .q-row{cursor:pointer}
 .q-row:hover{background:var(--bg)}
 .q-row.q-done{opacity:.6}
+/* Work Queues interactive controls — comfortable defaults, big on touch */
+.q-check{background:none;border:none;cursor:pointer;padding:6px;border-radius:9px;line-height:0;display:inline-flex;align-items:center;justify-content:center}
+.q-check:hover{background:var(--bg)}
+.q-qty{width:64px;font-family:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;text-align:center}
+@media (pointer: coarse){
+  .q-table td,.q-table th{padding-top:14px;padding-bottom:14px}
+  .q-check{padding:11px}
+  .q-check .ti{font-size:30px !important}
+  .q-qty{width:74px;font-size:17px;padding:11px 8px}
+  .q-needby{font-size:15px;padding:10px 8px}
+  .queue-tab{padding:11px 16px;font-size:14px}
+  .q-draw-btn{padding:10px 12px}
+  .q-open-btn{padding:11px}
+  .q-thumb{width:52px;height:52px}
+  .qp-select{font-size:15px;padding:9px 8px}
+}
 .q-badge{font-size:10px;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
 .qp-select{font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:6px;padding:3px 6px;background:var(--card);cursor:pointer}
 .q-needby{font-size:12px;padding:4px 6px;border:1px solid var(--border2);border-radius:6px;background:var(--card)}
@@ -215,6 +236,9 @@ tr:hover .del-btn{opacity:1}
 .modal-header{display:flex;align-items:center;gap:10px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border)}
 .modal-header i{font-size:20px;color:var(--green)}
 .modal-header h2{font-size:17px;font-weight:700;color:var(--text)}
+.help-sec{padding:10px 0;border-bottom:1px solid var(--border)}
+.help-sec:last-of-type{border-bottom:none}
+.help-sec b i{color:var(--navy);margin-right:5px}
 .section-card{background:#f7f9fc;border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:14px}
 .section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .section-title i{font-size:14px;color:var(--green)}
@@ -624,7 +648,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.43.1</div>
+    <div class="ver">v2.45.0</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -632,12 +656,16 @@ tr:hover .del-btn{opacity:1}
 <!-- Main -->
 <div class="main">
   <div class="topbar">
-    <div>
-      <div class="topbar-title" id="topbar-title-text">Open Orders</div>
-      <div class="topbar-sub" id="topbar-subtitle-text">Track and manage active jobs</div>
+    <div style="display:flex;align-items:center;gap:12px;min-width:0">
+      <button class="menu-toggle" id="menu-toggle" onclick="window._toggleSidebarPin(event)" title="Show / hide menu" aria-label="Show or hide menu"><i class="ti ti-menu-2"></i></button>
+      <div style="min-width:0">
+        <div class="topbar-title" id="topbar-title-text">Open Orders</div>
+        <div class="topbar-sub" id="topbar-subtitle-text">Track and manage active jobs</div>
+      </div>
     </div>
     <div class="topbar-actions">
       <span id="topbar-op-pill" class="op-pill" style="display:none"><i class="ti ti-user-cog"></i> Operator Mode</span>
+      <button class="btn" onclick="openHelp()" title="How to use this app"><i class="ti ti-help-circle"></i> Help</button>
       <button class="btn" id="topbar-ai-btn" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</button>
       <button class="btn green" id="topbar-add-btn" onclick="openAdd()"><i class="ti ti-plus"></i> Add Order</button>
     </div>
@@ -978,6 +1006,30 @@ tr:hover .del-btn{opacity:1}
       <button class="btn sm" onclick="closeModal('draw-modal')"><i class="ti ti-x"></i></button>
     </div>
     <div id="draw-modal-stage" style="flex:1;overflow:auto;background:#3a3a3a;display:flex;align-items:flex-start;justify-content:center"></div>
+  </div>
+</div>
+
+<!-- Help / Quick Start -->
+<div class="modal-bg" id="help-modal" style="display:none;z-index:95">
+  <div class="modal" style="width:720px">
+    <div class="modal-header"><i class="ti ti-help-circle"></i><h2>Quick start — how this app works</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('help-modal')"><i class="ti ti-x"></i></button></div>
+    <div style="font-size:13.5px;line-height:1.6;color:var(--text)">
+      <div class="help-sec"><b><i class="ti ti-plus"></i> Adding orders</b><br>
+        Use <b>Add Order</b> to enter a job by hand, or <b>AI Extract</b> to drop in a customer PO (PDF or photo) and let it fill the fields for you. Each line item gets an internal job number automatically.</div>
+      <div class="help-sec"><b><i class="ti ti-clipboard-list"></i> Open Orders</b><br>
+        The left list is every active job; click one to see its details on the right. The toolbar lets you search, filter by status or process, hide invoiced jobs, and show only orders with <b>Missing info</b> (the amber ⚠ badge flags a job that's missing a due date, qty, price, drawing, or PO #).</div>
+      <div class="help-sec"><b><i class="ti ti-checkbox"></i> Tracking progress</b><br>
+        On a job's detail, the <b>Current Process</b> icons show where it stands — they turn green as steps are checked off. Internal steps are checked off on the <b>Work Queues</b> page (the shop-floor task lists). The process icons update automatically as work gets done.</div>
+      <div class="help-sec"><b><i class="ti ti-truck-delivery"></i> Outside processes &amp; POs</b><br>
+        Steps like plating or material purchasing are tracked on <b>Need PO</b> (assign the vendor &amp; our PO #) and <b>Incoming / Outgoing</b> (what's out and what's due back). Switch Need PO to <b>Group for PO</b> to pool everything going to one vendor onto a single purchase order. Every assigned PO is logged under <b>Issued POs</b>.</div>
+      <div class="help-sec"><b><i class="ti ti-ruler-2"></i> Tube Cut List</b><br>
+        Under Tools — plan tube/bar cuts for least waste. Drop in a drawing for AI to read the lengths, or type them in, then print a cut sheet for the saw.</div>
+      <div class="help-sec"><b><i class="ti ti-menu-2"></i> Getting around</b><br>
+        The <b>☰ menu button</b> (top-left) shows or hides the side menu — handy on a tablet. On a computer you can also just move the mouse to the left edge to peek at it.</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px">Tip: most things on a job — status, dates, prices — can be clicked and edited right in place.</div>
+    </div>
+    <div style="margin-top:18px;display:flex;justify-content:flex-end"><button class="btn green" onclick="closeModal('help-modal')">Got it</button></div>
   </div>
 </div>
 
@@ -2409,7 +2461,7 @@ function renderQueues(){
       : `<input type="date" value="${nb}" class="q-needby" title="Need this step finished by" style="${nbOver?'color:var(--red);font-weight:600':''}" onclick="event.stopPropagation()" onchange="window._stepNeedBy('${r.id}','${proc.replace(/'/g,"\\'")}',this.value)">`;
     const qtyInput = done
       ? `<span style="color:var(--text3)">${step.qtyDone??need} / ${need||'—'}</span>`
-      : `<input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" style="width:64px" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${proc.replace(/'/g,"\\'")}',this.value)">`;
+      : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${proc.replace(/'/g,"\\'")}',this.value)">`;
     // drawing cell: thumbnail (images) or a clearly-labeled drawing button → zoomable viewer
     const d = r.drawing||{};
     let drawCell;
@@ -2435,7 +2487,7 @@ function renderQueues(){
       <td style="text-align:center">${need||'—'}</td>
       <td style="text-align:center">${qtyInput}</td>
       <td style="text-align:center">
-        <i class="ti ti-${done?'circle-check-filled':'circle'}" style="cursor:pointer;font-size:22px;color:${done?'var(--green)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${proc.replace(/'/g,"\\'")}',event)"></i>
+        <button class="q-check" title="${done?'Mark not done':'Mark complete'}" aria-label="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${proc.replace(/'/g,"\\'")}',event)"><i class="ti ti-${done?'circle-check-filled':'circle'}" style="font-size:22px;color:${done?'var(--green)':'var(--border2)'}"></i></button>
       </td>
       ${openCell}
     </tr>`;
@@ -3798,18 +3850,25 @@ window._login = async () => {
   }
 };
 window._logout = () => { signOut(auth); };
+window.openHelp = () => { document.getElementById('help-modal').style.display='flex'; };
 
-// ── Sidebar auto-hide: slides in on hover, pin to keep it open ──
+// ── Sidebar auto-hide: slides in on hover (desktop); a menu button toggles it everywhere ──
 (function(){
   const sb = document.getElementById('app-sidebar');
   const btn = document.getElementById('sidebar-pin-btn');
+  const mtbtn = document.getElementById('menu-toggle');
   if(!sb) return;
+  const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let pinned = false;
-  try{ pinned = localStorage.getItem('bsmp_sidebar_pinned')==='1'; }catch{}
+  const stored = (()=>{ try{ return localStorage.getItem('bsmp_sidebar_pinned'); }catch{ return null; } })();
+  if(stored==null){ pinned = isTouch; }      // touch devices can't hover → start with the menu open
+  else { pinned = stored==='1'; }
   function apply(){
     sb.classList.toggle('auto-hide', !pinned);
-    const hint=document.getElementById('sidebar-edge-hint'); if(hint) hint.style.display = pinned?'none':'block';
-    if(btn){ btn.classList.toggle('active', pinned); btn.title = pinned?'Auto-hide sidebar':'Keep sidebar open'; btn.innerHTML = pinned?'<i class="ti ti-pinned"></i>':'<i class="ti ti-pin"></i>'; }
+    const hint=document.getElementById('sidebar-edge-hint');
+    if(hint) hint.style.display = (pinned||isTouch)?'none':'block';   // edge peek is a mouse affordance
+    if(btn){ btn.classList.toggle('active', pinned); btn.title = pinned?'Auto-hide menu':'Keep menu open'; btn.innerHTML = pinned?'<i class="ti ti-pinned"></i>':'<i class="ti ti-pin"></i>'; }
+    if(mtbtn){ mtbtn.classList.toggle('active', pinned); }
   }
   window._toggleSidebarPin = (e) => {
     if(e) e.stopPropagation();
@@ -3817,6 +3876,12 @@ window._logout = () => { signOut(auth); };
     try{ localStorage.setItem('bsmp_sidebar_pinned', pinned?'1':'0'); }catch{}
     apply();
   };
+  // tapping the collapsed sliver opens it (touch has no hover to reveal it)
+  sb.addEventListener('click', (e)=>{
+    if(sb.classList.contains('auto-hide') && !pinned && (e.target===sb || sb.getBoundingClientRect().width < 60)){
+      window._toggleSidebarPin(e);
+    }
+  });
   apply();
 })();
 document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window._login(); });
