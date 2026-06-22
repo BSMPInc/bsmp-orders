@@ -46,7 +46,27 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .topbar h1{font-size:21px;font-weight:800;margin:0}
 .topbar p{margin:3px 0 0;color:var(--text2);font-size:13px}
 .help-btn{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--navy);background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 13px;cursor:pointer;margin-top:2px}
+.save-status{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 12px;margin-top:2px;cursor:default;transition:color .15s,border-color .15s}
+.save-status .ss-dot{width:8px;height:8px;border-radius:50%;background:#2faf74;flex-shrink:0;transition:background .15s}
+.save-status.saving{color:var(--blue);border-color:#3a6ea555}
+.save-status.saving .ss-dot{background:var(--blue);animation:sspulse 1s ease-in-out infinite}
+.save-status.error{color:var(--red);border-color:#A32D2D55;background:#A32D2D0a;cursor:pointer}
+.save-status.error .ss-dot{background:var(--red)}
+.save-status.offline{color:var(--amber);border-color:#BA751755;background:#BA75170a}
+.save-status.offline .ss-dot{background:var(--amber)}
+@keyframes sspulse{0%,100%{opacity:1}50%{opacity:.35}}
+.offline-banner{background:#BA7517;color:#fff;font-size:12.5px;font-weight:600;padding:8px 26px;display:flex;align-items:center;gap:8px}
+.offline-banner i{font-size:15px;flex-shrink:0}
 .help-btn:hover{background:var(--navy);color:#fff;border-color:var(--navy)}
+.page-help-btn{display:none;align-items:center;justify-content:center;vertical-align:middle;width:24px;height:24px;padding:0;border:none;background:transparent;color:var(--text3);cursor:pointer;border-radius:50%;transition:color .12s,background .12s}
+.page-help-btn:hover{color:var(--blue);background:#3a6ea514}
+.page-help-btn i{font-size:18px}
+.ph-modal{max-width:480px}
+.ph-body{font-size:13.5px;line-height:1.55;color:var(--text)}
+.ph-body p{margin:0 0 12px}
+.ph-body ul{margin:0;padding-left:18px}
+.ph-body li{margin-bottom:7px;color:var(--text2)}
+.ph-body b{color:var(--text);font-weight:700}
 .help-btn i{font-size:15px}
 .help-card{background:#fff;border-radius:14px;width:min(960px,94vw);height:92vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(16,24,40,.35)}
 .help-head{display:flex;align-items:center;gap:12px;padding:13px 16px;background:var(--navy);color:#fff;flex-shrink:0}
@@ -151,6 +171,10 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-num input{border:none;background:transparent;font-size:14px;font-weight:800;width:100%;padding:0;margin-top:2px;font-family:inherit;color:var(--text)}
 .acct-num input:focus{outline:none}
 .bal-hint{font-size:8px;font-weight:700;color:var(--navy);background:#2c57401a;border-radius:4px;padding:1px 4px;margin-left:4px;letter-spacing:.02em}
+.bal-fresh{display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--text3);margin-top:5px}
+.bal-fresh i{font-size:12px}
+.bal-fresh.stale{color:#8a4a00}
+.bal-fresh.stale i{color:var(--amber)}
 .bal-edit{display:flex;align-items:center;gap:2px;margin-top:4px;border:1.5px solid var(--navy3);border-radius:7px;background:#fff;padding:4px 7px;transition:border-color .12s,box-shadow .12s}
 .bal-edit:hover{border-color:var(--navy)}
 .bal-edit:focus-within{border-color:var(--navy);box-shadow:0 0 0 3px #2c574022}
@@ -204,6 +228,31 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
   .arch-head{display:none}
   .arch-row{grid-template-columns:1fr 1fr;gap:6px}
   .arch-amt{text-align:left}
+}
+/* trash view */
+.cf-search-bar{margin-bottom:12px}
+.cf-search-bar .list-search{min-width:280px;max-width:380px}
+.trash-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.trash-toolbar .list-search{min-width:240px}
+.trash-toolbar .btn.danger{margin-left:auto}
+.btn.danger{color:var(--red);border-color:#A32D2D44}
+.btn.danger:hover{background:#A32D2D0e}
+.btn.sm.danger{padding:5px 8px}
+.trash-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.trash-head{display:grid;grid-template-columns:auto 2fr 1fr 1fr auto;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.trash-row{display:grid;grid-template-columns:auto 2fr 1fr 1fr auto;gap:10px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--border2);font-size:12.5px}
+.trash-row:last-child{border-bottom:none}
+.trash-type{font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;text-align:center}
+.trash-type.ar{background:#2f8f6b1a;color:var(--ar)}
+.trash-type.ap{background:#A8443A1a;color:var(--ap)}
+.trash-party{font-weight:700}
+.trash-ref{font-weight:500;color:var(--text3);margin-left:6px;font-size:11.5px}
+.trash-amt{font-weight:700}
+.trash-when{color:var(--text3)}
+.trash-acts{display:flex;gap:6px;justify-content:flex-end}
+@media(max-width:720px){
+  .trash-head{display:none}
+  .trash-row{grid-template-columns:1fr auto;gap:6px}
 }
 /* recurring */
 .recur-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
@@ -259,6 +308,66 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
   .dep-row{grid-template-columns:1fr 1fr;gap:8px}
   .dep-split{text-align:left}
 }
+/* activity / audit trail */
+.au-toolbar{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.au-whoami{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:10px}
+.au-count{margin-left:auto;font-size:12px;color:var(--text3);font-weight:600}
+.au-day{margin-bottom:18px}
+.au-day-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:8px}
+.au-list{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.au-list-compact{box-shadow:none;margin-top:4px}
+.au-row{display:flex;gap:11px;align-items:flex-start;padding:10px 14px;border-bottom:1px solid var(--border2)}
+.au-row:last-child{border-bottom:none}
+.au-ic{flex-shrink:0;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;margin-top:1px}
+.au-main{flex:1;min-width:0}
+.au-line{font-size:13px;line-height:1.35}
+.au-label{font-weight:800}
+.au-party{font-weight:700;color:var(--text)}
+.au-detail{color:var(--text2)}
+.au-meta{font-size:11px;color:var(--text3);margin-top:2px;display:flex;align-items:center;gap:5px}
+.au-user{display:inline-flex;align-items:center;gap:3px;font-weight:600;color:var(--text2)}
+.au-user i{font-size:12px}
+/* cash forecast */
+.fc-toolbar{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.fc-toggle{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
+.fc-toggle input{width:15px;height:15px;accent-color:var(--navy);cursor:pointer}
+.fc-note{font-size:12px;color:var(--text3)}
+.fc-warn{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#8a4a00;background:#BA75171a;border:1px solid #BA751740;border-radius:9px;padding:9px 13px;margin-bottom:14px}
+.fc-warn i{color:var(--amber);flex-shrink:0}
+.fc-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);background:var(--card)}
+.fc-table{border-collapse:collapse;width:100%;min-width:760px}
+.fc-table th,.fc-table td{padding:9px 11px;text-align:right;border-bottom:1px solid var(--border2);font-size:12.5px}
+.fc-table thead th{background:#f5f7fa;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);text-align:right;border-bottom:1px solid var(--border)}
+.fc-table thead th.fc-now{color:var(--navy)}
+.fc-wd{font-size:12px;font-weight:800;color:var(--text2);margin-top:2px}
+.fc-table thead th.fc-now .fc-wd{color:var(--navy)}
+.fc-corner{text-align:left!important;background:#f5f7fa}
+.fc-acct{text-align:left!important;font-weight:700;font-size:13px;white-space:nowrap;position:sticky;left:0;background:var(--card);z-index:1}
+.fc-acct .acct-dot{margin-right:7px}
+.fc-start{font-size:10px;font-weight:600;color:var(--text3);margin-top:1px}
+.fc-combined{background:#eef2f7}
+.fc-combined .fc-acct{background:#eef2f7;font-weight:800;font-size:13.5px}
+.fc-combined td{font-weight:800;border-bottom:2px solid var(--border)}
+.fc-bal{font-weight:700;font-size:13.5px}
+.fc-io{font-size:10px;margin-top:2px;display:flex;gap:6px;justify-content:flex-end}
+.fc-in{color:var(--green)}
+.fc-out{color:var(--ap)}
+.fc-table td.fc-low{background:#BA751714}
+.fc-table td.fc-neg{background:#A32D2D14}
+.fc-table td.fc-neg .fc-bal{color:var(--red)}
+.fc-legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text3);flex-wrap:wrap}
+.fc-key{display:inline-flex;align-items:center;gap:5px}
+.fc-sw{width:11px;height:11px;border-radius:3px;display:inline-block}
+.fc-sw.fc-in{background:var(--green)}.fc-sw.fc-out{background:var(--ap)}
+.cd-panel{margin-top:22px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:15px}
+.cd-head{font-size:13px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:11px;flex-wrap:wrap}
+.cd-head i{color:var(--ar)}
+.cd-sub{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:0;text-transform:none}
+.cd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.cd-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border2)}
+.cd-name{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cd-row .acct-sel{flex-shrink:0;width:110px}
+@media(max-width:720px){.fc-acct{position:static}}
 /* pay run planner */
 .pr-legend{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text2);background:#eef2f7;border-radius:9px;padding:9px 13px;margin-bottom:16px}
 .pr-legend i{color:var(--blue);flex-shrink:0;margin-top:1px}
@@ -300,6 +409,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 }
 /* buttons */
 .btn{font-size:13px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--text);border-radius:9px;padding:8px 13px;cursor:pointer}
+.btn.sm{font-size:12px;padding:5px 10px}
 .btn:hover{background:#f5f7fa}
 .btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
 .btn.green{background:var(--ar);color:#fff;border-color:var(--ar)}
@@ -399,10 +509,13 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" id="nav-ap" onclick="go('ap')"><i class="ti ti-arrow-up-right"></i> Payables <span class="nb" id="nb-ap" style="display:none"></span></div>
     <div class="nav-item" id="nav-aging" onclick="go('aging')"><i class="ti ti-clock-hour-4"></i> Aging</div>
     <div class="nav-item" id="nav-cash" onclick="go('cash')"><i class="ti ti-building-bank"></i> Cash Flow</div>
+    <div class="nav-item" id="nav-forecast" onclick="go('forecast')"><i class="ti ti-chart-line"></i> Forecast</div>
     <div class="nav-item" id="nav-payrun" onclick="go('payrun')"><i class="ti ti-cash"></i> Pay Run</div>
     <div class="nav-item" id="nav-recur" onclick="go('recur')"><i class="ti ti-repeat"></i> Recurring <span class="nb" id="nb-recur" style="display:none"></span></div>
     <div class="nav-item" id="nav-deposit" onclick="go('deposit')"><i class="ti ti-pie-chart"></i> Deposits</div>
     <div class="nav-item" id="nav-archive" onclick="go('archive')"><i class="ti ti-archive"></i> Archive</div>
+    <div class="nav-item" id="nav-activity" onclick="go('activity')"><i class="ti ti-history"></i> Activity</div>
+    <div class="nav-item" id="nav-trash" onclick="go('trash')"><i class="ti ti-trash"></i> Trash <span class="nb" id="nb-trash" style="display:none"></span></div>
     <div class="sec-label">Tools</div>
     <div class="nav-item" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add receivable</div>
     <div class="nav-item" onclick="openManual('ap')"><i class="ti ti-plus"></i> Add payable</div>
@@ -415,11 +528,13 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     </div>
   </nav>
   <div class="main">
+    <div id="offline-banner" class="offline-banner" style="display:none"><i class="ti ti-wifi-off"></i> You're offline — changes are saved locally and will sync when the connection returns. Avoid closing the app until it reconnects.</div>
     <div class="topbar">
       <div class="topbar-titles">
-        <h1 id="pg-title">Dashboard</h1>
+        <h1><span id="pg-title">Dashboard</span> <button class="page-help-btn" id="page-help-btn" onclick="openPageHelp()" title="What is this page for?"><i class="ti ti-help-circle"></i></button></h1>
         <p id="pg-sub">Receivables and payables at a glance</p>
       </div>
+      <div class="save-status" id="save-status" title="Save status"><span class="ss-dot"></span><span class="ss-txt">All changes saved</span></div>
       <button class="help-btn" onclick="openHelp()" title="Open the training manual"><i class="ti ti-help"></i> Help</button>
     </div>
     <div class="content" id="content"><div class="loading"><i class="ti ti-loader"></i> Loading…</div></div>
@@ -428,6 +543,14 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 
 <!-- Payment / detail modal -->
 <div class="modal-bg" id="pay-modal"><div class="modal"><div id="pay-body"></div></div></div>
+<div class="modal-bg" id="ph-modal" onclick="if(event.target===this)closePageHelp()">
+  <div class="modal ph-modal">
+    <div class="m-head"><div class="m-t"><div class="t1"><i class="ti ti-help-circle" style="color:var(--blue)"></i> <span id="ph-title">Help</span></div><div class="t2">What this page is for &amp; how to use it</div></div>
+      <button class="m-x" onclick="closePageHelp()"><i class="ti ti-x"></i></button></div>
+    <div class="m-body ph-body" id="ph-body"></div>
+    <div class="m-foot"><button class="btn" onclick="closePageHelp()">Got it</button><button class="btn" onclick="closePageHelp();openHelp()"><i class="ti ti-book"></i> Full manual</button></div>
+  </div>
+</div>
 
 <!-- AI extract modal -->
 <div class="modal-bg" id="ai-modal">
@@ -498,6 +621,58 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
+// ── Save reliability: status indicator + write wrappers ──────────────────────
+let _pendingWrites=0;        // in-flight writes
+let _isOnline=true;          // Firebase connection state
+let _lastError='';           // last write error message
+let _failedWrites=[];        // {fn,args} queued for retry after a failure
+function setSaveStatus(state,txt){
+  const el=document.getElementById('save-status'); if(!el)return;
+  el.className='save-status'+(state?(' '+state):'');
+  const t=el.querySelector('.ss-txt'); if(t)t.textContent=txt;
+  el.onclick = state==='error' ? retryFailedWrites : null;
+}
+function refreshSaveStatus(){
+  if(!_isOnline){ setSaveStatus('offline','Offline — will sync'); return; }
+  if(_failedWrites.length){ setSaveStatus('error','Save failed — tap to retry'); return; }
+  if(_pendingWrites>0){ setSaveStatus('saving','Saving…'); return; }
+  setSaveStatus('','All changes saved');
+}
+// Wrap a Firebase write promise: track in-flight count, catch failures for retry.
+function trackWrite(promiseFactory, label){
+  _pendingWrites++; refreshSaveStatus();
+  let p;
+  try{ p=promiseFactory(); }
+  catch(err){ _pendingWrites--; queueFailure(promiseFactory,label,err); return Promise.reject(err); }
+  if(!p||typeof p.then!=='function'){ _pendingWrites--; refreshSaveStatus(); return Promise.resolve(); }
+  return p.then(()=>{ _pendingWrites--; refreshSaveStatus(); })
+          .catch(err=>{ _pendingWrites--; queueFailure(promiseFactory,label,err); });
+}
+function queueFailure(promiseFactory,label,err){
+  _lastError=(err&&err.message)||String(err);
+  _failedWrites.push({promiseFactory,label});
+  console.error('Save failed ['+label+']:',_lastError);
+  refreshSaveStatus();
+}
+function retryFailedWrites(){
+  if(!_failedWrites.length)return;
+  const queue=_failedWrites; _failedWrites=[]; refreshSaveStatus();
+  queue.forEach(w=>trackWrite(w.promiseFactory,w.label));
+}
+// Wrapped DB ops — use these everywhere instead of raw set/update/remove.
+function dbSet(path,val,label){ return trackWrite(()=>set(ref(db,path),val), label||('set '+path)); }
+function dbUpdate(path,val,label){ return trackWrite(()=>update(ref(db,path),val), label||('update '+path)); }
+function dbRemove(path,label){ return trackWrite(()=>remove(ref(db,path)), label||('remove '+path)); }
+// Watch Firebase connection state (more reliable than navigator.onLine for DB writes).
+function watchConnection(){
+  onValue(ref(db,'.info/connected'),snap=>{
+    _isOnline=!!snap.val();
+    const banner=document.getElementById('offline-banner');
+    if(banner)banner.style.display=_isOnline?'none':'flex';
+    refreshSaveStatus();
+  });
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 let orders = {};          // raw orders node (shared with the order tracker)
 let overlay = {};         // apar/entries node: payments + manual entries + edits
@@ -506,6 +681,37 @@ let recurring = {};       // apar/recurring node: recurring bill templates
 let depositBuckets = {};  // apar/depositBuckets node: Profit First allocation buckets
 let vendorAccounts = {};  // apar/vendorAccounts node: {vendorKey:accountId} learned assignments
 let vendorPriority = {};  // apar/vendorPriority node: {vendorKey:'critical'|'normal'|'wait'}
+let customerDelay = {};   // apar/customerDelay node: {customerKey:0|7|14|30} typical days late (forecast)
+let auditLog = {};        // apar/audit node: {id:{ts,user,action,entryId,party,detail}}
+let currentUser = null;   // {email, name}
+
+// Friendly display name per login email, stored in apar/userNames (so the log shows "Bert" not the email).
+let userNames = {};       // {emailKey: displayName}
+function emailKey(email){ return (email||'').toLowerCase().replace(/[^a-z0-9]+/g,'_'); }
+function whoami(){
+  if(!currentUser)return 'Someone';
+  const nm=userNames[emailKey(currentUser.email)];
+  return nm||currentUser.name||currentUser.email||'Someone';
+}
+// Append a critical event to the audit log. Kept lean: payments, deletions/voids, status changes, adds.
+function logAudit(action, opts){
+  opts=opts||{};
+  const id='a_'+Date.now().toString(36)+Math.floor(Math.random()*1000).toString(36);
+  const rec={ ts:Date.now(), user:whoami(), action,
+    entryId:opts.entryId||'', party:opts.party||'', detail:opts.detail||'' };
+  auditLog[id]=rec;
+  dbSet('apar/audit/'+id, rec, 'audit '+action);
+}
+window.setMyName=()=>{
+  if(!currentUser)return;
+  const cur=userNames[emailKey(currentUser.email)]||currentUser.name||'';
+  const nm=prompt('Your display name (shown in the activity log):', cur);
+  if(nm==null)return;
+  const clean=nm.trim(); if(!clean)return;
+  userNames[emailKey(currentUser.email)]=clean;
+  dbSet('apar/userNames/'+emailKey(currentUser.email), clean, 'set display name');
+  render();
+};
 let page = 'dash';
 let DEFAULT_TERMS = 30;   // Net 30 default
 
@@ -559,7 +765,7 @@ function deriveAP(){
 }
 
 // merge derived + overlay, plus manual-only entries
-function allEntries(){
+function allEntriesRaw(){
   const derived=[...deriveAR(),...deriveAP()];
   const seen=new Set();
   const merged=derived.map(e=>{
@@ -571,7 +777,7 @@ function allEntries(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null)};
+    return {...e,ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null)};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -581,11 +787,15 @@ function allEntries(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:o.party||'—',ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null});
     }
   });
-  return merged.filter(e=>!e.void);
+  return merged;
 }
+// Active entries: excludes voided and trashed. This is what every normal view uses.
+function allEntries(){ return allEntriesRaw().filter(e=>!e.void&&!e.trashed); }
+// Trashed entries only (for the Trash view).
+function trashedEntries(){ return allEntriesRaw().filter(e=>e.trashed); }
 function statusOf(e){
   const bal=(e.amount||0)-(e.paid||0);
   if(e.amount!=null && bal<=0.005 && e.amount>0) return 'paid';
@@ -610,10 +820,76 @@ function go(p){
     recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
     deposit:['Deposits','Split incoming money across your Profit First buckets'],
     archive:['Archive','Paid bills, auto-filed 45 days after withdrawal'],
-    payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance']}[p];
+    payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance'],
+    activity:['Activity','Who changed what — payments, deletions, and status changes'],
+    forecast:['Cash Forecast','Week-by-week projection of where your cash is heading'],
+    trash:['Trash','Deleted entries — restore them or delete permanently']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
+  renderPageHelpButton(p);
   render();
 }
+// Per-tab help: purpose + how-to, shown in a popover from the title-bar "?" button.
+const PAGE_HELP={
+  dash:{title:'Dashboard',body:`<p>Your at-a-glance home base — the headline numbers for what's coming in and going out.</p>
+    <ul><li>Shows total receivables (money owed to you) and payables (money you owe) side by side.</li>
+    <li>Click any entry to open it, record a payment, or edit details.</li>
+    <li>Most pages flow from here — use the sidebar to dig into a specific area.</li></ul>`},
+  ar:{title:'Receivables',body:`<p>Everything customers owe <b>you</b>. These build automatically from invoiced orders in the order tracker, and you can also add one manually.</p>
+    <ul><li>Search by customer, invoice #, or description; group by customer with the toggle.</li>
+    <li>Click an invoice to record a payment or set how reliably that customer pays (used by the Forecast).</li>
+    <li>Use <b>Add receivable</b> in the sidebar for anything not tied to an order.</li></ul>`},
+  ap:{title:'Payables',body:`<p>Everything <b>you</b> owe vendors. These build from your vendor POs, plus anything you add by hand or via AI Extract.</p>
+    <ul><li>Assign each bill to the bank account it'll be paid from — that powers Cash Flow, Pay Run, and the Forecast.</li>
+    <li>Click a bill to record payment, set its pay status, or attach early-pay discount terms.</li>
+    <li><b>AI Extract</b> in the sidebar reads a PDF bill and fills the details for you.</li></ul>`},
+  aging:{title:'Aging',body:`<p>Outstanding balances sorted by how overdue they are — the classic 0-30 / 31-60 / 61-90 / 90+ day buckets.</p>
+    <ul><li>Spot which customers are slow to pay and which bills are falling behind.</li>
+    <li>Older balances are the ones to chase first.</li></ul>`},
+  cash:{title:'Cash Flow',body:`<p>What's actually in each bank account versus what's scheduled to leave it. This is the heart of day-to-day cash management.</p>
+    <ul><li><b>Balance</b> is a number you type — keep it current; the "updated X ago" note turns amber after a week.</li>
+    <li><b>Projected</b> = balance minus what you've marked Scheduled. Only "Scheduled" bills reduce it.</li>
+    <li>Bill statuses flow Open → Attention → Scheduled → Withdrawn. Scheduled bills rise to the top of each card; withdrawn ones sink to the bottom.</li>
+    <li>When you mark a bill Withdrawn, the app offers to subtract it from that account's balance to keep things in sync.</li></ul>`},
+  forecast:{title:'Cash Forecast',body:`<p>A week-by-week projection of where your cash is heading over the next 8 weeks, per account and combined.</p>
+    <ul><li>Starts from today's balances, drains them by bills and recurring payments as they come due, and adds expected customer payments.</li>
+    <li>The <b>"Include expected customer payments"</b> toggle: on = realistic ins-and-outs; off = the conservative "if nobody pays us" floor.</li>
+    <li>Each customer's invoice lands at their due date <i>plus</i> their typical delay — set that in the reliability panel or on the invoice.</li>
+    <li>Amber = running low, red = goes negative. The banner names exactly which account and week to watch.</li></ul>`},
+  payrun:{title:'Pay Run',body:`<p>A per-account plan suggesting which <b>whole</b> invoices to schedule from each balance — it never splits an invoice.</p>
+    <ul><li>Plans from the balance you set in Cash Flow, minus what's already scheduled.</li>
+    <li>Protects the urgent ones first (critical vendors, overdue, expiring discounts), then spreads across vendors so the most get paid something.</li>
+    <li>Set a vendor's priority (critical / normal / wait) to steer the plan.</li>
+    <li><b>Commit</b> marks the chosen invoices as Scheduled — you can change any back in Cash Flow.</li></ul>`},
+  recur:{title:'Recurring',body:`<p>Templates for bills that repeat — rent, utilities, loan payments, subscriptions. The app auto-creates the next bill each cycle.</p>
+    <ul><li>Set the amount, account, and cadence (monthly or weekly); it rolls the due date forward automatically.</li>
+    <li>Pause a template to stop it generating without deleting it.</li>
+    <li>Generated bills show up in Payables and Cash Flow like any other.</li></ul>`},
+  deposit:{title:'Deposits',body:`<p>Split incoming money across your Profit First buckets (Profit, Owner's Pay, Tax, Operating, etc.).</p>
+    <ul><li>Set each bucket's percentage; "Balance to 100%" scales them to total exactly 100%.</li>
+    <li>Enter a deposit amount to see how it divides across buckets.</li></ul>`},
+  archive:{title:'Archive',body:`<p>Paid bills are filed here automatically 45 days after they're withdrawn, to keep your active lists clean.</p>
+    <ul><li>Search the archive by vendor, invoice #, or account.</li>
+    <li><b>Restore</b> sends a bill back to Cash Flow if it was filed by mistake.</li></ul>`},
+  activity:{title:'Activity',body:`<p>A running log of who changed what — payments, deletions, status changes, pay runs, and more.</p>
+    <ul><li>Grouped by day, newest first, with the person's name and how long ago.</li>
+    <li>Set your display name with <b>Change name</b> so the log shows "Maria" instead of an email.</li>
+    <li>Each bill also has its own History section at the bottom of its dialog.</li></ul>`},
+  trash:{title:'Trash',body:`<p>Deleted entries land here instead of vanishing — so an accidental delete is easy to undo.</p>
+    <ul><li><b>Restore</b> sends an entry back where it came from.</li>
+    <li>Delete-forever (the red button) or <b>Empty trash</b> removes it permanently — that can't be undone.</li>
+    <li>Nothing leaves your database until you purge it here.</li></ul>`}
+};
+function renderPageHelpButton(p){
+  const btn=$('page-help-btn'); if(!btn)return;
+  btn.style.display = PAGE_HELP[p] ? 'inline-flex' : 'none';
+}
+window.openPageHelp=()=>{
+  const h=PAGE_HELP[page]; if(!h)return;
+  $('ph-title').textContent=h.title;
+  $('ph-body').innerHTML=h.body;
+  $('ph-modal').style.display='flex';
+};
+window.closePageHelp=()=>{ $('ph-modal').style.display='none'; };
 function render(){
   const entries=allEntries();
   updateBadges(entries);
@@ -626,6 +902,9 @@ function render(){
   else if(page==='deposit') renderDeposit();
   else if(page==='archive') renderArchive();
   else if(page==='payrun') renderPayRun();
+  else if(page==='activity') renderActivity();
+  else if(page==='forecast') renderForecast();
+  else if(page==='trash') renderTrash();
 }
 function updateBadges(entries){
   const oa=entries.filter(e=>e.type==='ar'&&statusOf(e)==='over').length;
@@ -634,6 +913,7 @@ function updateBadges(entries){
   set('nb-ar',oa);set('nb-ap',op);
   const due=Object.values(recurring).filter(r=>r&&!r.paused&&daysUntil(r.nextDue)!=null&&daysUntil(r.nextDue)<=0).length;
   set('nb-recur',due);
+  set('nb-trash',trashedEntries().length);
 }
 // list view state (per side): search text, group-by-vendor, selected ids
 const listState={ar:{q:'',group:false,sel:new Set()},ap:{q:'',group:false,sel:new Set()}};
@@ -820,7 +1100,7 @@ let hidePaid={}; // {sectionKey:true} -> hide withdrawn (paid) bills in that sec
 function sortBills(list,sectionKey){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   const arr=[...list];
-  arr.sort((a,b)=>{
+  const colCmp=(a,b)=>{
     let av,bv;
     if(s.key==='party'){av=(a.party||'').toLowerCase();bv=(b.party||'').toLowerCase();}
     else if(s.key==='account'){av=(a.account&&accounts[a.account]?accounts[a.account].name:'').toLowerCase();bv=(b.account&&accounts[b.account]?accounts[b.account].name:'').toLowerCase();}
@@ -829,6 +1109,18 @@ function sortBills(list,sectionKey){
     else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
     else{av=a.due||'9999-99-99';bv=b.due||'9999-99-99';}
     if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
+  };
+  // Default float order within each card: scheduled bills rise to the top, withdrawn
+  // (paid/done) sink to the bottom, with open/attention in the middle. If the user
+  // explicitly sorts by the Status column, honor that order instead.
+  const floatRank=e=>e.payStatus==='scheduled'?0:(e.payStatus==='withdrawn'?2:1);
+  const useFloat=s.key!=='status';
+  arr.sort((a,b)=>{
+    if(useFloat){
+      const ar=floatRank(a), br=floatRank(b);
+      if(ar!==br)return ar-br;
+    }
+    return colCmp(a,b);
   });
   return arr;
 }
@@ -842,6 +1134,22 @@ function sortArrow(sectionKey,key){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   if(s.key!==key)return'';
   return `<i class="ti ti-chevron-${s.dir===1?'up':'down'}"></i>`;
+}
+const STALE_DAYS=7; // a balance older than this is flagged for review
+// Returns {label, stale} describing how fresh an account balance is.
+function balanceFreshness(a){
+  const ts=a&&a.balanceUpdatedAt;
+  if(!ts) return {label:'not yet updated', stale:true};
+  const days=(Date.now()-ts)/86400000;
+  const stale=days>=STALE_DAYS;
+  let label;
+  const mins=(Date.now()-ts)/60000;
+  if(mins<1) label='updated just now';
+  else if(mins<60) label='updated '+Math.floor(mins)+'m ago';
+  else if(days<1) label='updated '+Math.floor(mins/60)+'h ago';
+  else if(days<2) label='updated yesterday';
+  else label='updated '+Math.floor(days)+'d ago';
+  return {label, stale};
 }
 function renderCash(entries){
   const ap=entries.filter(e=>e.type==='ap');
@@ -872,7 +1180,7 @@ function renderCash(entries){
     const dueCell=wd
       ? `<span class="ab-due wd-date"><input type="date" value="${e.withdrawnDate||''}" onclick="event.stopPropagation()" onchange="setWithdrawnDate('${e.id}',this.value)" title="Withdrawal date"></span>`
       : `<span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>`;
-    return `<div class="acct-bill${wd?' is-wd':''}">
+    return `<div class="acct-bill${wd?' is-wd':''}" data-search="${esc([e.party,e.ref,e.planMethod].filter(Boolean).join(' ').toLowerCase())}">
       <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
       ${dueCell}
       ${accountSelect(e)}
@@ -907,6 +1215,7 @@ function renderCash(entries){
       <div class="acct-num bal-row"><div class="l">Balance <span class="bal-hint">you enter</span></div>
         <div class="bal-edit"><span class="bal-cur">$</span><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"><i class="ti ti-pencil bal-pen"></i></div>
       </div>
+      ${(()=>{const f=balanceFreshness(a);return `<div class="bal-fresh${f.stale?' stale':''}"><i class="ti ti-${f.stale?'alert-triangle':'clock'}"></i> ${f.label}</div>`;})()}
       <div class="acct-num"><div class="l">Scheduled out</div><div class="v">${fmtMoney(sched)}</div></div>
       <div class="acct-num"><div class="l">Projected</div><div class="v${proj<0?' neg':''}">${fmtMoney(proj)}</div></div>
       <div class="acct-foot">${pending>0.005?`<span class="acct-mini">${fmtMoney(pending)} assigned, not scheduled</span>`:''}${wd>0.005?`<span class="acct-mini">${fmtMoney(wd)} withdrawn</span>`:''}</div>
@@ -947,24 +1256,26 @@ function renderCash(entries){
     <div class="toolbar"><button class="btn primary" onclick="addAccount()"><i class="ti ti-plus"></i> Add account</button></div>
     <div class="acct-grid">${ids.map(id=>acctTile(id,accounts[id])).join('')}</div>
     ${ids.length===0?'<div class="empty">No accounts yet. Add your bank sub-accounts (Operating, Payroll, Utilities, etc.) to start tracking what\'s scheduled to drain from each one.</div>':''}
+    ${ids.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="cash-q" placeholder="Search vendor, invoice #, method…" value="${esc(cashQ)}" oninput="cashSearch(this.value)"></div></div>`:''}
     ${ids.map(id=>acctBillSection(id,accounts[id])).join('')}
     ${unassignedSection}`;
+  if(cashQ){ cashSearch(cashQ); const q=$('cash-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 window.addAccount=()=>{
   const name=prompt('Account name (e.g. Operating, Payroll, Utilities):'); if(!name||!name.trim())return;
   const id='acc_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
-  set(ref(db,'apar/accounts/'+id),{name:name.trim(),balance:0});
+  dbSet('apar/accounts/'+id,{name:name.trim(),balance:0});
 };
 window.renameAccount=(id,name)=>{
   if(!name||!name.trim()){render();return;}
-  update(ref(db,'apar/accounts/'+id),{name:name.trim()});
+  dbUpdate('apar/accounts/'+id,{name:name.trim()});
 };
 window.setAccountBalance=(id,val)=>{
-  update(ref(db,'apar/accounts/'+id),{balance:Number(val)||0});
+  dbUpdate('apar/accounts/'+id,{balance:Number(val)||0,balanceUpdatedAt:Date.now()});
 };
 window.deleteAccount=(id,name)=>{
   if(!confirm(`Delete account "${name}"? Bills assigned to it will move to Unassigned.`))return;
-  remove(ref(db,'apar/accounts/'+id));
+  dbRemove('apar/accounts/'+id);
 };
 window.setPlanMethod=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
@@ -984,10 +1295,26 @@ window.setPayStatus=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
   const o=ovl(id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  const prev=e.payStatus||'open';
   o.payStatus=val||'open';
   if(val==='withdrawn'){ if(!o.withdrawnDate) o.withdrawnDate=toISO(new Date()); }
   else { delete o.withdrawnDate; }
   writeOverlay(id,o); render();
+  if(prev!==(val||'open')) logAudit('status', {entryId:id, party:e.party,
+    detail:`${statusLabel(prev)} → ${statusLabel(val||'open')} · ${fmtMoney((e.amount||0)-(e.paid||0))}`});
+  // One-click reconcile: when a bill is newly withdrawn from an assigned account,
+  // offer to subtract it from that account's balance so the typed balance stays accurate.
+  if(val==='withdrawn' && prev!=='withdrawn' && e.account && accounts[e.account]){
+    const amt=Math.max(0,(e.amount||0)-(e.paid||0));
+    if(amt>0.005){
+      const acc=accounts[e.account];
+      const cur=Number(acc.balance)||0; const next=cur-amt;
+      if(confirm(`Subtract ${fmtMoney(amt)} from ${acc.name}'s balance?\n\n${fmtMoney(cur)} → ${fmtMoney(next)}\n\nThis keeps the balance in sync with what just left the account. Cancel to leave the balance unchanged.`)){
+        dbUpdate('apar/accounts/'+e.account,{balance:next,balanceUpdatedAt:Date.now()});
+        logAudit('reconcile',{entryId:id,party:e.party,detail:`${acc.name}: ${fmtMoney(cur)} → ${fmtMoney(next)} (−${fmtMoney(amt)})`});
+      }
+    }
+  }
 };
 window.setWithdrawnDate=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
@@ -1012,7 +1339,7 @@ function autoArchiveOld(){
       if(days!=null&&days>=45){
         const o=ovl(e.id);
         if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-        o.archived=true; overlay[e.id]=o; set(ref(db,'apar/entries/'+e.id),o);
+        o.archived=true; overlay[e.id]=o; dbSet('apar/entries/'+e.id,o);
       }
     }
   });
@@ -1057,10 +1384,10 @@ function generateRecurring(id,opts){
     planMethod:r.method||'',
     recurringId:id,
     payments:[]};
-  set(ref(db,'apar/entries/'+eid),o); overlay[eid]=o;
+  dbSet('apar/entries/'+eid,o); overlay[eid]=o;
   // advance the template to the next cycle
   const next=advanceDue(r.nextDue,r.cadence,r.day,r.weekday);
-  update(ref(db,'apar/recurring/'+id),{nextDue:next,lastGenerated:r.nextDue});
+  dbUpdate('apar/recurring/'+id,{nextDue:next,lastGenerated:r.nextDue});
   recurring[id]={...r,nextDue:next,lastGenerated:r.nextDue};
 }
 let _autoRan=false;
@@ -1083,13 +1410,13 @@ window.genRecurringNow=(id)=>{
 };
 window.toggleRecurPause=(id)=>{
   const r=recurring[id]; if(!r)return;
-  update(ref(db,'apar/recurring/'+id),{paused:!r.paused});
+  dbUpdate('apar/recurring/'+id,{paused:!r.paused});
   recurring[id]={...r,paused:!r.paused}; render();
 };
 window.deleteRecurring=(id)=>{
   const r=recurring[id]; if(!r)return;
   if(!confirm(`Delete recurring template "${r.vendor}"? Bills already generated stay in your payables.`))return;
-  remove(ref(db,'apar/recurring/'+id)); delete recurring[id]; render();
+  dbRemove('apar/recurring/'+id); delete recurring[id]; render();
 };
 function renderRecurring(){
   const ids=Object.keys(recurring);
@@ -1205,7 +1532,7 @@ window.saveRecurring=()=>{
     lastGenerated:_recurEditId?(recurring[_recurEditId]?.lastGenerated||''):''
   };
   const id=_recurEditId||('r_'+Date.now().toString(36)+Math.floor(Math.random()*1000));
-  set(ref(db,'apar/recurring/'+id),r); recurring[id]=r;
+  dbSet('apar/recurring/'+id,r); recurring[id]=r;
   closePay(); render();
 };
 
@@ -1222,7 +1549,7 @@ function seedDepositBuckets(){
   seed.forEach(([name,pct],i)=>{
     const id='b_'+Date.now().toString(36)+i+Math.floor(Math.random()*1000);
     const b={name,pct,account:'',order:i};
-    depositBuckets[id]=b; set(ref(db,'apar/depositBuckets/'+id),b);
+    depositBuckets[id]=b; dbSet('apar/depositBuckets/'+id,b);
   });
 }
 function bucketList(){
@@ -1293,18 +1620,18 @@ window.setBucket=(id,field,val)=>{
   const b=depositBuckets[id]; if(!b)return;
   if(field==='pct') val=Number(val)||0;
   const nb={...b,[field]:val};
-  depositBuckets[id]=nb; update(ref(db,'apar/depositBuckets/'+id),{[field]:val});
+  depositBuckets[id]=nb; dbUpdate('apar/depositBuckets/'+id,{[field]:val});
   render();
 };
 window.addBucket=()=>{
   const order=bucketList().length;
   const id='b_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
   const b={name:'New bucket',pct:0,account:'',order};
-  depositBuckets[id]=b; set(ref(db,'apar/depositBuckets/'+id),b); render();
+  depositBuckets[id]=b; dbSet('apar/depositBuckets/'+id,b); render();
 };
 window.deleteBucket=(id,name)=>{
   if(!confirm(`Delete bucket "${name}"?`))return;
-  delete depositBuckets[id]; remove(ref(db,'apar/depositBuckets/'+id)); render();
+  delete depositBuckets[id]; dbRemove('apar/depositBuckets/'+id); render();
 };
 window.normalizeBuckets=()=>{
   const bs=bucketList(); const total=bs.reduce((s,b)=>s+(Number(b.pct)||0),0);
@@ -1312,7 +1639,7 @@ window.normalizeBuckets=()=>{
   bs.forEach(b=>{
     const scaled=Math.round((Number(b.pct)||0)/total*1000)/10; // one decimal
     depositBuckets[b.id]={...depositBuckets[b.id],pct:scaled};
-    update(ref(db,'apar/depositBuckets/'+b.id),{pct:scaled});
+    dbUpdate('apar/depositBuckets/'+b.id,{pct:scaled});
   });
   render();
 };
@@ -1323,6 +1650,304 @@ window.sortArchive=(key)=>{
   archiveSort=(archiveSort.key===key)?{key,dir:-archiveSort.dir}:{key,dir:key==='withdrawnDate'?-1:1};
   render();
 };
+// ── Cash Forecast (week-by-week projection) ──────────────────────────────────
+const DELAY_TIERS=[
+  {k:0,label:'On time'},
+  {k:7,label:'+1 week'},
+  {k:14,label:'+2 weeks'},
+  {k:30,label:'+1 month'}
+];
+function delayLabel(d){ const t=DELAY_TIERS.find(t=>t.k===d); return t?t.label:(d+'d'); }
+function custKey(name){ return vendorKey(name); }           // same normalization
+function delayOf(party){ const d=customerDelay[custKey(party||'')]; return d!=null?Number(d):0; }
+window.setCustomerDelay=(party,val)=>{
+  const ck=custKey(party||''); customerDelay[ck]=Number(val)||0;
+  dbSet('apar/customerDelay/'+ck, Number(val)||0, 'set customer delay'); render();
+};
+let _fcInflows=true;        // toggle: include expected customer payments
+window.toggleForecastInflows=()=>{ _fcInflows=!_fcInflows; renderForecast(); };
+
+// Build the Monday of the week containing a date.
+function weekStart(d){ const x=new Date(d); x.setHours(0,0,0,0); const dow=(x.getDay()+6)%7; x.setDate(x.getDate()-dow); return x; }
+// Forecast model: returns {weeks:[{start,end,label}], perAccount:{id:[bal,...]}, combined:[...], flows:{accId:[{in,out}]}, combinedFlows:[...]}
+function buildForecast(numWeeks){
+  numWeeks=numWeeks||8;
+  const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  const entries=allEntries();
+  const ap=entries.filter(e=>e.type==='ap'&&!e.archived&&!e.void&&unpaid(e)>0.005);
+  const ar=entries.filter(e=>e.type==='ar'&&!e.archived&&!e.void&&unpaid(e)>0.005);
+  const ids=Object.keys(accounts);
+
+  // week buckets
+  const today=new Date(); today.setHours(0,0,0,0);
+  const w0=weekStart(today);
+  const weeks=[];
+  for(let i=0;i<numWeeks;i++){
+    const start=new Date(w0); start.setDate(start.getDate()+i*7);
+    const end=new Date(start); end.setDate(end.getDate()+6);
+    weeks.push({start,end});
+  }
+  const weekIndexFor=(iso)=>{
+    if(!iso)return -1; const d=new Date(iso+'T00:00:00'); d.setHours(0,0,0,0);
+    if(d<weeks[0].start) return 0; // overdue/past -> fold into week 0 (it's due now)
+    for(let i=0;i<weeks.length;i++){ if(d>=weeks[i].start && d<=weeks[i].end) return i; }
+    return -1; // beyond horizon
+  };
+
+  // flows per account
+  const flows={}; ids.forEach(id=>flows[id]=weeks.map(()=>({in:0,out:0})));
+  const unassignedFlows=weeks.map(()=>({in:0,out:0}));
+  const fl=(accId)=> accId&&flows[accId] ? flows[accId] : unassignedFlows;
+
+  // OUTFLOWS: payables by due date (overdue folds into week 0)
+  ap.forEach(e=>{ const wi=weekIndexFor(e.due); if(wi<0)return; fl(e.account)[wi].out+=unpaid(e); });
+
+  // OUTFLOWS: recurring templates projected across the horizon by cadence
+  Object.values(recurring).forEach(r=>{
+    if(!r||r.paused||!r.amount)return;
+    let due=r.nextDue; let guard=0;
+    while(due && guard<60){
+      const wi=weekIndexFor(due);
+      const d=new Date(due+'T00:00:00');
+      if(d>weeks[weeks.length-1].end) break;
+      if(wi>=0) fl(r.account)[wi].out+=Number(r.amount)||0;
+      due=advanceDue(due,r.cadence||'monthly',r.day,r.weekday);
+      guard++;
+    }
+  });
+
+  // INFLOWS: receivables shifted by each customer's typical delay
+  if(_fcInflows){
+    ar.forEach(e=>{
+      const delay=delayOf(e.party);
+      const base=e.due||toISO(today);
+      const adj=addDays(base, delay);
+      const wi=weekIndexFor(adj); if(wi<0)return;
+      fl(e.account)[wi].in+=unpaid(e);
+    });
+  }
+
+  // running balances
+  const perAccount={}; const combined=[];
+  ids.forEach(id=>{
+    let bal=Number(accounts[id].balance)||0; const line=[];
+    for(let i=0;i<weeks.length;i++){ bal += flows[id][i].in - flows[id][i].out; line.push(bal); }
+    perAccount[id]=line;
+  });
+  let cb=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
+  const combinedFlows=weeks.map((_,i)=>{
+    let inn=0,out=0; ids.forEach(id=>{ inn+=flows[id][i].in; out+=flows[id][i].out; });
+    inn+=unassignedFlows[i].in; out+=unassignedFlows[i].out;
+    return {in:inn,out:out};
+  });
+  for(let i=0;i<weeks.length;i++){ cb += combinedFlows[i].in - combinedFlows[i].out; combined.push(cb); }
+
+  return {weeks,perAccount,combined,flows,combinedFlows,unassignedFlows,startBal:{
+    combined:ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0),
+    perAccount:Object.fromEntries(ids.map(id=>[id,Number(accounts[id].balance)||0]))
+  }};
+}
+function renderForecast(){
+  const ids=Object.keys(accounts);
+  if(!ids.length){ $('content').innerHTML='<div class="empty">No bank accounts yet. Add them in Cash Flow first — the forecast projects each account\'s balance forward.</div>'; return; }
+  const F=buildForecast(8);
+  const W=F.weeks;
+  const wLabel=w=>`${w.start.getMonth()+1}/${w.start.getDate()}`;
+  const thisWeekIdx=0;
+
+  // header cells
+  const headCells=W.map((w,i)=>`<th class="${i===thisWeekIdx?'fc-now':''}">${i===thisWeekIdx?'This wk':'Wk of'}<div class="fc-wd">${wLabel(w)}</div></th>`).join('');
+
+  // combined row (headline)
+  const combinedCells=F.combined.map((bal,i)=>{
+    const f=F.combinedFlows[i];
+    const neg=bal<0; const low=bal>=0&&bal<1000;
+    return `<td class="${neg?'fc-neg':(low?'fc-low':'')}">
+      <div class="fc-bal">${fmtMoney(bal)}</div>
+      <div class="fc-io">${f.in>0.005?`<span class="fc-in">+${fmtMoney(f.in)}</span>`:''}${f.out>0.005?`<span class="fc-out">−${fmtMoney(f.out)}</span>`:''}</div>
+    </td>`;
+  }).join('');
+
+  // per-account rows
+  const acctRows=ids.map(id=>{
+    const c=colorFor(id); const line=F.perAccount[id];
+    const cells=line.map((bal,i)=>{
+      const f=F.flows[id][i]; const neg=bal<0; const low=bal>=0&&bal<500;
+      return `<td class="${neg?'fc-neg':(low?'fc-low':'')}">
+        <div class="fc-bal">${fmtMoney(bal)}</div>
+        <div class="fc-io">${f.in>0.005?`<span class="fc-in">+${fmtMoney(f.in)}</span>`:''}${f.out>0.005?`<span class="fc-out">−${fmtMoney(f.out)}</span>`:''}</div>
+      </td>`;
+    }).join('');
+    return `<tr><th class="fc-acct"><span class="acct-dot" style="background:${c.bar}"></span>${esc(accounts[id].name)}<div class="fc-start">now ${fmtMoney(F.startBal.perAccount[id])}</div></th>${cells}</tr>`;
+  }).join('');
+
+  // any account that dips negative within the horizon -> warning
+  const dips=[];
+  ids.forEach(id=>{ const w=F.perAccount[id].findIndex(b=>b<0); if(w>=0)dips.push({name:accounts[id].name,wk:w}); });
+  const combinedDip=F.combined.findIndex(b=>b<0);
+
+  const warn = (dips.length||combinedDip>=0) ? `<div class="fc-warn"><i class="ti ti-alert-triangle"></i> ${
+    combinedDip>=0?`Total cash goes negative the week of ${wLabel(W[combinedDip])}. `:''
+  }${dips.length?`${dips.map(d=>`<b>${esc(d.name)}</b> dips below $0 (wk of ${wLabel(W[d.wk])})`).join(', ')}.`:''}</div>` : '';
+
+  // customer reliability manager (delay tiers)
+  const arParties=[...new Set(allEntries().filter(e=>e.type==='ar'&&!e.archived&&!e.void&&((e.amount||0)-(e.paid||0))>0.005).map(e=>e.party))].sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  const delayRows=arParties.map(p=>`<div class="cd-row">
+    <span class="cd-name">${esc(p)}</span>
+    <select class="acct-sel" onchange="setCustomerDelay('${esc(p).replace(/'/g,"\\'")}',this.value)">
+      ${DELAY_TIERS.map(t=>`<option value="${t.k}" ${delayOf(p)===t.k?'selected':''}>${t.label}</option>`).join('')}
+    </select>
+  </div>`).join('');
+
+  $('content').innerHTML=`
+    <div class="fc-toolbar">
+      <label class="fc-toggle"><input type="checkbox" ${_fcInflows?'checked':''} onchange="toggleForecastInflows()"> Include expected customer payments</label>
+      <span class="fc-note">${_fcInflows?'Receivables are added on each customer\'s typical pay date (due date + their delay).':'Outflows only — the conservative floor, assuming no customer payments arrive.'}</span>
+    </div>
+    ${warn}
+    <div class="fc-scroll">
+      <table class="fc-table">
+        <thead><tr><th class="fc-corner">Account</th>${headCells}</tr></thead>
+        <tbody>
+          <tr class="fc-combined"><th class="fc-acct">All accounts<div class="fc-start">now ${fmtMoney(F.startBal.combined)}</div></th>${combinedCells}</tr>
+          ${acctRows}
+        </tbody>
+      </table>
+    </div>
+    <div class="fc-legend"><span class="fc-key"><span class="fc-sw fc-in"></span> money in</span><span class="fc-key"><span class="fc-sw fc-out"></span> money out</span><span class="fc-key"><span class="fc-sw" style="background:#BA751733"></span> running low</span><span class="fc-key"><span class="fc-sw" style="background:#A32D2D33"></span> negative</span></div>
+    ${arParties.length?`<div class="cd-panel">
+      <div class="cd-head"><i class="ti ti-users"></i> Customer payment reliability <span class="cd-sub">how many days after the due date each customer typically pays — shifts when their money lands in the forecast</span></div>
+      <div class="cd-grid">${delayRows}</div>
+    </div>`:''}`;
+}
+
+// ── Activity / audit trail ───────────────────────────────────────────────────
+const AUDIT_META={
+  add:{icon:'ti-plus',color:'var(--green)',label:'Added'},
+  payment:{icon:'ti-cash',color:'var(--green)',label:'Payment'},
+  'payment-removed':{icon:'ti-arrow-back-up',color:'var(--amber)',label:'Payment removed'},
+  status:{icon:'ti-flag',color:'var(--blue)',label:'Status'},
+  payrun:{icon:'ti-calendar-check',color:'var(--blue)',label:'Pay run'},
+  void:{icon:'ti-eye-off',color:'var(--amber)',label:'Hidden'},
+  delete:{icon:'ti-trash',color:'var(--amber)',label:'Trashed'},
+  restore:{icon:'ti-arrow-back-up',color:'var(--green)',label:'Restored'},
+  purge:{icon:'ti-trash-x',color:'var(--red)',label:'Deleted'},
+  reconcile:{icon:'ti-adjustments',color:'var(--blue)',label:'Reconciled'}
+};
+function auditSorted(){ return Object.values(auditLog).sort((a,b)=>(b.ts||0)-(a.ts||0)); }
+function relTime(ts){
+  if(!ts)return''; const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60)return'just now'; const m=Math.floor(s/60);
+  if(m<60)return m+'m ago'; const h=Math.floor(m/60);
+  if(h<24)return h+'h ago'; const d=Math.floor(h/24);
+  if(d<7)return d+'d ago';
+  const dt=new Date(ts); return (dt.getMonth()+1)+'/'+dt.getDate()+'/'+String(dt.getFullYear()).slice(2);
+}
+function auditRowHtml(r,opts){
+  opts=opts||{};
+  const m=AUDIT_META[r.action]||{icon:'ti-point',color:'var(--text3)',label:r.action};
+  const dt=new Date(r.ts||0);
+  const exact=dt.toLocaleString();
+  const party=opts.hideParty?'':(r.party?`<span class="au-party">${esc(r.party)}</span>`:'');
+  return `<div class="au-row">
+    <span class="au-ic" style="background:${m.color}1a;color:${m.color}"><i class="ti ${m.icon}"></i></span>
+    <div class="au-main">
+      <div class="au-line"><span class="au-label" style="color:${m.color}">${m.label}</span> ${party}<span class="au-detail">${esc(r.detail||'')}</span></div>
+      <div class="au-meta"><span class="au-user"><i class="ti ti-user"></i> ${esc(r.user||'Someone')}</span> · <span title="${esc(exact)}">${relTime(r.ts)}</span></div>
+    </div>
+  </div>`;
+}
+function renderActivity(){
+  const rows=auditSorted();
+  const me=currentUser?whoami():'';
+  const head=`<div class="au-toolbar">
+    <div class="au-whoami">Signed in as <b>${esc(me||'—')}</b> <button class="btn sm" onclick="setMyName()"><i class="ti ti-pencil"></i> Change name</button></div>
+    <div class="au-count">${rows.length} event${rows.length!==1?'s':''} logged</div>
+  </div>`;
+  if(!rows.length){
+    $('content').innerHTML=head+`<div class="empty">No activity logged yet. Payments, deletions, and status changes will appear here with who made them.</div>`;
+    return;
+  }
+  const byDay={};
+  rows.forEach(r=>{ const dt=new Date(r.ts||0); const k=dt.toDateString(); (byDay[k]=byDay[k]||[]).push(r); });
+  const days=Object.keys(byDay).sort((a,b)=>new Date(b)-new Date(a));
+  const today=new Date().toDateString();
+  const yest=new Date(Date.now()-86400000).toDateString();
+  const dayLabel=k=>k===today?'Today':(k===yest?'Yesterday':new Date(k).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}));
+  const body=days.map(k=>`<div class="au-day"><div class="au-day-h">${dayLabel(k)}</div><div class="au-list">${byDay[k].map(r=>auditRowHtml(r)).join('')}</div></div>`).join('');
+  $('content').innerHTML=head+`<div style="max-width:760px">${body}</div>`;
+}
+function entryHistoryHtml(entryId){
+  const rows=auditSorted().filter(r=>r.entryId===entryId);
+  if(!rows.length)return'';
+  return `<div class="m-sect">History</div>
+    <div class="au-list au-list-compact">${rows.map(r=>auditRowHtml(r,{hideParty:true})).join('')}</div>`;
+}
+
+// ── Trash (soft-deleted entries) ─────────────────────────────────────────────
+let trashQ='';
+// Generic row-search: filters elements with [data-search] under a container by substring.
+function filterRows(selector,q){
+  const needle=(q||'').trim().toLowerCase();
+  document.querySelectorAll(selector).forEach(el=>{
+    const hay=el.getAttribute('data-search')||'';
+    el.style.display=(!needle||hay.includes(needle))?'':'none';
+  });
+}
+let archiveQ='', payrunQ='', cashQ='';
+window.archiveSearch=(v)=>{ archiveQ=v; filterRows('.arch-row',v); };
+window.payrunSearch=(v)=>{ payrunQ=v; filterRows('.pr-row',v);
+  document.querySelectorAll('.pr-acct').forEach(card=>{
+    const rows=card.querySelectorAll('.pr-row');
+    const anyVisible=[...rows].some(r=>r.style.display!=='none');
+    card.style.display=(!v.trim()||anyVisible||!rows.length)?'':'none';
+  });
+};
+window.cashSearch=(v)=>{ cashQ=v; filterRows('.acct-bill',v);
+  // hide a section whose visible rows are all filtered out
+  document.querySelectorAll('.acct-bills-section').forEach(sec=>{
+    const rows=sec.querySelectorAll('.acct-bill');
+    const anyVisible=[...rows].some(r=>r.style.display!=='none');
+    sec.style.display=(!v.trim()||anyVisible)?'':'none';
+  });
+};
+window.trashSearch=(v)=>{ trashQ=v; const items=document.querySelectorAll('.trash-row'); const q=v.trim().toLowerCase();
+  items.forEach(el=>{ const hay=el.getAttribute('data-search')||''; el.style.display=(!q||hay.includes(q))?'':'none'; });
+};
+function renderTrash(){
+  const items=trashedEntries().sort((a,b)=>(b.trashedAt||0)-(a.trashedAt||0));
+  const acctName=e=>e.account&&accounts[e.account]?accounts[e.account].name:'—';
+  const when=ts=>ts?relTime(ts):'—';
+  const row=e=>{
+    const hay=[e.party,e.ref,e.rel,acctName(e)].filter(Boolean).join(' ').toLowerCase();
+    return `<div class="trash-row" data-search="${esc(hay)}">
+      <span class="trash-type ${e.type}">${e.type==='ar'?'AR':'AP'}</span>
+      <span class="trash-party">${esc(e.party)}${e.ref?`<span class="trash-ref">#${esc(e.ref)}</span>`:''}</span>
+      <span class="trash-amt">${fmtMoney(Math.max(0,(e.amount||0)-(e.paid||0)))}</span>
+      <span class="trash-when">${when(e.trashedAt)}</span>
+      <span class="trash-acts">
+        <button class="btn sm" onclick="restoreEntry('${e.id}')" title="Restore"><i class="ti ti-arrow-back-up"></i> Restore</button>
+        <button class="btn sm danger" onclick="purgeEntry('${e.id}')" title="Delete permanently"><i class="ti ti-trash-x"></i></button>
+      </span>
+    </div>`;
+  };
+  const head=`<div class="trash-toolbar">
+    <div class="list-search"><i class="ti ti-search"></i><input id="trash-q" placeholder="Search trashed entries…" value="${esc(trashQ)}" oninput="trashSearch(this.value)"></div>
+    ${items.length?`<button class="btn danger" onclick="emptyTrash()"><i class="ti ti-trash-x"></i> Empty trash (${items.length})</button>`:''}
+  </div>`;
+  if(!items.length){
+    $('content').innerHTML=head+`<div class="empty">Trash is empty. Deleted entries land here and can be restored — nothing is permanently removed until you empty the trash or delete it here.</div>`;
+    return;
+  }
+  $('content').innerHTML=head+`
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Deleted entries are kept here so nothing is lost by accident. Restore one to send it back, or delete it permanently.</div>
+    <div class="trash-list">
+      <div class="trash-head"><span></span><span>Entry</span><span>Balance</span><span>Deleted</span><span></span></div>
+      ${items.map(row).join('')}
+    </div>`;
+  setTimeout(()=>{ const q=$('trash-q'); if(q&&trashQ){ q.focus(); q.setSelectionRange(q.value.length,q.value.length); } },0);
+}
+
 function renderArchive(){
   const arch=allEntries().filter(e=>e.type==='ap'&&e.archived);
   const total=arch.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
@@ -1338,7 +1963,7 @@ function renderArchive(){
     if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
   });
   const arrow=k=>s.key!==k?'':`<i class="ti ti-chevron-${s.dir===1?'up':'down'}"></i>`;
-  const row=e=>`<div class="arch-row">
+  const row=e=>`<div class="arch-row" data-search="${esc([e.party,e.ref,acctName(e),e.planMethod].filter(Boolean).join(' ').toLowerCase())}">
     <span onclick="openEntry('${e.id}')" class="arch-party">${esc(e.party)}</span>
     <span>${e.withdrawnDate?fmtDate(e.withdrawnDate):'—'}</span>
     <span>${esc(acctName(e))}</span>
@@ -1352,7 +1977,8 @@ function renderArchive(){
       <div class="stat"><div class="l">Total archived</div><div class="v">${fmtMoney(total)}</div><div class="s">lifetime</div></div>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Paid bills move here automatically 45 days after their withdrawal date. Restore one anytime to send it back to Cash Flow.</div>
-    ${arch.length?`<div class="arch-list">
+    ${arch.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="arch-q" placeholder="Search vendor, invoice #, account…" value="${esc(archiveQ)}" oninput="archiveSearch(this.value)"></div></div>
+    <div class="arch-list">
       <div class="arch-head">
         <span onclick="sortArchive('party')">Vendor ${arrow('party')}</span>
         <span onclick="sortArchive('withdrawnDate')">Withdrawn ${arrow('withdrawnDate')}</span>
@@ -1363,6 +1989,7 @@ function renderArchive(){
       </div>
       ${sorted.map(row).join('')}
     </div>`:'<div class="empty">Nothing archived yet. Once a withdrawn bill is 45 days past its withdrawal date, it lands here automatically.</div>'}`;
+  if(archiveQ){ archiveSearch(archiveQ); const q=$('arch-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 
 // ── Pay Run planner (suggest how to split available cash) ──────────────────────
@@ -1370,7 +1997,7 @@ const PRIORITIES=[{k:'critical',label:'Critical'},{k:'normal',label:'Normal'},{k
 function priOf(party){ return vendorPriority[vendorKey(party||'')]||'normal'; }
 window.setVendorPriority=(party,val)=>{
   const vk=vendorKey(party||''); vendorPriority[vk]=val;
-  set(ref(db,'apar/vendorPriority/'+vk),val); render();
+  dbSet('apar/vendorPriority/'+vk,val); render();
 };
 // Detect an early-pay discount in terms text like "2% 10, Net 30" or "2/10 net 30".
 // Returns {pct, days} or null. We scan the entry's notes/rel/terms fields.
@@ -1468,9 +2095,10 @@ window.commitAccountPlan=(accId)=>{
     const o=ovl(id);
     if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
     o.payStatus='scheduled';
-    overlay[id]=o; set(ref(db,'apar/entries/'+id),o);
+    overlay[id]=o; dbSet('apar/entries/'+id,o);
   });
   render();
+  logAudit('payrun',{detail:`Scheduled ${ids.length} invoice${ids.length!==1?'s':''} (${fmtMoney(plan.scheduledNow)}) on ${name}`});
 };
 function renderPayRun(){
   const ids=Object.keys(accounts);
@@ -1490,7 +2118,7 @@ function renderPayRun(){
     const tags=[];
     if(a.disc) tags.push(`<span class="pr-tag disc" title="${a.disc.pct}% off if paid within ${a.disc.days} days">save ${a.disc.pct}% · ${a.disc.daysLeft}d left</span>`);
     if(a.over) tags.push(`<span class="pr-tag over">overdue</span>`);
-    return `<div class="pr-row${picked?'':' skip'}" onclick="openEntry('${a.e.id}')">
+    return `<div class="pr-row${picked?'':' skip'}" data-search="${esc([a.e.party,a.e.ref].filter(Boolean).join(' ').toLowerCase())}" onclick="openEntry('${a.e.id}')">
       <div class="pr-v"><span class="pr-name">${esc(a.e.party)}</span> ${tags.join(' ')}<div class="pr-sub">${esc(a.e.ref||'')} · due ${dueTxt}</div></div>
       ${priSelect(a.e.party)}
       <span class="pr-owed">${fmtMoney(a.amt)}</span>
@@ -1528,7 +2156,9 @@ function renderPayRun(){
       <div class="stat"><div class="l">Open candidates</div><div class="v">${totalCandidates}</div><div class="s">unpaid, assigned bills</div></div>
     </div>
     <div class="pr-legend"><i class="ti ti-info-circle"></i> Each account is planned from the balance you set in Cash Flow, minus what's already scheduled. Invoices are paid <b>whole</b> — never split — and the plan spreads across vendors so the most vendors get at least one invoice paid. Protected bills (critical vendors, overdue, expiring discounts) come first. <b>Commit</b> marks the chosen invoices as Scheduled in Cash Flow; change any back there anytime.</div>
+    ${plans.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="payrun-q" placeholder="Search vendor or invoice #…" value="${esc(payrunQ)}" oninput="payrunSearch(this.value)"></div></div>`:''}
     ${plans.map(cardFor).join('')}`;
+  if(payrunQ){ payrunSearch(payrunQ); const q=$('payrun-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 
 // ── Entry / payment dialog ───────────────────────────────────────────────────
@@ -1556,6 +2186,9 @@ window.openEntry=(id)=>{
       <div class="m-row"><span class="k">Paid</span><span class="v">${fmtMoney(e.paid)}</span></div>
       <div class="m-row"><span class="k">Balance</span><span class="v" style="color:${bal>0.005?'var(--red)':'var(--ar)'}">${fmtMoney(bal)}</span></div>
       <div class="m-row"><span class="k">Status</span><span class="v"><span class="pill ${st}">${STATUS_LABEL[st]}</span></span></div>
+      ${isAR?`<div class="m-row"><span class="k">Pays</span><span class="v"><select class="acct-sel" onchange="setCustomerDelay('${esc(e.party).replace(/'/g,"\\'")}',this.value)" title="Typical days after due date this customer pays — used in the cash forecast">
+        ${DELAY_TIERS.map(t=>`<option value="${t.k}" ${delayOf(e.party)===t.k?'selected':''}>${t.label}</option>`).join('')}
+      </select></span></div>`:''}
       ${(isAR && Array.isArray(e.lineItems) && e.lineItems.length)?`
       <div class="m-sect">Line items</div>
       <div class="li-table">
@@ -1603,16 +2236,17 @@ window.openEntry=(id)=>{
       </div>
       <div class="fld"><label>Note</label><input id="p-note" type="text" placeholder="optional"></div>
       <button class="btn green" onclick="addPay()"><i class="ti ti-plus"></i> Add payment</button>
+      ${entryHistoryHtml(e.id)}
     </div>
     <div class="m-foot">
-      <button class="btn" onclick="${e.manual?`delEntry('${e.id}')`:`voidEntry('${e.id}')`}" style="color:var(--red)">${e.manual?'Delete':'Hide entry'}</button>
+      <button class="btn" onclick="${e.manual?`delEntry('${e.id}')`:`voidEntry('${e.id}')`}" style="color:var(--red)"><i class="ti ti-${e.manual?'trash':'eye-off'}"></i> ${e.manual?'Move to trash':'Hide entry'}</button>
       <button class="btn primary" onclick="closePay()">Done</button>
     </div>`;
   $('pay-modal').style.display='flex';
 };
 window.closePay=()=>{$('pay-modal').style.display='none';_cur=null;};
 function ovl(id){return overlay[id]?{...overlay[id]}:{};}
-function writeOverlay(id,o){ overlay[id]=o; set(ref(db,'apar/entries/'+id),o); }
+function writeOverlay(id,o){ overlay[id]=o; dbSet('apar/entries/'+id,o) }
 window.saveMeta=()=>{
   if(!_cur)return; const e=_cur; const o=ovl(e.id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
@@ -1641,15 +2275,23 @@ window.addPay=()=>{
   o.payments=[...(e.payments||[]),{date:$('p-date').value||toISO(new Date()),amount:amt,note:$('p-note').value||'',method:$('p-method').value||'',refNo:$('p-ref').value.trim()||''}];
   if(o.terms==null)o.terms=e.terms; if(!o.issue&&e.issue)o.issue=e.issue;
   writeOverlay(e.id,o); render(); openEntry(e.id);
+  logAudit('payment', {entryId:e.id, party:e.party,
+    detail:`Recorded ${fmtMoney(amt)}${$('p-method').value?(' · '+$('p-method').value):''}`});
 };
 window.rmPay=(i)=>{
   if(!_cur)return; const e=_cur; const o=ovl(e.id);
+  const removed=(e.payments||[])[i];
   const ps=[...(e.payments||[])]; ps.splice(i,1); o.payments=ps;
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;}
   writeOverlay(e.id,o); render(); openEntry(e.id);
+  if(removed) logAudit('payment-removed', {entryId:e.id, party:e.party,
+    detail:`Removed ${fmtMoney(removed.amount||0)}`});
 };
-window.voidEntry=(id)=>{ if(!confirm('Hide this auto-linked entry from AP/AR? (It stays in the order tracker.)'))return; const o=ovl(id); o.void=true; writeOverlay(id,o); closePay(); render(); };
-window.delEntry=(id)=>{ if(!confirm('Delete this manual entry?'))return; delete overlay[id]; remove(ref(db,'apar/entries/'+id)); closePay(); render(); };
+window.voidEntry=(id)=>{ if(!confirm('Hide this auto-linked entry from AP/AR? (It stays in the order tracker.)'))return; const e=allEntries().find(x=>x.id===id); const o=ovl(id); o.void=true; writeOverlay(id,o); logAudit('void',{entryId:id,party:e?e.party:'',detail:'Hidden from AP/AR'}); closePay(); render(); };
+window.delEntry=(id)=>{ if(!confirm('Move this entry to Trash? You can restore it later from the Trash tab.'))return; const e=allEntries().find(x=>x.id===id); const party=e?e.party:''; const amt=e?((e.amount||0)-(e.paid||0)):0; const o=ovl(id); o.trashed=true; o.trashedAt=Date.now(); writeOverlay(id,o); logAudit('delete',{entryId:id,party,detail:`Moved to trash · ${fmtMoney(amt)}`}); closePay(); render(); };
+window.restoreEntry=(id)=>{ const e=trashedEntries().find(x=>x.id===id); const o=ovl(id); o.trashed=false; delete o.trashedAt; writeOverlay(id,o); logAudit('restore',{entryId:id,party:e?e.party:'',detail:'Restored from trash'}); render(); };
+window.purgeEntry=(id)=>{ const e=trashedEntries().find(x=>x.id===id); if(!confirm(`Permanently delete this entry${e?` for ${e.party}`:''}? This cannot be undone.`))return; const party=e?e.party:''; delete overlay[id]; dbRemove('apar/entries/'+id); logAudit('purge',{entryId:id,party,detail:'Permanently deleted'}); render(); };
+window.emptyTrash=()=>{ const items=trashedEntries(); if(!items.length)return; if(!confirm(`Permanently delete all ${items.length} trashed entr${items.length!==1?'ies':'y'}? This cannot be undone.`))return; items.forEach(e=>{ delete overlay[e.id]; dbRemove('apar/entries/'+e.id); }); logAudit('purge',{detail:`Emptied trash (${items.length} entr${items.length!==1?'ies':'y'})`}); render(); };
 
 // ── Manual add ───────────────────────────────────────────────────────────────
 window.openManual=(type)=>{
@@ -1658,19 +2300,22 @@ window.openManual=(type)=>{
     <div class="m-head ${type}"><div class="m-t"><div class="t1">New ${isAR?'receivable':'payable'}</div><div class="t2">Manual entry</div></div><button class="m-x" onclick="closePay()"><i class="ti ti-x"></i></button></div>
     <div class="m-body">
       <div class="fld"><label>${isAR?'Customer':'Vendor'}</label><input id="nm-party" type="text" placeholder="${isAR?'Customer name':'Vendor name'}"></div>
-      <div class="fld"><label>Reference (${isAR?'invoice #':'our PO / bill #'})</label><input id="nm-ref" type="text" placeholder="${isAR?'Inv 1042':'PO BSMP-1234'}"></div>
-      <div class="fld"><label>Description</label><input id="nm-rel" type="text" placeholder="optional"></div>
+      <div class="fld"><label>${isAR?'Invoice #':'Vendor invoice #'}</label><input id="nm-ref" type="text" placeholder="${isAR?'e.g. INV-1042':'e.g. 62366512'}"></div>
+      <div class="fld"><label>${isAR?'Items':'For'}</label><input id="nm-rel" type="text" placeholder="optional"></div>
       <div class="frow">
-        <div class="fld"><label>Amount</label><input id="nm-amt" type="number" step="0.01"></div>
+        <div class="fld"><label>${isAR?'Invoice':'Bill'} amount</label><input id="nm-amt" type="number" step="0.01"></div>
         <div class="fld"><label>Issue date</label><input id="nm-issue" type="date" value="${toISO(new Date())}"></div>
       </div>
-      <div class="fld"><label>Terms (net days)</label><input id="nm-terms" type="number" value="${DEFAULT_TERMS}"></div>
+      <div class="frow">
+        <div class="fld"><label>Terms (net days)</label><input id="nm-terms" type="number" value="${DEFAULT_TERMS}"></div>
+        <div class="fld"><label>Due date</label><input id="nm-due" type="date" placeholder="auto from terms"></div>
+      </div>
       ${!isAR?`<div class="fld"><label>Account (which bank account pays this)</label><select id="nm-account">
         <option value="">Unassigned</option>
         ${Object.entries(accounts).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join('')}
       </select></div>`:''}
     </div>
-    <div class="m-foot"><button class="btn" onclick="closePay()">Cancel</button><button class="btn ${isAR?'green':'primary'}" onclick="saveManual('${type}')">Add</button></div>`;
+    <div class="m-foot"><button class="btn" onclick="closePay()">Cancel</button><button class="btn ${isAR?'green':'primary'}" onclick="saveManual('${type}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button></div>`;
   $('pay-modal').style.display='flex';
 };
 window.saveManual=(type)=>{
@@ -1681,7 +2326,9 @@ window.saveManual=(type)=>{
   const o={manual:true,type,party,ref:$('nm-ref').value.trim(),rel:$('nm-rel').value.trim(),
     amount:Number($('nm-amt').value)||0,issue:$('nm-issue').value||'',terms:nmTermsRaw===''?DEFAULT_TERMS:Number(nmTermsRaw),
     account:acctEl?(acctEl.value||''):'',payments:[]};
+  const dueVal=$('nm-due')?$('nm-due').value:''; if(dueVal)o.dueDate=dueVal;
   writeOverlay(id,o); closePay(); render();
+  logAudit('add',{entryId:id,party,detail:`Added ${type==='ar'?'receivable':'payable'} · ${fmtMoney(o.amount)}`});
 };
 
 // ── Export ───────────────────────────────────────────────────────────────────
@@ -1852,10 +2499,11 @@ window.aiAdd=()=>{
     if(acctId){ o.account=acctId; o.payStatus='open'; }
     // remember this vendor→account choice for next time (only when an account is chosen)
     const vk=vendorKey(party);
-    if(acctId && vendorAccounts[vk]!==acctId){ vendorAccounts[vk]=acctId; set(ref(db,'apar/vendorAccounts/'+vk),acctId); }
+    if(acctId && vendorAccounts[vk]!==acctId){ vendorAccounts[vk]=acctId; dbSet('apar/vendorAccounts/'+vk,acctId) }
   }
   writeOverlay(id,o); render();
   _aiAddedCount++;
+  logAudit('add',{entryId:id,party,detail:`Added ${aiType==='ar'?'receivable':'payable'} via AI · ${fmtMoney(o.amount)}`});
   const st=$('ai-status');
   // multi-invoice: advance to the next one instead of closing
   if(_aiIdx < _aiQueue.length-1){
@@ -1881,7 +2529,9 @@ $('lg-pass').addEventListener('keydown',e=>{if(e.key==='Enter')$('lg-btn').click
 
 onAuthStateChanged(auth,(user)=>{
   if(user){
+    currentUser={ email:user.email||'', name:(user.displayName||(user.email||'').split('@')[0]||'') };
     $('login').style.display='none'; $('app').style.display='flex';
+    watchConnection();
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
     onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; autoArchiveOld(); render(); });
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
@@ -1889,7 +2539,11 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
     onValue(ref(db,'apar/vendorAccounts'),snap=>{ vendorAccounts=snap.val()||{}; });
     onValue(ref(db,'apar/vendorPriority'),snap=>{ vendorPriority=snap.val()||{}; if(page==='payrun')render(); });
+    onValue(ref(db,'apar/customerDelay'),snap=>{ customerDelay=snap.val()||{}; if(page==='forecast')render(); });
+    onValue(ref(db,'apar/audit'),snap=>{ auditLog=snap.val()||{}; if(page==='activity')render(); });
+    onValue(ref(db,'apar/userNames'),snap=>{ userNames=snap.val()||{}; });
   }else{
+    currentUser=null;
     $('login').style.display='flex'; $('app').style.display='none';
   }
 });
