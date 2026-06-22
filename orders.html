@@ -747,7 +747,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.52.3</div>
+    <div class="ver">v2.52.4</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -1786,21 +1786,35 @@ function renderCards(){
   renderSortbar();
   const cg=document.getElementById('cards'); if(!cg) return;
   cg.className='po-master';
+  // remember scroll positions so an in-place edit doesn't jump the panes to the top
+  const prevList=cg.querySelector('.po-list');
+  const prevDetail=cg.querySelector('.po-detail');
+  const listTop = prevList ? prevList.scrollTop : 0;
+  const prevDetailTop = prevDetail ? prevDetail.scrollTop : 0;
   let groups=poGroups();
   if(hideInvoiced) groups=groups.filter(g=>!g.allInvoiced);
   if(!groups.length){
     const hidden=hideInvoiced && orders.some(r=>!r.archived && isDoneRow(r));
     cg.innerHTML=`<div class="empty-state"><i class="ti ti-${hidden?'eye-off':'clipboard-list'}"></i><p>${hidden?'No active orders — invoiced POs are hidden. Toggle “Show invoiced” to bring them back.':'No orders match — click Add Order or use AI Extract'}</p></div>`;
+    _lastRenderedPO=null;
     return;
   }
   groups=sortGroups(groups);
   const gks=groups.map(g=>g.gk);
   if(!selectedPO || !gks.includes(selectedPO)) selectedPO=gks[0];
+  const keepDetail = (_lastRenderedPO===selectedPO);   // same card open → keep its scroll
   const left=groups.map(condensedCard).join('');
   const sel=groups.find(g=>g.gk===selectedPO);
   cg.innerHTML=`<div class="po-split"><div class="po-list">${left}</div><div class="po-detail">${sel?poDetailHtml(sel):''}</div></div>`;
+  _lastRenderedPO=selectedPO;
   sizeCardPanes();
+  requestAnimationFrame(()=>{
+    const l=cg.querySelector('.po-list'); const d=cg.querySelector('.po-detail');
+    if(l) l.scrollTop=listTop;
+    if(d) d.scrollTop = keepDetail ? prevDetailTop : 0;
+  });
 }
+let _lastRenderedPO=null;
 // Give the list and detail their own bounded height so the list scrolls while the
 // opened card stays in view. Only on wide (two-column) layouts; narrow screens flow normally.
 function sizeCardPanes(){
