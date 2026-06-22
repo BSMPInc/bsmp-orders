@@ -507,6 +507,83 @@ tr:hover .del-btn{opacity:1}
 .pm-po{font-size:10.5px;font-weight:700;color:#46506a;background:#dde5f1;border-radius:5px;padding:1px 6px;flex-shrink:0}
 .pm-miss{display:inline-flex;align-items:center;color:#BA7517;font-size:13px;flex-shrink:0}
 .pm-miss i{font-size:13px}
+.risk-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;border:1px solid;border-radius:6px;padding:1px 7px;white-space:nowrap}
+.risk-badge i{font-size:12px}
+.risk-mini{display:inline-flex;align-items:center;font-size:13px;flex-shrink:0}
+/* ── Daily Dispatch ── */
+.disp-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:13px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
+.disp-date{font-size:16px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px}
+.disp-date i{color:#BA7517}
+.disp-counts{display:flex;gap:8px;flex-wrap:wrap}
+.disp-stat{font-size:12.5px;color:var(--text2);background:#eef1f6;border:1px solid var(--border);border-radius:18px;padding:5px 12px;display:inline-flex;align-items:center;gap:5px}
+.disp-stat b{color:var(--text);font-weight:800}
+.disp-stat.bad{background:#fbeaea;border-color:#f0c9c9;color:#A32D2D}.disp-stat.bad b{color:#A32D2D}
+.disp-stat.warn{background:#fbf1df;border-color:#f0ddb8;color:#BA7517}.disp-stat.warn b{color:#BA7517}
+.disp-group{background:var(--card);border:1px solid var(--border);border-radius:13px;margin-bottom:13px;overflow:hidden;box-shadow:var(--shadow)}
+.disp-group.none{border-color:#f0ddb8}
+.disp-phead{display:flex;align-items:center;gap:11px;padding:12px 16px;background:#fafbfd;border-bottom:1px solid var(--border)}
+.disp-group.none .disp-phead{background:#fdf8ee}
+.disp-pname{font-size:15px;font-weight:800;color:var(--text)}
+.disp-psub{font-size:11.5px;color:var(--text2);margin-top:1px}
+.disp-rows{display:flex;flex-direction:column}
+.disp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid #f1f3f7}
+.disp-row:last-child{border-bottom:none}
+.disp-row:hover{background:#f9fbfd}
+.disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:150px;flex-shrink:0}
+.disp-out{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a8553a;background:#a8553a14;border-radius:5px;padding:1px 6px;margin-left:2px}
+.disp-job{flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.disp-dates{font-size:11.5px;white-space:nowrap;flex-shrink:0}
+.disp-empty{text-align:center;color:var(--text3);padding:60px 20px;background:var(--card);border:1px solid var(--border);border-radius:13px}
+.disp-empty i{font-size:34px;display:block;margin-bottom:10px;opacity:.5}
+.disp-empty div{font-size:15px;font-weight:700;color:var(--text2)}
+.disp-empty span{font-size:12.5px;display:block;margin-top:4px;max-width:420px;margin-left:auto;margin-right:auto}
+/* ── AI Daily Brief ── */
+.brief-card{background:linear-gradient(180deg,#fbf9ff,#fff);border:1px solid #e4dcf3;border-radius:13px;padding:15px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
+.brief-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.brief-title{font-size:14px;font-weight:800;color:#5a3ea8;display:inline-flex;align-items:center;gap:7px}
+.brief-title i{font-size:17px}
+.brief-text{font-size:13.5px;line-height:1.55;color:var(--text)}
+.brief-p{margin:3px 0}
+.brief-li{display:flex;gap:7px;margin:3px 0}
+.brief-dot{color:#7a5cc0;font-weight:800;flex-shrink:0}
+.brief-meta{font-size:11px;color:var(--text3);margin-top:9px}
+.brief-empty{font-size:13px;color:var(--text2);line-height:1.5}
+.brief-loading{font-size:13px;color:#5a3ea8;display:flex;align-items:center;gap:8px;padding:6px 0}
+.brief-error{font-size:12.5px;color:var(--red);background:#fbeaea;border:1px solid #f0c9c9;border-radius:8px;padding:9px 11px;display:flex;align-items:flex-start;gap:7px}
+.brief-divider{height:1px;background:var(--border);margin:13px 0 11px}
+.ask-row{display:flex;gap:8px}
+.ask-input{flex:1;min-width:0;font-family:inherit;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:9px;background:#fff}
+.ask-input:focus{outline:none;border-color:#7a5cc0}
+.ask-answer{margin-top:11px}
+.ask-q{font-size:12px;font-weight:700;color:#5a3ea8;display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.spin{display:inline-block;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (pointer: coarse){ .ask-input{font-size:15px;padding:11px 12px} }
+/* ── Team Load (load-leveling by count) ── */
+.tl-card{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:13px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
+.tl-head{font-size:13px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:7px;margin-bottom:11px}
+.tl-head i{color:var(--navy);font-size:16px}
+.tl-sub{font-weight:500;color:var(--text3);font-size:11.5px}
+.tl-row{display:flex;align-items:center;gap:10px;padding:5px 0}
+.tl-row .pc-dot{flex-shrink:0}
+.tl-name{font-size:12.5px;font-weight:600;color:var(--text);width:120px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-track{flex:1;min-width:60px;height:14px;background:#eef1f6;border-radius:7px;overflow:hidden}
+.tl-fill{height:100%;border-radius:7px;min-width:2px;transition:width .3s}
+.tl-count{font-size:12px;font-weight:700;color:var(--text2);width:120px;flex-shrink:0;text-align:right}
+.tl-behind{color:var(--red);font-weight:700;font-size:10.5px;margin-left:3px}
+.tl-free{color:var(--text3);font-weight:500;font-size:10.5px;margin-left:3px;font-style:italic}
+.tl-row.none .tl-name{color:#BA7517}
+@media(max-width:760px){ .tl-name{width:90px} .tl-count{width:auto} }
+.badge-red{background:var(--red) !important;color:#fff !important}
+@media (pointer: coarse){
+  .disp-row{padding:14px 16px;gap:13px}
+  .disp-proc{font-size:14px}
+  .disp-job{font-size:14px}
+}
+@media(max-width:760px){
+  .disp-proc{min-width:0}
+  .disp-dates,.disp-job{white-space:normal}
+}
 .pm-mid{display:flex;align-items:center;gap:7px;margin-top:6px}
 .pm-part{font-size:10.5px;font-weight:700;color:#33405a;background:#eef2f8;border:1px solid #d7dde6;border-radius:5px;padding:1px 7px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
 .pm-part i{font-size:11px;color:#8a93a5}
@@ -631,6 +708,7 @@ tr:hover .del-btn{opacity:1}
   <div class="sidebar-section">
     <div class="sidebar-section-label mgr-only">Orders</div>
     <div class="sidebar-section-label op-only" style="display:none">Shop Floor</div>
+    <div class="nav-item mgr-only" id="nav-dispatch" onclick="showPage('dispatch')"><i class="ti ti-sun"></i> <span class="nav-label">Today</span><span class="nav-badge" id="badge-dispatch" style="display:none"></span></div>
     <div class="nav-item active mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
     <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
@@ -669,7 +747,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.47.0</div>
+    <div class="ver">v2.52.1</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -716,6 +794,7 @@ tr:hover .del-btn{opacity:1}
       </span>
       <button class="btn" id="hide-invoiced-btn" onclick="toggleHideInvoiced()" title="Invoiced POs always sink to the bottom; this hides them completely"><i class="ti ti-eye"></i> Hide invoiced</button>
       <button class="btn" id="incomplete-btn" onclick="toggleOnlyIncomplete()" title="Show only orders missing a due date, qty, price, description, or drawing"><i class="ti ti-alert-triangle"></i> Missing info</button>
+      <button class="btn" id="atrisk-btn" onclick="toggleOnlyAtRisk()" title="Show only jobs that are behind or must start now to make their due date"><i class="ti ti-clock-exclamation"></i> At risk</button>
       <div class="view-toggle">
         <button id="vt-card" onclick="setViewMode('card')"><i class="ti ti-layout-grid"></i> Cards</button>
         <button id="vt-table" onclick="setViewMode('table')"><i class="ti ti-table"></i> Table</button>
@@ -770,6 +849,14 @@ tr:hover .del-btn{opacity:1}
       </div>
       <div id="customer-list" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
     </div>
+  </div>
+
+  <!-- Today / Daily Dispatch Page -->
+  <div id="dispatch-page" style="display:none">
+    <div id="dispatch-summary"></div>
+    <div id="dispatch-brief"></div>
+    <div id="dispatch-load"></div>
+    <div id="dispatch-body"></div>
   </div>
 
   <!-- Team Page -->
@@ -1247,7 +1334,7 @@ const ordersRef = ref(db, 'orders');
 const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
 const STATUS_CLASS = {'Confirmed':'s-confirmed','In Progress':'s-in-progress','QC':'s-qc','Ready for Invoice':'s-ready','Invoiced':'s-invoiced','Completed':'s-completed','Need Purchase Order':'s-need-po'};
 const STATUS_ACCENT = {'Confirmed':'#1a4a90','In Progress':'#b07a00','QC':'#5a45c0','Ready for Invoice':'#4a8a1a','Invoiced':'#0a7050','Completed':'#8a93a5','Need Purchase Order':'#b53030'};
-const INTERNAL_PROCESSES = ['Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly'];
+const INTERNAL_PROCESSES = ['Purchasing','Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly','Delivery'];
 const EXTERNAL_PROCESSES = ['Purchasing- Material','Purchasing- Hardware','Purchasing- Tooling','Outsource- Plating','Outsource- Paint','Outsource- Machining','Outsource- Other'];
 const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 const EXTERNAL_SET = new Set(EXTERNAL_PROCESSES);
@@ -1255,8 +1342,9 @@ function isExternal(name){ return EXTERNAL_SET.has(name); }
 function procUnit(name){ return isExternal(name) ? 'd' : 'h'; }
 // Colors are grouped (not per-process) to keep the calendar, queues and cards calm:
 // one tone for all in-house work, one for purchasing, one for outsourcing.
-const GROUP_COLORS = { internal:'#64748B', purchasing:'#C08A2E', outsource:'#A8443A' };
+const GROUP_COLORS = { internal:'#64748B', purchasing:'#C08A2E', outsource:'#A8443A', delivery:'#2C7A7B' };
 const PROCESS_COLORS = {
+  'Purchasing':GROUP_COLORS.purchasing,
   'Program':GROUP_COLORS.internal,
   'Laser':GROUP_COLORS.internal,
   'Shear/Sawing':GROUP_COLORS.internal,
@@ -1265,6 +1353,7 @@ const PROCESS_COLORS = {
   'Machining':GROUP_COLORS.internal,
   'Weld':GROUP_COLORS.internal,
   'Hardware/Assembly':GROUP_COLORS.internal,
+  'Delivery':GROUP_COLORS.delivery,
   'Purchasing- Material':GROUP_COLORS.purchasing,'Purchasing- Hardware':GROUP_COLORS.purchasing,'Purchasing- Tooling':GROUP_COLORS.purchasing,
   'Outsource- Plating':GROUP_COLORS.outsource,'Outsource- Paint':GROUP_COLORS.outsource,'Outsource- Machining':GROUP_COLORS.outsource,'Outsource- Other':GROUP_COLORS.outsource
 };
@@ -1272,6 +1361,8 @@ const PROCESS_COLORS = {
 // (industrial style) so the detail panel shows an icon instead of a long label.
 // Full name shows on hover.
 const PROC_ICON_PATHS = {
+  'Purchasing':'<path d="M2.4 4.4h2.3l.62 2.4H20l-2.1 7.2H8.1l-.28 1.25H18.4v1.75H6.3L3.7 5.85l-1.3-.3z"/><circle cx="9.3" cy="19.2" r="1.65"/><circle cx="16.6" cy="19.2" r="1.65"/>',
+  'Delivery':'<rect x="1.8" y="6.6" width="11" height="8.4" rx="1"/><path d="M12.8 9.2h3.9l3.3 3.3v2.5h-7.2z"/><circle cx="6.3" cy="17" r="1.95"/><circle cx="16.7" cy="17" r="1.95"/>',
   'Program':'<path fill-rule="evenodd" d="M3.5 4h17a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1 -1.5 1.5h-17A1.5 1.5 0 0 1 2 13.5v-8A1.5 1.5 0 0 1 3.5 4zm1.5 2.6v5.8h14V6.6z"/><path d="M7 8.2l2.6 1.6L7 11.4v-1.3l1-.3-1-.3z"/><rect x="11" y="10.8" width="4.2" height="1.1" rx=".5"/><path d="M9 16h6l1.1 2.1h-8.2z"/><rect x="6.6" y="18" width="10.8" height="1.7" rx=".85"/>',
   'Laser':'<path d="M9 3h6v3l-1.4 2h-3.2l-1.4 -2z"/><path d="M11.1 9l.9 5 .9 -5z"/><rect x="3.5" y="17.4" width="17" height="2.4" rx="1.2"/><circle cx="9.6" cy="16.2" r=".85"/><circle cx="14.4" cy="16.2" r=".85"/><circle cx="12" cy="17.1" r=".85"/>',
   'Shear/Sawing':'<rect x="2.5" y="17.6" width="19" height="2.4" rx=".6"/><rect x="2.5" y="13.2" width="19" height="2" rx=".5" opacity=".55"/><path d="M3.2 4.4l17.6 6.4 -17.6 2.2z"/><circle cx="4.4" cy="5.3" r="1.15"/>',
@@ -1312,6 +1403,7 @@ let cardSortKey='due', cardSortDir=1; // due | customer | value | status | newes
 let selectedPO=null;                 // master-detail: which PO group is shown on the right
 let hideInvoiced=false;              // toggle: remove fully-invoiced POs from the active list
 let onlyIncomplete=false;            // toggle: show only orders missing key info
+let onlyAtRisk=false;               // toggle: show only behind / tight jobs
 const DONE_STATUSES=new Set(['Invoiced']);     // statuses treated as "done" → sink to bottom / hide
 function isDoneRow(r){ return DONE_STATUSES.has(r.status); }
 function isDoneGroup(items){ return items.length>0 && items.every(isDoneRow); }
@@ -1383,6 +1475,10 @@ function updateNavBadges(){
   const set=(id,n)=>{const el=document.getElementById(id);if(!el)return;if(n>0){el.textContent=n;el.style.display='';}else{el.style.display='none';}};
   set('badge-ready', active.filter(r=>r.status==='Ready for Invoice').length);
   set('badge-needpo', active.filter(r=>r.status==='Need Purchase Order').length);
+  // "Today" badge = jobs whose current step is behind schedule
+  const behind=active.filter(r=>!['Completed','Invoiced'].includes(r.status) && jobHealth(r).state==='behind').length;
+  const db=document.getElementById('badge-dispatch');
+  if(db){ if(behind>0){ db.textContent=behind; db.style.display=''; db.classList.add('badge-red'); } else db.style.display='none'; }
 }
 function render(){
   invalidateSched();
@@ -1515,6 +1611,7 @@ function poGroups(){
   if(sf) live=live.filter(r=>r.status===sf);
   if(pf) live=live.filter(r=>r.currentProcess===pf||(r.completedProcesses||[]).includes(pf));
   if(onlyIncomplete) live=live.filter(r=>isIncomplete(r));
+  if(onlyAtRisk) live=live.filter(r=>['behind','today','soon'].includes(jobHealth(r).state));
   const map=new Map();
   live.forEach(r=>{const k=r.customer+'||'+(r.po||'verbal');if(!map.has(k))map.set(k,[]);map.get(k).push(r);});
   const groups=[];
@@ -1539,7 +1636,7 @@ function poGroups(){
     const incompleteItems=items.filter(r=>isIncomplete(r));
     groups.push({gk,items:sortedItems,customer:items[0].customer||'',po:items[0].po||'verbal',
       gtotal,gqty,statuses,overdue,gdue,gdays,dueOverdue,payRoll,newest,doneRank,allInvoiced:isDoneGroup(items),
-      incompleteCount:incompleteItems.length});
+      incompleteCount:incompleteItems.length, health:groupHealth(items)});
   });
   return groups;
 }
@@ -1625,12 +1722,13 @@ function condensedCard(g){
   const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
   const missTip=g.incompleteCount?`${g.incompleteCount} item${g.incompleteCount!==1?'s':''} missing info`:'';
   const missBadge=g.incompleteCount?`<span class="pm-miss" title="${missTip}"><i class="ti ti-alert-triangle"></i></span>`:'';
+  const riskChip=healthBadge(g.health);
   return `<div class="po-mini${g.gk===selectedPO?' active':''}${g.allInvoiced?' done':(g.doneRank===1?' done-soft':'')}" onclick="window._selPO('${gkE}')">
     <div class="pm-accent" style="background:${accColor}"></div>
     <div class="pm-top"><span class="pm-cust">${g.customer||'—'}</span>${missBadge}<span class="pm-po">#${g.po}</span></div>
     <div class="pm-mid">${partChip}<span class="pm-count">${g.items.length} item${g.items.length!==1?'s':''}</span></div>
     <div class="pm-bot"><span class="pm-due" style="${g.dueOverdue?'color:var(--red);font-weight:600':''}">${g.overdue?'● ':''}${dueVal}</span><span class="pm-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
-    <div class="pm-status">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span></div>
+    <div class="pm-status">${riskChip}${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span></div>
   </div>`;
 }
 
@@ -1746,6 +1844,12 @@ window.toggleOnlyIncomplete=()=>{
   if(b) b.classList.toggle('active',onlyIncomplete);
   render();
 };
+window.toggleOnlyAtRisk=()=>{
+  onlyAtRisk=!onlyAtRisk;
+  const b=document.getElementById('atrisk-btn');
+  if(b) b.classList.toggle('active',onlyAtRisk);
+  render();
+};
 
 
 function lineRow(r,ind){
@@ -1800,13 +1904,19 @@ function detailInner(r){
   const computed=computeStepDates(r);
   const computedMap={}; computed.forEach(c=>computedMap[c.name]=c);
   const ord=enabledOrdered(sch);
+  const msInfo=computeMustStart(r);
+  const msMap={}; if(msInfo) msInfo.perStep.forEach((x,i)=>{ if(x) msMap[i]=x; });
+  const todayWS=atWorkStart(new Date(new Date().toDateString())).getTime();
   const seqRows = ord.map((step,idx)=>{
     const p=step.name; const ext=isExternal(p);
     const cd=computedMap[p];
     const done=!!step.done;
     const qtyNeeded=r.qty||0;
+    const ms=msMap[idx];
+    const msLate = ms && !done && ms.mustStart.getTime() < todayWS;
     let dateLabel='';
     if(done){ dateLabel = step.doneAt ? `done ${fmtDate(step.doneAt.slice(0,10))}` : 'done'; }
+    else if(ms){ dateLabel = `<span style="color:${msLate?'var(--red)':'var(--text2)'};font-weight:${msLate?'700':'400'}" title="Latest this step can start to make the due date">start by ${fmtDate(toISO(ms.mustStart))}</span>`; }
     else if(ext && cd){ dateLabel = `${fmtDate(toISO(cd.start))} → ${fmtDate(toISO(cd.end))}`; }
     else if(!ext){ dateLabel = stepStatus(r,p)==='ready' ? 'ready' : 'waiting'; }
     const anchorIcon = (ext && step.start) ? `<i class="ti ti-pin" style="font-size:12px;color:var(--blue)" title="Manual anchor"></i>` : '';
@@ -1847,7 +1957,8 @@ function detailInner(r){
       ${subLabel('External')}
       <div class="process-grid">${procBtns(EXTERNAL_PROCESSES)}</div>
       <div style="margin-top:6px;font-size:11px;color:var(--text3)">Click → active · click again → done · click done to clear</div>
-      <div class="detail-label" style="margin-top:16px">Production Schedule${progressPill}</div>
+      <div class="detail-label" style="margin-top:16px">Production Schedule${progressPill}${msInfo&&HEALTH_META[msInfo.state]?`<span style="margin-left:8px">${healthBadge(msInfo)}</span>`:''}</div>
+      ${msInfo&&HEALTH_META[msInfo.state]?`<div style="font-size:11.5px;color:${HEALTH_META[msInfo.state].color};margin-bottom:6px">${healthTip(msInfo)}.</div>`:''}
       <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps are tracked on the Work Queues page (check off or enter parts completed). External steps are lead-time gates in business days that drive the calendar/Gantt; set a date to pin one as a fixed anchor (📌).</div>
       ${ord.length ? `<div class="sched-steps">${seqRows}</div>` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them below in the order they should run.</div>`}
       ${subLabel('Add internal step')}
@@ -2505,6 +2616,7 @@ function autoIndexCustomer(name, poNotes) {
 
 // ── Page switching ─────────────────────────────────────────────────────────────
 const PAGE_META = {
+  dispatch: {title:'Today',          sub:'Each person\u2019s tasks for today, most urgent first'},
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   queues:   {title:'Work Queues',    sub:'Shop-floor task lists grouped by process'},
   customers:{title:'Customers',      sub:'Customer index & PO format notes'},
@@ -2518,7 +2630,7 @@ const PAGE_META = {
 };
 window.showPage = (page) => {
   if(userRole==='operator') page='queues';   // operators are locked to Work Queues
-  ['orders','queues','customers','team','schedule','needpo','issuedpos','cutlist','archive','settings'].forEach(p=>{
+  ['orders','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -2529,6 +2641,7 @@ window.showPage = (page) => {
   document.getElementById('topbar-ai-btn').style.display = ordersOnly ? '' : 'none';
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
+  if(page==='dispatch') document.getElementById('nav-dispatch')?.classList.add('active');
   if(page==='queues') document.getElementById('nav-queues')?.classList.add('active');
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
   if(page==='team') document.getElementById('nav-team')?.classList.add('active');
@@ -2539,6 +2652,7 @@ window.showPage = (page) => {
   if(page==='archive') document.getElementById('nav-archive')?.classList.add('active');
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
   if(page==='queues') renderQueues();
+  if(page==='dispatch') renderDispatch();
   if(page==='customers') renderCustomers();
   if(page==='team') renderTeam();
   if(page==='schedule') renderSchedule();
@@ -2704,6 +2818,258 @@ function renderQueues(){
     </tr></thead>
     <tbody>${trs}</tbody>
   </table></div>`;
+}
+
+// ══════════════ DAILY DISPATCH — "Today" board ══════════════
+// One row per active job = its current actionable step (first not-done, upstream complete),
+// grouped by the assigned person, sorted by must-start urgency. The morning stand-up screen.
+function dispatchItems(){
+  const live = orders.filter(r=>!r.archived && !['Completed','Invoiced'].includes(r.status));
+  const items=[];
+  live.forEach(r=>{
+    const ord=enabledOrdered(ensureSchedule(r));
+    const cur=ord.find(s=>!s.done);     // current actionable step (all earlier ones done)
+    if(!cur) return;
+    items.push({r, step:cur, health:jobHealth(r), ext:isExternal(cur.name)});
+  });
+  return items;
+}
+function renderDispatch(){
+  const sumEl=document.getElementById('dispatch-summary');
+  const body=document.getElementById('dispatch-body');
+  if(!body) return;
+  const items=dispatchItems();
+  const prio=r=>(r.priority==null?2:r.priority);
+  const dueVal=r=>r.due?new Date(r.due+'T00:00:00').getTime():8.64e15;
+  const msVal=it=>it.health.mustStart?it.health.mustStart.getTime():8.64e15;
+  const cmp=(a,b)=>(HEALTH_RANK[a.health.state]-HEALTH_RANK[b.health.state])||(msVal(a)-msVal(b))||(prio(a.r)-prio(b.r))||(dueVal(a.r)-dueVal(b.r));
+
+  const behindN=items.filter(i=>i.health.state==='behind').length;
+  const todayN=items.filter(i=>i.health.state==='today').length;
+  const dateStr=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  if(sumEl) sumEl.innerHTML=`<div class="disp-summary">
+    <div class="disp-date"><i class="ti ti-sun"></i> ${dateStr}</div>
+    <div class="disp-counts">
+      <span class="disp-stat"><b>${items.length}</b> task${items.length!==1?'s':''} ready</span>
+      ${behindN?`<span class="disp-stat bad"><i class="ti ti-alert-triangle-filled"></i> <b>${behindN}</b> behind</span>`:''}
+      ${todayN?`<span class="disp-stat warn"><i class="ti ti-clock-exclamation"></i> <b>${todayN}</b> start today</span>`:''}
+    </div></div>`;
+
+  if(!items.length){
+    body.innerHTML=`<div class="disp-empty"><i class="ti ti-coffee"></i><div>Nothing ready to dispatch right now</div><span>Every active job is either waiting on an upstream step or already moving. Check back as steps get completed.</span></div>`;
+    renderDailyBrief(); renderTeamLoad();
+    return;
+  }
+
+  const groups=new Map();
+  items.forEach(it=>{ const k=it.step.assignee && personById(it.step.assignee) ? it.step.assignee : '__none__'; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
+  groups.forEach(arr=>arr.sort(cmp));
+  const worst=k=>Math.min(...groups.get(k).map(i=>HEALTH_RANK[i.health.state]));
+  let keys=[...groups.keys()].sort((a,b)=>{
+    if(a==='__none__') return 1; if(b==='__none__') return -1;
+    return (worst(a)-worst(b)) || ((personById(a)?.name||'').localeCompare(personById(b)?.name||''));
+  });
+
+  body.innerHTML = keys.map(k=>{
+    const arr=groups.get(k); const none=k==='__none__'; const person=none?null:personById(k);
+    const behindCount=arr.filter(i=>i.health.state==='behind').length;
+    const head = none
+      ? `<div class="disp-phead none"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${arr.length} ready step${arr.length!==1?'s':''} with no owner — assign someone</div></div></div>`
+      : `<div class="disp-phead"><span class="pc-dot lg" style="background:${person?.color||'#888'}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div></div>`;
+    return `<div class="disp-group${none?' none':''}">${head}<div class="disp-rows">${arr.map(dispatchRow).join('')}</div></div>`;
+  }).join('');
+  renderDailyBrief(); renderTeamLoad();
+}
+function dispatchRow(it){
+  const {r, step, health, ext}=it;
+  const col=PROCESS_COLORS[step.name]||'#888';
+  const due=r.due?fmtDate(r.due):'—';
+  const dueOver=r.due && new Date(r.due+'T00:00:00')<new Date(new Date().toDateString());
+  const ms=health.mustStart?fmtDate(toISO(health.mustStart)):'';
+  const msLate=health.state==='behind';
+  const esc=s=>esc2(s);
+  const qtyCtl = ext ? '' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
+  const assignCtl = team.length ? `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : '';
+  return `<div class="disp-row">
+    <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
+    <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
+    <div class="disp-job"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</div>
+    ${healthBadge(health)}
+    <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span> · `:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
+    ${qtyCtl}
+    ${assignCtl}
+    <button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>
+  </div>`;
+}
+
+// ══════════════ AI DAILY STAND-UP ══════════════
+// The schedule logic computes the facts; the AI only narrates the snapshot we hand it.
+const AI_WORKER='https://bsmp-ai-extract.frosty-fog-1f12.workers.dev';
+let _brief = { text:'', at:'', loading:false, error:'' };
+let _ask   = { q:'', answer:'', loading:false, error:'' };
+try{ const c=JSON.parse(localStorage.getItem('bsmp_daily_brief')||'null'); if(c && c.date===new Date().toDateString()){ _brief.text=c.text; _brief.at=c.at; } }catch{}
+
+function buildDispatchSnapshot(){
+  const items=dispatchItems();
+  const nameOf=id=>{ const p=personById(id); return p?p.name:null; };
+  const rec=it=>({
+    customer:it.r.customer||'', job:it.r.job||'', part:it.r.part||it.r.desc||'',
+    step:shortProc(it.step.name), outside:!!it.ext,
+    assignee: it.step.assignee?nameOf(it.step.assignee):null,
+    state: it.health.state,
+    daysBehind: it.health.state==='behind' ? Math.abs(it.health.slackDays) : 0,
+    startBy: it.health.mustStart?toISO(it.health.mustStart):null,
+    due: it.r.due||null
+  });
+  const all=items.map(rec);
+  const behind=all.filter(x=>x.state==='behind').sort((a,b)=>b.daysBehind-a.daysBehind);
+  const startToday=all.filter(x=>x.state==='today');
+  const soon=all.filter(x=>x.state==='soon');
+  const pmap=new Map();
+  all.forEach(x=>{ const nm=x.assignee||'Unassigned'; if(!pmap.has(nm)) pmap.set(nm,{name:nm,tasks:0,behind:0}); const e=pmap.get(nm); e.tasks++; if(x.state==='behind')e.behind++; });
+  const byPerson=[...pmap.values()].sort((a,b)=>b.behind-a.behind||b.tasks-a.tasks);
+  const unassigned=all.filter(x=>!x.assignee);
+  const toSendOut=all.filter(x=>x.outside);
+  return {
+    date:new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}),
+    totals:{activeJobs:items.length, behind:behind.length, startToday:startToday.length, startSoon:soon.length, unassigned:unassigned.length},
+    behind:behind.slice(0,15), startToday:startToday.slice(0,15), startSoon:soon.slice(0,10),
+    workloadByPerson:byPerson, unassignedReady:unassigned.slice(0,15), outsideWorkToSend:toSendOut.slice(0,15)
+  };
+}
+async function aiNarrate(promptText){
+  const resp=await fetch(AI_WORKER,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:700,messages:[{role:'user',content:promptText}]})});
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message||'API error');
+  const t=(data.content||[]).map(c=>c.text||'').join('').trim();
+  if(!t) throw new Error('Empty response');
+  return t;
+}
+const BRIEF_PROMPT=`You are the operations assistant for Bert's Sheet Metal Products, a metal fabrication shop. Below is today's production status, ALREADY COMPUTED from the schedule. Treat every number and job as authoritative — do not recalculate, invent jobs, or add details that are not present. Write a brief, plain-English morning stand-up for the shop manager.
+Rules:
+- 3 to 6 short lines or sentences. No heading, no preamble, no sign-off.
+- Lead with what is behind schedule and which person needs to act (use the assignee names).
+- Call out any outside work / purchase orders that should be sent out today.
+- Name the single biggest risk to on-time delivery (the "long pole") if there is one.
+- Flag anything with no owner that needs assigning.
+- If nothing is behind, say so plainly and mention what is coming up.
+Be concrete and scannable; use the exact customer and job names. You may use short "- " bullet lines.
+
+TODAY'S STATUS (JSON):
+`;
+const ASK_PROMPT=`You are the operations assistant for Bert's Sheet Metal Products. Answer the manager's question using ONLY the production-status data below (already computed — never invent, recompute, or assume jobs/dates not present). Be concise and specific, naming the relevant jobs, customers, and people. If the data does not contain the answer, say so in one sentence.
+
+QUESTION: %Q%
+
+PRODUCTION STATUS (JSON):
+`;
+window.genDailyBrief=async ()=>{
+  _brief.loading=true; _brief.error=''; renderDailyBrief();
+  try{
+    const snap=buildDispatchSnapshot();
+    const text=await aiNarrate(BRIEF_PROMPT+JSON.stringify(snap));
+    _brief.text=text; _brief.at=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    try{ localStorage.setItem('bsmp_daily_brief', JSON.stringify({date:new Date().toDateString(), text, at:_brief.at})); }catch{}
+  }catch(e){ _brief.error=e.message||'Could not generate brief'; }
+  _brief.loading=false; renderDailyBrief();
+};
+window.askDispatch=async ()=>{
+  const inp=document.getElementById('ask-input'); const q=(inp?.value||'').trim();
+  if(!q){ return; }
+  _ask.q=q; _ask.loading=true; _ask.error=''; _ask.answer=''; renderDailyBrief();
+  try{
+    const snap=buildDispatchSnapshot();
+    const answer=await aiNarrate(ASK_PROMPT.replace('%Q%', q)+JSON.stringify(snap));
+    _ask.answer=answer;
+  }catch(e){ _ask.error=e.message||'Could not answer'; }
+  _ask.loading=false; renderDailyBrief();
+  const i=document.getElementById('ask-input'); if(i) i.value=_ask.q;
+};
+window.askKey=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); askDispatch(); } };
+function fmtBrief(t){
+  const lines=(t||'').split(/\n+/).map(l=>l.trim()).filter(Boolean);
+  return lines.map(l=>{
+    const s=esc2(l.replace(/^[-•*]\s+/,'')).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+    return /^[-•*]\s+/.test(l) ? `<div class="brief-li"><span class="brief-dot">•</span><span>${s}</span></div>` : `<div class="brief-p">${s}</div>`;
+  }).join('');
+}
+function renderDailyBrief(){
+  const host=document.getElementById('dispatch-brief'); if(!host) return;
+  const hasItems = dispatchItems().length>0;
+  const briefBody = _brief.loading
+    ? `<div class="brief-loading"><i class="ti ti-loader-2 spin"></i> Reading today's schedule…</div>`
+    : _brief.error
+      ? `<div class="brief-error"><i class="ti ti-alert-triangle"></i> ${esc2(_brief.error)}. The board below is still accurate — try again in a moment.</div>`
+      : _brief.text
+        ? `<div class="brief-text">${fmtBrief(_brief.text)}</div><div class="brief-meta">Generated ${esc2(_brief.at)} from the current board — always double-check against the jobs below.</div>`
+        : `<div class="brief-empty">Get a plain-English summary of today's priorities — what's behind, who needs to act, and what to send out.</div>`;
+  const askBody = _ask.loading
+    ? `<div class="brief-loading"><i class="ti ti-loader-2 spin"></i> Thinking…</div>`
+    : _ask.error
+      ? `<div class="brief-error"><i class="ti ti-alert-triangle"></i> ${esc2(_ask.error)}</div>`
+      : _ask.answer
+        ? `<div class="ask-answer"><div class="ask-q"><i class="ti ti-message-2"></i> ${esc2(_ask.q)}</div><div class="brief-text">${fmtBrief(_ask.answer)}</div></div>`
+        : '';
+  host.innerHTML = `<div class="brief-card">
+    <div class="brief-head">
+      <span class="brief-title"><i class="ti ti-sparkles"></i> AI Daily Brief</span>
+      <button class="btn ${_brief.text?'':'green'}" onclick="genDailyBrief()" ${_brief.loading?'disabled':''}>
+        <i class="ti ti-${_brief.loading?'loader-2 spin':(_brief.text?'refresh':'wand')}"></i> ${_brief.text?'Refresh':'Write today’s brief'}</button>
+    </div>
+    ${briefBody}
+    <div class="brief-divider"></div>
+    <div class="ask-row">
+      <input id="ask-input" class="ask-input" placeholder="Ask about your schedule — e.g. “what's at risk this week?”" onkeydown="askKey(event)" value="${esc2(_ask.q)}">
+      <button class="btn" onclick="askDispatch()" ${_ask.loading?'disabled':''}><i class="ti ti-arrow-right"></i> Ask</button>
+    </div>
+    ${askBody}
+  </div>`;
+}
+
+// ══════════════ TEAM LOAD — load-leveling by task count (no hours) ══════════════
+function teamLoad(){
+  const live = orders.filter(r=>!r.archived && !['Completed','Invoiced'].includes(r.status));
+  const load = new Map();   // personId -> {today, behind}
+  team.forEach(p=>load.set(p.id,{today:0, behind:0}));
+  let unassigned=0, unassignedBehind=0;
+  live.forEach(r=>{
+    const ord=enabledOrdered(ensureSchedule(r));
+    const cur=ord.find(s=>!s.done);
+    if(!cur) return;
+    const behind = jobHealth(r).state==='behind';
+    if(cur.assignee && load.has(cur.assignee)){ const e=load.get(cur.assignee); e.today++; if(behind) e.behind++; }
+    else if(!cur.assignee){ unassigned++; if(behind) unassignedBehind++; }
+  });
+  return {load, unassigned, unassignedBehind};
+}
+function renderTeamLoad(){
+  const host=document.getElementById('dispatch-load'); if(!host) return;
+  if(!team.length){ host.innerHTML=''; return; }
+  const {load, unassigned, unassignedBehind}=teamLoad();
+  const rows=team.map(p=>({p, ...load.get(p.id)}));
+  const maxN=Math.max(1, unassigned, ...rows.map(r=>r.today));
+  rows.sort((a,b)=>(b.behind-a.behind)||(b.today-a.today)||a.p.name.localeCompare(b.p.name));
+  const bar=(n,behind,color)=>{
+    const pct=Math.round(n/maxN*100);
+    return `<div class="tl-track"><div class="tl-fill" style="width:${pct}%;background:${behind?'var(--red)':color}"></div></div>`;
+  };
+  const personRow=r=>`<div class="tl-row">
+    <span class="pc-dot" style="background:${r.p.color||'#888'}">${personInitials(r.p.name)}</span>
+    <span class="tl-name">${esc2(r.p.name)}</span>
+    ${bar(r.today, r.behind, r.p.color||'#3a6ea5')}
+    <span class="tl-count">${r.today}${r.behind?` <span class="tl-behind">${r.behind} behind</span>`:''}${r.today===0?'<span class="tl-free">free</span>':''}</span>
+  </div>`;
+  const unRow = unassigned ? `<div class="tl-row none">
+    <span class="pc-dot" style="background:#BA7517"><i class="ti ti-help" style="font-size:12px"></i></span>
+    <span class="tl-name">Unassigned</span>
+    ${bar(unassigned, unassignedBehind, '#BA7517')}
+    <span class="tl-count">${unassigned}${unassignedBehind?` <span class="tl-behind">${unassignedBehind} behind</span>`:''}</span>
+  </div>` : '';
+  host.innerHTML=`<div class="tl-card">
+    <div class="tl-head"><i class="ti ti-scale"></i> Team load <span class="tl-sub">— active jobs on each person right now</span></div>
+    ${rows.map(personRow).join('')}
+    ${unRow}
+  </div>`;
 }
 
 function renderArchive(){
@@ -2958,6 +3324,72 @@ function stepStatus(r, name){
 
 function getSched(){ if(!_schedCache) _schedCache = computeGlobalSchedule(); return _schedCache; }
 function computeStepDates(r){ return getSched().get(r.id) || []; }
+
+// ══════════════ BACKWARD SCHEDULING — "must-start-by" engine ══════════════
+// Walk backward from the due date through each step's duration (business days)
+// to find the latest each step can start and still make the date. The first
+// not-done step's must-start vs. today tells us if the job is behind / tight.
+function subBusinessDays(date, days){
+  let d=atWorkStart(new Date(date)), n=Math.max(0,Math.ceil(days)), removed=0;
+  while(removed<n){ d=addDays(d,-1); if(!isWeekend(d)) removed++; }
+  return atWorkStart(d);
+}
+function bizDaysBetween(a,b){ // signed business days from a to b (+ if b later)
+  let from=atWorkStart(new Date(a)), to=atWorkStart(new Date(b));
+  if(from.getTime()===to.getTime()) return 0;
+  const sign = to>from?1:-1; let d=new Date(from), cnt=0, guard=0;
+  while(atWorkStart(d).getTime()!==to.getTime() && guard++<100000){ d=addDays(d,sign); if(!isWeekend(d)) cnt+=sign; }
+  return cnt;
+}
+function computeMustStart(r){
+  const sch=ensureSchedule(r); const steps=enabledOrdered(sch);
+  if(!steps.length || !r.due) return null;          // need a due date and steps
+  if(steps.every(s=>s.done)) return null;           // everything done
+  const due=atWorkStart(new Date(r.due+'T00:00:00'));
+  let mustFinish=due; const perStep=new Array(steps.length);
+  for(let i=steps.length-1;i>=0;i--){
+    const s=steps[i];
+    const dur=Math.max(1, Math.ceil(s.duration ?? defDur(s.name)));   // ≥1 business day per step
+    const mStart=subBusinessDays(mustFinish, dur);
+    perStep[i]={name:s.name, mustStart:mStart, mustFinish, done:!!s.done};
+    mustFinish=mStart;
+  }
+  const idx=steps.findIndex(s=>!s.done); if(idx<0) return null;
+  const firstMS=perStep[idx].mustStart;
+  const today=atWorkStart(new Date(new Date().toDateString()));
+  const slack=bizDaysBetween(today, firstMS);        // + future buffer, − days behind
+  let state = slack<0?'behind' : slack===0?'today' : slack<=2?'soon' : 'ontrack';
+  return {state, slackDays:slack, mustStart:firstMS, firstStep:perStep[idx].name, perStep, due, steps};
+}
+const HEALTH_RANK = {behind:0, today:1, soon:2, ontrack:3, none:4};
+function jobHealth(r){
+  if(r.archived || ['Completed','Invoiced'].includes(r.status)) return {state:'none'};
+  return computeMustStart(r) || {state:'none'};
+}
+function groupHealth(items){
+  let worst={state:'none'};
+  items.forEach(r=>{ const h=jobHealth(r); if(HEALTH_RANK[h.state] < HEALTH_RANK[worst.state]) worst=h; });
+  return worst;
+}
+const HEALTH_META = {
+  behind:{label:'Behind',  color:'#A32D2D', bg:'#fbeaea', border:'#f0c9c9', icon:'alert-triangle-filled'},
+  today: {label:'Start today', color:'#BA7517', bg:'#fbf1df', border:'#f0ddb8', icon:'clock-exclamation'},
+  soon:  {label:'Start soon',  color:'#BA7517', bg:'#fbf6ec', border:'#efe4cf', icon:'clock'}
+};
+function healthTip(h){
+  if(!h||h.state==='none'||h.state==='ontrack') return '';
+  const by = h.mustStart?fmtDate(toISO(h.mustStart)):'';
+  const due = h.due?fmtDate(toISO(h.due)):'';
+  if(h.state==='behind') return `${shortProc(h.firstStep)} should have started by ${by} — ${Math.abs(h.slackDays)} business day${Math.abs(h.slackDays)!==1?'s':''} behind to make the ${due} due date`;
+  if(h.state==='today') return `${shortProc(h.firstStep)} must start today to make the ${due} due date`;
+  return `${shortProc(h.firstStep)} must start by ${by} (in ${h.slackDays} day${h.slackDays!==1?'s':''}) to make ${due}`;
+}
+function healthBadge(h, mini){
+  if(!h || !HEALTH_META[h.state]) return '';
+  const m=HEALTH_META[h.state];
+  if(mini) return `<span class="risk-mini" style="color:${m.color}" title="${healthTip(h).replace(/"/g,'&quot;')}"><i class="ti ti-${m.icon}"></i></span>`;
+  return `<span class="risk-badge" style="color:${m.color};background:${m.bg};border-color:${m.border}" title="${healthTip(h).replace(/"/g,'&quot;')}"><i class="ti ti-${m.icon}"></i>${m.label}</span>`;
+}
 
 // Sent / received marking for external steps (Incoming/Outgoing board).
 function _extStep(id, name){
@@ -3573,9 +4005,11 @@ function confirmDone(process, partLabel, jobLabel, onYes, onCancel){
 // Re-render whichever page is currently visible (so queue/schedule update too, not just Orders)
 function refreshActivePage(){
   invalidateSched();
+  if(document.getElementById('dispatch-page')?.style.display !== 'none'){ renderDispatch(); updateNavBadges&&updateNavBadges(); return; }
   if(document.getElementById('queues-page')?.style.display !== 'none'){ renderQueues(); return; }
   if(document.getElementById('schedule-page')?.style.display !== 'none'){ renderSchedule(); }
   render();
+  updateNavBadges&&updateNavBadges();
 }
 window._stepDuration = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
