@@ -123,6 +123,9 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .entry.ar.sel{border-left-color:var(--ar)}.entry.ap.sel{border-left-color:var(--ap)}
 /* list search box */
 .list-search{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 11px;min-width:240px}
+.sort-ctl{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 10px;cursor:pointer}
+.sort-ctl i{font-size:15px;color:var(--text3)}
+.sort-ctl select{border:none;background:transparent;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;outline:none}
 .list-search:focus-within{border-color:var(--navy)}
 .list-search i{color:var(--text3);font-size:15px}
 .list-search input{border:none;outline:none;font-family:inherit;font-size:13px;width:100%;background:transparent;color:var(--text)}
@@ -916,7 +919,7 @@ function updateBadges(entries){
   set('nb-trash',trashedEntries().length);
 }
 // list view state (per side): search text, group-by-vendor, selected ids
-const listState={ar:{q:'',group:false,sel:new Set()},ap:{q:'',group:false,sel:new Set()}};
+const listState={ar:{q:'',group:false,sort:'due',sel:new Set()},ap:{q:'',group:false,sort:'due',sel:new Set()}};
 let _curSide='ap';
 function entryCard(e,opts){
   opts=opts||{};
@@ -977,11 +980,38 @@ function renderDash(entries){
     </div>
     <div class="board">${colHtml('ar',entries)}${colHtml('ap',entries)}</div>`;
 }
+// Sort a list of entries by the chosen key for the AR/AP views.
+const LIST_SORTS=[
+  {k:'due',label:'Due date'},
+  {k:'issue',label:'Date (issued)'},
+  {k:'until',label:'Days until due'},
+  {k:'amount',label:'Amount'}
+];
+function sortListBy(arr,key){
+  const a2=[...arr];
+  if(key==='issue'){
+    a2.sort((a,b)=>(b.issue||'').localeCompare(a.issue||'')); // newest issued first
+  } else if(key==='until'){
+    // most urgent first: fewest days until due (overdue = negative, so naturally on top)
+    const du=e=>{ if(!e.due)return 1e9; return daysUntil(e.due); };
+    a2.sort((a,b)=>du(a)-du(b));
+  } else if(key==='amount'){
+    const bal=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+    a2.sort((a,b)=>bal(b)-bal(a)); // largest balance first
+  } else { // 'due' (default): overdue first, then by due date ascending
+    a2.sort((a,b)=>{
+      const sa=statusOf(a)==='over'?0:1, sb=statusOf(b)==='over'?0:1;
+      if(sa!==sb)return sa-sb;
+      return (a.due||'9999').localeCompare(b.due||'9999');
+    });
+  }
+  return a2;
+}
 function renderList(entries,side){
   _curSide=side;
   const S=listState[side];
   const isAR=side==='ar';
-  const all=sortEntries(entries);
+  const all=sortListBy(entries,S.sort);
   // prune selections that no longer exist
   const ids=new Set(all.map(e=>e.id));
   S.sel.forEach(id=>{ if(!ids.has(id)) S.sel.delete(id); });
@@ -1030,10 +1060,22 @@ function renderList(entries,side){
     <button class="sb-clear" onclick="clearSel()">Clear</button>
   </div>`:'';
 
+  // for collapse-all: are all current groups collapsed?
+  let allCollapsed=false, groupNames=[];
+  if(S.group){
+    const gset={}; list.forEach(e=>{ gset[e.party||'—']=1; });
+    groupNames=Object.keys(gset);
+    allCollapsed = groupNames.length>0 && groupNames.every(n=>S.collapsed&&S.collapsed[n]);
+  }
+
   $('content').innerHTML=`
     <div class="toolbar">
       <button class="btn ${isAR?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button>
       <button class="btn ${S.group?'primary':''}" onclick="toggleGroupMode()"><i class="ti ti-layout-list"></i> ${S.group?'Grouped':'Group by '+(isAR?'customer':'vendor')}</button>
+      ${S.group?`<button class="btn" onclick="toggleCollapseAll()"><i class="ti ti-chevrons-${allCollapsed?'down':'up'}"></i> ${allCollapsed?'Expand all':'Collapse all'}</button>`:''}
+      <label class="sort-ctl"><i class="ti ti-arrows-sort"></i><select id="list-sort" onchange="setListSort(this.value)">
+        ${LIST_SORTS.map(s=>`<option value="${s.k}" ${S.sort===s.k?'selected':''}>${s.label}</option>`).join('')}
+      </select></label>
       <div class="list-search"><i class="ti ti-search"></i><input id="list-q" placeholder="Search ${isAR?'customer':'vendor'}, invoice #, description…" value="${esc(S.q)}"></div>
       <div style="margin-left:auto;font-weight:800">${fmtMoney(outstanding)} outstanding · ${all.length} item${all.length!==1?'s':''}</div>
     </div>
@@ -1048,6 +1090,17 @@ function renderList(entries,side){
   }
 }
 window.toggleGroupMode=()=>{ listState[_curSide].group=!listState[_curSide].group; rerenderList(); };
+window.setListSort=(key)=>{ listState[_curSide].sort=key; rerenderList(); };
+window.toggleCollapseAll=()=>{
+  const S=listState[_curSide]; S.collapsed=S.collapsed||{};
+  // determine current group names from the live list
+  const list=sortListBy(allEntries().filter(e=>e.type===_curSide),S.sort)
+    .filter(e=>{ const q=S.q.trim().toLowerCase(); return !q||[e.party,e.ref,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q)); });
+  const names=[...new Set(list.map(e=>e.party||'—'))];
+  const allCollapsed = names.length>0 && names.every(n=>S.collapsed[n]);
+  names.forEach(n=>{ S.collapsed[n]=!allCollapsed; }); // if all collapsed -> expand all, else collapse all
+  rerenderList();
+};
 window.toggleGroup=(name)=>{ const S=listState[_curSide]; S.collapsed=S.collapsed||{}; S.collapsed[name]=!S.collapsed[name]; rerenderList(); };
 window.toggleSel=(id)=>{ const S=listState[_curSide]; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); rerenderList(); };
 window.clearSel=()=>{ listState[_curSide].sel.clear(); rerenderList(); };
