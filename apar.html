@@ -864,7 +864,7 @@ const PAGE_HELP={
     <li>Set a vendor's priority (critical / normal / wait) to steer the plan.</li>
     <li><b>Commit</b> marks the chosen invoices as Scheduled — you can change any back in Cash Flow.</li></ul>`},
   recur:{title:'Recurring',body:`<p>Templates for bills that repeat — rent, utilities, loan payments, subscriptions. The app auto-creates the next bill each cycle.</p>
-    <ul><li>Set the amount, account, and cadence (monthly or weekly); it rolls the due date forward automatically.</li>
+    <ul><li>Set the amount, account, and cadence (monthly, bi-weekly, or weekly); it rolls the due date forward automatically.</li>
     <li>Pause a template to stop it generating without deleting it.</li>
     <li>Generated bills show up in Payables and Cash Flow like any other.</li></ul>`},
   deposit:{title:'Deposits Calculator',body:`<p>Split incoming money across your Profit First buckets (Profit, Owner's Pay, Tax, Operating, etc.).</p>
@@ -1410,6 +1410,10 @@ function advanceDue(iso,cadence,day,weekday){
     d.setDate(d.getDate()+7);
     return toISO(d);
   }
+  if(cadence==='biweekly'){
+    d.setDate(d.getDate()+14);
+    return toISO(d);
+  }
   // monthly: jump to next month, clamp day to month length
   const targetDay=day||d.getDate();
   let y=d.getFullYear(), m=d.getMonth()+1;
@@ -1475,12 +1479,13 @@ function renderRecurring(){
   const ids=Object.keys(recurring);
   const monthlyTotal=ids.filter(id=>recurring[id]&&!recurring[id].paused).reduce((s,id)=>{
     const r=recurring[id]; const amt=Number(r.amount)||0;
-    return s+(r.cadence==='weekly'?amt*52/12:amt); // normalize weekly to monthly
+    return s+(r.cadence==='weekly'?amt*52/12:(r.cadence==='biweekly'?amt*26/12:amt)); // normalize to monthly
   },0);
   const dueNow=ids.filter(id=>{const r=recurring[id];return r&&!r.paused&&daysUntil(r.nextDue)!=null&&daysUntil(r.nextDue)<=0;}).length;
 
   const cadenceTxt=r=>{
     if(r.cadence==='weekly'){const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][r.weekday||0];return `Weekly · ${wd}`;}
+    if(r.cadence==='biweekly'){const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][r.weekday||0];return `Bi-weekly · ${wd}`;}
     return `Monthly · day ${r.day||1}`;
   };
   const sorted=ids.slice().sort((a,a2)=>(recurring[a].nextDue||'9999').localeCompare(recurring[a2].nextDue||'9999'));
@@ -1542,10 +1547,11 @@ function showRecurEditor(r){
       <div class="frow">
         <div class="fld"><label>Cadence</label><select id="rc-cadence" onchange="recurCadenceToggle()">
           <option value="monthly" ${cadence==='monthly'?'selected':''}>Monthly</option>
+          <option value="biweekly" ${cadence==='biweekly'?'selected':''}>Bi-weekly (every 2 weeks)</option>
           <option value="weekly" ${cadence==='weekly'?'selected':''}>Weekly</option>
         </select></div>
-        <div class="fld" id="rc-day-wrap" style="${cadence==='weekly'?'display:none':''}"><label>Day of month</label><input id="rc-day" type="number" min="1" max="31" value="${day}"></div>
-        <div class="fld" id="rc-wd-wrap" style="${cadence==='weekly'?'':'display:none'}"><label>Weekday</label><select id="rc-weekday">
+        <div class="fld" id="rc-day-wrap" style="${cadence!=='monthly'?'display:none':''}"><label>Day of month</label><input id="rc-day" type="number" min="1" max="31" value="${day}"></div>
+        <div class="fld" id="rc-wd-wrap" style="${cadence!=='monthly'?'':'display:none'}"><label>Weekday</label><select id="rc-weekday">
           ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((n,i)=>`<option value="${i}" ${wd===i?'selected':''}>${n}</option>`).join('')}
         </select></div>
       </div>
@@ -1564,8 +1570,9 @@ function showRecurEditor(r){
 }
 window.recurCadenceToggle=()=>{
   const c=$('rc-cadence').value;
-  $('rc-day-wrap').style.display=c==='weekly'?'none':'';
-  $('rc-wd-wrap').style.display=c==='weekly'?'':'none';
+  const usesWeekday=(c==='weekly'||c==='biweekly');
+  $('rc-day-wrap').style.display=usesWeekday?'none':'';
+  $('rc-wd-wrap').style.display=usesWeekday?'':'none';
 };
 window.saveRecurring=()=>{
   const vendor=$('rc-vendor').value.trim(); if(!vendor){alert('Enter a vendor name');return;}
@@ -1576,7 +1583,7 @@ window.saveRecurring=()=>{
     account:$('rc-account').value||'',
     cadence,
     day:cadence==='monthly'?(Number($('rc-day').value)||1):null,
-    weekday:cadence==='weekly'?(Number($('rc-weekday').value)||0):null,
+    weekday:(cadence==='weekly'||cadence==='biweekly')?(Number($('rc-weekday').value)||0):null,
     nextDue:$('rc-nextdue').value||toISO(new Date()),
     method:$('rc-method').value||'',
     autopay:$('rc-autopay').checked,
