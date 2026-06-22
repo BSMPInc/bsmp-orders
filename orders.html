@@ -137,7 +137,12 @@ select:focus{border-color:var(--green)}
 .tm-check:hover{border-color:var(--navy)}
 .tm-check.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 .tm-check.on span{color:#fff !important}
-.ss-assignee{font-family:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--border);border-radius:7px;background:#fff;max-width:140px}
+.ss-assignee{font-family:inherit;font-size:12px;padding:5px 6px;border:1px solid var(--border);border-radius:7px;background:#fff;width:64px;min-width:64px;text-align:center;font-weight:600}
+.sdate{font-family:inherit;font-size:12px;padding:6px 9px;border:1px solid var(--border2);border-radius:7px;background:#fff;cursor:pointer;color:var(--text);text-align:center;min-width:74px;font-variant-numeric:tabular-nums}
+.sdate.empty{color:var(--text3);font-weight:400}
+.sdate:hover:not(:disabled){border-color:var(--green)}
+.sdate:disabled{opacity:.55;cursor:default}
+.sdate-input{font-family:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--green);border-radius:7px}
 .q-personbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--border)}
 .q-pb-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3)}
 .q-pchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:18px;padding:5px 11px;background:#fff;color:var(--text2);cursor:pointer}
@@ -773,7 +778,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.54.1</div>
+    <div class="ver">v2.54.2</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -2006,12 +2011,14 @@ function detailInner(r){
     else if(!ext){ dateLabel = stepStatus(r,p)==='ready' ? 'ready' : 'waiting'; }
     const anchorIcon = (ext && step.start) ? `<i class="ti ti-pin" style="font-size:12px;color:var(--blue)" title="Manual anchor"></i>` : '';
     // right-side controls differ for internal (qty done) vs external (days + anchor date)
+    const pJs=p.replace(/'/g,"\\'");
+    const sdate=(kind,val,title,disabled)=>`<button type="button" class="sdate${val?'':' empty'}" title="${title}" ${disabled?'disabled':''} onclick="window._editStepDate(event,'${r.id}','${pJs}','${kind}')">${val?fmtDate(val):'mm/dd/yy'}</button>`;
     const rightControls = ext
       ? `<input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Business days" style="width:48px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
          <span style="font-size:10px;color:var(--text3);min-width:26px">days</span>
-         <input type="date" value="${step.start||''}" title="Override start (optional anchor)" onchange="window._stepStart('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>`
+         ${sdate('start', step.start, 'Override start (optional anchor)', done)}`
       : `<span style="font-size:10px;color:var(--text3)">need by</span>
-         <input type="date" value="${step.needBy||''}" title="Need this step finished by" style="width:138px" onchange="window._stepNeedBy('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
+         ${sdate('needBy', step.needBy, 'Need this step finished by', false)}
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
          <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`;
     return`<div class="sched-step ss-on" style="${done?'opacity:.62':''}">
@@ -2582,9 +2589,10 @@ const ALL_PROCESSES = ()=>[...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 function assigneeOptions(p, current){
   const can=team.filter(pp=>(pp.processes||[]).includes(p)).sort((a,b)=>a.name.localeCompare(b.name));
   const others=team.filter(pp=>!(pp.processes||[]).includes(p)).sort((a,b)=>a.name.localeCompare(b.name));
-  let html=`<option value="">— unassigned —</option>`;
-  if(can.length) html+=`<optgroup label="Can run this">`+can.map(pp=>`<option value="${pp.id}" ${pp.id===current?'selected':''}>${esc2(pp.name)}</option>`).join('')+`</optgroup>`;
-  if(others.length) html+=`<optgroup label="Others">`+others.map(pp=>`<option value="${pp.id}" ${pp.id===current?'selected':''}>${esc2(pp.name)}</option>`).join('')+`</optgroup>`;
+  const opt=pp=>`<option value="${pp.id}" title="${esc2(pp.name)}" ${pp.id===current?'selected':''}>${personInitials(pp.name)}</option>`;
+  let html=`<option value="">—</option>`;
+  if(can.length) html+=`<optgroup label="Can run this">`+can.map(opt).join('')+`</optgroup>`;
+  if(others.length) html+=`<optgroup label="Others">`+others.map(opt).join('')+`</optgroup>`;
   return html;
 }
 
@@ -4218,6 +4226,25 @@ window._stepNeedBy = (id, name, val) => {
   step.needBy = val||'';
   saveDB();
   if(document.getElementById('queues-page')?.style.display !== 'none') renderQueues();
+};
+// Click an MM/DD/YY field → open a date picker, commit, then re-render (so it shows MM/DD/YY)
+window._editStepDate = (e, id, name, kind) => {
+  e.stopPropagation();
+  const btn = e.currentTarget; if(btn.disabled) return;
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const step = ensureSchedule(r).steps.find(s=>s.name===name); if(!step) return;
+  const cur = kind==='needBy' ? (step.needBy||'') : (step.start||'');
+  const inp = document.createElement('input'); inp.type='date'; inp.className='sdate-input'; inp.value=cur;
+  btn.replaceWith(inp); inp.focus();
+  try{ inp.showPicker && inp.showPicker(); }catch(_){}
+  let done=false;
+  const commit=()=>{ if(done) return; done=true;
+    if(kind==='needBy') step.needBy=inp.value||''; else step.start=inp.value;
+    saveDB(); refreshActivePage();
+  };
+  inp.addEventListener('change', commit);
+  inp.addEventListener('blur', ()=>{ if(!done){ done=true; refreshActivePage(); } });
+  inp.addEventListener('keydown', ev=>{ if(ev.key==='Enter') inp.blur(); if(ev.key==='Escape'){ done=true; refreshActivePage(); } });
 };
 window._stepAssignee = (id, name, personId) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
