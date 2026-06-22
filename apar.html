@@ -512,7 +512,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" id="nav-forecast" onclick="go('forecast')"><i class="ti ti-chart-line"></i> Forecast</div>
     <div class="nav-item" id="nav-payrun" onclick="go('payrun')"><i class="ti ti-cash"></i> Pay Run</div>
     <div class="nav-item" id="nav-recur" onclick="go('recur')"><i class="ti ti-repeat"></i> Recurring <span class="nb" id="nb-recur" style="display:none"></span></div>
-    <div class="nav-item" id="nav-deposit" onclick="go('deposit')"><i class="ti ti-pie-chart"></i> Deposits</div>
+    <div class="nav-item" id="nav-deposit" onclick="go('deposit')"><i class="ti ti-chart-pie"></i> Deposits Calculator</div>
     <div class="nav-item" id="nav-archive" onclick="go('archive')"><i class="ti ti-archive"></i> Archive</div>
     <div class="nav-item" id="nav-activity" onclick="go('activity')"><i class="ti ti-history"></i> Activity</div>
     <div class="nav-item" id="nav-trash" onclick="go('trash')"><i class="ti ti-trash"></i> Trash <span class="nb" id="nb-trash" style="display:none"></span></div>
@@ -818,7 +818,7 @@ function go(p){
     aging:['Aging','Outstanding balances by age'],
     cash:['Cash Flow','Bank account balances vs. what\'s scheduled to come out'],
     recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
-    deposit:['Deposits','Split incoming money across your Profit First buckets'],
+    deposit:['Deposits Calculator','Split incoming money across your Profit First buckets'],
     archive:['Archive','Paid bills, auto-filed 45 days after withdrawal'],
     payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance'],
     activity:['Activity','Who changed what — payments, deletions, and status changes'],
@@ -864,7 +864,7 @@ const PAGE_HELP={
     <ul><li>Set the amount, account, and cadence (monthly or weekly); it rolls the due date forward automatically.</li>
     <li>Pause a template to stop it generating without deleting it.</li>
     <li>Generated bills show up in Payables and Cash Flow like any other.</li></ul>`},
-  deposit:{title:'Deposits',body:`<p>Split incoming money across your Profit First buckets (Profit, Owner's Pay, Tax, Operating, etc.).</p>
+  deposit:{title:'Deposits Calculator',body:`<p>Split incoming money across your Profit First buckets (Profit, Owner's Pay, Tax, Operating, etc.).</p>
     <ul><li>Set each bucket's percentage; "Balance to 100%" scales them to total exactly 100%.</li>
     <li>Enter a deposit amount to see how it divides across buckets.</li></ul>`},
   archive:{title:'Archive',body:`<p>Paid bills are filed here automatically 45 days after they're withdrawn, to keep your active lists clean.</p>
