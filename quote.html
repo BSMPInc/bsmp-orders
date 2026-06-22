@@ -6960,6 +6960,7 @@ function printCustomerQuote(sourceId){
     const cqRate = parseFloat(document.getElementById("cq-rate").value)||0;
     const taxPct = parseFloat(document.getElementById("cq-tax").value)||0;
     const twoLines = document.getElementById("cq-twolines").checked;
+    const assumptions = (document.getElementById("cq-assumptions").value||"").trim();
 
     // Build line items
     const items = [];
