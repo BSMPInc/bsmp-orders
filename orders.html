@@ -716,7 +716,7 @@ tr:hover .del-btn{opacity:1}
   <div class="sidebar-section">
     <div class="sidebar-section-label mgr-only">Orders</div>
     <div class="sidebar-section-label op-only" style="display:none">Shop Floor</div>
-    <div class="nav-item mgr-only" id="nav-dispatch" onclick="showPage('dispatch')"><i class="ti ti-sun"></i> <span class="nav-label">Today</span><span class="nav-badge" id="badge-dispatch" style="display:none"></span></div>
+    <div class="nav-item" id="nav-dispatch" onclick="showPage('dispatch')"><i class="ti ti-sun"></i> <span class="nav-label">Today</span><span class="nav-badge" id="badge-dispatch" style="display:none"></span></div>
     <div class="nav-item active mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
     <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
@@ -755,7 +755,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.52.5</div>
+    <div class="ver">v2.52.6</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -2664,7 +2664,7 @@ const PAGE_META = {
   settings: {title:'Process Times',  sub:'Lead times for outside processes'}
 };
 window.showPage = (page) => {
-  if(userRole==='operator') page='queues';   // operators are locked to Work Queues
+  if(userRole==='operator' && !['queues','dispatch'].includes(page)) page='queues';   // operators: Work Queues + Today only
   ['orders','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
@@ -2938,7 +2938,9 @@ function dispatchRow(it){
   const msLate=health.state==='behind';
   const esc=s=>esc2(s);
   const qtyCtl = ext ? '' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
-  const assignCtl = team.length ? `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : '';
+  const op = userRole==='operator';
+  const assignCtl = (op || !team.length) ? '' : `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>`;
+  const openBtn = op ? '' : `<button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
   return `<div class="disp-row">
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
@@ -2947,7 +2949,7 @@ function dispatchRow(it){
     <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span> · `:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     ${qtyCtl}
     ${assignCtl}
-    <button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>
+    ${openBtn}
   </div>`;
 }
 
@@ -3044,6 +3046,7 @@ function fmtBrief(t){
 }
 function renderDailyBrief(){
   const host=document.getElementById('dispatch-brief'); if(!host) return;
+  if(userRole==='operator'){ host.innerHTML=''; return; }   // manager planning tool
   const hasItems = dispatchItems().length>0;
   const briefBody = _brief.loading
     ? `<div class="brief-loading"><i class="ti ti-loader-2 spin"></i> Reading today's schedule…</div>`
