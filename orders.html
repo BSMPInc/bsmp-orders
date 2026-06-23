@@ -799,6 +799,7 @@ tr:hover .del-btn{opacity:1}
     <div class="topbar-actions">
       <span id="topbar-op-pill" class="op-pill" style="display:none"><i class="ti ti-user-cog"></i> Operator Mode</span>
       <button class="btn" onclick="openHelp()" title="How to use this app"><i class="ti ti-help-circle"></i> Help</button>
+      <button class="btn" id="topbar-import-btn" onclick="openQuoteImport()"><i class="ti ti-file-import"></i> Import Quote</button>
       <button class="btn" id="topbar-ai-btn" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</button>
       <button class="btn green" id="topbar-add-btn" onclick="openAdd()"><i class="ti ti-plus"></i> Add Order</button>
     </div>
@@ -1246,6 +1247,22 @@ tr:hover .del-btn{opacity:1}
       <button class="btn green" onclick="window.printConfirmation()"><i class="ti ti-printer"></i> Print / Save PDF</button>
     </div>
   </div>
+</div>
+
+<!-- Import from Quote Modal -->
+<div class="modal-bg" id="qimport-modal" style="display:none">
+<div class="modal">
+  <div class="modal-header"><i class="ti ti-file-import"></i><h2>Import from Quote</h2></div>
+  <div style="padding:0 4px 10px">
+    <input type="text" id="qimport-search" placeholder="Search quote #, part, customer…" oninput="window._renderQuoteImportList()"
+      style="width:100%;box-sizing:border-box;height:36px;font-size:14px;padding:0 12px;border:1px solid var(--border2);border-radius:10px;background:#f7f9fc;color:var(--text);outline:none;font-family:inherit">
+    <div style="font-size:11.5px;color:var(--text3);margin-top:6px">Pick a quote to create an order — the operations on the quote become the order's enabled process steps. Durations start at your shop defaults; the quoted detail is saved to the order's notes.</div>
+  </div>
+  <div id="qimport-list" style="max-height:52vh;overflow:auto;border:1px solid var(--border);border-radius:10px"></div>
+  <div class="modal-actions" style="margin-top:14px;display:flex;justify-content:flex-end">
+    <button class="btn" onclick="window.closeModal('qimport-modal')">Close</button>
+  </div>
+</div>
 </div>
 
 <!-- Add/Edit Modal -->
@@ -2450,6 +2467,126 @@ window.saveOrder=()=>{
   maybeAdvanceCounter(order.job);
   saveDB();render();closeModal('add-modal');
 };
+
+// ── Import from Quote (consumes quotes/ synced by the quote tool) ────────────
+const quotesRef = ref(db, 'quotes');
+let _quoteCache = [];
+onValue(quotesRef, snap => {
+  const v = snap.val() || {};
+  _quoteCache = Object.values(v).sort((a,b)=> (b.id||0) - (a.id||0));
+  const m = document.getElementById('qimport-modal');
+  if(m && m.style.display === 'flex') window._renderQuoteImportList();
+});
+
+// Map a quote operation code (leading number) to an order-tracker process.
+function _qLeadCode(op){ const m = String(op||'').match(/\d+/); return m ? parseInt(m[0],10) : NaN; }
+function _qCodeToProcess(op){
+  const n = _qLeadCode(op);
+  if(isNaN(n)) return null;
+  if(n>=101 && n<=199) return 'Shear/Sawing';        // 101 Saw, 102 Shear
+  if(n>=201 && n<=299) return 'Program';
+  if(n>=400 && n<=499) return 'Laser';
+  if(n>=500 && n<=599) return 'De-Burr/Finish';
+  if(n>=601 && n<=699) return 'Form';
+  if(n>=701 && n<=799) return 'Weld';                // TIG / MIG
+  if(n>=800 && n<=899) return 'Hardware/Assembly';
+  if((n>=900 && n<=999) || (n>=1001 && n<=1099)) return 'Machining';   // machine ops + CNC mill
+  if(n>=1100 && n<=1199) return '__INSPECTION__';    // 1100 Inspection, 1101 First Article → note
+  return null;
+}
+function _qOutsourceProcess(desc){
+  const d = (desc||'').toLowerCase();
+  if(/plat|anodi|zinc|chrome|nickel|passiv|oxide|galvan/.test(d)) return 'Outsource- Plating';
+  if(/paint|powder|coat|cerakote/.test(d))                        return 'Outsource- Paint';
+  if(/machin|turn|mill|grind|lathe|edm|jet/.test(d))              return 'Outsource- Machining';
+  return 'Outsource- Other';
+}
+function _qMapProcesses(q){
+  const enabled = new Set(); let inspection = false;
+  (q.laborLines||[]).forEach(l => { const p=_qCodeToProcess(l.op); if(p==='__INSPECTION__') inspection=true; else if(p) enabled.add(p); });
+  (q.outLines||[]).forEach(o => enabled.add(_qOutsourceProcess(o.desc)));
+  if((q.hwLines||[]).length){ enabled.add('Purchasing- Hardware'); enabled.add('Hardware/Assembly'); }
+  if(q.material && q.material!=='—' && String(q.material).trim()) enabled.add('Purchasing- Material');
+  enabled.add('Delivery');
+  return { enabled:[...enabled], inspection };
+}
+function _qBuildNotes(q, inspection){
+  const lines = [];
+  lines.push('Imported from Quote' + (q.quoteNo?(' #'+q.quoteNo):'') + (q.date?(' ('+q.date+')'):'') + '.');
+  if(inspection) lines.push('Inspection / first article required (per quote).');
+  if((q.laborLines||[]).length) lines.push('Quoted ops: ' + q.laborLines.map(l=>l.op).filter(Boolean).join(', '));
+  if((q.outLines||[]).length)   lines.push('Outsource: ' + q.outLines.map(o=>o.desc).filter(Boolean).join('; '));
+  if((q.hwLines||[]).length)    lines.push('Hardware: '  + q.hwLines.map(h=>h.desc).filter(Boolean).join('; '));
+  if(q.notes) lines.push('Quote notes: ' + q.notes);
+  return lines.join('\n');
+}
+window.openQuoteImport = () => {
+  const modal = document.getElementById('qimport-modal');
+  modal.style.display = 'flex';
+  document.getElementById('qimport-search').value = '';
+  window._renderQuoteImportList();
+  setTimeout(()=>document.getElementById('qimport-search').focus(), 50);
+};
+window._renderQuoteImportList = () => {
+  const s = (document.getElementById('qimport-search').value||'').toLowerCase();
+  const body = document.getElementById('qimport-list');
+  if(!_quoteCache.length){
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3)">No quotes in the cloud yet. On the quote tool, sign in and run “Sync all to cloud”.</div>';
+    return;
+  }
+  const list = _quoteCache.filter(q => {
+    const hay = ((q.quoteNo||'')+' '+(q.partNum||'')+' '+(q.customer||'')+' '+(q.material||'')).toLowerCase();
+    return !s || hay.includes(s);
+  });
+  if(!list.length){ body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text3)">No quotes match that search.</div>'; return; }
+  body.innerHTML = list.slice(0,200).map(q => {
+    const m = _qMapProcesses(q);
+    const chips = m.enabled.map(p =>
+      `<span style="display:inline-block;font-size:10px;font-weight:700;color:#fff;background:${PROCESS_COLORS[p]||'#888'};border-radius:5px;padding:1px 7px;margin:1px 2px">${(p||'').replace(/^(Outsource|Purchasing)-\s*/,'')}</span>`
+    ).join('');
+    return `<div class="q-row" style="padding:11px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="window._doQuoteImport('${q.id}')">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;flex-wrap:wrap">
+        <span style="font-weight:700">${q.partNum||'—'}</span>
+        ${q.quoteNo?`<span style="font-size:10px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:4px;padding:1px 6px">Quote #${q.quoteNo}</span>`:''}
+        <span style="color:var(--text2);font-size:12px">${q.customer||''}</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text3)">Qty ${q.qty||'—'} · ${q.date||''}</span>
+      </div>
+      <div>${chips || '<span style="font-size:11px;color:var(--text3)">no processes detected — will create an empty schedule</span>'}</div>
+    </div>`;
+  }).join('');
+};
+window._doQuoteImport = (id) => {
+  const q = _quoteCache.find(x => String(x.id) === String(id));
+  if(!q) return;
+  const m = _qMapProcesses(q);
+  const enabledSet = new Set(m.enabled);
+  const steps = PROCESSES.map(p => ({ name:p, enabled:enabledSet.has(p), duration:defDur(p), start:'' }));
+  const qty = parseFloat(q.qty) || 0;
+  const cost = parseFloat(q.pricePerPart != null ? q.pricePerPart : q.costPerPart) || 0;
+  const today = new Date().toISOString().slice(0,10);
+  const order = {
+    id: uid(),
+    customer: (q.customer && q.customer!=='—') ? q.customer : '',
+    po: (q.poNumber||'').trim(),
+    job: '',
+    part: (q.partNum && q.partNum!=='—') ? q.partNum : '',
+    desc: [ (q.material && q.material!=='—') ? q.material : '', (q.revision && q.revision!=='—') ? ('Rev '+q.revision) : '' ].filter(Boolean).join(' · '),
+    qty, cost, total: qty&&cost ? qty*cost : 0,
+    ordered: today, due: (q.dueDate||''),
+    status: 'Confirmed', invoice: '', payment: 'Unpaid',
+    notes: _qBuildNotes(q, m.inspection),
+    currentProcess: '', completedProcesses: [],
+    schedule: { steps },
+    quoteId: q.id, quoteNo: q.quoteNo || ''
+  };
+  orders.unshift(order);
+  maybeAdvanceCounter(order.job);
+  saveDB(); invalidateSched(); render();
+  closeModal('qimport-modal');
+  showPage('orders'); setFilter('');
+  setTimeout(()=>{ const el=document.querySelector(`[data-rowid="${order.id}"]`); if(el){ el.classList.add('row-flash'); el.scrollIntoView({behavior:'smooth',block:'center'}); } }, 140);
+};
+
 window.closeModal=(id)=>document.getElementById(id).style.display='none';
 window.openAI=()=>{document.getElementById('ai-modal').style.display='flex';aiParsed=[];};
 window.handleFile=async(input)=>{
@@ -2795,6 +2932,7 @@ window.showPage = (page) => {
   const ordersOnly = page==='orders';
   document.getElementById('topbar-add-btn').style.display = ordersOnly ? '' : 'none';
   document.getElementById('topbar-ai-btn').style.display = ordersOnly ? '' : 'none';
+  { const impBtn=document.getElementById('topbar-import-btn'); if(impBtn) impBtn.style.display = ordersOnly ? '' : 'none'; }
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
   if(page==='dispatch') document.getElementById('nav-dispatch')?.classList.add('active');
