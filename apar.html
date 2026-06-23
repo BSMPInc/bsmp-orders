@@ -860,7 +860,7 @@ const PAGE_HELP={
     <li>Amber = running low, red = goes negative. The banner names exactly which account and week to watch.</li></ul>`},
   payrun:{title:'Pay Run',body:`<p>A per-account plan suggesting which <b>whole</b> invoices to schedule from each balance — it never splits an invoice.</p>
     <ul><li>Plans from the balance you set in Cash Flow, minus what's already scheduled.</li>
-    <li>Protects the urgent ones first (critical vendors, overdue, expiring discounts), then spreads across vendors so the most get paid something.</li>
+    <li>Protects the urgent ones first (critical vendors, overdue, expiring discounts), then pays down each vendor's oldest invoices first (FIFO).</li>
     <li>Set a vendor's priority (critical / normal / wait) to steer the plan.</li>
     <li><b>Commit</b> marks the chosen invoices as Scheduled — you can change any back in Cash Flow.</li></ul>`},
   recur:{title:'Recurring',body:`<p>Templates for bills that repeat — rent, utilities, loan payments, subscriptions. The app auto-creates the next bill each cycle.</p>
@@ -1347,18 +1347,35 @@ window.setRowAccount=(id,val)=>{
 window.setPayStatus=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
   const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;if(o.amount==null)o.amount=e.amount;}
   const prev=e.payStatus||'open';
   o.payStatus=val||'open';
-  if(val==='withdrawn'){ if(!o.withdrawnDate) o.withdrawnDate=toISO(new Date()); }
-  else { delete o.withdrawnDate; }
+  // remaining balance BEFORE we touch payments (used for both auto-pay and reconcile)
+  const remainBefore=Math.max(0,(e.amount||0)-(e.paid||0));
+  if(val==='withdrawn'){
+    if(!o.withdrawnDate) o.withdrawnDate=toISO(new Date());
+    // Auto-record a full payment so the bill reads as Paid (and drops the "Record payment" button).
+    // Tagged autoWithdraw so we can cleanly reverse it if the status changes back.
+    const pays=[...(e.payments||[])];
+    const alreadyAuto=pays.some(p=>p&&p.autoWithdraw);
+    if(remainBefore>0.005 && !alreadyAuto){
+      pays.push({date:o.withdrawnDate,amount:remainBefore,method:e.planMethod||'',note:'Auto-recorded on withdrawal',autoWithdraw:true});
+      o.payments=pays;
+    }
+  } else {
+    delete o.withdrawnDate;
+    // Reverse only the payment WE auto-added; never touch manually recorded payments.
+    if((e.payments||[]).some(p=>p&&p.autoWithdraw)){
+      o.payments=(e.payments||[]).filter(p=>!(p&&p.autoWithdraw));
+    }
+  }
   writeOverlay(id,o); render();
   if(prev!==(val||'open')) logAudit('status', {entryId:id, party:e.party,
-    detail:`${statusLabel(prev)} → ${statusLabel(val||'open')} · ${fmtMoney((e.amount||0)-(e.paid||0))}`});
+    detail:`${statusLabel(prev)} → ${statusLabel(val||'open')} · ${fmtMoney(remainBefore)}`});
   // One-click reconcile: when a bill is newly withdrawn from an assigned account,
   // offer to subtract it from that account's balance so the typed balance stays accurate.
   if(val==='withdrawn' && prev!=='withdrawn' && e.account && accounts[e.account]){
-    const amt=Math.max(0,(e.amount||0)-(e.paid||0));
+    const amt=remainBefore;
     if(amt>0.005){
       const acc=accounts[e.account];
       const cur=Number(acc.balance)||0; const next=cur-amt;
@@ -2106,38 +2123,47 @@ function planAccount(accId){
     const pri=priOf(e.party);
     const disc=discountActive(e);
     const protect=(pri==='critical'||over||!!disc)&&pri!=='wait';
-    return {e,amt,over,pri,disc,protect,vk:vendorKey(e.party)};
+    // age key: older invoices first. Prefer issue date, fall back to due date.
+    const ageKey=(e.issue||e.due||'9999-99-99');
+    return {e,amt,over,pri,disc,protect,vk:vendorKey(e.party),ageKey};
   });
 
   let remaining=avail;
   const chosen=new Set();
   const fund=a=>{ if(a.amt<=remaining+0.005 && !chosen.has(a.e.id)){ chosen.add(a.e.id); remaining-=a.amt; return true;} return false; };
 
-  // 1) protect — whole invoices, most urgent first (discount expiring soonest, then most overdue)
+  // 1) protect — whole invoices, most urgent first (discount expiring soonest, then most overdue, then oldest)
   ann.filter(a=>a.protect).sort((a,b)=>{
     const ad=a.disc?a.disc.daysLeft:9999,bd=b.disc?b.disc.daysLeft:9999; if(ad!==bd)return ad-bd;
-    const ao=a.over?(daysUntil(a.e.due)||0):9999,bo=b.over?(daysUntil(b.e.due)||0):9999; return ao-bo;
+    const ao=a.over?(daysUntil(a.e.due)||0):9999,bo=b.over?(daysUntil(b.e.due)||0):9999; if(ao!==bo)return ao-bo;
+    return a.ageKey.localeCompare(b.ageKey); // oldest first
   }).forEach(fund);
 
-  // 2) maximize vendor coverage — each not-yet-funded vendor's smallest open invoice
+  // 2) maximize vendor coverage — give each not-yet-funded vendor their OLDEST open invoice,
+  //    so every vendor relationship gets paid down starting from the longest-outstanding bill.
   const byVendor={};
   ann.filter(a=>a.pri!=='wait').forEach(a=>{ (byVendor[a.vk]=byVendor[a.vk]||[]).push(a); });
   // vendors that already got something in protect are "covered"
   const covered=new Set(ann.filter(a=>chosen.has(a.e.id)).map(a=>a.vk));
-  // order uncovered vendors by their smallest invoice ascending (so we cover the most vendors)
+  // order uncovered vendors by their oldest invoice (longest-outstanding vendor served first);
+  // tie-break by smallest so we still fit the most vendors when ages match.
+  const oldestOf=vk=>byVendor[vk].map(a=>a.ageKey).sort()[0];
   const uncovered=Object.keys(byVendor).filter(vk=>!covered.has(vk))
-    .map(vk=>({vk,min:Math.min(...byVendor[vk].map(a=>a.amt))}))
-    .sort((a,b)=>a.min-b.min);
+    .map(vk=>({vk,age:oldestOf(vk),min:Math.min(...byVendor[vk].map(a=>a.amt))}))
+    .sort((a,b)=>a.age.localeCompare(b.age) || a.min-b.min);
   uncovered.forEach(({vk})=>{
-    const smallest=byVendor[vk].filter(a=>!chosen.has(a.e.id)).sort((a,b)=>a.amt-b.amt)[0];
-    if(smallest)fund(smallest);
+    // this vendor's OLDEST not-yet-funded invoice (tie-break smaller amount first)
+    const oldest=byVendor[vk].filter(a=>!chosen.has(a.e.id))
+      .sort((a,b)=>a.ageKey.localeCompare(b.ageKey) || a.amt-b.amt)[0];
+    if(oldest)fund(oldest);
   });
 
-  // 3) leftover — additional whole invoices, smallest first (incl. wait vendors last)
-  const rest=ann.filter(a=>!chosen.has(a.e.id)&&a.pri!=='wait').sort((a,b)=>a.amt-b.amt);
-  rest.forEach(fund);
-  const waitRest=ann.filter(a=>!chosen.has(a.e.id)&&a.pri==='wait').sort((a,b)=>a.amt-b.amt);
-  waitRest.forEach(fund);
+  // 3) leftover — pay down each vendor's OLDEST invoices first (FIFO), then by smaller amount.
+  //    Group remaining by vendor so a vendor's oldest unpaid bills clear before newer ones.
+  const restSort=(arr)=>arr.sort((a,b)=>
+    a.vk.localeCompare(b.vk) || a.ageKey.localeCompare(b.ageKey) || a.amt-b.amt);
+  restSort(ann.filter(a=>!chosen.has(a.e.id)&&a.pri!=='wait')).forEach(fund);
+  restSort(ann.filter(a=>!chosen.has(a.e.id)&&a.pri==='wait')).forEach(fund);
 
   const scheduledNow=avail-remaining;
   return {accId,bal,alreadySched,avail,remaining,bills:ann,chosen,scheduledNow,
@@ -2215,7 +2241,7 @@ function renderPayRun(){
       <div class="stat"><div class="l">This plan schedules</div><div class="v">${fmtMoney(totalSched)}</div><div class="s">whole invoices</div></div>
       <div class="stat"><div class="l">Open candidates</div><div class="v">${totalCandidates}</div><div class="s">unpaid, assigned bills</div></div>
     </div>
-    <div class="pr-legend"><i class="ti ti-info-circle"></i> Each account is planned from the balance you set in Cash Flow, minus what's already scheduled. Invoices are paid <b>whole</b> — never split — and the plan spreads across vendors so the most vendors get at least one invoice paid. Protected bills (critical vendors, overdue, expiring discounts) come first. <b>Commit</b> marks the chosen invoices as Scheduled in Cash Flow; change any back there anytime.</div>
+    <div class="pr-legend"><i class="ti ti-info-circle"></i> Each account is planned from the balance you set in Cash Flow, minus what's already scheduled. Invoices are paid <b>whole</b> — never split. Protected bills (critical vendors, overdue, expiring discounts) come first, then each vendor's <b>oldest</b> invoice, then the rest oldest-first within each vendor (longest-outstanding debt paid down first). <b>Commit</b> marks the chosen invoices as Scheduled in Cash Flow; change any back there anytime.</div>
     ${plans.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="payrun-q" placeholder="Search vendor or invoice #…" value="${esc(payrunQ)}" oninput="payrunSearch(this.value)"></div></div>`:''}
     ${plans.map(cardFor).join('')}`;
   if(payrunQ){ payrunSearch(payrunQ); const q=$('payrun-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
