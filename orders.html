@@ -781,7 +781,7 @@ tr:hover .del-btn{opacity:1}
       <span class="sync-label" id="sync-label">Connecting…</span>
     </div>
     <div class="city">Chatsworth, CA 91311</div>
-    <div class="ver">v2.54.3</div>
+    <div class="ver">v2.54.4</div>
     <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
@@ -2017,9 +2017,12 @@ function detailInner(r){
     const pJs=p.replace(/'/g,"\\'");
     const sdate=(kind,val,title,disabled)=>`<button type="button" class="sdate${val?'':' empty'}" title="${title}" ${disabled?'disabled':''} onclick="window._editStepDate(event,'${r.id}','${pJs}','${kind}')">${val?fmtDate(val):'mm/dd/yy'}</button>`;
     const rightControls = ext
-      ? `<input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Business days" style="width:48px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
-         <span style="font-size:10px;color:var(--text3);min-width:26px">days</span>
-         ${sdate('start', step.start, 'Override start (optional anchor)', done)}`
+      ? `<input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Lead time in business days" style="width:44px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
+         <span style="font-size:10px;color:var(--text3);min-width:24px">days</span>
+         <span style="font-size:10px;color:var(--text3)">need by</span>
+         ${sdate('needBy', step.needBy, 'Need this step finished/back by — also shows in Work Queues', false)}
+         <span style="font-size:10px;color:var(--text3)" title="Optional: pin the start date as a fixed schedule anchor">start</span>
+         ${sdate('start', step.start, 'Pin the start date (optional anchor)', done)}`
       : `<span style="font-size:10px;color:var(--text3)">need by</span>
          ${sdate('needBy', step.needBy, 'Need this step finished by', false)}
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
