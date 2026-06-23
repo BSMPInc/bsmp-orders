@@ -801,6 +801,9 @@ function allEntries(){ return allEntriesRaw().filter(e=>!e.void&&!e.trashed); }
 function trashedEntries(){ return allEntriesRaw().filter(e=>e.trashed); }
 function statusOf(e){
   const bal=(e.amount||0)-(e.paid||0);
+  // A withdrawn bill means the money has left the account — treat it as paid even if no
+  // payment line was recorded (e.g. bills withdrawn before auto-payment existed, or via Pay Run).
+  if((e.payStatus||'')==='withdrawn') return 'paid';
   if(e.amount!=null && bal<=0.005 && e.amount>0) return 'paid';
   const d=daysUntil(e.due);
   if(bal>0.005 && d!==null && d<0) return 'over';
