@@ -1412,7 +1412,7 @@ const ordersRef = ref(db, 'orders');
 const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
 const STATUS_CLASS = {'Confirmed':'s-confirmed','In Progress':'s-in-progress','QC':'s-qc','Ready for Invoice':'s-ready','Invoiced':'s-invoiced','Completed':'s-completed','Need Purchase Order':'s-need-po'};
 const STATUS_ACCENT = {'Confirmed':'#1a4a90','In Progress':'#b07a00','QC':'#5a45c0','Ready for Invoice':'#4a8a1a','Invoiced':'#0a7050','Completed':'#8a93a5','Need Purchase Order':'#b53030'};
-const INTERNAL_PROCESSES = ['Purchasing','Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly','Delivery'];
+const INTERNAL_PROCESSES = ['Inventory Check','Purchasing','Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly','Delivery'];
 const EXTERNAL_PROCESSES = ['Purchasing- Material','Purchasing- Hardware','Purchasing- Tooling','Outsource- Plating','Outsource- Paint','Outsource- Machining','Outsource- Other'];
 const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 const EXTERNAL_SET = new Set(EXTERNAL_PROCESSES);
@@ -1422,6 +1422,7 @@ function procUnit(name){ return isExternal(name) ? 'd' : 'h'; }
 // one tone for all in-house work, one for purchasing, one for outsourcing.
 const GROUP_COLORS = { internal:'#64748B', purchasing:'#C08A2E', outsource:'#A8443A', delivery:'#2C7A7B' };
 const PROCESS_COLORS = {
+  'Inventory Check':GROUP_COLORS.internal,
   'Purchasing':GROUP_COLORS.purchasing,
   'Program':GROUP_COLORS.internal,
   'Laser':GROUP_COLORS.internal,
@@ -1439,6 +1440,7 @@ const PROCESS_COLORS = {
 // (industrial style) so the detail panel shows an icon instead of a long label.
 // Full name shows on hover.
 const PROC_ICON_PATHS = {
+  'Inventory Check':'<rect x="2.4" y="18.7" width="19.2" height="2.7" rx=".5"/><rect x="3.9" y="6.6" width="3.1" height="12.1" rx=".4"/><rect x="7.4" y="4.7" width="3.1" height="14" rx=".4"/><rect x="10.9" y="7.7" width="2.9" height="11" rx=".4"/><path d="M16.05 18.7 L18.45 18.7 L16.45 7.5 L14.05 7.5 Z"/>',
   'Purchasing':'<path d="M2.4 4.4h2.3l.62 2.4H20l-2.1 7.2H8.1l-.28 1.25H18.4v1.75H6.3L3.7 5.85l-1.3-.3z"/><circle cx="9.3" cy="19.2" r="1.65"/><circle cx="16.6" cy="19.2" r="1.65"/>',
   'Delivery':'<rect x="1.8" y="6.6" width="11" height="8.4" rx="1"/><path d="M12.8 9.2h3.9l3.3 3.3v2.5h-7.2z"/><circle cx="6.3" cy="17" r="1.95"/><circle cx="16.7" cy="17" r="1.95"/>',
   'Program':'<path fill-rule="evenodd" d="M3.5 4h17a1.5 1.5 0 0 1 1.5 1.5v8a1.5 1.5 0 0 1 -1.5 1.5h-17A1.5 1.5 0 0 1 2 13.5v-8A1.5 1.5 0 0 1 3.5 4zm1.5 2.6v5.8h14V6.6z"/><path d="M7 8.2l2.6 1.6L7 11.4v-1.3l1-.3-1-.3z"/><rect x="11" y="10.8" width="4.2" height="1.1" rx=".5"/><path d="M9 16h6l1.1 2.1h-8.2z"/><rect x="6.6" y="18" width="10.8" height="1.7" rx=".85"/>',
@@ -3547,13 +3549,12 @@ function ensureSchedule(r){
   }
   return r.schedule;
 }
-// enabled steps in the job's chosen run order (seq), falling back to list order
+// enabled steps in the job's chosen run order (seq), falling back to list order.
+// Inventory Check is pinned first — it always precedes every other step.
 function enabledOrdered(sch){
-  return sch.steps.filter(s=>s.enabled).sort((a,b)=>{
-    const as = (a.seq!=null) ? a.seq : 1000+PROCESSES.indexOf(a.name);
-    const bs = (b.seq!=null) ? b.seq : 1000+PROCESSES.indexOf(b.name);
-    return as-bs;
-  });
+  const rank = s => s.name==='Inventory Check' ? -Infinity
+                  : ((s.seq!=null) ? s.seq : 1000+PROCESSES.indexOf(s.name));
+  return sch.steps.filter(s=>s.enabled).sort((a,b)=> rank(a)-rank(b));
 }
 
 function addDays(date, n){ const d=new Date(date); d.setDate(d.getDate()+n); return d; }
