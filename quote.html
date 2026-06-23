@@ -2382,6 +2382,27 @@ let HISTORY = JSON.parse(localStorage.getItem('bsmp_history') || '[]');
 // Permanent archive of every printed quote/invoice for future reference.
 let ARCHIVE = JSON.parse(localStorage.getItem('bsmp_archive') || '[]');
 
+// ── Cloud-sync hooks ──────────────────────────────────────────────────────
+// Setters defined INSIDE this classic script so the Firebase sync module can
+// reliably reassign these in-memory variables when remote data arrives.
+window.__bsmpSet = {
+  history:      v => { HISTORY = Array.isArray(v) ? v : []; },
+  archive:      v => { ARCHIVE = Array.isArray(v) ? v : []; },
+  customers:    v => { CUSTOMERS = Array.isArray(v) ? v : []; },
+  rates:        v => { if(v && typeof v==='object') RATES = v; },
+  timeStandards:v => { if(v && typeof v==='object') TIME_STANDARDS = v; },
+  laserSpeeds:  v => {
+    try {
+      Object.keys(v||{}).forEach(key=>{
+        if(LASER_SPEEDS[key]){
+          if(v[key].ips!==undefined)      LASER_SPEEDS[key].ips    = v[key].ips;
+          if(v[key].pierceMs!==undefined) LASER_SPEEDS[key].pierce = v[key].pierceMs/1000;
+        }
+      });
+    } catch(e){ console.warn('laserSpeeds apply', e); }
+  }
+};
+
 // Save a printed quote into the permanent archive. Stores everything needed to
 // re-open the exact same printable quote later. `kind` = 'quote' | 'qtybreaks' | 'combined'.
 let _suppressArchive = false;
@@ -6659,6 +6680,18 @@ function saveMinSheet(){
 let QUOTE_COUNTER = parseInt(localStorage.getItem('bsmp_quote_counter'), 10);
 if(isNaN(QUOTE_COUNTER)) QUOTE_COUNTER = 2281;
 
+// Cloud-sync hook for the shared quote counter.
+if(window.__bsmpSet){
+  window.__bsmpSet.quoteCounter = v => {
+    const n = parseInt(v, 10);
+    if(!isNaN(n)){
+      QUOTE_COUNTER = n;
+      const el = document.getElementById('next-quote-number');
+      if(el) el.value = QUOTE_COUNTER;
+    }
+  };
+}
+
 // Peek at the next quote number WITHOUT consuming it.
 function peekNextQuoteNumber(){
   return QUOTE_COUNTER;
@@ -7329,6 +7362,260 @@ function openPrintWindow(q){
 }
 
 init();
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════════════
+     BSMP Quote Tool · Firebase two-way sync  (cloud-authoritative, local cache)
+     Quotes + archive + shop config (customers, rates, time standards, laser
+     speeds, quote counter) live in the shared Firebase project. localStorage
+     is kept as an offline cache. AI key / proxy URL stay LOCAL (never synced).
+     Requires DB rules allowing auth users to read/write  quotes, quoteArchive,
+     and config.
+     ════════════════════════════════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, set, remove, onValue, runTransaction }
+  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+         setPersistence, browserLocalPersistence }
+  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
+  authDomain: "bsmp-orders.firebaseapp.com",
+  databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com",
+  projectId: "bsmp-orders",
+  storageBucket: "bsmp-orders.firebasestorage.app",
+  messagingSenderId: "924947028289",
+  appId: "1:924947028289:web:c58c74e37ee51aa1b9e9c0"
+};
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+let signedIn = false;
+let _applyingRemote = false;     // true while we write remote data into the local cache (prevents echo)
+
+// ── localStorage helpers ───────────────────────────────────────────────────
+function lsGet(key, fallback){
+  try { const v = localStorage.getItem(key); return v==null ? fallback : JSON.parse(v); }
+  catch { return fallback; }
+}
+function lsSetSilently(key, valStr){
+  _applyingRemote = true;
+  try { _origSetItem(key, valStr); } finally { _applyingRemote = false; }
+}
+function clean(o){ return JSON.parse(JSON.stringify(o)); }   // strips undefined for RTDB
+function safeCall(name){ try { if(typeof window[name]==='function') window[name](); } catch(e){ console.warn(name, e); } }
+function applySet(setter, val){ try { window.__bsmpSet && window.__bsmpSet[setter] && window.__bsmpSet[setter](val); } catch(e){ console.warn('set '+setter, e); } }
+
+// ── What gets synced ────────────────────────────────────────────────────────
+const COLLECTIONS = {
+  'bsmp_history': { path:'quotes',       setter:'history', render:['renderHistory'], first:true, prev:{} },
+  'bsmp_archive': { path:'quoteArchive', setter:'archive', render:['renderArchive'], first:true, prev:{} }
+};
+const CONFIG = {
+  'bsmp_customers':      { path:'config/customers',     setter:'customers',     render:['populateCustomerSelect','renderCustomersTable'] },
+  'bsmp_rates':          { path:'config/rates',         setter:'rates',         render:['renderRatesTable'] },
+  'bsmp_time_standards': { path:'config/timeStandards', setter:'timeStandards', render:['renderTimeStandards'] },
+  'bsmp_laser_speeds':   { path:'config/laserSpeeds',   setter:'laserSpeeds',   render:['renderLaserSpeeds'] }
+};
+const COUNTER_KEY  = 'bsmp_quote_counter';
+const COUNTER_PATH = 'config/quoteCounter';
+
+// ── Apply remote → local (cache + in-memory + re-render) ────────────────────
+function applyCollection(key, spec, cloudMap){
+  const arr = Object.values(cloudMap || {}).sort((a,b)=> (b.id||0) - (a.id||0));
+  lsSetSilently(key, JSON.stringify(arr));
+  applySet(spec.setter, arr);
+  spec.prev = {};
+  arr.forEach(q => { if(q && q.id!=null) spec.prev[String(q.id)] = JSON.stringify(q); });
+  spec.render.forEach(safeCall);
+}
+function applyConfig(key, spec, val){
+  lsSetSilently(key, JSON.stringify(val));
+  applySet(spec.setter, val);
+  spec.render.forEach(safeCall);
+}
+
+// ── Push local → remote ─────────────────────────────────────────────────────
+function pushItem(path, item){
+  if(item && item.id!=null){ set(ref(db, path + '/' + item.id), clean(item)).catch(e=>console.warn('push', e)); }
+}
+function diffPushCollection(key, spec){
+  const cur = lsGet(key, []);
+  const curMap = {};
+  cur.forEach(q => { if(q && q.id!=null) curMap[String(q.id)] = q; });
+  // upserts
+  for(const id in curMap){
+    const sig = JSON.stringify(curMap[id]);
+    if(spec.prev[id] !== sig){ pushItem(spec.path, curMap[id]); }
+  }
+  // deletes — propagate individual removals, but never a full wipe (safety)
+  const curCount = Object.keys(curMap).length, prevCount = Object.keys(spec.prev).length;
+  if(!(curCount === 0 && prevCount > 0)){
+    for(const id in spec.prev){
+      if(!(id in curMap)){ remove(ref(db, spec.path + '/' + id)).catch(()=>{}); }
+    }
+  }
+  spec.prev = {};
+  for(const id in curMap) spec.prev[id] = JSON.stringify(curMap[id]);
+}
+function pushConfig(key, spec){
+  const val = lsGet(key, null);
+  if(val != null) set(ref(db, spec.path), clean(val)).catch(e=>console.warn('cfg push', e));
+}
+
+// ── Intercept every local write ─────────────────────────────────────────────
+const _origSetItem = localStorage.setItem.bind(localStorage);
+let _pushTimers = {};
+localStorage.setItem = function(key, val){
+  _origSetItem(key, val);
+  if(_applyingRemote || !signedIn) return;
+  if(COLLECTIONS[key] || CONFIG[key]){
+    clearTimeout(_pushTimers[key]);
+    _pushTimers[key] = setTimeout(() => {
+      if(COLLECTIONS[key]) diffPushCollection(key, COLLECTIONS[key]);
+      else                 pushConfig(key, CONFIG[key]);
+    }, 700);     // debounce burst writes
+  }
+};
+
+// ── Quote counter: keep shared + advance atomically on consume ──────────────
+const _origConsume = window.consumeQuoteNumber;
+if(typeof _origConsume === 'function'){
+  window.consumeQuoteNumber = function(){
+    const n = _origConsume.apply(this, arguments);   // local increment + field update
+    if(signedIn){
+      runTransaction(ref(db, COUNTER_PATH), cur => Math.max((cur||0), (typeof n==='number'? n : 0)) + 1).catch(()=>{});
+    }
+    return n;
+  };
+}
+const _origSaveNext = window.saveNextQuoteNumber;
+if(typeof _origSaveNext === 'function'){
+  window.saveNextQuoteNumber = function(){
+    const r = _origSaveNext.apply(this, arguments);
+    if(signedIn){ const v = parseInt(localStorage.getItem(COUNTER_KEY), 10); if(!isNaN(v)) set(ref(db, COUNTER_PATH), v).catch(()=>{}); }
+    return r;
+  };
+}
+
+// ── Attach listeners once signed in ─────────────────────────────────────────
+let _wired = false;
+function wireListeners(){
+  if(_wired) return; _wired = true;
+
+  // Collections — merge local-only items up on first snapshot, then cloud wins.
+  for(const key in COLLECTIONS){
+    const spec = COLLECTIONS[key];
+    onValue(ref(db, spec.path), snap => {
+      const cloud = snap.val() || {};
+      if(spec.first){
+        spec.first = false;
+        const local = lsGet(key, []);
+        local.forEach(q => {
+          if(q && q.id!=null && !(String(q.id) in cloud)){ pushItem(spec.path, q); cloud[String(q.id)] = clean(q); }
+        });
+      }
+      applyCollection(key, spec, cloud);
+    });
+  }
+
+  // Config — if cloud empty, seed from local; else cloud wins.
+  for(const key in CONFIG){
+    const spec = CONFIG[key];
+    onValue(ref(db, spec.path), snap => {
+      if(!snap.exists()){ pushConfig(key, spec); return; }
+      applyConfig(key, spec, snap.val());
+    });
+  }
+
+  // Counter — if cloud empty, seed from local; else mirror down.
+  onValue(ref(db, COUNTER_PATH), snap => {
+    if(!snap.exists()){
+      const v = parseInt(localStorage.getItem(COUNTER_KEY), 10);
+      set(ref(db, COUNTER_PATH), isNaN(v) ? 2281 : v).catch(()=>{});
+      return;
+    }
+    const v = snap.val();
+    lsSetSilently(COUNTER_KEY, String(v));
+    applySet('quoteCounter', v);
+  });
+
+  setStatus('Synced ✓');
+}
+
+// ── Manual full push (run from the master machine before connecting others) ─
+async function syncAll(){
+  if(!signedIn){ setStatus('Sign in first', true); return; }
+  setStatus('Pushing all…');
+  for(const key in COLLECTIONS){ lsGet(key, []).forEach(q => pushItem(COLLECTIONS[key].path, q)); }
+  for(const key in CONFIG){ pushConfig(key, CONFIG[key]); }
+  const cv = parseInt(localStorage.getItem(COUNTER_KEY), 10);
+  if(!isNaN(cv)) await set(ref(db, COUNTER_PATH), cv).catch(()=>{});
+  setStatus('All pushed ✓');
+}
+
+// ── Minimal floating widget ─────────────────────────────────────────────────
+function buildWidget(){
+  const wrap = document.createElement('div');
+  wrap.id = 'qsync';
+  wrap.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+  wrap.innerHTML = `
+    <div id="qsync-chip" style="display:flex;align-items:center;gap:7px;background:#1e293b;color:#fff;border-radius:20px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)">
+      <span id="qsync-dot" style="width:8px;height:8px;border-radius:50%;background:#64748b"></span>
+      <span id="qsync-label">Cloud sync</span>
+    </div>
+    <div id="qsync-panel" style="display:none;position:absolute;left:0;bottom:42px;width:252px;background:#fff;border:1px solid #dbe1ec;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:14px;color:#1a2233;font-size:13px">
+      <div id="qsync-state" style="font-weight:700;margin-bottom:10px">Signed out</div>
+      <div id="qsync-signin">
+        <input id="qsync-email" type="email" placeholder="Email" autocomplete="username"
+          style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:6px;font-family:inherit">
+        <input id="qsync-pass" type="password" placeholder="Password" autocomplete="current-password"
+          style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:8px;font-family:inherit">
+        <button id="qsync-login" style="width:100%;font-size:13px;font-weight:600;padding:8px;border:none;border-radius:8px;background:#2563b0;color:#fff;cursor:pointer">Sign in</button>
+        <div id="qsync-err" style="color:#dc2626;font-size:11.5px;margin-top:6px;min-height:14px"></div>
+      </div>
+      <div id="qsync-actions" style="display:none">
+        <button id="qsync-all" style="width:100%;font-size:13px;font-weight:600;padding:8px;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;color:#1a2233;cursor:pointer;margin-bottom:6px">Sync all to cloud</button>
+        <button id="qsync-out" style="width:100%;font-size:12px;font-weight:600;padding:7px;border:none;border-radius:8px;background:transparent;color:#64748b;cursor:pointer">Sign out</button>
+      </div>
+    </div>`;
+  document.body.appendChild(wrap);
+  document.getElementById('qsync-chip').onclick = () => {
+    const p = document.getElementById('qsync-panel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  };
+  document.getElementById('qsync-login').onclick = async () => {
+    const err = document.getElementById('qsync-err'); err.textContent = '';
+    try { await signInWithEmailAndPassword(auth, document.getElementById('qsync-email').value.trim(), document.getElementById('qsync-pass').value); }
+    catch(e){ err.textContent = 'Sign-in failed. Check email / password.'; }
+  };
+  document.getElementById('qsync-pass').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('qsync-login').click(); });
+  document.getElementById('qsync-out').onclick = () => signOut(auth);
+  document.getElementById('qsync-all').onclick = syncAll;
+}
+function setStatus(text, isErr){
+  const label = document.getElementById('qsync-label'), dot = document.getElementById('qsync-dot');
+  if(label) label.textContent = signedIn ? text : 'Cloud sync';
+  if(dot)   dot.style.background = isErr ? '#dc2626' : (signedIn ? '#22c55e' : '#64748b');
+}
+
+onAuthStateChanged(auth, user => {
+  signedIn = !!user;
+  const state = document.getElementById('qsync-state');
+  const si = document.getElementById('qsync-signin'), ac = document.getElementById('qsync-actions');
+  if(state) state.textContent = signedIn ? ('Connected — ' + user.email) : 'Signed out';
+  if(si) si.style.display = signedIn ? 'none' : 'block';
+  if(ac) ac.style.display = signedIn ? 'block' : 'none';
+  setStatus(signedIn ? 'Connecting…' : 'Cloud sync');
+  if(signedIn) wireListeners();
+});
+
+buildWidget();
+setStatus('Cloud sync');
 </script>
 </body>
 </html>
