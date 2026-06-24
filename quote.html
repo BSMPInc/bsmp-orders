@@ -329,13 +329,36 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .history-table th {
   font-size: 10px; font-weight: 700; color: var(--text2);
-  text-transform: uppercase; letter-spacing: .07em;
-  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  text-transform: uppercase; letter-spacing: .05em;
+  padding: 8px 5px; border-bottom: 1px solid var(--border);
   background: var(--surface2); text-align: left;
 }
-.history-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.history-table td { padding: 9px 5px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .history-table tbody tr:hover td { background: var(--sky-light); }
 .history-table tr:last-child td { border-bottom: none; }
+.history-table .num { white-space: nowrap; }
+.history-table td select { min-width: 104px; }
+#history-body, #assembly-picker-body { overflow-x: auto; }
+.hist-filter { font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface); color: var(--text); max-width: 170px; }
+.hist-filter:focus { outline: none; border-color: var(--navy); }
+.history-table tr.row-selected td { background: var(--sky-light); }
+.history-table tr.row-selected td:first-child { box-shadow: inset 3px 0 0 var(--navy); }
+/* ── TOAST ── */
+#toast-host { position: fixed; bottom: 22px; right: 22px; z-index: 12000; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: 12px; min-width: 270px; max-width: 390px;
+  background: var(--surface, #fff); border: 1px solid var(--border2, #d8dee9); border-left: 4px solid var(--success, #16a34a);
+  border-radius: 10px; padding: 12px 14px; box-shadow: 0 10px 30px rgba(15,23,42,0.18);
+  font-size: 13px; color: var(--text, #1a1a1a); transform: translateY(10px); opacity: 0; transition: opacity .2s ease, transform .2s ease; }
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast .toast-ico { flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display:flex; align-items:center; justify-content:center; background: var(--success-bg, #dcfce7); color: var(--success, #16a34a); }
+.toast .toast-body { flex: 1 1 auto; line-height: 1.4; min-width: 0; }
+.toast .toast-title { font-weight: 700; }
+.toast .toast-sub { color: var(--text3, #64748b); font-size: 12px; margin-top: 1px; }
+.toast .toast-action { flex: 0 0 auto; font-weight: 700; color: var(--navy, #1e3a8a); background: none; border: none; cursor: pointer; font-size: 12px; padding: 4px 7px; border-radius: 6px; }
+.toast .toast-action:hover { background: var(--sky-light, #eff6ff); }
+.toast .toast-x { flex:0 0 auto; background:none; border:none; color: var(--text3, #94a3b8); cursor: pointer; font-size: 16px; line-height: 1; padding: 2px 4px; }
+.toast.toast-error { border-left-color: #dc2626; }
+.toast.toast-error .toast-ico { background:#fee2e2; color:#dc2626; }
 .badge {
   display: inline-block; font-size: 11px; font-weight: 700;
   padding: 2px 9px; border-radius: 20px; letter-spacing: .01em;
@@ -1405,12 +1428,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <div id="history-stats" style="font-size:12px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap"></div>
         <div id="history-tier-stats" style="font-size:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;margin-top:4px"></div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
         <div class="search-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="history-search" placeholder="Search customer or part…" style="width:210px" oninput="renderHistory()">
+          <input type="text" id="history-search" placeholder="Part # or customer…" style="width:170px" oninput="renderHistory()">
         </div>
-        <select id="history-status-filter" onchange="renderHistory()" style="font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid var(--border2)">
+        <select id="history-filter-customer" class="hist-filter" onchange="renderHistory()" title="Filter by customer"><option value="">All customers</option></select>
+        <select id="history-filter-material" class="hist-filter" onchange="renderHistory()" title="Filter by material"><option value="">All materials</option></select>
+        <input type="date" id="history-filter-from" class="hist-filter" onchange="renderHistory()" title="From date" style="width:150px">
+        <input type="date" id="history-filter-to" class="hist-filter" onchange="renderHistory()" title="To date" style="width:150px">
+        <select id="history-status-filter" class="hist-filter" onchange="renderHistory()">
           <option value="all">All statuses</option>
           <option value="pending">Pending</option>
           <option value="accepted">Accepted</option>
@@ -1418,10 +1445,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <option value="noresponse">No Response</option>
           <option value="stale">⚑ Needs follow-up</option>
         </select>
+        <button class="btn btn-sm" onclick="clearHistoryFilters()" title="Reset all filters">Clear filters</button>
         <button class="btn btn-sm" onclick="buildCombinedQuote()" id="combine-btn" style="white-space:nowrap">Combine selected (0)</button>
         <button class="btn btn-sm btn-danger" onclick="clearHistory()">Clear all</button>
       </div>
     </div>
+    <div id="combine-selected-bar" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius)"></div>
     <div id="history-body"></div>
   </div>
 </div>
@@ -1620,7 +1649,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div style="display:flex;gap:8px;margin-bottom:12px">
       <div class="search-box" style="flex:1">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="asm-part-search" placeholder="Search saved quotes by part number or customer…" oninput="renderAsmPartSearch()">
+        <input type="text" id="asm-part-search" placeholder="Search saved quotes by part #, customer, or material — or click to browse…" oninput="renderAsmPartSearch()" onfocus="renderAsmPartSearch()">
       </div>
     </div>
 
@@ -2381,27 +2410,6 @@ let CUSTOMERS = JSON.parse(localStorage.getItem('bsmp_customers') || 'null') || 
 let HISTORY = JSON.parse(localStorage.getItem('bsmp_history') || '[]');
 // Permanent archive of every printed quote/invoice for future reference.
 let ARCHIVE = JSON.parse(localStorage.getItem('bsmp_archive') || '[]');
-
-// ── Cloud-sync hooks ──────────────────────────────────────────────────────
-// Setters defined INSIDE this classic script so the Firebase sync module can
-// reliably reassign these in-memory variables when remote data arrives.
-window.__bsmpSet = {
-  history:      v => { HISTORY = Array.isArray(v) ? v : []; },
-  archive:      v => { ARCHIVE = Array.isArray(v) ? v : []; },
-  customers:    v => { CUSTOMERS = Array.isArray(v) ? v : []; },
-  rates:        v => { if(v && typeof v==='object') RATES = v; },
-  timeStandards:v => { if(v && typeof v==='object') TIME_STANDARDS = v; },
-  laserSpeeds:  v => {
-    try {
-      Object.keys(v||{}).forEach(key=>{
-        if(LASER_SPEEDS[key]){
-          if(v[key].ips!==undefined)      LASER_SPEEDS[key].ips    = v[key].ips;
-          if(v[key].pierceMs!==undefined) LASER_SPEEDS[key].pierce = v[key].pierceMs/1000;
-        }
-      });
-    } catch(e){ console.warn('laserSpeeds apply', e); }
-  }
-};
 
 // Save a printed quote into the permanent archive. Stores everything needed to
 // re-open the exact same printable quote later. `kind` = 'quote' | 'qtybreaks' | 'combined'.
@@ -4064,6 +4072,35 @@ function copyQuote(){
   }).catch(()=>alert('Copy failed — please copy manually.'));
 }
 
+// Lightweight toast notifications (success/error) with optional action button.
+function showToast(opts){
+  if(typeof opts==='string') opts={title:opts};
+  const host=document.getElementById('toast-host');
+  if(!host){ return; }
+  const t=document.createElement('div');
+  t.className='toast'+(opts.type==='error'?' toast-error':'');
+  const icoOk='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+  const icoErr='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  const ico=document.createElement('span'); ico.className='toast-ico'; ico.innerHTML=(opts.type==='error'?icoErr:icoOk);
+  const body=document.createElement('div'); body.className='toast-body';
+  const title=document.createElement('div'); title.className='toast-title'; title.textContent=opts.title||'Done'; body.appendChild(title);
+  if(opts.sub){ const sub=document.createElement('div'); sub.className='toast-sub'; sub.textContent=opts.sub; body.appendChild(sub); }
+  t.appendChild(ico); t.appendChild(body);
+  let timer;
+  function dismiss(){ clearTimeout(timer); t.classList.remove('show'); setTimeout(()=>{ if(t.parentNode) t.remove(); },220); }
+  if(opts.actionLabel){
+    const a=document.createElement('button'); a.className='toast-action'; a.textContent=opts.actionLabel;
+    a.onclick=function(){ try{ if(opts.onAction) opts.onAction(); } finally { dismiss(); } };
+    t.appendChild(a);
+  }
+  const x=document.createElement('button'); x.className='toast-x'; x.setAttribute('aria-label','Dismiss'); x.textContent='×'; x.onclick=dismiss;
+  t.appendChild(x);
+  host.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  timer=setTimeout(dismiss, opts.duration||4500);
+  return dismiss;
+}
+
 function saveQuote(){
   const d=window._calc; if(!d) return;
   const pn=document.getElementById('partnum').value;
@@ -4163,9 +4200,21 @@ function saveQuote(){
   HISTORY.unshift(quote);
   if(HISTORY.length>500) HISTORY.pop();
   localStorage.setItem('bsmp_history', JSON.stringify(HISTORY));
-  const btn=event.target.closest('button');
-  const orig=btn.innerHTML; btn.innerHTML='✓ Saved!'; btn.style.background='var(--success)';
-  setTimeout(()=>{btn.innerHTML=orig;btn.style.background='';},2000);
+
+  // Confirmation: toast + brief button state change.
+  const money = v => '$'+(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  showToast({
+    title: 'Quote saved to history',
+    sub: (pn||cust) + ' · ' + money(quote.jobTotal) + ' (qty ' + quote.qty + ')',
+    actionLabel: 'View',
+    onAction: () => showPanel('history'),
+    duration: 5000
+  });
+  const btn = (typeof event!=='undefined' && event && event.target) ? event.target.closest('button') : null;
+  if(btn){
+    const orig=btn.innerHTML; btn.innerHTML='✓ Saved!'; btn.style.background='var(--success)';
+    setTimeout(()=>{ btn.innerHTML=orig; btn.style.background=''; },2000);
+  }
 }
 
 function resetForm(){
@@ -4207,9 +4256,16 @@ function resetForm(){
 
 // ===================== HISTORY =====================
 function renderHistory(){
+  populateHistoryFilters();
   const search=(document.getElementById('history-search').value||'').toLowerCase();
   const statusFilterEl=document.getElementById('history-status-filter');
   const statusFilter=statusFilterEl?statusFilterEl.value:'all';
+  const fCustomer=(document.getElementById('history-filter-customer')||{}).value||'';
+  const fMaterial=(document.getElementById('history-filter-material')||{}).value||'';
+  const fFrom=(document.getElementById('history-filter-from')||{}).value||'';
+  const fTo=(document.getElementById('history-filter-to')||{}).value||'';
+  const fromD=fFrom?new Date(fFrom+'T00:00:00'):null;
+  const toD=fTo?new Date(fTo+'T23:59:59'):null;
   const filtered=HISTORY.filter(q=>{
     const matchesSearch = q.partNum.toLowerCase().includes(search)||
       q.customer.toLowerCase().includes(search)||
@@ -4219,7 +4275,11 @@ function renderHistory(){
     if(statusFilter==='all') matchesStatus = true;
     else if(statusFilter==='stale') matchesStatus = isStale(q);
     else matchesStatus = (qStatus===statusFilter);
-    return matchesSearch && matchesStatus;
+    const matchesCustomer = !fCustomer || q.customer===fCustomer;
+    const matchesMaterial = !fMaterial || (q.material||'')===fMaterial;
+    let matchesDate = true;
+    if(fromD || toD){ const qd=quoteDate(q); if(fromD && (!qd||qd<fromD)) matchesDate=false; if(toD && (!qd||qd>toD)) matchesDate=false; }
+    return matchesSearch && matchesStatus && matchesCustomer && matchesMaterial && matchesDate;
   });
   document.getElementById('history-count').textContent=`${filtered.length} quote${filtered.length!==1?'s':''}`;
   const body=document.getElementById('history-body');
@@ -4232,7 +4292,7 @@ function renderHistory(){
   body.innerHTML=`<table class="history-table">
     <thead><tr><th style="width:40px;text-align:center;font-size:10px">Combine</th><th>Date</th><th>Part</th><th>Customer</th><th>Material</th><th style="text-align:right">Qty</th><th style="text-align:right">Price/part</th><th style="text-align:right">Job total</th><th>Status</th><th></th></tr></thead>
     <tbody>${filtered.map(q=>`
-      <tr>
+      <tr class="${combineSelected.has(q.id)?'row-selected':''}">
         <td style="text-align:center"><input type="checkbox" class="combine-chk" value="${q.id}" ${combineSelected.has(q.id)?'checked':''} onchange="toggleCombine(${q.id}, this.checked)" style="width:16px;height:16px;cursor:pointer;accent-color:var(--navy)"></td>
         <td style="color:var(--text2);white-space:nowrap;font-size:12px">${q.date}</td>
         <td>
@@ -4250,16 +4310,17 @@ function renderHistory(){
         <td class="num" style="font-weight:600">${fmt(q.pricePerPart)}</td>
         <td class="num" style="font-weight:600;color:var(--navy)">${fmt(q.jobTotal)}</td>
         <td>${statusDropdown(q)}</td>
-        <td style="white-space:nowrap">
+        <td style="white-space:nowrap;text-align:right">
           <button class="btn btn-sm" onclick="reloadQuote(${q.id})">Load</button>
-          <button class="btn btn-sm" onclick="printQuoteFromHistory(${q.id})" style="margin-left:4px">Print</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteQuote(${q.id})" style="margin-left:4px">×</button>
+          <button class="btn btn-sm" title="Print quote" aria-label="Print quote" onclick="printQuoteFromHistory(${q.id})" style="margin-left:3px;padding:5px 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+          <button class="btn btn-sm btn-danger" title="Delete quote" aria-label="Delete quote" onclick="deleteQuote(${q.id})" style="margin-left:3px;padding:5px 8px">×</button>
         </td>
       </tr>`).join('')}
     </tbody>
   </table>`;
   const cbtn = document.getElementById('combine-btn');
   if(cbtn) cbtn.textContent = `Combine selected (${combineSelected.size})`;
+  renderCombineBar();
   // Stats reflect all search-matched quotes regardless of the status filter,
   // so the win rate stays meaningful while you filter the view.
   const searchMatched=HISTORY.filter(q=>
@@ -5258,14 +5319,21 @@ function showAssemblyPanel() {
 function renderAsmPartSearch() {
   const q = (document.getElementById('asm-part-search').value||'').toLowerCase();
   const res = document.getElementById('asm-part-results');
-  if (!q) { res.style.display='none'; return; }
 
-  const matches = HISTORY.filter(h =>
-    !h.isAssembly &&
-    ((h.partNum||'').toLowerCase().includes(q) ||
-     (h.customer||'').toLowerCase().includes(q) ||
-     (h.material||'').toLowerCase().includes(q))
-  ).slice(0, 10);
+  let matches, browsing=false;
+  if (!q) {
+    // No query → browse the most recent saved part quotes (newest first).
+    browsing = true;
+    matches = HISTORY.filter(h => !h.isAssembly).slice(0, 8);
+    if (!matches.length) { res.style.display='none'; return; }
+  } else {
+    matches = HISTORY.filter(h =>
+      !h.isAssembly &&
+      ((h.partNum||'').toLowerCase().includes(q) ||
+       (h.customer||'').toLowerCase().includes(q) ||
+       (h.material||'').toLowerCase().includes(q))
+    ).slice(0, 10);
+  }
 
   if (!matches.length) {
     res.style.display='block';
@@ -5275,7 +5343,10 @@ function renderAsmPartSearch() {
 
   const fmt = v => '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   res.style.display='block';
-  res.innerHTML = matches.map(h => `
+  const header = browsing
+    ? '<div style="padding:7px 14px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;background:var(--surface2);border-bottom:1px solid var(--border)">Recent quotes — type to filter</div>'
+    : '';
+  res.innerHTML = header + matches.map(h => `
     <div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s"
          onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"
          onclick="addAsmPart('${h.id}')">
@@ -6680,18 +6751,6 @@ function saveMinSheet(){
 let QUOTE_COUNTER = parseInt(localStorage.getItem('bsmp_quote_counter'), 10);
 if(isNaN(QUOTE_COUNTER)) QUOTE_COUNTER = 2281;
 
-// Cloud-sync hook for the shared quote counter.
-if(window.__bsmpSet){
-  window.__bsmpSet.quoteCounter = v => {
-    const n = parseInt(v, 10);
-    if(!isNaN(n)){
-      QUOTE_COUNTER = n;
-      const el = document.getElementById('next-quote-number');
-      if(el) el.value = QUOTE_COUNTER;
-    }
-  };
-}
-
 // Peek at the next quote number WITHOUT consuming it.
 function peekNextQuoteNumber(){
   return QUOTE_COUNTER;
@@ -6730,8 +6789,58 @@ const combineSelected = new Set();
 
 function toggleCombine(id, checked){
   if(checked) combineSelected.add(id); else combineSelected.delete(id);
+  // Re-render so the row highlight, selected-chips bar, and button count all stay in sync.
+  renderHistory();
+}
+
+function clearCombineSelection(){ combineSelected.clear(); renderHistory(); }
+
+// Build the "selected to combine" chip bar so it's obvious which quotes are picked,
+// even if the current filters hide some of them from the table.
+function renderCombineBar(){
+  const bar = document.getElementById('combine-selected-bar');
   const btn = document.getElementById('combine-btn');
   if(btn) btn.textContent = `Combine selected (${combineSelected.size})`;
+  if(!bar) return;
+  if(!combineSelected.size){ bar.style.display='none'; bar.innerHTML=''; return; }
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const money = v => '$'+(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const picked = HISTORY.filter(q=>combineSelected.has(q.id));
+  let totalJob = 0; picked.forEach(q=> totalJob += parseFloat(q.jobTotal)||0);
+  const chips = picked.map(q=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--sky-mid);border-radius:16px;padding:3px 4px 3px 11px;margin:3px 5px 3px 0;font-size:12px;font-weight:600;color:#1e40af">${esc(q.partNum||'Part')}${q.quoteNo?` <span style="color:#0369a1;font-weight:700">#${esc(q.quoteNo)}</span>`:''} · ${money(q.jobTotal)}<button onclick="toggleCombine(${q.id}, false)" title="Remove from selection" aria-label="Remove" style="border:none;background:none;color:#64748b;cursor:pointer;font-size:15px;line-height:1;padding:0 3px;border-radius:50%">×</button></span>`).join('');
+  bar.style.display='block';
+  bar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:0">
+      <span style="font-weight:700;color:#1e40af;margin-right:6px;font-size:12px">Selected to combine (${combineSelected.size}) · ${money(totalJob)} total:</span>${chips}
+    </div>
+    <button class="btn btn-sm" onclick="clearCombineSelection()" style="flex-shrink:0">Clear selection</button>
+  </div>`;
+}
+
+// Populate the Customer and Material filter dropdowns from the distinct values in history,
+// preserving the current selection across re-renders.
+function populateHistoryFilters(){
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const fill = (id, values, allLabel) => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const cur = sel.value;
+    const opts = [...new Set(values.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
+    sel.innerHTML = `<option value="">${allLabel}</option>` + opts.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(opts.includes(cur)) sel.value = cur; else sel.value = '';
+  };
+  fill('history-filter-customer', HISTORY.map(q=>q.customer), 'All customers');
+  fill('history-filter-material', HISTORY.map(q=>q.material), 'All materials');
+}
+
+function clearHistoryFilters(){
+  const s = document.getElementById('history-search'); if(s) s.value='';
+  const c = document.getElementById('history-filter-customer'); if(c) c.value='';
+  const m = document.getElementById('history-filter-material'); if(m) m.value='';
+  const f = document.getElementById('history-filter-from'); if(f) f.value='';
+  const t = document.getElementById('history-filter-to'); if(t) t.value='';
+  const st = document.getElementById('history-status-filter'); if(st) st.value='all';
+  renderHistory();
 }
 
 function buildCombinedQuote(){
@@ -7228,6 +7337,47 @@ function openPrintWindow(q){
 
   const taxRow = q.tax > 0 ? `<tr><td class="tot-label">TAX</td><td class="tot-val">${fmt(q.tax)}</td></tr>` : `<tr><td class="tot-label">TAX</td><td class="tot-val">0.00</td></tr>`;
 
+  const MASTHEAD = `
+    <div class="top">
+      <div class="company">
+        <div class="name">BERT'S SHEET METAL PRODUCTS INC.</div>
+        <div>9521 Irondale Ave</div>
+        <div>Chatsworth, CA&nbsp;&nbsp;91311</div>
+        <div>+18187750104</div>
+        <div>info@bertsmp.com</div>
+      </div>
+      <div class="logo"><img src="${BSMP_LOGO}" alt="Bert's"></div>
+    </div>`;
+
+  const TOPBLOCK = `
+    <div class="quote-title">Quote</div>
+    <div class="meta">
+      <div class="col"><div class="label">Address</div><div class="addr">${nl2br(q.billto)}</div></div>
+      <div class="col"><div class="label">Ship To</div><div class="addr">${nl2br(q.shipto)}</div></div>
+      <div class="col meta-right">
+        <div class="row"><span class="k">Quote #</span><span>${esc(q.quoteno)}</span></div>
+        <div class="row"><span class="k">Date</span><span>${esc(q.date)}</span></div>
+      </div>
+    </div>
+    <hr class="sep">
+    <div class="leadtime"><div class="label">Lead Time</div><div>${esc(q.leadtime)}</div></div>`;
+
+  const TOTALSBLOCK = `
+    <div class="totals-dash"></div>
+    <div class="totals-wrap">
+      <table class="totals">
+        <tr><td class="tot-label">SUBTOTAL</td><td class="tot-val">${fmt(q.subtotal)}</td></tr>
+        ${taxRow}
+        <tr class="grand"><td class="tot-label">TOTAL</td><td class="tot-val">$${fmt(q.total)}</td></tr>
+      </table>
+    </div>`;
+
+  const SIGBLOCK = `
+    <div class="footer">
+      <div class="sig">Accepted By</div>
+      <div class="sig">Accepted Date</div>
+    </div>`;
+
   const win = window.open("", "_blank", "width=850,height=1100");
   if(!win){ alert("Pop-up blocked. Allow pop-ups for this site to print quotes."); return; }
   win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Quote ${esc(q.quoteno)||""}</title>
@@ -7235,21 +7385,15 @@ function openPrintWindow(q){
     * { box-sizing:border-box; margin:0; padding:0; }
     html, body { background:#e5e7eb; }
     body { font-family:Arial,Helvetica,sans-serif; color:#1a1a1a; font-size:12px; line-height:1.45; }
-    /* The page is exactly US Letter (8.5in x 11in). On screen it sits on a gray
-       backdrop; when printed it fills the sheet edge-to-edge within the margins. */
-    /* On screen: show the sheet at true Letter size on a gray backdrop so
-       what you see matches the print. flex column lets the footer sit at bottom. */
-    .page {
-      width:8.5in;
-      min-height:11in;
-      margin:24px auto;
-      padding:0.5in 0.55in;
-      background:#fff;
-      box-shadow:0 2px 16px rgba(0,0,0,0.18);
-      display:flex;
-      flex-direction:column;
-    }
-    .page > .body-content { flex:1 0 auto; }
+    /* Each .sheet is exactly one US Letter page. Content is paginated by JS into
+       as many sheets as needed; the masthead and the line-item column headers
+       repeat on every sheet, and each sheet is numbered at the bottom. */
+    .sheet { width:8.5in; height:11in; padding:0.5in 0.55in; background:#fff;
+      display:flex; flex-direction:column; overflow:hidden; }
+    .sheet-top { flex:0 0 auto; }
+    .sheet-body { flex:1 1 auto; overflow:hidden; }
+    .sheet-foot { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center;
+      border-top:1px solid #ddd; margin-top:8px; padding-top:6px; font-size:10px; color:#888; }
     .top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
     .company { font-size:12px; line-height:1.55; }
     .company .name { font-weight:700; font-size:13px; margin-bottom:2px; }
@@ -7266,7 +7410,9 @@ function openPrintWindow(q){
     hr.sep { border:none; border-top:1px solid #1a1a1a; margin:13px 0; }
     .leadtime { margin-bottom:16px; }
     .leadtime .label { font-weight:700; text-transform:uppercase; font-size:11px; margin-bottom:3px; }
-    table.items { width:100%; border-collapse:collapse; margin-bottom:0; }
+    table.items { width:100%; border-collapse:collapse; table-layout:fixed; }
+    table.items th.num, table.items td.num { width:84px; }
+    table.items td.desc { word-wrap:break-word; overflow-wrap:break-word; }
     table.items thead th { background:#d9d9d9; text-align:left; padding:7px 10px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.02em; }
     table.items thead th.num { text-align:right; }
     table.items tbody td { padding:9px 10px; vertical-align:top; font-size:12px; }
@@ -7279,82 +7425,79 @@ function openPrintWindow(q){
     table.totals td.tot-label { font-weight:400; }
     table.totals td.tot-val { text-align:right; white-space:nowrap; }
     table.totals tr.grand td { font-size:23px; font-weight:700; padding-top:8px; }
-    .footer { display:flex; justify-content:space-between; margin-top:60px; font-size:12px; flex:0 0 auto; }
+    .assume { margin-top:14px; font-size:10.5px; color:#666; line-height:1.5; border-top:1px solid #ddd; padding-top:8px; }
+    .footer { display:flex; justify-content:space-between; margin-top:48px; font-size:12px; }
     .footer .sig { width:46%; border-top:1px solid #1a1a1a; padding-top:6px; }
-    /* Print: @page owns the paper size. Margin is ZERO here because the .page
-       keeps its own 0.5in padding as the content inset — this avoids the
-       browser double-applying margins and shrink-to-fit scaling the layout. */
     @page { size:letter portrait; margin:0; }
+    @media screen {
+      html, body { background:#e5e7eb; }
+      .sheet { margin:24px auto; box-shadow:0 2px 16px rgba(0,0,0,0.18); }
+    }
     @media print {
-      html, body { background:#fff; width:8.5in; }
-      .page {
-        width:8.5in;
-        min-height:11in;
-        margin:0;
-        padding:0.5in 0.55in;
-        box-shadow:none;
-        page-break-after:avoid;
-      }
+      html, body { background:#fff; }
+      .sheet { margin:0; box-shadow:none; }
+      .sheet + .sheet { page-break-before:always; }
     }
   </style></head><body>
-    <div class="page">
-    <div class="body-content">
-    <div class="top">
-      <div class="company">
-        <div class="name">BERT'S SHEET METAL PRODUCTS INC.</div>
-        <div>9521 Irondale Ave</div>
-        <div>Chatsworth, CA&nbsp;&nbsp;91311</div>
-        <div>+18187750104</div>
-        <div>info@bertsmp.com</div>
-      </div>
-      <div class="logo"><img src="${BSMP_LOGO}" alt="Bert's"></div>
+    <div id="mast-src" style="display:none">${MASTHEAD}</div>
+    <div id="foot-left-text" style="display:none">Quote #${esc(q.quoteno)} \u00b7 ${esc(q.date)}</div>
+    <div id="src" style="display:none">
+      <div id="b-top">${TOPBLOCK}</div>
+      <table id="src-items"><tbody>${rows}</tbody></table>
+      <div id="b-totals">${TOTALSBLOCK}</div>
+      ${q.assumptions ? '<div id="b-assume" class="assume">'+esc(q.assumptions).replace(/\\n/g,'<br>')+'</div>' : ''}
+      <div id="b-sig">${SIGBLOCK}</div>
     </div>
-    <div class="quote-title">Quote</div>
-    <div class="meta">
-      <div class="col">
-        <div class="label">Address</div>
-        <div class="addr">${nl2br(q.billto)}</div>
-      </div>
-      <div class="col">
-        <div class="label">Ship To</div>
-        <div class="addr">${nl2br(q.shipto)}</div>
-      </div>
-      <div class="col meta-right">
-        <div class="row"><span class="k">Quote #</span><span>${esc(q.quoteno)}</span></div>
-        <div class="row"><span class="k">Date</span><span>${esc(q.date)}</span></div>
-      </div>
-    </div>
-    <hr class="sep">
-    <div class="leadtime">
-      <div class="label">Lead Time</div>
-      <div>${esc(q.leadtime)}</div>
-    </div>
-    <table class="items">
-      <thead><tr>
-        <th>Part Number/ Description</th>
-        <th class="num">Qty</th>
-        <th class="num">Rate</th>
-        <th class="num">Amount</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="totals-dash"></div>
-    <div class="totals-wrap">
-      <table class="totals">
-        <tr><td class="tot-label">SUBTOTAL</td><td class="tot-val">${fmt(q.subtotal)}</td></tr>
-        ${taxRow}
-        <tr class="grand"><td class="tot-label">TOTAL</td><td class="tot-val">$${fmt(q.total)}</td></tr>
-      </table>
-    </div>
-    ${q.assumptions?'<div style="margin-top:14px;font-size:10.5px;color:#666;line-height:1.5;border-top:1px solid #ddd;padding-top:8px">'+esc(q.assumptions).replace(/\\n/g,'<br>')+'</div>':''}
-    </div><!-- /body-content -->
-    <div class="footer">
-      <div class="sig">Accepted By</div>
-      <div class="sig">Accepted Date</div>
-    </div>
-    </div>
+    <div id="paper"></div>
     <script>
-      window.onload = function(){ setTimeout(function(){ window.print(); }, 350); };
+      window.ITEMS_THEAD = '<tr><th>Part Number/ Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>';
+      (function(){
+        var paper=document.getElementById('paper');
+        var mastHTML=document.getElementById('mast-src').innerHTML;
+        var footL=document.getElementById('foot-left-text').textContent;
+        function makeSheet(){
+          var s=document.createElement('div'); s.className='sheet';
+          var top=document.createElement('div'); top.className='sheet-top'; top.innerHTML=mastHTML;
+          var body=document.createElement('div'); body.className='sheet-body';
+          var fill=document.createElement('div'); fill.className='sheet-fill'; body.appendChild(fill);
+          var foot=document.createElement('div'); foot.className='sheet-foot';
+          foot.innerHTML='<span class="foot-l"></span><span class="foot-r"></span>';
+          s.appendChild(top); s.appendChild(body); s.appendChild(foot);
+          paper.appendChild(s); return s;
+        }
+        function fillOf(s){ return s.getElementsByClassName('sheet-fill')[0]; }
+        // True content height (not floored at body height) vs available height, minus a safety buffer.
+        function fits(s){ var bd=s.getElementsByClassName('sheet-body')[0];
+          return fillOf(s).getBoundingClientRect().height <= bd.clientHeight - 14; }
+        var sheet=makeSheet(); var body=fillOf(sheet);
+        function appendBlock(node){ if(!node) return; body.appendChild(node);
+          if(!fits(sheet)){ body.removeChild(node); sheet=makeSheet(); body=fillOf(sheet); body.appendChild(node); } }
+        function newItemsTable(){ var t=document.createElement('table'); t.className='items';
+          t.innerHTML='<thead>'+window.ITEMS_THEAD+'</thead><tbody></tbody>'; return t; }
+        appendBlock(document.getElementById('b-top'));
+        var srcRows=[].slice.call(document.querySelectorAll('#src-items tbody tr'));
+        if(srcRows.length){
+          var table=newItemsTable(); body.appendChild(table); var tb=table.getElementsByTagName('tbody')[0];
+          for(var i=0;i<srcRows.length;i++){
+            tb.appendChild(srcRows[i]);
+            if(!fits(sheet)){ tb.removeChild(srcRows[i]);
+              sheet=makeSheet(); body=fillOf(sheet);
+              table=newItemsTable(); body.appendChild(table); tb=table.getElementsByTagName('tbody')[0];
+              tb.appendChild(srcRows[i]); }
+          }
+        }
+        appendBlock(document.getElementById('b-totals'));
+        appendBlock(document.getElementById('b-assume'));
+        appendBlock(document.getElementById('b-sig'));
+        var sheets=[].slice.call(paper.getElementsByClassName('sheet'));
+        for(var j=0;j<sheets.length;j++){
+          sheets[j].getElementsByClassName('foot-l')[0].textContent=footL;
+          sheets[j].getElementsByClassName('foot-r')[0].textContent='Page '+(j+1)+' of '+sheets.length;
+        }
+        var src=document.getElementById('src'); if(src&&src.parentNode) src.parentNode.removeChild(src);
+        window.focus();
+        setTimeout(function(){ window.print(); }, 350);
+      })();
     <\/script>
   </body></html>`);
   win.document.close();
@@ -7363,259 +7506,6 @@ function openPrintWindow(q){
 
 init();
 </script>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     BSMP Quote Tool · Firebase two-way sync  (cloud-authoritative, local cache)
-     Quotes + archive + shop config (customers, rates, time standards, laser
-     speeds, quote counter) live in the shared Firebase project. localStorage
-     is kept as an offline cache. AI key / proxy URL stay LOCAL (never synced).
-     Requires DB rules allowing auth users to read/write  quotes, quoteArchive,
-     and config.
-     ════════════════════════════════════════════════════════════════════════ -->
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, set, remove, onValue, runTransaction }
-  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-         setPersistence, browserLocalPersistence }
-  from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
-  authDomain: "bsmp-orders.firebaseapp.com",
-  databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com",
-  projectId: "bsmp-orders",
-  storageBucket: "bsmp-orders.firebasestorage.app",
-  messagingSenderId: "924947028289",
-  appId: "1:924947028289:web:c58c74e37ee51aa1b9e9c0"
-};
-const app  = initializeApp(firebaseConfig);
-const db   = getDatabase(app);
-const auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch(()=>{});
-
-let signedIn = false;
-let _applyingRemote = false;     // true while we write remote data into the local cache (prevents echo)
-
-// ── localStorage helpers ───────────────────────────────────────────────────
-function lsGet(key, fallback){
-  try { const v = localStorage.getItem(key); return v==null ? fallback : JSON.parse(v); }
-  catch { return fallback; }
-}
-function lsSetSilently(key, valStr){
-  _applyingRemote = true;
-  try { _origSetItem(key, valStr); } finally { _applyingRemote = false; }
-}
-function clean(o){ return JSON.parse(JSON.stringify(o)); }   // strips undefined for RTDB
-function safeCall(name){ try { if(typeof window[name]==='function') window[name](); } catch(e){ console.warn(name, e); } }
-function applySet(setter, val){ try { window.__bsmpSet && window.__bsmpSet[setter] && window.__bsmpSet[setter](val); } catch(e){ console.warn('set '+setter, e); } }
-
-// ── What gets synced ────────────────────────────────────────────────────────
-const COLLECTIONS = {
-  'bsmp_history': { path:'quotes',       setter:'history', render:['renderHistory'], first:true, prev:{} },
-  'bsmp_archive': { path:'quoteArchive', setter:'archive', render:['renderArchive'], first:true, prev:{} }
-};
-const CONFIG = {
-  'bsmp_customers':      { path:'config/customers',     setter:'customers',     render:['populateCustomerSelect','renderCustomersTable'] },
-  'bsmp_rates':          { path:'config/rates',         setter:'rates',         render:['renderRatesTable'] },
-  'bsmp_time_standards': { path:'config/timeStandards', setter:'timeStandards', render:['renderTimeStandards'] },
-  'bsmp_laser_speeds':   { path:'config/laserSpeeds',   setter:'laserSpeeds',   render:['renderLaserSpeeds'] }
-};
-const COUNTER_KEY  = 'bsmp_quote_counter';
-const COUNTER_PATH = 'config/quoteCounter';
-
-// ── Apply remote → local (cache + in-memory + re-render) ────────────────────
-function applyCollection(key, spec, cloudMap){
-  const arr = Object.values(cloudMap || {}).sort((a,b)=> (b.id||0) - (a.id||0));
-  lsSetSilently(key, JSON.stringify(arr));
-  applySet(spec.setter, arr);
-  spec.prev = {};
-  arr.forEach(q => { if(q && q.id!=null) spec.prev[String(q.id)] = JSON.stringify(q); });
-  spec.render.forEach(safeCall);
-}
-function applyConfig(key, spec, val){
-  lsSetSilently(key, JSON.stringify(val));
-  applySet(spec.setter, val);
-  spec.render.forEach(safeCall);
-}
-
-// ── Push local → remote ─────────────────────────────────────────────────────
-function pushItem(path, item){
-  if(item && item.id!=null){ set(ref(db, path + '/' + item.id), clean(item)).catch(e=>console.warn('push', e)); }
-}
-function diffPushCollection(key, spec){
-  const cur = lsGet(key, []);
-  const curMap = {};
-  cur.forEach(q => { if(q && q.id!=null) curMap[String(q.id)] = q; });
-  // upserts
-  for(const id in curMap){
-    const sig = JSON.stringify(curMap[id]);
-    if(spec.prev[id] !== sig){ pushItem(spec.path, curMap[id]); }
-  }
-  // deletes — propagate individual removals, but never a full wipe (safety)
-  const curCount = Object.keys(curMap).length, prevCount = Object.keys(spec.prev).length;
-  if(!(curCount === 0 && prevCount > 0)){
-    for(const id in spec.prev){
-      if(!(id in curMap)){ remove(ref(db, spec.path + '/' + id)).catch(()=>{}); }
-    }
-  }
-  spec.prev = {};
-  for(const id in curMap) spec.prev[id] = JSON.stringify(curMap[id]);
-}
-function pushConfig(key, spec){
-  const val = lsGet(key, null);
-  if(val != null) set(ref(db, spec.path), clean(val)).catch(e=>console.warn('cfg push', e));
-}
-
-// ── Intercept every local write ─────────────────────────────────────────────
-const _origSetItem = localStorage.setItem.bind(localStorage);
-let _pushTimers = {};
-localStorage.setItem = function(key, val){
-  _origSetItem(key, val);
-  if(_applyingRemote || !signedIn) return;
-  if(COLLECTIONS[key] || CONFIG[key]){
-    clearTimeout(_pushTimers[key]);
-    _pushTimers[key] = setTimeout(() => {
-      if(COLLECTIONS[key]) diffPushCollection(key, COLLECTIONS[key]);
-      else                 pushConfig(key, CONFIG[key]);
-    }, 700);     // debounce burst writes
-  }
-};
-
-// ── Quote counter: keep shared + advance atomically on consume ──────────────
-const _origConsume = window.consumeQuoteNumber;
-if(typeof _origConsume === 'function'){
-  window.consumeQuoteNumber = function(){
-    const n = _origConsume.apply(this, arguments);   // local increment + field update
-    if(signedIn){
-      runTransaction(ref(db, COUNTER_PATH), cur => Math.max((cur||0), (typeof n==='number'? n : 0)) + 1).catch(()=>{});
-    }
-    return n;
-  };
-}
-const _origSaveNext = window.saveNextQuoteNumber;
-if(typeof _origSaveNext === 'function'){
-  window.saveNextQuoteNumber = function(){
-    const r = _origSaveNext.apply(this, arguments);
-    if(signedIn){ const v = parseInt(localStorage.getItem(COUNTER_KEY), 10); if(!isNaN(v)) set(ref(db, COUNTER_PATH), v).catch(()=>{}); }
-    return r;
-  };
-}
-
-// ── Attach listeners once signed in ─────────────────────────────────────────
-let _wired = false;
-function wireListeners(){
-  if(_wired) return; _wired = true;
-
-  // Collections — merge local-only items up on first snapshot, then cloud wins.
-  for(const key in COLLECTIONS){
-    const spec = COLLECTIONS[key];
-    onValue(ref(db, spec.path), snap => {
-      const cloud = snap.val() || {};
-      if(spec.first){
-        spec.first = false;
-        const local = lsGet(key, []);
-        local.forEach(q => {
-          if(q && q.id!=null && !(String(q.id) in cloud)){ pushItem(spec.path, q); cloud[String(q.id)] = clean(q); }
-        });
-      }
-      applyCollection(key, spec, cloud);
-    });
-  }
-
-  // Config — if cloud empty, seed from local; else cloud wins.
-  for(const key in CONFIG){
-    const spec = CONFIG[key];
-    onValue(ref(db, spec.path), snap => {
-      if(!snap.exists()){ pushConfig(key, spec); return; }
-      applyConfig(key, spec, snap.val());
-    });
-  }
-
-  // Counter — if cloud empty, seed from local; else mirror down.
-  onValue(ref(db, COUNTER_PATH), snap => {
-    if(!snap.exists()){
-      const v = parseInt(localStorage.getItem(COUNTER_KEY), 10);
-      set(ref(db, COUNTER_PATH), isNaN(v) ? 2281 : v).catch(()=>{});
-      return;
-    }
-    const v = snap.val();
-    lsSetSilently(COUNTER_KEY, String(v));
-    applySet('quoteCounter', v);
-  });
-
-  setStatus('Synced ✓');
-}
-
-// ── Manual full push (run from the master machine before connecting others) ─
-async function syncAll(){
-  if(!signedIn){ setStatus('Sign in first', true); return; }
-  setStatus('Pushing all…');
-  for(const key in COLLECTIONS){ lsGet(key, []).forEach(q => pushItem(COLLECTIONS[key].path, q)); }
-  for(const key in CONFIG){ pushConfig(key, CONFIG[key]); }
-  const cv = parseInt(localStorage.getItem(COUNTER_KEY), 10);
-  if(!isNaN(cv)) await set(ref(db, COUNTER_PATH), cv).catch(()=>{});
-  setStatus('All pushed ✓');
-}
-
-// ── Minimal floating widget ─────────────────────────────────────────────────
-function buildWidget(){
-  const wrap = document.createElement('div');
-  wrap.id = 'qsync';
-  wrap.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:99999;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-  wrap.innerHTML = `
-    <div id="qsync-chip" style="display:flex;align-items:center;gap:7px;background:#1e293b;color:#fff;border-radius:20px;padding:7px 13px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.2)">
-      <span id="qsync-dot" style="width:8px;height:8px;border-radius:50%;background:#64748b"></span>
-      <span id="qsync-label">Cloud sync</span>
-    </div>
-    <div id="qsync-panel" style="display:none;position:absolute;left:0;bottom:42px;width:252px;background:#fff;border:1px solid #dbe1ec;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.18);padding:14px;color:#1a2233;font-size:13px">
-      <div id="qsync-state" style="font-weight:700;margin-bottom:10px">Signed out</div>
-      <div id="qsync-signin">
-        <input id="qsync-email" type="email" placeholder="Email" autocomplete="username"
-          style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:6px;font-family:inherit">
-        <input id="qsync-pass" type="password" placeholder="Password" autocomplete="current-password"
-          style="width:100%;box-sizing:border-box;font-size:13px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;margin-bottom:8px;font-family:inherit">
-        <button id="qsync-login" style="width:100%;font-size:13px;font-weight:600;padding:8px;border:none;border-radius:8px;background:#2563b0;color:#fff;cursor:pointer">Sign in</button>
-        <div id="qsync-err" style="color:#dc2626;font-size:11.5px;margin-top:6px;min-height:14px"></div>
-      </div>
-      <div id="qsync-actions" style="display:none">
-        <button id="qsync-all" style="width:100%;font-size:13px;font-weight:600;padding:8px;border:1px solid #cbd5e1;border-radius:8px;background:#f1f5f9;color:#1a2233;cursor:pointer;margin-bottom:6px">Sync all to cloud</button>
-        <button id="qsync-out" style="width:100%;font-size:12px;font-weight:600;padding:7px;border:none;border-radius:8px;background:transparent;color:#64748b;cursor:pointer">Sign out</button>
-      </div>
-    </div>`;
-  document.body.appendChild(wrap);
-  document.getElementById('qsync-chip').onclick = () => {
-    const p = document.getElementById('qsync-panel');
-    p.style.display = p.style.display === 'none' ? 'block' : 'none';
-  };
-  document.getElementById('qsync-login').onclick = async () => {
-    const err = document.getElementById('qsync-err'); err.textContent = '';
-    try { await signInWithEmailAndPassword(auth, document.getElementById('qsync-email').value.trim(), document.getElementById('qsync-pass').value); }
-    catch(e){ err.textContent = 'Sign-in failed. Check email / password.'; }
-  };
-  document.getElementById('qsync-pass').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('qsync-login').click(); });
-  document.getElementById('qsync-out').onclick = () => signOut(auth);
-  document.getElementById('qsync-all').onclick = syncAll;
-}
-function setStatus(text, isErr){
-  const label = document.getElementById('qsync-label'), dot = document.getElementById('qsync-dot');
-  if(label) label.textContent = signedIn ? text : 'Cloud sync';
-  if(dot)   dot.style.background = isErr ? '#dc2626' : (signedIn ? '#22c55e' : '#64748b');
-}
-
-onAuthStateChanged(auth, user => {
-  signedIn = !!user;
-  const state = document.getElementById('qsync-state');
-  const si = document.getElementById('qsync-signin'), ac = document.getElementById('qsync-actions');
-  if(state) state.textContent = signedIn ? ('Connected — ' + user.email) : 'Signed out';
-  if(si) si.style.display = signedIn ? 'none' : 'block';
-  if(ac) ac.style.display = signedIn ? 'block' : 'none';
-  setStatus(signedIn ? 'Connecting…' : 'Cloud sync');
-  if(signedIn) wireListeners();
-});
-
-buildWidget();
-setStatus('Cloud sync');
-</script>
+<div id="toast-host" aria-live="polite"></div>
 </body>
 </html>
