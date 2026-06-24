@@ -1446,6 +1446,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <option value="stale">⚑ Needs follow-up</option>
         </select>
         <button class="btn btn-sm" onclick="clearHistoryFilters()" title="Reset all filters">Clear filters</button>
+        <button class="btn btn-sm" onclick="exportBackup()" title="Download a backup of all your saved data (quotes, prices, rates, settings)">⤓ Backup</button>
         <button class="btn btn-sm" onclick="buildCombinedQuote()" id="combine-btn" style="white-space:nowrap">Combine selected (0)</button>
         <button class="btn btn-sm btn-danger" onclick="clearHistory()">Clear all</button>
       </div>
@@ -1497,6 +1498,26 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <div class="page-header">
     <h2>Settings</h2>
     <p>API key and shop configuration</p>
+  </div>
+  <div class="card" id="backup-card">
+    <div class="card-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Backup &amp; Restore
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:6px;line-height:1.6">Your quotes, prices, rates, customers and settings are saved <strong>only in this browser, on this computer</strong>. They don't sync, and clearing your browsing data erases them. Export a backup file regularly and keep it somewhere safe (cloud drive or email) — and use it to move everything to another computer.</p>
+    <p style="font-size:11px;color:var(--text3);margin-bottom:14px">The backup file does <strong>not</strong> include your AI API key, so it's safe to store and share within your shop.</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="exportBackup()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export backup
+      </button>
+      <button class="btn" onclick="document.getElementById('backup-file-input').click()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Restore from file…
+      </button>
+      <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none" onchange="onBackupFileChosen(event)">
+    </div>
+    <div id="backup-status" style="margin-top:10px;font-size:12px;color:var(--text2)"></div>
   </div>
   <div class="card">
     <div class="card-title">AI Connection</div>
@@ -1898,6 +1919,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">Backup &amp; Restore</div>
+        <ul class="changelog-list">
+          <li>Export a full backup of your data to a dated <code>.json</code> file — quotes, archived quotes, material prices, rates, customers, tier markups, and shop settings</li>
+          <li>Restore from a backup file with a choice of <strong>Merge</strong> (adds without duplicates, keeps current settings) or <strong>Replace all</strong> (exact restore)</li>
+          <li>Use it to recover after clearing browser data, or to move everything to another computer</li>
+          <li>Backups never include your API key, so the file is safe to store and share</li>
+          <li>Export from Settings → Backup &amp; Restore, or the quick <em>⤓ Backup</em> button on the Quote History toolbar</li>
+          <li>Reminder: browser storage is per-computer and per-browser and is erased if you clear browsing data — back up regularly</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">CNC Mill Estimator</div>
@@ -2596,6 +2629,12 @@ function init(){
   populateCncRateCodes();
   loadResmedExample(true);
   calculate();
+  // After a backup restore, the page reloads — show a confirmation toast once.
+  try{
+    const rm=localStorage.getItem('bsmp_restore_msg');
+    if(rm){ localStorage.removeItem('bsmp_restore_msg'); const m=JSON.parse(rm);
+      setTimeout(()=>{ if(typeof showToast==='function') showToast({title:m.title||'Backup restored', sub:m.sub||'', duration:6000}); }, 500); }
+  }catch(e){}
   // Setup drag-drop for main dropzone
   const dz = document.getElementById('dropzone');
   dz.addEventListener('dragover', e=>{e.preventDefault();dz.classList.add('over');});
@@ -4099,6 +4138,118 @@ function showToast(opts){
   requestAnimationFrame(()=>t.classList.add('show'));
   timer=setTimeout(dismiss, opts.duration||4500);
   return dismiss;
+}
+
+// ===================== BACKUP & RESTORE =====================
+// Keys included in a backup. API key and one-time UI flags are deliberately excluded.
+const BACKUP_KEYS = ['bsmp_history','bsmp_archive','bsmp_prices','bsmp_rates','bsmp_customers',
+  'bsmp_assumptions','bsmp_tier_markups','bsmp_laser_speeds','bsmp_time_standards',
+  'bsmp_min_sheet','bsmp_shopname','bsmp_shoploc','bsmp_quote_counter'];
+
+function backupArrayLen(s){ try{ const a=JSON.parse(s); return Array.isArray(a)?a.length:0; }catch(e){ return 0; } }
+
+function exportBackup(){
+  const data={};
+  BACKUP_KEYS.forEach(k=>{ const v=localStorage.getItem(k); if(v!==null) data[k]=v; });
+  const counts={
+    quotes: backupArrayLen(data['bsmp_history']),
+    archived: backupArrayLen(data['bsmp_archive']),
+    prices: backupArrayLen(data['bsmp_prices']),
+    customers: backupArrayLen(data['bsmp_customers'])
+  };
+  const payload={ _bsmp_backup:true, app:'BSMP Quote Tool', version:1, exportedAt:new Date().toISOString(), counts, data };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const d=new Date(); const pad=n=>String(n).padStart(2,'0');
+  const a=document.createElement('a');
+  a.download='bsmp-backup-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+'.json';
+  a.href=url; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  const st=document.getElementById('backup-status');
+  if(st) st.textContent='Backup downloaded ('+counts.quotes+' quotes, '+counts.prices+' prices, '+counts.archived+' archived). Keep it somewhere safe.';
+  if(typeof showToast==='function') showToast({title:'Backup exported', sub:counts.quotes+' quotes \u00b7 '+counts.prices+' prices \u00b7 '+counts.archived+' archived', duration:5000});
+}
+
+function onBackupFileChosen(ev){
+  const file=ev.target && ev.target.files && ev.target.files[0];
+  if(ev.target) ev.target.value='';
+  if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(){
+    let payload;
+    try{ payload=JSON.parse(reader.result); }catch(e){ alert('That file is not a valid backup \u2014 it could not be read as JSON.'); return; }
+    if(!payload || !payload._bsmp_backup || !payload.data){ alert('That does not look like a BSMP backup file.'); return; }
+    showRestoreModal(payload);
+  };
+  reader.onerror=function(){ alert('Could not read that file.'); };
+  reader.readAsText(file);
+}
+
+function showRestoreModal(payload){
+  const d=payload.data||{};
+  const c=payload.counts||{};
+  const when = payload.exportedAt ? new Date(payload.exportedAt).toLocaleString() : 'unknown date';
+  const q=(c.quotes!=null?c.quotes:backupArrayLen(d.bsmp_history));
+  const pr=(c.prices!=null?c.prices:backupArrayLen(d.bsmp_prices));
+  const ar=(c.archived!=null?c.archived:backupArrayLen(d.bsmp_archive));
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:11000;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.innerHTML='<div style="background:var(--surface);border-radius:14px;max-width:470px;width:100%;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:\'DM Sans\',system-ui,sans-serif">'
+    +'<div style="font-size:17px;font-weight:700;color:var(--text);margin-bottom:4px">Restore backup</div>'
+    +'<div style="font-size:12px;color:var(--text3);margin-bottom:14px">From '+when+'</div>'
+    +'<div style="font-size:13px;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:16px;line-height:1.7">'
+      +'<strong>'+q+'</strong> saved quotes &middot; <strong>'+pr+'</strong> material prices &middot; <strong>'+ar+'</strong> archived &middot; rates, customers &amp; settings</div>'
+    +'<div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:18px">'
+      +'<strong style="color:var(--text2)">Merge</strong> &mdash; adds the backup\'s quotes, prices and archived quotes to what\'s already in this browser (skips duplicates) and keeps your current rates/settings. Safe for restoring after data loss.<br><br>'
+      +'<strong style="color:var(--text2)">Replace all</strong> &mdash; wipes this browser\'s data and loads everything from the backup exactly.</div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">'
+      +'<button class="btn" id="rb-cancel">Cancel</button>'
+      +'<button class="btn" id="rb-replace" style="border-color:#dc2626;color:#dc2626">Replace all</button>'
+      +'<button class="btn btn-primary" id="rb-merge">Merge</button></div></div>';
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.addEventListener('click',e=>{ if(e.target===overlay) close(); });
+  overlay.querySelector('#rb-cancel').onclick=close;
+  overlay.querySelector('#rb-merge').onclick=function(){ applyRestore('merge', payload); };
+  overlay.querySelector('#rb-replace').onclick=function(){ if(confirm('Replace ALL data in this browser with the backup? Anything currently saved here that is not in the backup will be lost.')) applyRestore('replace', payload); };
+}
+
+function applyRestore(mode, payload){
+  const d=payload.data||{};
+  const parseArr=s=>{ try{ const a=JSON.parse(s); return Array.isArray(a)?a:[]; }catch(e){ return []; } };
+  const mergeById=key=>{
+    const incoming=parseArr(d[key]);
+    const existing=parseArr(localStorage.getItem(key));
+    const seen=new Set(existing.map(x=>String(x&&x.id)));
+    const merged=existing.concat(incoming.filter(x=> x && !seen.has(String(x.id))));
+    merged.sort((a,b)=>(Number(b&&b.id)||0)-(Number(a&&a.id)||0));
+    localStorage.setItem(key, JSON.stringify(merged));
+  };
+  try{
+    if(mode==='replace'){
+      BACKUP_KEYS.forEach(k=> localStorage.removeItem(k));
+      Object.keys(d).forEach(k=>{ if(BACKUP_KEYS.indexOf(k)>=0 && d[k]!=null) localStorage.setItem(k, d[k]); });
+    } else {
+      if('bsmp_history' in d) mergeById('bsmp_history');
+      if('bsmp_archive' in d) mergeById('bsmp_archive');
+      if('bsmp_prices' in d) mergeById('bsmp_prices');
+      if('bsmp_customers' in d){
+        const incoming=parseArr(d.bsmp_customers), existing=parseArr(localStorage.getItem('bsmp_customers'));
+        const names=new Set(existing.map(x=>(x&&x.name||'').toLowerCase()));
+        localStorage.setItem('bsmp_customers', JSON.stringify(existing.concat(incoming.filter(x=> x && !names.has((x.name||'').toLowerCase())))));
+      }
+      if('bsmp_quote_counter' in d){
+        const inc=parseInt(d.bsmp_quote_counter)||0, cur=parseInt(localStorage.getItem('bsmp_quote_counter'))||0;
+        localStorage.setItem('bsmp_quote_counter', String(Math.max(inc,cur)));
+      }
+      ['bsmp_rates','bsmp_assumptions','bsmp_tier_markups','bsmp_laser_speeds','bsmp_time_standards','bsmp_min_sheet','bsmp_shopname','bsmp_shoploc'].forEach(k=>{
+        if(d[k]!=null && localStorage.getItem(k)===null) localStorage.setItem(k, d[k]);
+      });
+    }
+    const total=backupArrayLen(localStorage.getItem('bsmp_history'));
+    localStorage.setItem('bsmp_restore_msg', JSON.stringify({title:'Backup restored', sub:total+' quotes now in history'}));
+  }catch(e){ alert('Restore failed: '+e.message); return; }
+  location.reload();
 }
 
 function saveQuote(){
