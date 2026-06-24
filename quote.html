@@ -1921,6 +1921,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div id="changelog-entries">
 
       <div class="changelog-entry">
+        <div class="changelog-version">Storage fix — saving no longer fails when full</div>
+        <ul class="changelog-list">
+          <li>Fixed the bug where saving silently did nothing (no confirmation) once the browser's storage filled up</li>
+          <li>Drawing previews are now stored as small compressed thumbnails instead of full-size images — roughly <strong>95% smaller</strong>, so you can save far more quotes before hitting any limit</li>
+          <li>Existing saved quotes are automatically shrunk once on load to reclaim space</li>
+          <li>If storage ever does fill, saving now recovers automatically (trims the oldest previews first) and tells you what happened instead of failing quietly — back up and clear old quotes when you see that warning</li>
+        </ul>
+      </div>
+
+      <div class="changelog-entry">
         <div class="changelog-version">Backup &amp; Restore</div>
         <ul class="changelog-list">
           <li>Export a full backup of your data to a dated <code>.json</code> file — quotes, archived quotes, material prices, rates, customers, tier markups, and shop settings</li>
@@ -2629,6 +2639,7 @@ function init(){
   populateCncRateCodes();
   loadResmedExample(true);
   calculate();
+  migrateThumbnails();
   // After a backup restore, the page reloads — show a confirmation toast once.
   try{
     const rm=localStorage.getItem('bsmp_restore_msg');
@@ -3995,7 +4006,7 @@ function updatePartHeader(d, file){
         imgEl.src = canvas.toDataURL('image/png');
         imgEl.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain';
         box.innerHTML = ''; box.appendChild(imgEl);
-        currentPartImg = canvas.toDataURL('image/png');
+        currentPartImg = shrinkCanvas(canvas, THUMB_MAXDIM, THUMB_QUALITY);
       };
       img.src = e.target.result;
     };
@@ -4041,7 +4052,7 @@ async function renderPdfIsometric(file, box){
     const fullUrl = canvas.toDataURL('image/png');
     imgEl.onclick = () => showFullDrawing(fullUrl);
     box.innerHTML = ''; box.appendChild(imgEl);
-    currentPartImg = dataUrl;
+    currentPartImg = shrinkCanvas(crop, THUMB_MAXDIM, THUMB_QUALITY);
   } catch(err){
     console.error('PDF render failed:', err);
     showPdfPlaceholder(box);
@@ -4252,6 +4263,88 @@ function applyRestore(mode, payload){
   location.reload();
 }
 
+// ---- Drawing thumbnails & quota-safe history storage ----
+// Saved quotes embed a small preview of the drawing. Keep it a compact JPEG so
+// bsmp_history never blows past the browser's ~5MB localStorage limit.
+const THUMB_MAXDIM = 220, THUMB_QUALITY = 0.62;
+
+// Shrink a canvas to a small JPEG data URL (synchronous; used at capture time).
+function shrinkCanvas(srcCanvas, maxDim, quality){
+  try{
+    const w=srcCanvas.width, h=srcCanvas.height;
+    if(!w||!h) return srcCanvas.toDataURL('image/jpeg', quality||0.6);
+    const scale=Math.min(1, (maxDim||THUMB_MAXDIM)/Math.max(w,h));
+    const cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+    const c=document.createElement('canvas'); c.width=cw; c.height=ch;
+    const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cw,ch); ctx.drawImage(srcCanvas,0,0,cw,ch);
+    return c.toDataURL('image/jpeg', quality||THUMB_QUALITY);
+  }catch(e){ try{ return srcCanvas.toDataURL('image/jpeg', 0.6); }catch(_){ return null; } }
+}
+
+// Shrink an existing data-URL image (async; used to migrate already-saved quotes).
+function shrinkDataUrl(dataUrl, maxDim, quality){
+  return new Promise(resolve=>{
+    if(!dataUrl || typeof dataUrl!=='string' || dataUrl.indexOf('data:image')!==0){ resolve(dataUrl||null); return; }
+    const im=new Image();
+    im.onload=function(){ try{
+      const w=im.naturalWidth||im.width, h=im.naturalHeight||im.height;
+      if(!w||!h){ resolve(dataUrl); return; }
+      const scale=Math.min(1, (maxDim||THUMB_MAXDIM)/Math.max(w,h));
+      const cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+      const c=document.createElement('canvas'); c.width=cw; c.height=ch;
+      const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cw,ch); ctx.drawImage(im,0,0,cw,ch);
+      resolve(c.toDataURL('image/jpeg', quality||THUMB_QUALITY));
+    }catch(e){ resolve(dataUrl); } };
+    im.onerror=function(){ resolve(dataUrl); };
+    im.src=dataUrl;
+  });
+}
+
+function isQuotaError(e){ return !!e && (e.name==='QuotaExceededError' || e.name==='NS_ERROR_DOM_QUOTA_REACHED' || e.code===22 || e.code===1014 || /quota/i.test(e.message||'')); }
+
+// Write HISTORY to localStorage; if storage is full, recover by trimming the oldest
+// quotes' images first, then dropping the oldest quotes. Never throws on a quota error.
+function persistHistory(){
+  try{ localStorage.setItem('bsmp_history', JSON.stringify(HISTORY)); return {ok:true, strippedImgs:0, droppedQuotes:0}; }
+  catch(e){
+    if(!isQuotaError(e)) throw e;
+    let strippedImgs=0, droppedQuotes=0;
+    for(let i=HISTORY.length-1; i>=0; i--){
+      if(HISTORY[i] && HISTORY[i].img){ HISTORY[i].img=null; strippedImgs++;
+        try{ localStorage.setItem('bsmp_history', JSON.stringify(HISTORY)); return {ok:true, strippedImgs, droppedQuotes}; }
+        catch(e2){ if(!isQuotaError(e2)) throw e2; }
+      }
+    }
+    while(HISTORY.length>1){
+      HISTORY.pop(); droppedQuotes++;
+      try{ localStorage.setItem('bsmp_history', JSON.stringify(HISTORY)); return {ok:true, strippedImgs, droppedQuotes}; }
+      catch(e3){ if(!isQuotaError(e3)) throw e3; }
+    }
+    return {ok:false, strippedImgs, droppedQuotes};
+  }
+}
+
+// One-time: recompress oversized drawing previews already saved in history to reclaim space.
+async function migrateThumbnails(){
+  try{
+    if(localStorage.getItem('bsmp_thumbs_v2')) return;
+    let changed=false;
+    for(let i=0;i<HISTORY.length;i++){
+      const q=HISTORY[i];
+      if(q && typeof q.img==='string' && q.img.indexOf('data:image')===0 && q.img.length>16000){
+        const small=await shrinkDataUrl(q.img, THUMB_MAXDIM, THUMB_QUALITY);
+        if(small && small.length < q.img.length){ q.img=small; changed=true; }
+      }
+    }
+    if(changed){
+      try{ persistHistory(); }catch(e){}
+      const hp=document.getElementById('panel-history');
+      if(typeof renderHistory==='function' && hp && hp.classList.contains('active')) renderHistory();
+    }
+    try{ localStorage.setItem('bsmp_thumbs_v2','1'); }catch(e){}
+  }catch(e){ console.warn('Thumbnail migration skipped:', e); }
+}
+
 function saveQuote(){
   const d=window._calc; if(!d) return;
   const pn=document.getElementById('partnum').value;
@@ -4350,17 +4443,34 @@ function saveQuote(){
   };
   HISTORY.unshift(quote);
   if(HISTORY.length>500) HISTORY.pop();
-  localStorage.setItem('bsmp_history', JSON.stringify(HISTORY));
+  const persistResult = persistHistory();
 
   // Confirmation: toast + brief button state change.
   const money = v => '$'+(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  showToast({
-    title: 'Quote saved to history',
-    sub: (pn||cust) + ' · ' + money(quote.jobTotal) + ' (qty ' + quote.qty + ')',
-    actionLabel: 'View',
-    onAction: () => showPanel('history'),
-    duration: 5000
-  });
+  if(persistResult.ok && !persistResult.droppedQuotes && !persistResult.strippedImgs){
+    showToast({
+      title: 'Quote saved to history',
+      sub: (pn||cust) + ' · ' + money(quote.jobTotal) + ' (qty ' + quote.qty + ')',
+      actionLabel: 'View',
+      onAction: () => showPanel('history'),
+      duration: 5000
+    });
+  } else if(persistResult.ok){
+    const bits=[];
+    if(persistResult.droppedQuotes) bits.push(persistResult.droppedQuotes+' old quote'+(persistResult.droppedQuotes>1?'s':''));
+    if(persistResult.strippedImgs) bits.push(persistResult.strippedImgs+' old thumbnail'+(persistResult.strippedImgs>1?'s':''));
+    showToast({
+      title: 'Saved — storage was full, trimmed old data',
+      sub: 'Removed '+bits.join(' and ')+' to make room. Export a backup to keep your full record.',
+      type:'error', duration: 9000
+    });
+  } else {
+    showToast({
+      title: 'Could not save — storage full',
+      sub: 'Even after trimming. Export a backup (Settings), delete some old quotes, then try again.',
+      type:'error', duration: 10000
+    });
+  }
   const btn = (typeof event!=='undefined' && event && event.target) ? event.target.closest('button') : null;
   if(btn){
     const orig=btn.innerHTML; btn.innerHTML='✓ Saved!'; btn.style.background='var(--success)';
