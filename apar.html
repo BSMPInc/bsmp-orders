@@ -492,6 +492,29 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .ai-drop i{font-size:30px;opacity:.5;display:block;margin-bottom:8px;color:var(--ar)}
 .ai-drop .d1{font-size:13px;font-weight:600;color:var(--text)}
 .ai-status{font-size:12px;color:var(--text2);margin-top:12px;white-space:pre-wrap;background:#f7f9fc;border:1px solid var(--border);border-radius:8px;padding:9px 11px;max-height:120px;overflow:auto}
+.imp-help{font-size:12.5px;color:var(--text2);line-height:1.5;margin:0 0 10px}
+.imp-paste{width:100%;min-height:150px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;border:1px solid var(--border);border-radius:9px;padding:10px;resize:vertical;box-sizing:border-box;white-space:pre;overflow:auto}
+.imp-or{text-align:center;font-size:11px;color:var(--text3);margin:10px 0;text-transform:uppercase;letter-spacing:.05em}
+.imp-file-row{display:flex;align-items:center;gap:10px}
+.imp-file-name{font-size:12px;color:var(--text3)}
+.imp-status{font-size:12.5px;margin-top:12px;border-radius:8px;padding:9px 11px}
+.imp-status.err{background:#A32D2D12;border:1px solid #A32D2D40;color:#7a2020}
+.imp-review-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.imp-summary{font-size:13px;color:var(--text2)}
+.imp-warn-txt{color:var(--amber);font-weight:700}
+.imp-table-wrap{max-height:380px;overflow:auto;border:1px solid var(--border);border-radius:10px}
+.imp-table{width:100%;border-collapse:collapse;font-size:12px}
+.imp-table thead th{position:sticky;top:0;background:#eef2f7;text-align:left;padding:8px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap}
+.imp-table td{padding:7px 10px;border-bottom:1px solid var(--border2);white-space:nowrap}
+.imp-table tr:last-child td{border-bottom:none}
+.imp-table tr.imp-bad{background:#A32D2D0a}
+.imp-table tr.imp-bad i{color:var(--amber)}
+.imp-ok{color:var(--green)}
+.imp-amt{font-weight:700;text-align:right}
+.imp-dim{color:var(--text3)}
+.imp-type{font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px}
+.imp-type.ar{background:#2f8f6b1a;color:var(--ar)}
+.imp-type.ap{background:#A8443A1a;color:var(--ap)}
 .ai-status.err{background:#A32D2D10;border-color:#A32D2D33;color:var(--red)}
 .ai-cta{display:flex;align-items:center;gap:14px;background:#2f8f6b0d;border:1px solid #2f8f6b33;border-radius:12px;padding:13px 16px;margin-bottom:16px;cursor:pointer;transition:.15s}
 .ai-cta:hover{background:#2f8f6b18;border-color:#2f8f6b55}
@@ -552,6 +575,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add receivable</div>
     <div class="nav-item" onclick="openManual('ap')"><i class="ti ti-plus"></i> Add payable</div>
     <div class="nav-item" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</div>
+    <div class="nav-item" onclick="openImport()"><i class="ti ti-table-import"></i> Import (CSV/paste)</div>
     <div class="nav-item" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</div>
     <div class="side-foot">
       Bert's Sheet Metal Products
@@ -616,6 +640,48 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
       </div>
     </div>
     <div class="m-foot"><button class="btn" onclick="closeAI()">Cancel</button><button class="btn green" id="ai-add" onclick="aiAdd()" style="display:none">Add entry</button></div>
+  </div>
+</div>
+
+<!-- Bulk import modal -->
+<div class="modal-bg" id="import-modal">
+  <div class="modal" style="max-width:880px">
+    <div class="m-head" style="background:var(--navy)">
+      <div class="m-t"><div class="t1"><i class="ti ti-table-import"></i> Import invoices</div><div class="t2">Paste from a spreadsheet or upload a CSV — review, then add them all</div></div>
+      <button class="m-x" onclick="closeImport()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="m-body" id="import-body">
+      <!-- step 1: input -->
+      <div id="import-step1">
+        <div class="seg" style="margin-bottom:12px;width:100%">
+          <button id="imp-t-ar" class="active" style="flex:1" onclick="setImportSide('ar')">Receivables (customer invoices)</button>
+          <button id="imp-t-ap" style="flex:1" onclick="setImportSide('ap')">Payables (vendor bills)</button>
+          <button id="imp-t-mixed" style="flex:1" onclick="setImportSide('mixed')">Mixed (Type column)</button>
+        </div>
+        <p class="imp-help">Copy the rows from your spreadsheet (including the header row) and paste below — or upload a <b>.csv</b>. Columns are matched automatically: <b>customer/vendor</b>, <b>invoice #</b>, <b>amount</b>, <b>date</b>, <b>due date</b>, <b>terms</b>, <b>account</b>, <b>notes</b>.</p>
+        <textarea id="imp-paste" class="imp-paste" placeholder="Paste spreadsheet rows here (Tab-separated)…&#10;&#10;Customer full name&#9;Num&#9;Date&#9;Due date&#9;Amount&#10;GM Fabrication LLC&#9;6152&#9;03/20/2026&#9;04/19/2026&#9;1,420.00"></textarea>
+        <div class="imp-or">or</div>
+        <div class="imp-file-row">
+          <button class="btn" onclick="document.getElementById('imp-file').click()"><i class="ti ti-upload"></i> Upload CSV file</button>
+          <input type="file" id="imp-file" accept=".csv,text/csv" style="display:none" onchange="importFromFile(this.files[0])">
+          <span id="imp-file-name" class="imp-file-name"></span>
+        </div>
+        <div class="imp-status" id="imp-status" style="display:none"></div>
+      </div>
+      <!-- step 2: review -->
+      <div id="import-step2" style="display:none">
+        <div class="imp-review-head">
+          <div id="imp-summary" class="imp-summary"></div>
+          <button class="btn sm" onclick="importBack()"><i class="ti ti-arrow-left"></i> Back / re-paste</button>
+        </div>
+        <div class="imp-table-wrap"><table class="imp-table" id="imp-table"></table></div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn" onclick="closeImport()">Cancel</button>
+      <button class="btn primary" id="imp-parse-btn" onclick="importParse()"><i class="ti ti-eye"></i> Preview</button>
+      <button class="btn green" id="imp-commit-btn" style="display:none" onclick="importCommit()"><i class="ti ti-check"></i> Import all</button>
+    </div>
   </div>
 </div>
 
@@ -2545,6 +2611,152 @@ window.exportCSV=()=>{
 
 window.go=go;
 window.doSignOut=()=>signOut(auth);
+
+// ── Bulk import (CSV / paste) ────────────────────────────────────────────────
+let _impSide='ar';        // 'ar' | 'ap' | 'mixed'
+let _impRows=[];          // parsed+validated rows for review/commit
+window.openImport=()=>{
+  _impSide='ar'; _impRows=[];
+  setImportSide('ar');
+  $('imp-paste').value=''; $('imp-file-name').textContent=''; if($('imp-file'))$('imp-file').value='';
+  $('imp-status').style.display='none';
+  $('import-step1').style.display=''; $('import-step2').style.display='none';
+  $('imp-parse-btn').style.display=''; $('imp-commit-btn').style.display='none';
+  $('import-modal').style.display='flex';
+};
+window.closeImport=()=>{ $('import-modal').style.display='none'; };
+window.setImportSide=(s)=>{ _impSide=s;
+  ['ar','ap','mixed'].forEach(k=>{ const b=$('imp-t-'+k); if(b)b.classList.toggle('active',k===s); });
+};
+window.importBack=()=>{
+  $('import-step1').style.display=''; $('import-step2').style.display='none';
+  $('imp-parse-btn').style.display=''; $('imp-commit-btn').style.display='none';
+};
+window.importFromFile=(file)=>{
+  if(!file)return; $('imp-file-name').textContent=file.name;
+  const r=new FileReader();
+  r.onload=()=>{ $('imp-paste').value=String(r.result||''); importParse(); };
+  r.onerror=()=>{ impStatus('err',"Couldn't read that file."); };
+  r.readAsText(file);
+};
+function impStatus(kind,msg){ const el=$('imp-status'); el.style.display='block'; el.className='imp-status '+(kind||''); el.innerHTML=msg; }
+
+// Split a line into fields: tab-separated if any tabs present, else CSV (with quoted-field support).
+function impSplitLine(line, tabbed){
+  if(tabbed) return line.split('\t').map(s=>s.trim());
+  const out=[]; let cur='',q=false;
+  for(let i=0;i<line.length;i++){ const c=line[i];
+    if(q){ if(c==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else { if(c==='"')q=true; else if(c===','){out.push(cur);cur='';} else cur+=c; }
+  }
+  out.push(cur); return out.map(s=>s.trim());
+}
+// Map a header label to a known field via flexible matching.
+function impHeaderField(h){
+  const k=h.toLowerCase().replace(/[^a-z0-9]/g,'');
+  if(/^(customer|customerfullname|customername|vendor|vendorname|party|name|client|payee)/.test(k))return 'party';
+  if(/(invoice|invoiceno|invoicenum|invoice#|num|number|ref|reference|billno|bill#|docno)/.test(k)&&!/date/.test(k))return 'ref';
+  if(/(amount|total|amt|balance|invoicetotal|ordertotal)/.test(k))return 'amount';
+  if(/(duedate|datedue)/.test(k))return 'due';
+  if(/(issuedate|invoicedate|^date$|transactiondate|billdate|orderdate)/.test(k)||k==='date')return 'issue';
+  if(/(terms|netdays|net)/.test(k))return 'terms';
+  if(/(account|bankaccount|payfrom)/.test(k))return 'account';
+  if(/(type|artype|aporar|side)/.test(k))return 'rowtype';
+  if(/(note|notes|memo|description|desc|rel|for|items)/.test(k))return 'notes';
+  return null;
+}
+// Normalize a date string to ISO yyyy-mm-dd. Accepts mm/dd/yyyy, m/d/yy, yyyy-mm-dd.
+function impDate(s){
+  if(!s)return ''; s=s.trim();
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m)return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){ let[ ,mm,dd,yy]=m; yy=yy.length===2?('20'+yy):yy; return `${yy}-${String(+mm).padStart(2,'0')}-${String(+dd).padStart(2,'0')}`; }
+  const d=new Date(s); if(!isNaN(d)) return toISO(d);
+  return '';
+}
+function impAmount(s){ if(s==null)return NaN; const n=Number(String(s).replace(/[$,\s]/g,'')); return n; }
+
+window.importParse=()=>{
+  const raw=($('imp-paste').value||'').replace(/\r/g,'').trim();
+  if(!raw){ impStatus('err','Paste some rows or upload a CSV first.'); return; }
+  const lines=raw.split('\n').filter(l=>l.trim()!=='');
+  if(lines.length<2){ impStatus('err','Need a header row plus at least one data row.'); return; }
+  const tabbed=lines[0].includes('\t');
+  const headers=impSplitLine(lines[0],tabbed);
+  // build column map
+  const colMap={}; headers.forEach((h,i)=>{ const f=impHeaderField(h); if(f&&colMap[f]==null)colMap[f]=i; });
+  if(colMap.party==null||colMap.amount==null){
+    impStatus('err','Could not find a <b>customer/vendor</b> column and an <b>amount</b> column. Make sure the first row has headers.');
+    return;
+  }
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const f=impSplitLine(lines[i],tabbed);
+    const get=key=>colMap[key]!=null?(f[colMap[key]]||'').trim():'';
+    const party=get('party');
+    const amount=impAmount(get('amount'));
+    const issue=impDate(get('issue'));
+    const due=impDate(get('due'));
+    const ref=get('ref');
+    const notes=get('notes');
+    const termsRaw=get('terms');
+    let type=_impSide;
+    if(_impSide==='mixed'){ const tv=get('rowtype').toLowerCase(); type=/^a?r|receiv|customer|invoice.?out/.test(tv)?'ar':(/^a?p|pay|vendor|bill/.test(tv)?'ap':''); }
+    // derive terms: explicit, else from issue+due, else default
+    let terms=null;
+    if(termsRaw!==''&&!isNaN(Number(termsRaw))) terms=Number(termsRaw);
+    else if(issue&&due){ const dd=Math.round((new Date(due+'T00:00:00')-new Date(issue+'T00:00:00'))/86400000); if(dd>=0)terms=dd; }
+    const issues=[];
+    if(!party)issues.push('no name');
+    if(isNaN(amount)||amount<=0)issues.push('bad amount');
+    if(_impSide==='mixed'&&!type)issues.push('unknown type');
+    rows.push({type:type||'ar',party,ref,amount:isNaN(amount)?0:amount,issue,due,terms,notes,issues});
+  }
+  _impRows=rows;
+  renderImportReview();
+  $('import-step1').style.display='none'; $('import-step2').style.display='';
+  $('imp-parse-btn').style.display='none'; $('imp-commit-btn').style.display='';
+};
+function renderImportReview(){
+  const ok=_impRows.filter(r=>!r.issues.length);
+  const bad=_impRows.filter(r=>r.issues.length);
+  const sideLabel=_impSide==='ar'?'receivables':_impSide==='ap'?'payables':'invoices';
+  $('imp-summary').innerHTML=`<b>${ok.length}</b> ready to import${bad.length?` · <span class="imp-warn-txt">${bad.length} need attention (will be skipped)</span>`:''} · ${sideLabel}`;
+  const head=`<thead><tr><th></th><th>Type</th><th>Customer / Vendor</th><th>Invoice #</th><th>Amount</th><th>Issued</th><th>Due</th><th>Terms</th></tr></thead>`;
+  const body=_impRows.map((r,i)=>{
+    const bad=r.issues.length>0;
+    return `<tr class="${bad?'imp-bad':''}">
+      <td>${bad?`<i class="ti ti-alert-triangle" title="${esc(r.issues.join(', '))}"></i>`:'<i class="ti ti-check imp-ok"></i>'}</td>
+      <td><span class="imp-type ${r.type}">${r.type.toUpperCase()}</span></td>
+      <td>${esc(r.party||'—')}</td>
+      <td>${esc(r.ref||'—')}</td>
+      <td class="imp-amt">${isNaN(r.amount)||!r.amount?'<span class="imp-warn-txt">?</span>':fmtMoney(r.amount)}</td>
+      <td>${r.issue?fmtDate(r.issue):'—'}</td>
+      <td>${r.due?fmtDate(r.due):'<span class="imp-dim">auto</span>'}</td>
+      <td>${r.terms!=null?r.terms+'d':`<span class="imp-dim">${DEFAULT_TERMS}d</span>`}</td>
+    </tr>`;
+  }).join('');
+  $('imp-table').innerHTML=head+'<tbody>'+body+'</tbody>';
+}
+window.importCommit=()=>{
+  const ok=_impRows.filter(r=>!r.issues.length);
+  if(!ok.length){ impStatus('err','No valid rows to import.'); return; }
+  if(!confirm(`Import ${ok.length} ${_impSide==='ap'?'payable':_impSide==='ar'?'receivable':'invoice'}${ok.length!==1?'s':''}? They'll be added as open invoices.`))return;
+  let n=0;
+  ok.forEach((r,idx)=>{
+    const id='m_'+Date.now().toString(36)+Math.floor(Math.random()*100000).toString(36)+idx;
+    const o={manual:true,type:r.type,party:r.party,ref:r.ref||'',rel:r.notes||'',
+      amount:r.amount,issue:r.issue||'',terms:r.terms!=null?r.terms:DEFAULT_TERMS,
+      account:'',payments:[]};
+    if(r.due)o.dueDate=r.due;
+    overlay[id]=o; dbSet('apar/entries/'+id,o,'import');
+    n++;
+  });
+  logAudit('add',{detail:`Imported ${n} invoice${n!==1?'s':''} via bulk import`});
+  closeImport(); render();
+  alert(`Imported ${n} invoice${n!==1?'s':''}.`);
+};
 
 // ── AI Extract (drag & drop an invoice/bill) ─────────────────────────────────
 let aiType='ar';
