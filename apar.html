@@ -137,6 +137,12 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .vg-name{font-weight:800;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vg-cnt{font-size:11px;font-weight:700;color:#46506a;background:#dde4ee;border-radius:11px;padding:1px 8px;flex-shrink:0}
 .vg-sum{font-size:12.5px;font-weight:700;color:var(--text2);flex-shrink:0}
+.vg-merge{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:none;background:transparent;color:var(--text3);border-radius:7px;cursor:pointer;transition:color .12s,background .12s}
+.vg-merge:hover{color:var(--navy);background:#fff}
+.vg-merge i{font-size:16px}
+.merge-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.merge-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:600;background:#f5f7fa;border:1px solid var(--border2);border-radius:8px;padding:7px 11px}
+.merge-row i{color:var(--navy);font-size:14px;margin-right:4px}
 .vgroup-body{padding-left:6px;border-left:2px solid var(--border2);margin-left:6px}
 /* sticky selected-total bar */
 .selbar{position:fixed;left:240px;right:0;bottom:0;z-index:40;display:flex;align-items:center;gap:16px;background:var(--navy);color:#fff;padding:12px 26px;box-shadow:0 -3px 14px rgba(16,24,40,.18)}
@@ -231,6 +237,29 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
   .arch-head{display:none}
   .arch-row{grid-template-columns:1fr 1fr;gap:6px}
   .arch-amt{text-align:left}
+}
+/* grouped archive */
+.arch-groups{display:flex;flex-direction:column;gap:12px}
+.arch-group{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
+.arch-gh{display:flex;align-items:center;gap:10px;padding:10px 15px;background:#eef2f7;border-bottom:1px solid var(--border)}
+.arch-gname{font-weight:800;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arch-gcnt{font-size:11px;font-weight:700;color:#46506a;background:#dde4ee;border-radius:11px;padding:1px 8px}
+.arch-gsum{font-size:12.5px;font-weight:800;color:var(--text2)}
+.arch-glist{display:flex;flex-direction:column}
+.arch-row2{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:12px;align-items:center;padding:9px 15px;border-bottom:1px solid var(--border2);font-size:12.5px;cursor:pointer}
+.arch-row2:last-child{border-bottom:none}
+.arch-row2:hover{background:#f7f9fb}
+.arch-type{font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;text-align:center}
+.arch-type.ar{background:#2f8f6b1a;color:var(--ar)}
+.arch-type.ap{background:#A8443A1a;color:var(--ap)}
+.arch-main{min-width:0;display:flex;flex-direction:column;gap:1px}
+.arch-ref2{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arch-meta{font-size:11px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arch-when2{color:var(--text3);font-size:12px;white-space:nowrap}
+.arch-amt2{font-weight:700;text-align:right;white-space:nowrap}
+@media(max-width:720px){
+  .arch-row2{grid-template-columns:auto 1fr auto;gap:8px}
+  .arch-when2{display:none}
 }
 /* trash view */
 .cf-search-bar{margin-bottom:12px}
@@ -685,6 +714,8 @@ let depositBuckets = {};  // apar/depositBuckets node: Profit First allocation b
 let vendorAccounts = {};  // apar/vendorAccounts node: {vendorKey:accountId} learned assignments
 let vendorPriority = {};  // apar/vendorPriority node: {vendorKey:'critical'|'normal'|'wait'}
 let customerDelay = {};   // apar/customerDelay node: {customerKey:0|7|14|30} typical days late (forecast)
+let vendorAliases = {};   // apar/vendorAliases node: {variantKey: canonicalName} — fold duplicate vendor names into one
+let vendorAliasNames = {}; // apar/vendorAliasNames node: {variantKey: originalDisplayName} — for un-merge labels
 let auditLog = {};        // apar/audit node: {id:{ts,user,action,entryId,party,detail}}
 let currentUser = null;   // {email, name}
 
@@ -780,7 +811,7 @@ function allEntriesRaw(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null)};
+    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null)};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -789,7 +820,7 @@ function allEntriesRaw(){
       const paid=payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
-      merged.push({id,type:o.type||'ar',party:o.party||'—',ref:o.ref||'',rel:o.rel||'',
+      merged.push({id,type:o.type||'ar',party:canonicalParty(o.party||'—'),ref:o.ref||'',rel:o.rel||'',
         amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null});
     }
   });
@@ -811,6 +842,9 @@ function statusOf(e){
   return 'open';
 }
 const STATUS_LABEL={open:'Open',partial:'Partial',paid:'Paid',over:'Overdue'};
+// An invoice is archived once it's settled — fully paid, or (for payables) withdrawn,
+// which statusOf already reports as 'paid'. Also honors a manual archive flag if present.
+function isArchived(e){ return statusOf(e)==='paid' || !!e.archived; }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 const $=id=>document.getElementById(id);
@@ -825,7 +859,7 @@ function go(p){
     cash:['Cash Flow','Bank account balances vs. what\'s scheduled to come out'],
     recur:['Recurring','Templates that auto-create your repeating bills each cycle'],
     deposit:['Deposits Calculator','Split incoming money across your Profit First buckets'],
-    archive:['Archive','Paid bills, auto-filed 45 days after withdrawal'],
+    archive:['Archive','Paid & settled invoices, grouped by customer and vendor'],
     payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance'],
     activity:['Activity','Who changed what — payments, deletions, and status changes'],
     forecast:['Cash Forecast','Week-by-week projection of where your cash is heading'],
@@ -873,9 +907,11 @@ const PAGE_HELP={
   deposit:{title:'Deposits Calculator',body:`<p>Split incoming money across your Profit First buckets (Profit, Owner's Pay, Tax, Operating, etc.).</p>
     <ul><li>Set each bucket's percentage; "Balance to 100%" scales them to total exactly 100%.</li>
     <li>Enter a deposit amount to see how it divides across buckets.</li></ul>`},
-  archive:{title:'Archive',body:`<p>Paid bills are filed here automatically 45 days after they're withdrawn, to keep your active lists clean.</p>
-    <ul><li>Search the archive by vendor, invoice #, or account.</li>
-    <li><b>Restore</b> sends a bill back to Cash Flow if it was filed by mistake.</li></ul>`},
+  archive:{title:'Archive',body:`<p>Invoices that are fully paid (or, for payables, withdrawn) file themselves here automatically, keeping your active Receivables and Payables lists to just what's still open.</p>
+    <ul><li>Holds both receivables and payables, grouped by customer / vendor.</li>
+    <li>Each group shows its count and total settled.</li>
+    <li>Search across everything by customer, vendor, or invoice #.</li>
+    <li><b>Reopen</b> sends an invoice back to the active list if you need to correct it.</li></ul>`},
   activity:{title:'Activity',body:`<p>A running log of who changed what — payments, deletions, status changes, pay runs, and more.</p>
     <ul><li>Grouped by day, newest first, with the person's name and how long ago.</li>
     <li>Set your display name with <b>Change name</b> so the log shows "Maria" instead of an email.</li>
@@ -900,8 +936,8 @@ function render(){
   const entries=allEntries();
   updateBadges(entries);
   if(page==='dash') renderDash(entries);
-  else if(page==='ar') renderList(entries.filter(e=>e.type==='ar'),'ar');
-  else if(page==='ap') renderList(entries.filter(e=>e.type==='ap'),'ap');
+  else if(page==='ar') renderList(entries.filter(e=>e.type==='ar'&&!isArchived(e)),'ar');
+  else if(page==='ap') renderList(entries.filter(e=>e.type==='ap'&&!isArchived(e)),'ap');
   else if(page==='aging') renderAging(entries);
   else if(page==='cash') renderCash(entries);
   else if(page==='recur') renderRecurring();
@@ -1049,6 +1085,7 @@ function renderList(entries,side){
           <span class="vg-name">${esc(name)}</span>
           <span class="vg-cnt">${g.length}</span>
           <span class="vg-sum">${fmtMoney(gOut)} out</span>
+          <button class="vg-merge" onclick="event.stopPropagation();openMergeVendor('${esc(name).replace(/'/g,"\\'")}','${side}')" title="Merge this vendor into another (same company, different name)"><i class="ti ti-arrow-merge"></i></button>
         </div>
         ${collapsed?'':`<div class="vgroup-body">${g.map(card).join('')}</div>`}
       </div>`;
@@ -1088,7 +1125,7 @@ function renderList(entries,side){
   // wire up search input (preserve focus + caret)
   const qi=$('list-q');
   if(qi){
-    qi.oninput=()=>{ const pos=qi.selectionStart; S.q=qi.value; renderList(allEntries().filter(e=>e.type===side),side);
+    qi.oninput=()=>{ const pos=qi.selectionStart; S.q=qi.value; renderList(allEntries().filter(e=>e.type===side&&!isArchived(e)),side);
       const nq=$('list-q'); if(nq){ nq.focus(); try{nq.setSelectionRange(pos,pos);}catch(e){} } };
   }
 }
@@ -1097,7 +1134,7 @@ window.setListSort=(key)=>{ listState[_curSide].sort=key; rerenderList(); };
 window.toggleCollapseAll=()=>{
   const S=listState[_curSide]; S.collapsed=S.collapsed||{};
   // determine current group names from the live list
-  const list=sortListBy(allEntries().filter(e=>e.type===_curSide),S.sort)
+  const list=sortListBy(allEntries().filter(e=>e.type===_curSide&&!isArchived(e)),S.sort)
     .filter(e=>{ const q=S.q.trim().toLowerCase(); return !q||[e.party,e.ref,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q)); });
   const names=[...new Set(list.map(e=>e.party||'—'))];
   const allCollapsed = names.length>0 && names.every(n=>S.collapsed[n]);
@@ -1105,9 +1142,70 @@ window.toggleCollapseAll=()=>{
   rerenderList();
 };
 window.toggleGroup=(name)=>{ const S=listState[_curSide]; S.collapsed=S.collapsed||{}; S.collapsed[name]=!S.collapsed[name]; rerenderList(); };
+// ── Vendor merge / aliasing ──────────────────────────────────────────────────
+let _mergeSrc='', _mergeSide='ar';
+window.openMergeVendor=(name,side)=>{
+  _mergeSrc=name; _mergeSide=side;
+  const names=[...new Set(allEntries().filter(e=>e.type===side&&!e.archived&&!e.void&&!e.trashed).map(e=>e.party))]
+    .filter(n=>n && n!==name).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  const isAR=side==='ar';
+  const opts=names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  // names currently merged INTO this one (so they can be unmerged)
+  const mergedIn=Object.keys(vendorAliases).filter(k=>vendorKey(vendorAliases[k])===vendorKey(name));
+  const mergedRows=mergedIn.map(k=>{
+    const variant=_aliasVariantLabel(k);
+    return `<div class="merge-row"><span><i class="ti ti-arrow-merge"></i> ${esc(variant)}</span>
+      <button class="btn sm" onclick="unmergeVendor('${k.replace(/'/g,"\\'")}')">Unmerge</button></div>`;
+  }).join('');
+  $('pay-body').innerHTML=`
+    <div class="m-head" style="background:var(--navy)"><div class="m-t"><div class="t1">Merge ${isAR?'customer':'vendor'}</div><div class="t2">Combine two names that are the same ${isAR?'customer':'vendor'}</div></div>
+      <button class="m-x" onclick="closePay()"><i class="ti ti-x"></i></button></div>
+    <div class="m-body">
+      <p style="font-size:13.5px;color:var(--text2);line-height:1.5;margin:0 0 14px">
+        You're merging <b>${esc(name)}</b> into another ${isAR?'customer':'vendor'}. All of its bills move under the name you pick, and any future bills that come in as "<b>${esc(name)}</b>" fold in automatically.</p>
+      ${names.length?`
+      <div class="fld"><label>Merge "${esc(name)}" into…</label>
+        <select id="merge-target">${opts}</select></div>
+      <div style="font-size:12px;color:var(--text3);margin-top:8px">The name you pick becomes the one shown everywhere. You can undo this later from the same menu.</div>
+      `:`<div class="empty" style="margin:0">No other ${isAR?'customers':'vendors'} to merge into — you need at least two distinct names.</div>`}
+      ${mergedIn.length?`<div class="m-sect" style="margin-top:18px">Already merged into "${esc(name)}"</div>
+        <div class="merge-list">${mergedRows}</div>`:''}
+    </div>
+    <div class="m-foot"><button class="btn" onclick="closePay()">Cancel</button>
+      ${names.length?`<button class="btn primary" onclick="confirmMergeVendor()"><i class="ti ti-arrow-merge"></i> Merge</button>`:''}</div>`;
+  $('pay-modal').style.display='flex';
+};
+// Best-effort human label for an alias key: prefer a stored original-name memory, else de-slug the key.
+function _aliasVariantLabel(key){
+  if(vendorAliasNames&&vendorAliasNames[key])return vendorAliasNames[key];
+  return key.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+window.unmergeVendor=(variantKey)=>{
+  if(!variantKey)return;
+  delete vendorAliases[variantKey];
+  dbSet('apar/vendorAliases',vendorAliases,'unmerge vendor');
+  if(vendorAliasNames&&vendorAliasNames[variantKey]){ const nm=vendorAliasNames[variantKey]; delete vendorAliasNames[variantKey]; dbSet('apar/vendorAliasNames',vendorAliasNames,'unmerge name'); }
+  logAudit('merge',{detail:`Unmerged "${_aliasVariantLabel(variantKey)}"`});
+  closePay(); render();
+};
+window.confirmMergeVendor=()=>{
+  const target=$('merge-target')?$('merge-target').value:'';
+  if(!target||!_mergeSrc)return;
+  const srcKey=vendorKey(_mergeSrc);
+  const tgtName=target;
+  if(srcKey===vendorKey(tgtName)){ closePay(); return; }
+  vendorAliases[srcKey]=tgtName;
+  vendorAliasNames[srcKey]=_mergeSrc; // remember the real original name for unmerge display
+  // Re-point any aliases that resolved to the source so chains collapse onto the new target.
+  Object.keys(vendorAliases).forEach(k=>{ if(vendorKey(vendorAliases[k])===srcKey) vendorAliases[k]=tgtName; });
+  dbSet('apar/vendorAliases',vendorAliases,'merge vendor');
+  dbSet('apar/vendorAliasNames',vendorAliasNames,'merge vendor name');
+  logAudit('merge',{party:tgtName,detail:`Merged "${_mergeSrc}" into "${tgtName}"`});
+  closePay(); render();
+};
 window.toggleSel=(id)=>{ const S=listState[_curSide]; if(S.sel.has(id))S.sel.delete(id); else S.sel.add(id); rerenderList(); };
 window.clearSel=()=>{ listState[_curSide].sel.clear(); rerenderList(); };
-function rerenderList(){ renderList(allEntries().filter(e=>e.type===_curSide),_curSide); }
+function rerenderList(){ renderList(allEntries().filter(e=>e.type===_curSide&&!isArchived(e)),_curSide); }
 function bucketize(entries){
   const b={cur:0,b30:0,b60:0,b90:0,b90p:0};
   entries.forEach(e=>{
@@ -1398,25 +1496,26 @@ window.setWithdrawnDate=(id,val)=>{
 };
 window.unarchiveBill=(id)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
-  const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-  o.archived=false; writeOverlay(id,o); render();
+  // Withdrawn (or auto-paid) → revert status + strip the auto payment so it returns to the active list.
+  if((e.payStatus||'')==='withdrawn' || (e.payments||[]).some(p=>p&&p.autoWithdraw)){
+    const o=ovl(id);
+    if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;if(o.amount==null)o.amount=e.amount;}
+    o.payStatus='open'; delete o.withdrawnDate; delete o.archived;
+    o.payments=(e.payments||[]).filter(p=>!(p&&p.autoWithdraw));
+    writeOverlay(id,o); logAudit('restore',{entryId:id,party:e.party,detail:'Reopened from archive'}); render();
+    return;
+  }
+  // Manually fully-paid → can't reopen without removing a payment; open the dialog so the user decides.
+  if(statusOf(e)==='paid'){
+    alert('This invoice is archived because it\'s fully paid. To reopen it, remove a payment in the invoice — opening it now.');
+    openEntry(id); return;
+  }
+  // Fallback: clear any manual archive flag.
+  const o=ovl(id); delete o.archived; writeOverlay(id,o); render();
 };
 // auto-archive: withdrawn bills move to Archive once 45+ days past their withdrawal date
 let _archiveRan=false;
-function autoArchiveOld(){
-  if(_archiveRan)return; _archiveRan=true;
-  allEntries().forEach(e=>{
-    if(e.type==='ap'&&!e.archived&&(e.payStatus||'')==='withdrawn'&&e.withdrawnDate){
-      const days=daysSince(e.withdrawnDate);
-      if(days!=null&&days>=45){
-        const o=ovl(e.id);
-        if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-        o.archived=true; overlay[e.id]=o; dbSet('apar/entries/'+e.id,o);
-      }
-    }
-  });
-}
+function autoArchiveOld(){ /* retired: invoices now archive automatically when paid/withdrawn (see isArchived) */ }
 function daysSince(iso){ if(!iso)return null; const d=daysUntil(iso); return d==null?null:-d; }
 
 // ── Recurring bills (templates that generate payables each cycle) ──────────────
@@ -1912,7 +2011,8 @@ const AUDIT_META={
   delete:{icon:'ti-trash',color:'var(--amber)',label:'Trashed'},
   restore:{icon:'ti-arrow-back-up',color:'var(--green)',label:'Restored'},
   purge:{icon:'ti-trash-x',color:'var(--red)',label:'Deleted'},
-  reconcile:{icon:'ti-adjustments',color:'var(--blue)',label:'Reconciled'}
+  reconcile:{icon:'ti-adjustments',color:'var(--blue)',label:'Reconciled'},
+  merge:{icon:'ti-arrow-merge',color:'var(--blue)',label:'Vendor merge'}
 };
 function auditSorted(){ return Object.values(auditLog).sort((a,b)=>(b.ts||0)-(a.ts||0)); }
 function relTime(ts){
@@ -1975,7 +2075,13 @@ function filterRows(selector,q){
   });
 }
 let archiveQ='', payrunQ='', cashQ='';
-window.archiveSearch=(v)=>{ archiveQ=v; filterRows('.arch-row',v); };
+window.archiveSearch=(v)=>{ archiveQ=v; filterRows('.arch-row2',v);
+  document.querySelectorAll('.arch-group').forEach(g=>{
+    const rows=g.querySelectorAll('.arch-row2');
+    const anyVisible=[...rows].some(r=>r.style.display!=='none');
+    g.style.display=(!v.trim()||anyVisible)?'':'none';
+  });
+};
 window.payrunSearch=(v)=>{ payrunQ=v; filterRows('.pr-row',v);
   document.querySelectorAll('.pr-acct').forEach(card=>{
     const rows=card.querySelectorAll('.pr-row');
@@ -2029,46 +2135,48 @@ function renderTrash(){
 }
 
 function renderArchive(){
-  const arch=allEntries().filter(e=>e.type==='ap'&&e.archived);
-  const total=arch.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
-  const acctName=e=>e.account&&accounts[e.account]?accounts[e.account].name:'—';
-  const s=archiveSort;
-  const sorted=[...arch].sort((a,b)=>{
-    let av,bv;
-    if(s.key==='party'){av=(a.party||'').toLowerCase();bv=(b.party||'').toLowerCase();}
-    else if(s.key==='account'){av=acctName(a).toLowerCase();bv=acctName(b).toLowerCase();}
-    else if(s.key==='method'){av=(a.planMethod||'').toLowerCase();bv=(b.planMethod||'').toLowerCase();}
-    else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
-    else{av=a.withdrawnDate||'';bv=b.withdrawnDate||'';}
-    if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
-  });
-  const arrow=k=>s.key!==k?'':`<i class="ti ti-chevron-${s.dir===1?'up':'down'}"></i>`;
-  const row=e=>`<div class="arch-row" data-search="${esc([e.party,e.ref,acctName(e),e.planMethod].filter(Boolean).join(' ').toLowerCase())}">
-    <span onclick="openEntry('${e.id}')" class="arch-party">${esc(e.party)}</span>
-    <span>${e.withdrawnDate?fmtDate(e.withdrawnDate):'—'}</span>
-    <span>${esc(acctName(e))}</span>
-    <span>${esc(e.planMethod||'—')}</span>
-    <span class="arch-amt">${fmtMoney(Math.max(0,(e.amount||0)-(e.paid||0)))}</span>
-    <button class="btn sm" onclick="unarchiveBill('${e.id}')" title="Restore to Cash Flow"><i class="ti ti-arrow-back-up"></i></button>
-  </div>`;
+  const arch=allEntries().filter(e=>isArchived(e)&&!e.trashed);
+  const arTotal=arch.filter(e=>e.type==='ar').reduce((s,e)=>s+(e.amount||0),0);
+  const apTotal=arch.filter(e=>e.type==='ap').reduce((s,e)=>s+(e.amount||0),0);
+  const acctName=e=>e.account&&accounts[e.account]?accounts[e.account].name:'';
+  // payment/settle date for display: latest payment date, else withdrawn date
+  const settledDate=e=>{
+    const ds=(e.payments||[]).map(p=>p.date).filter(Boolean).sort();
+    return ds.length?ds[ds.length-1]:(e.withdrawnDate||'');
+  };
+  const row=e=>{
+    const meta=[e.type==='ap'?acctName(e):'', e.planMethod, e.ref?('#'+e.ref):''].filter(Boolean).join(' · ');
+    return `<div class="arch-row2" data-search="${esc([e.party,e.ref,acctName(e),e.planMethod].filter(Boolean).join(' ').toLowerCase())}" onclick="openEntry('${e.id}')">
+      <span class="arch-type ${e.type}">${e.type==='ar'?'AR':'AP'}</span>
+      <span class="arch-main"><span class="arch-ref2">${esc(e.rel||e.process||('#'+(e.ref||'')))}</span>${meta?`<span class="arch-meta">${esc(meta)}</span>`:''}</span>
+      <span class="arch-when2">${settledDate(e)?fmtDate(settledDate(e)):'—'}</span>
+      <span class="arch-amt2">${fmtMoney(e.amount||0)}</span>
+      <button class="btn sm" onclick="event.stopPropagation();unarchiveBill('${e.id}')" title="Reopen (mark unpaid)"><i class="ti ti-arrow-back-up"></i> Reopen</button>
+    </div>`;
+  };
+  // group by party (canonical name already applied upstream)
+  const groups={};
+  arch.forEach(e=>{ const k=e.party||'—'; (groups[k]=groups[k]||[]).push(e); });
+  const names=Object.keys(groups).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  const groupHtml=names.map(name=>{
+    const g=groups[name].sort((a,b)=>(settledDate(b)||'').localeCompare(settledDate(a)||''));
+    const gTot=g.reduce((s,e)=>s+(e.amount||0),0);
+    return `<div class="arch-group" data-group="${esc(name.toLowerCase())}">
+      <div class="arch-gh"><span class="arch-gname">${esc(name)}</span><span class="arch-gcnt">${g.length}</span><span class="arch-gsum">${fmtMoney(gTot)}</span></div>
+      <div class="arch-glist">${g.map(row).join('')}</div>
+    </div>`;
+  }).join('');
+
   $('content').innerHTML=`
     <div class="stats">
-      <div class="stat"><div class="l">Archived bills</div><div class="v">${arch.length}</div><div class="s">paid & filed</div></div>
-      <div class="stat"><div class="l">Total archived</div><div class="v">${fmtMoney(total)}</div><div class="s">lifetime</div></div>
+      <div class="stat"><div class="l">Archived</div><div class="v">${arch.length}</div><div class="s">paid & settled</div></div>
+      <div class="stat"><div class="l">Receivables collected</div><div class="v">${fmtMoney(arTotal)}</div><div class="s">lifetime</div></div>
+      <div class="stat"><div class="l">Payables paid</div><div class="v">${fmtMoney(apTotal)}</div><div class="s">lifetime</div></div>
     </div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Paid bills move here automatically 45 days after their withdrawal date. Restore one anytime to send it back to Cash Flow.</div>
-    ${arch.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="arch-q" placeholder="Search vendor, invoice #, account…" value="${esc(archiveQ)}" oninput="archiveSearch(this.value)"></div></div>
-    <div class="arch-list">
-      <div class="arch-head">
-        <span onclick="sortArchive('party')">Vendor ${arrow('party')}</span>
-        <span onclick="sortArchive('withdrawnDate')">Withdrawn ${arrow('withdrawnDate')}</span>
-        <span onclick="sortArchive('account')">Account ${arrow('account')}</span>
-        <span onclick="sortArchive('method')">Method ${arrow('method')}</span>
-        <span onclick="sortArchive('amount')">Amount ${arrow('amount')}</span>
-        <span></span>
-      </div>
-      ${sorted.map(row).join('')}
-    </div>`:'<div class="empty">Nothing archived yet. Once a withdrawn bill is 45 days past its withdrawal date, it lands here automatically.</div>'}`;
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Invoices land here automatically once they're fully paid (or, for payables, withdrawn). Grouped by ${'customer / vendor'}. Reopen one to send it back to the active list.</div>
+    ${arch.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="arch-q" placeholder="Search customer, vendor, invoice #…" value="${esc(archiveQ)}" oninput="archiveSearch(this.value)"></div></div>
+    <div class="arch-groups">${groupHtml}</div>`
+    :'<div class="empty">Nothing archived yet. Once an invoice is fully paid — or a bill is withdrawn — it files itself here automatically.</div>'}`;
   if(archiveQ){ archiveSearch(archiveQ); const q=$('arch-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 
@@ -2568,6 +2676,12 @@ function updateAiStatus(){
   }
 }
 function vendorKey(name){ return (name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'_'; }
+// Resolve a raw vendor/customer name to its canonical name via the alias map.
+// vendorAliases maps a variant's key -> canonical display name. If no alias, return as-is.
+function canonicalParty(name){
+  const canon=vendorAliases[vendorKey(name||'')];
+  return canon||name;
+}
 function fillAccountSelect(selId){
   const sel=$('ai-account'); if(!sel)return;
   sel.innerHTML='<option value="">Unassigned</option>'+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${id===selId?'selected':''}>${esc(a.name)}</option>`).join('');
@@ -2629,6 +2743,8 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/vendorAccounts'),snap=>{ vendorAccounts=snap.val()||{}; });
     onValue(ref(db,'apar/vendorPriority'),snap=>{ vendorPriority=snap.val()||{}; if(page==='payrun')render(); });
     onValue(ref(db,'apar/customerDelay'),snap=>{ customerDelay=snap.val()||{}; if(page==='forecast')render(); });
+    onValue(ref(db,'apar/vendorAliases'),snap=>{ vendorAliases=snap.val()||{}; render(); });
+    onValue(ref(db,'apar/vendorAliasNames'),snap=>{ vendorAliasNames=snap.val()||{}; });
     onValue(ref(db,'apar/audit'),snap=>{ auditLog=snap.val()||{}; if(page==='activity')render(); });
     onValue(ref(db,'apar/userNames'),snap=>{ userNames=snap.val()||{}; });
   }else{
