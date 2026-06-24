@@ -803,6 +803,7 @@ tr:hover .del-btn{opacity:1}
     <div class="topbar-actions">
       <span id="topbar-op-pill" class="op-pill" style="display:none"><i class="ti ti-user-cog"></i> Operator Mode</span>
       <button class="btn" onclick="openHelp()" title="How to use this app"><i class="ti ti-help-circle"></i> Help</button>
+      <button class="btn mgr-only green" id="topbar-combine-btn" onclick="openCombineInvoice()" style="display:none"><i class="ti ti-files"></i> Combine Invoice</button>
       <button class="btn" id="topbar-import-btn" onclick="openQuoteImport()"><i class="ti ti-file-import"></i> Import Quote</button>
       <button class="btn" id="topbar-ai-btn" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</button>
       <button class="btn green" id="topbar-add-btn" onclick="openAdd()"><i class="ti ti-plus"></i> Add Order</button>
@@ -1383,6 +1384,27 @@ tr:hover .del-btn{opacity:1}
 <div class="picker" id="status-picker"></div>
 <div class="picker" id="pay-picker"></div>
 
+<!-- Combine multiple orders into one invoice -->
+<div class="modal-bg" id="combine-modal" style="display:none;align-items:center;justify-content:center;z-index:72">
+  <div class="modal" style="max-width:620px;width:92vw;padding:22px;max-height:88vh;display:flex;flex-direction:column">
+    <div style="font-size:17px;font-weight:800;margin-bottom:3px">Combine into one invoice</div>
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:14px">Select orders from a single customer to bill them under one invoice number.</div>
+    <div id="combine-list" style="overflow:auto;border:1px solid var(--border);border-radius:10px;flex:1;min-height:120px"></div>
+    <div id="combine-warn" style="display:none;color:var(--red);font-size:12px;margin-top:8px"></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:7px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">Invoice #</label>
+        <input id="combine-invnum" type="text" placeholder="e.g. 1042" onkeydown="if(event.key==='Enter')window._createCombinedInvoice()" style="width:120px;box-sizing:border-box;font-size:15px;padding:9px 11px;border:1px solid var(--border);border-radius:8px">
+      </div>
+      <div style="margin-left:auto;font-size:13px;color:var(--text2)"><span id="combine-count">0</span> selected · <b id="combine-total" style="color:var(--text)">$0.00</b></div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn" onclick="window.closeModal('combine-modal')">Cancel</button>
+      <button class="btn green" id="combine-go" onclick="window._createCombinedInvoice()">Create combined invoice</button>
+    </div>
+  </div>
+</div>
+
 <!-- Invoice number dialog (Ready for Invoice → Invoiced) -->
 <div class="modal-bg" id="invoice-modal" style="display:none;align-items:center;justify-content:center;z-index:72">
   <div class="modal" style="max-width:380px;padding:22px">
@@ -1710,6 +1732,7 @@ function poGroups(){
   const rows=orders.filter(r=>!r.archived);
   const q=document.getElementById('search').value.toLowerCase();
   const sf=document.getElementById('filter-status').value;
+  { const cb=document.getElementById('topbar-combine-btn'); if(cb) cb.style.display=(sf==='Ready for Invoice')?'':'none'; }
   const pf=document.getElementById('filter-process').value;
   let live=rows;
   if(q) live=live.filter(r=>[r.customer,r.po,r.job,r.part,r.desc,r.invoice].join(' ').toLowerCase().includes(q));
@@ -2254,6 +2277,71 @@ window._confirmInvoice=()=>{
   document.getElementById('invoice-modal').style.display='none'; _pendingInvoiceId=null;
 };
 window._cancelInvoice=()=>{ document.getElementById('invoice-modal').style.display='none'; _pendingInvoiceId=null; };
+
+// ── Combine multiple Ready-for-Invoice orders under one invoice number ───────
+function _readyForInvoiceOrders(){ return orders.filter(o=>!o.archived && o.status==='Ready for Invoice'); }
+window.openCombineInvoice=()=>{
+  document.getElementById('combine-invnum').value='';
+  const w=document.getElementById('combine-warn'); w.style.display='none'; w.textContent='';
+  window._renderCombineList();
+  document.getElementById('combine-modal').style.display='flex';
+};
+window._renderCombineList=()=>{
+  const list=_readyForInvoiceOrders();
+  const body=document.getElementById('combine-list');
+  if(!list.length){ body.innerHTML='<div style="padding:26px;text-align:center;color:var(--text3)">No orders are currently in “Ready for Invoice”.</div>'; window._updateCombineSummary(); return; }
+  const groups={};
+  list.forEach(o=>{ const c=(o.customer||'—'); (groups[c]=groups[c]||[]).push(o); });
+  body.innerHTML=Object.keys(groups).sort((a,b)=>a.localeCompare(b)).map(cust=>{
+    const rows=groups[cust].map(o=>{
+      const lbl=[o.po&&('PO '+o.po), o.job&&('Job '+o.job), o.part].filter(Boolean).join(' · ')||'(no detail)';
+      const t=rowTotal(o);
+      return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer">
+        <input type="checkbox" class="combine-cb" data-id="${o.id}" data-cust="${esc2(cust)}" data-total="${t}" onchange="window._updateCombineSummary()" style="width:16px;height:16px;flex-shrink:0">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc2(lbl)}</span>
+        <span style="font-size:12px;color:var(--text3);flex-shrink:0">${o.qty||''}</span>
+        <span style="font-size:13px;font-weight:700;min-width:82px;text-align:right;flex-shrink:0">${t?fmtMoney(t):''}</span>
+      </label>`;
+    }).join('');
+    return `<div>
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#f4f6fa;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1">
+        <span style="font-weight:700;font-size:12.5px">${esc2(cust)}</span>
+        <button class="btn sm" data-cust="${esc2(cust)}" style="margin-left:auto;font-size:11px;padding:3px 8px" onclick="window._combineSelectCustomer(this.getAttribute('data-cust'))">Select all</button>
+      </div>${rows}</div>`;
+  }).join('');
+  window._updateCombineSummary();
+};
+window._combineSelectCustomer=(cust)=>{
+  document.querySelectorAll('.combine-cb').forEach(cb=>{ cb.checked=(cb.getAttribute('data-cust')===cust); });
+  window._updateCombineSummary();
+};
+window._updateCombineSummary=()=>{
+  const checked=[...document.querySelectorAll('.combine-cb:checked')];
+  const custs=new Set(checked.map(cb=>cb.getAttribute('data-cust')));
+  const total=checked.reduce((s,cb)=>s+(parseFloat(cb.getAttribute('data-total'))||0),0);
+  document.getElementById('combine-count').textContent=checked.length;
+  document.getElementById('combine-total').textContent=fmtMoney(total)||'$0.00';
+  const warn=document.getElementById('combine-warn'), go=document.getElementById('combine-go');
+  if(custs.size>1){ warn.style.display='block'; warn.textContent='These orders are for different customers — an invoice can only cover one customer.'; go.disabled=true; go.style.opacity=.5; }
+  else { warn.style.display='none'; go.disabled=false; go.style.opacity=1; }
+};
+window._createCombinedInvoice=()=>{
+  const checked=[...document.querySelectorAll('.combine-cb:checked')];
+  const warn=document.getElementById('combine-warn'); const showWarn=t=>{ warn.style.display='block'; warn.textContent=t; };
+  if(checked.length<2){ showWarn('Select at least two orders to combine.'); return; }
+  if(new Set(checked.map(cb=>cb.getAttribute('data-cust'))).size>1){ showWarn('These orders are for different customers — an invoice can only cover one customer.'); return; }
+  const num=(document.getElementById('combine-invnum').value||'').trim();
+  if(!num){ showWarn('Enter an invoice number.'); return; }
+  const ids=checked.map(cb=>cb.getAttribute('data-id'));
+  const prior=ids.map(id=>{ const r=orders.find(o=>String(o.id)===String(id)); return r?{id:r.id,status:r.status,invoice:r.invoice,payment:r.payment}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.invoice=num; r.status='Invoiced'; if(!r.payment)r.payment='Unpaid'; } });
+  saveDB(); render();
+  window.closeModal('combine-modal');
+  if(typeof showUndoToast==='function') showUndoToast(`Invoiced ${ids.length} orders under #${num}`, ()=>{
+    prior.forEach(p=>{ const r=orders.find(o=>String(o.id)===String(p.id)); if(r){ r.status=p.status; r.invoice=p.invoice; r.payment=p.payment; } });
+    saveDB(); render();
+  });
+};
 window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${PAY_LABEL[p]||p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._pps=(id,pay)=>{const r=orders.find(o=>o.id===id);if(r){r.payment=pay;saveDB();render();}document.getElementById('pay-picker').style.display='none';};
 window._oe=(id)=>openEdit(id);
@@ -2954,6 +3042,7 @@ window.showPage = (page) => {
   document.getElementById('topbar-add-btn').style.display = ordersOnly ? '' : 'none';
   document.getElementById('topbar-ai-btn').style.display = ordersOnly ? '' : 'none';
   { const impBtn=document.getElementById('topbar-import-btn'); if(impBtn) impBtn.style.display = ordersOnly ? '' : 'none'; }
+  { const cb=document.getElementById('topbar-combine-btn'); if(cb && !ordersOnly) cb.style.display='none'; }
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
   if(page==='dispatch') document.getElementById('nav-dispatch')?.classList.add('active');
