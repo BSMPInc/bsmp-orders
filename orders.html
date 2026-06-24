@@ -243,6 +243,11 @@ tr:last-child td{border-bottom:none}
 
 /* badges */
 .status-badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;cursor:pointer;letter-spacing:.2px}
+.status-badge[onclick]{cursor:pointer}
+.status-badge[onclick]::after{content:'';display:inline-block;margin-left:5px;width:0;height:0;border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-top:4px solid currentColor;opacity:.45;vertical-align:middle;transition:opacity .15s}
+.status-badge[onclick]:hover{filter:brightness(.96);box-shadow:0 0 0 2px rgba(0,0,0,.07)}
+.status-badge[onclick]:hover::after{opacity:.85}
+.s-received{background:#def0f4;color:#15607a}
 .s-confirmed{background:#e8f0fb;color:#1a4a90}
 .s-in-progress{background:#fff3d6;color:#7a4800}
 .s-qc{background:#ede8fb;color:#3d2d9a}
@@ -819,9 +824,9 @@ tr:hover .del-btn{opacity:1}
       <input type="text" id="search" placeholder="Search customer, part, job #…">
       <select id="filter-status">
         <option value="">All statuses</option>
-        <option>Confirmed</option><option>In Progress</option><option>QC</option>
+        <option>Received</option><option>Confirmed</option><option>In Progress</option>
+        <option>Need Purchase Order</option><option>Completed</option>
         <option>Ready for Invoice</option><option>Invoiced</option>
-        <option>Completed</option><option>Need Purchase Order</option>
       </select>
       <select id="filter-process"><option value="">All processes</option></select>
       <span class="table-only-controls" style="display:flex;gap:8px;align-items:center">
@@ -1314,7 +1319,7 @@ tr:hover .del-btn{opacity:1}
     <div class="section-title"><i class="ti ti-file-invoice"></i> Status & Invoice</div>
     <div class="form-grid">
       <div class="form-group"><label>Status</label>
-        <select id="f-status"><option>Confirmed</option><option>In Progress</option><option>QC</option><option>Ready for Invoice</option><option>Invoiced</option><option>Completed</option><option>Need Purchase Order</option></select>
+        <select id="f-status"><option>Received</option><option>Confirmed</option><option>In Progress</option><option>Need Purchase Order</option><option>Completed</option><option>Ready for Invoice</option><option>Invoiced</option></select>
       </div>
       <div class="form-group"><label>Payment</label>
         <select id="f-payment"><option value="Unpaid">Open</option><option value="Partial">Partial</option><option value="Paid">Paid</option></select>
@@ -1441,9 +1446,9 @@ const storage = getStorage(app);
 const auth = getAuth(app);
 const ordersRef = ref(db, 'orders');
 
-const STATUSES = ['Confirmed','In Progress','QC','Ready for Invoice','Invoiced','Completed','Need Purchase Order'];
-const STATUS_CLASS = {'Confirmed':'s-confirmed','In Progress':'s-in-progress','QC':'s-qc','Ready for Invoice':'s-ready','Invoiced':'s-invoiced','Completed':'s-completed','Need Purchase Order':'s-need-po'};
-const STATUS_ACCENT = {'Confirmed':'#1a4a90','In Progress':'#b07a00','QC':'#5a45c0','Ready for Invoice':'#4a8a1a','Invoiced':'#0a7050','Completed':'#8a93a5','Need Purchase Order':'#b53030'};
+const STATUSES = ['Received','Confirmed','In Progress','Need Purchase Order','Completed','Ready for Invoice','Invoiced'];
+const STATUS_CLASS = {'Received':'s-received','Confirmed':'s-confirmed','In Progress':'s-in-progress','Need Purchase Order':'s-need-po','Completed':'s-completed','Ready for Invoice':'s-ready','Invoiced':'s-invoiced'};
+const STATUS_ACCENT = {'Received':'#15607a','Confirmed':'#1a4a90','In Progress':'#b07a00','Need Purchase Order':'#b53030','Completed':'#8a93a5','Ready for Invoice':'#4a8a1a','Invoiced':'#0a7050'};
 const INTERNAL_PROCESSES = ['Inventory Check','Purchasing','Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly','Delivery'];
 const EXTERNAL_PROCESSES = ['Purchasing- Material','Purchasing- Hardware','Purchasing- Tooling','Outsource- Plating','Outsource- Paint','Outsource- Machining','Outsource- Other'];
 const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
@@ -1695,7 +1700,7 @@ const CARD_SORTS=[
   {key:'status',   label:'Status',   icon:'flag'},
   {key:'newest',   label:'Newest',   icon:'sparkles'},
 ];
-const STATUS_SORT_ORDER={'Need Purchase Order':0,'Confirmed':1,'In Progress':2,'QC':3,'Ready for Invoice':4,'Invoiced':5,'Completed':6};
+const STATUS_SORT_ORDER={'Received':0,'Confirmed':1,'In Progress':2,'Need Purchase Order':3,'Completed':4,'Ready for Invoice':5,'Invoiced':6};
 
 // Short, friendly name for a process: "Outsource- Plating" → "Plating"
 function shortProc(name){ return (name||'').replace(/^(Outsource|Purchasing)-\s*/,''); }
@@ -2511,7 +2516,7 @@ window.openAdd=()=>{
   editId=null;_prefillSteps=null;document.getElementById('modal-title').textContent='Add New Order';document.getElementById('save-btn').innerHTML='<i class="ti ti-check"></i> Save Order';
   ['customer','po','job','part','desc','notes','invoice'].forEach(f=>document.getElementById('f-'+f).value='');
   ['qty','cost'].forEach(f=>document.getElementById('f-'+f).value='');
-  document.getElementById('f-status').value='Confirmed';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
+  document.getElementById('f-status').value='Received';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
   document.getElementById('f-ordered').value='';document.getElementById('f-due').value='';
   document.getElementById('add-modal').style.display='flex';
 };
@@ -2682,7 +2687,7 @@ window._doQuoteImport = (id) => {
     desc: [ (q.material && q.material!=='—') ? q.material : '', (q.revision && q.revision!=='—') ? ('Rev '+q.revision) : '' ].filter(Boolean).join(' · '),
     qty, cost, total: qty&&cost ? qty*cost : 0,
     ordered: today, due: (q.dueDate||''),
-    status: 'Confirmed', invoice: '', payment: 'Unpaid',
+    status: 'Received', invoice: '', payment: 'Unpaid',
     notes: _qBuildNotes(q, m.inspection),
     currentProcess: '', completedProcesses: [],
     schedule: { steps },
@@ -2720,7 +2725,7 @@ window.importAIOrders=()=>{
   if(!aiParsed||!aiParsed.length)return;
   // build new order objects, then assign internal job numbers per customer+PO
   aiParsed.forEach(r=>{
-    const o={id:uid(),customer:r.customer||'',po:r.po||'',job:'',part:r.part||'',desc:r.desc||'',qty:parseFloat(r.qty)||0,cost:parseFloat(r.cost)||0,total:(parseFloat(r.qty)||0)*(parseFloat(r.cost)||0),ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Confirmed',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
+    const o={id:uid(),customer:r.customer||'',po:r.po||'',job:'',part:r.part||'',desc:r.desc||'',qty:parseFloat(r.qty)||0,cost:parseFloat(r.cost)||0,total:(parseFloat(r.qty)||0)*(parseFloat(r.cost)||0),ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
     // assign job number considering existing + already-added-this-batch orders
     o.job = suggestJobNumber(o.customer, o.po);
     orders.unshift(o);                 // add first so same-PO siblings get -2, -3…
@@ -3856,6 +3861,7 @@ window.markReceived = (id, name, e) => {
   const s=_extStep(id,name); if(!s) return;
   const t=toISO(new Date());
   s.receivedAt=t; s.done=true; s.doneAt=t;   // received completes the external step
+  { const r=orders.find(o=>o.id===id); if(r) autoAdvanceStatus(r); }
   saveDB(); invalidateSched(); render(); renderSchedule();
 };
 window.undoSent = (id, name, e) => {
@@ -4423,6 +4429,21 @@ window._toggleStepDone = (id, name, e) => {
   }
   applyStepDone(id, name, false);
 };
+// Auto-advance status from production progress. Forward-only, and only while the
+// order is in a production state — manual/billing states win and are never overridden.
+const AUTO_RANK={'Received':0,'Confirmed':1,'In Progress':2,'Completed':3};
+function autoAdvanceStatus(r){
+  if(!r || !(r.status in AUTO_RANK)) return;   // skip Need PO / Ready for Invoice / Invoiced
+  const sch=r.schedule; if(!sch || !Array.isArray(sch.steps)) return;
+  const enabled=sch.steps.filter(s=>s.enabled);
+  if(!enabled.length) return;
+  const allDone=enabled.every(s=>s.done);
+  const anyProgress=enabled.some(s=>s.done || (parseFloat(s.qtyDone)||0)>0);
+  let target=null;
+  if(allDone) target='Completed';
+  else if(anyProgress) target='In Progress';
+  if(target && AUTO_RANK[target] > AUTO_RANK[r.status]) r.status=target;   // never move backward
+}
 function applyStepDone(id, name, makeDone){
   const r = orders.find(o=>o.id===id); if(!r) return;
   const sch = ensureSchedule(r);
@@ -4432,6 +4453,7 @@ function applyStepDone(id, name, makeDone){
   r.completedProcesses = r.completedProcesses || [];
   if(makeDone){ if(!r.completedProcesses.includes(name)) r.completedProcesses.push(name); if(r.currentProcess===name) r.currentProcess=''; }
   else { r.completedProcesses = r.completedProcesses.filter(p=>p!==name); }
+  autoAdvanceStatus(r);
   saveDB(); refreshActivePage();
 }
 // Lightweight in-app confirm dialog (consistent styling, touch-friendly for iPads)
@@ -4514,6 +4536,7 @@ window._stepQty = (id, name, val) => {
   const step = sch.steps.find(s=>s.name===name); if(!step) return;
   const n = val===''? null : Math.max(0, parseInt(val)||0);
   step.qtyDone = n;
+  autoAdvanceStatus(r);
   saveDB();
   const need = r.qty||0;
   // when the full quantity is reached, ask before auto-completing the step
