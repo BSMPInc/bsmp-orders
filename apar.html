@@ -194,6 +194,15 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .bal-edit:hover .bal-pen,.bal-edit:focus-within .bal-pen{color:var(--navy)}
 .acct-bills-section{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:14px}
 .acct-bills-section h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:8px}
+.acct-bills-section h3{cursor:pointer;user-select:none}
+.acct-bills-section.collapsed h3{margin-bottom:0}
+.acct-chev{font-size:16px;color:var(--text3);flex-shrink:0}
+.acct-cnt{font-size:11px;font-weight:700;color:#46506a;background:#eef2f7;border-radius:11px;padding:1px 8px;flex-shrink:0}
+.cf-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.cf-toolbar .list-search{min-width:240px}
+.cf-filter{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 10px;cursor:pointer}
+.cf-filter i{font-size:14px;color:var(--text3)}
+.cf-filter select{border:none;background:transparent;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;outline:none}
 .acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
 .acct-bills{font-size:12.5px}
 .acct-bill-head{display:grid;grid-template-columns:1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;padding:0 0 6px;border-bottom:1px solid var(--border)}
@@ -955,6 +964,7 @@ const PAGE_HELP={
     <ul><li><b>Balance</b> is a number you type — keep it current; the "updated X ago" note turns amber after a week.</li>
     <li><b>Projected</b> = balance minus what you've marked Scheduled. Only "Scheduled" bills reduce it.</li>
     <li>Bill statuses flow Open → Attention → Scheduled → Withdrawn. Scheduled bills rise to the top of each card; withdrawn ones sink to the bottom.</li>
+    <li>Collapse any account card by clicking its header, or use Collapse all — handy when you have many accounts. Filter by status or due date, or search, to focus on specific invoices.</li>
     <li>When you mark a bill Withdrawn, the app offers to subtract it from that account's balance to keep things in sync.</li></ul>`},
   forecast:{title:'Cash Forecast',body:`<p>A week-by-week projection of where your cash is heading over the next 8 weeks, per account and combined.</p>
     <ul><li>Starts from today's balances, drains them by bills and recurring payments as they come due, and adds expected customer payments.</li>
@@ -1317,6 +1327,22 @@ const ACCT_COLORS=[
 function colorFor(id){ const ids=Object.keys(accounts); return ACCT_COLORS[ids.indexOf(id)%ACCT_COLORS.length]||ACCT_COLORS[0]; }
 let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'status'|'amount',dir:1|-1}}
 let hidePaid={}; // {sectionKey:true} -> hide withdrawn (paid) bills in that section
+let cashCollapsed={}; // {accountId:true} -> account card collapsed
+let cashFilter={status:'all',due:'all'}; // focused filters across all cards
+// Does a bill pass the current Cash Flow status/due filters?
+function cashBillMatchesFilter(e){
+  const st=e.payStatus||'open';
+  if(cashFilter.status!=='all' && st!==cashFilter.status) return false;
+  if(cashFilter.due!=='all'){
+    const d=daysUntil(e.due);
+    if(cashFilter.due==='overdue'){ if(!(d!=null&&d<0)) return false; }
+    else if(cashFilter.due==='week'){ if(!(d!=null&&d>=0&&d<=7)) return false; }
+    else if(cashFilter.due==='month'){ if(!(d!=null&&d>=0&&d<=31)) return false; }
+    else if(cashFilter.due==='nodate'){ if(e.due) return false; }
+  }
+  return true;
+}
+function cashFilterActive(){ return cashFilter.status!=='all'||cashFilter.due!=='all'; }
 function sortBills(list,sectionKey){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   const arr=[...list];
@@ -1350,6 +1376,18 @@ window.sortCash=(sectionKey,key)=>{
   render();
 };
 window.toggleHidePaid=(sectionKey)=>{ hidePaid[sectionKey]=!hidePaid[sectionKey]; render(); };
+window.toggleCashCard=(id)=>{ cashCollapsed[id]=!cashCollapsed[id]; render(); };
+window.toggleCashCollapseAll=()=>{
+  const ids=Object.keys(accounts);
+  const cardIds=[...ids];
+  const ap=allEntries().filter(e=>e.type==='ap'&&!e.archived&&Math.max(0,(e.amount||0)-(e.paid||0))>0.005);
+  if(ap.some(e=>!e.account))cardIds.push('unassigned');
+  const allCollapsed=cardIds.length>0&&cardIds.every(k=>cashCollapsed[k]);
+  cardIds.forEach(k=>{ cashCollapsed[k]=!allCollapsed; });
+  render();
+};
+window.setCashFilter=(key,val)=>{ cashFilter[key]=val; render(); };
+window.clearCashFilters=()=>{ cashFilter={status:'all',due:'all'}; render(); };
 function sortArrow(sectionKey,key){
   const s=cashSort[sectionKey]||{key:'due',dir:1};
   if(s.key!==key)return'';
@@ -1443,8 +1481,11 @@ function renderCash(entries){
   };
 
   const acctBillSection=(id,a)=>{
-    const allBills=ap.filter(e=>e.account===id&&unpaid(e)>0.005&&!e.archived);
-    if(!allBills.length)return'';
+    const allBillsRaw=ap.filter(e=>e.account===id&&unpaid(e)>0.005&&!e.archived);
+    if(!allBillsRaw.length)return'';
+    const allBills=allBillsRaw.filter(cashBillMatchesFilter);
+    // when filtering, hide cards that have no matching bills
+    if(cashFilterActive()&&!allBills.length)return'';
     const paidCount=allBills.filter(e=>(e.payStatus||'open')==='withdrawn').length;
     const hidden=!!hidePaid[id];
     const shown=hidden?allBills.filter(e=>(e.payStatus||'open')!=='withdrawn'):allBills;
@@ -1453,18 +1494,31 @@ function renderCash(entries){
     const wd=allBills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
     const totTxt=`${fmtMoney(sched)} scheduled`+(wd>0.005?` · ${fmtMoney(wd)} withdrawn`:'');
     const c=colorFor(id);
-    const toggle=paidCount>0?`<button class="paid-toggle" onclick="toggleHidePaid('${id}')"><i class="ti ti-eye${hidden?'':'-off'}"></i> ${hidden?`Show ${paidCount} paid`:'Hide paid'}</button>`:'';
+    const collapsed=!!cashCollapsed[id];
+    const toggle=paidCount>0?`<button class="paid-toggle" onclick="event.stopPropagation();toggleHidePaid('${id}')"><i class="ti ti-eye${hidden?'':'-off'}"></i> ${hidden?`Show ${paidCount} paid`:'Hide paid'}</button>`:'';
     const body=bills.length?billHead(id)+bills.map(billRow).join(''):'<div class="acct-empty">All paid bills hidden.</div>';
-    return `<div class="acct-bills-section" style="border-left:4px solid ${c.bar}"><h3><span class="acct-dot" style="background:${c.bar}"></span>${esc(a.name)}<span class="tot">${totTxt}</span>${toggle}</h3>
-      <div class="acct-bills">${body}</div>
+    const count=allBills.length;
+    return `<div class="acct-bills-section${collapsed?' collapsed':''}" style="border-left:4px solid ${c.bar}">
+      <h3 onclick="toggleCashCard('${id}')"><i class="ti ti-chevron-${collapsed?'right':'down'} acct-chev"></i><span class="acct-dot" style="background:${c.bar}"></span>${esc(a.name)}<span class="acct-cnt">${count}</span><span class="tot">${totTxt}</span>${collapsed?'':toggle}</h3>
+      ${collapsed?'':`<div class="acct-bills">${body}</div>`}
     </div>`;
   };
 
-  const unassigned=sortBills(ap.filter(e=>!e.account&&unpaid(e)>0.005&&!e.archived),'unassigned');
+  const unassignedRaw=ap.filter(e=>!e.account&&unpaid(e)>0.005&&!e.archived).filter(cashBillMatchesFilter);
+  const unassigned=sortBills(unassignedRaw,'unassigned');
   const unassignedTotal=unassigned.reduce((s,e)=>s+unpaid(e),0);
-  const unassignedSection=`<div class="acct-bills-section"><h3>Unassigned<span class="tot">${fmtMoney(unassignedTotal)}</span></h3>
-    <div class="acct-bills">${unassigned.length?billHead('unassigned')+unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>
+  const uCollapsed=!!cashCollapsed['unassigned'];
+  const unassignedSection=(cashFilterActive()&&!unassigned.length)?'':`<div class="acct-bills-section${uCollapsed?' collapsed':''}">
+    <h3 onclick="toggleCashCard('unassigned')"><i class="ti ti-chevron-${uCollapsed?'right':'down'} acct-chev"></i>Unassigned<span class="acct-cnt">${unassigned.length}</span><span class="tot">${fmtMoney(unassignedTotal)}</span></h3>
+    ${uCollapsed?'':`<div class="acct-bills">${unassigned.length?billHead('unassigned')+unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>`}
   </div>`;
+
+  // collapse-all state: are all account cards (incl. unassigned if present) collapsed?
+  const allCardIds=[...ids];
+  if(ap.some(e=>!e.account&&unpaid(e)>0.005&&!e.archived))allCardIds.push('unassigned');
+  const allCashCollapsed=allCardIds.length>0&&allCardIds.every(k=>cashCollapsed[k]);
+  // any bill matching the active filter (for the empty-state message)
+  const anyCashMatch=ap.some(e=>unpaid(e)>0.005&&!e.archived&&cashBillMatchesFilter(e));
 
   $('content').innerHTML=`
     <div class="stats">
@@ -1476,9 +1530,25 @@ function renderCash(entries){
     <div class="toolbar"><button class="btn primary" onclick="addAccount()"><i class="ti ti-plus"></i> Add account</button></div>
     <div class="acct-grid">${ids.map(id=>acctTile(id,accounts[id])).join('')}</div>
     ${ids.length===0?'<div class="empty">No accounts yet. Add your bank sub-accounts (Operating, Payroll, Utilities, etc.) to start tracking what\'s scheduled to drain from each one.</div>':''}
-    ${ids.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="cash-q" placeholder="Search vendor, invoice #, method…" value="${esc(cashQ)}" oninput="cashSearch(this.value)"></div></div>`:''}
+    ${ids.length?`<div class="cf-toolbar">
+      <div class="list-search"><i class="ti ti-search"></i><input id="cash-q" placeholder="Search vendor, invoice #, method…" value="${esc(cashQ)}" oninput="cashSearch(this.value)"></div>
+      <label class="cf-filter"><i class="ti ti-flag"></i><select onchange="setCashFilter('status',this.value)">
+        <option value="all" ${cashFilter.status==='all'?'selected':''}>All statuses</option>
+        ${PAY_STATUSES.map(s=>`<option value="${s.k}" ${cashFilter.status===s.k?'selected':''}>${s.label}</option>`).join('')}
+      </select></label>
+      <label class="cf-filter"><i class="ti ti-calendar"></i><select onchange="setCashFilter('due',this.value)">
+        <option value="all" ${cashFilter.due==='all'?'selected':''}>Any due date</option>
+        <option value="overdue" ${cashFilter.due==='overdue'?'selected':''}>Overdue</option>
+        <option value="week" ${cashFilter.due==='week'?'selected':''}>Due ≤ 7 days</option>
+        <option value="month" ${cashFilter.due==='month'?'selected':''}>Due ≤ 30 days</option>
+        <option value="nodate" ${cashFilter.due==='nodate'?'selected':''}>No due date</option>
+      </select></label>
+      ${cashFilterActive()?`<button class="btn sm" onclick="clearCashFilters()"><i class="ti ti-x"></i> Clear</button>`:''}
+      <button class="btn sm" style="margin-left:auto" onclick="toggleCashCollapseAll()"><i class="ti ti-chevrons-${allCashCollapsed?'down':'up'}"></i> ${allCashCollapsed?'Expand all':'Collapse all'}</button>
+    </div>`:''}
     ${ids.map(id=>acctBillSection(id,accounts[id])).join('')}
-    ${unassignedSection}`;
+    ${unassignedSection}
+    ${cashFilterActive()&&!anyCashMatch?'<div class="empty">No bills match these filters. <a href="#" onclick="clearCashFilters();return false">Clear filters</a></div>':''}`;
   if(cashQ){ cashSearch(cashQ); const q=$('cash-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 window.addAccount=()=>{
@@ -2156,8 +2226,9 @@ window.payrunSearch=(v)=>{ payrunQ=v; filterRows('.pr-row',v);
   });
 };
 window.cashSearch=(v)=>{ cashQ=v; filterRows('.acct-bill',v);
-  // hide a section whose visible rows are all filtered out
+  // hide a section whose visible rows are all filtered out — but never hide a collapsed card
   document.querySelectorAll('.acct-bills-section').forEach(sec=>{
+    if(sec.classList.contains('collapsed')){ sec.style.display=''; return; }
     const rows=sec.querySelectorAll('.acct-bill');
     const anyVisible=[...rows].some(r=>r.style.display!=='none');
     sec.style.display=(!v.trim()||anyVisible)?'':'none';
