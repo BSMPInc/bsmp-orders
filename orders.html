@@ -548,6 +548,13 @@ tr:hover .del-btn{opacity:1}
 .disp-psub{font-size:11.5px;color:var(--text2);margin-top:1px}
 .disp-rows{display:flex;flex-direction:column}
 .disp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid #f1f3f7}
+.disp-seq{font-size:11px;font-weight:800;color:var(--text3);min-width:17px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
+.disp-move{display:inline-flex;flex-direction:column;gap:2px;flex-shrink:0;margin-left:2px}
+.dm-btn{border:1px solid var(--border);background:#fff;border-radius:6px;width:28px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);padding:0}
+.dm-btn:active{background:#eef1f6}
+.dm-btn:disabled{opacity:.3;cursor:default}
+.dm-btn i{font-size:13px}
+@media(pointer:coarse){ .dm-btn{width:38px;height:26px} .dm-btn i{font-size:17px} .disp-seq{font-size:12.5px;min-width:20px} }
 .disp-row:last-child{border-bottom:none}
 .disp-row:hover{background:#f9fbfd}
 .disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:150px;flex-shrink:0}
@@ -1170,10 +1177,44 @@ tr:hover .del-btn{opacity:1}
         </div>
       </div>
     </div>
+    <div class="table-card" style="max-width:560px;margin-top:16px">
+      <div class="table-card-header">
+        <i class="ti ti-database-export"></i><span>Backup &amp; Restore</span>
+      </div>
+      <div style="padding:16px">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Automatic snapshots are kept in the cloud so you can roll back if anything goes wrong. You can also download a full copy (including quotes) to keep off-site.</p>
+        <div id="backup-auto-status" style="font-size:12.5px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:7px;color:var(--text2)"><span class="sync-dot live" style="width:8px;height:8px"></span> Automatic backups on</div>
+        <div id="backup-list" style="border:1px solid var(--border);border-radius:9px;max-height:200px;overflow:auto;margin-bottom:14px"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn" onclick="backupNow()"><i class="ti ti-camera"></i> Back up now</button>
+          <button class="btn green" onclick="downloadBackup()"><i class="ti ti-download"></i> Download full copy</button>
+          <button class="btn" onclick="document.getElementById('restore-file').click()"><i class="ti ti-upload"></i> Restore from file…</button>
+          <input type="file" id="restore-file" accept="application/json,.json" style="display:none" onchange="handleRestoreFile(this)">
+        </div>
+        <div id="backup-status" style="font-size:12px;margin-top:12px;min-height:16px"></div>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px;line-height:1.5"><i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Restoring replaces current cloud data on every device. The newest auto-snapshot is kept fresh while the app is open; download a full copy now and then for true off-site safety.</p>
+      </div>
+    </div>
   </div><!-- /settings-page -->
   </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app-root -->
+
+<!-- Restore-from-backup confirmation -->
+<div class="modal-bg" id="restore-modal" style="display:none;align-items:center;justify-content:center;z-index:120">
+  <div class="modal" style="max-width:440px;padding:22px">
+    <div style="font-size:17px;font-weight:800;margin-bottom:6px;color:var(--red)"><i class="ti ti-alert-triangle"></i> Restore from backup</div>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:10px">This <b>replaces all current cloud data</b> with the backup below — on every device. Anything added since that backup will be lost.</p>
+    <div id="restore-summary" style="font-size:13px;background:#f4f6fa;border-radius:8px;padding:10px 12px;margin-bottom:14px"></div>
+    <label style="font-size:12px;font-weight:600;color:var(--text2)">Type RESTORE to confirm</label>
+    <input id="restore-confirm-input" type="text" placeholder="RESTORE" autocomplete="off" style="width:100%;box-sizing:border-box;margin-top:5px;font-size:15px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;text-transform:uppercase">
+    <div id="restore-err" style="color:var(--red);font-size:12px;margin-top:6px;min-height:14px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn" onclick="window.closeModal('restore-modal')">Cancel</button>
+      <button class="btn" style="background:var(--red);color:#fff;border:none" onclick="confirmRestore()">Restore &amp; overwrite</button>
+    </div>
+  </div>
+</div>
 
 <!-- Mark-complete confirmation -->
 <div class="modal-bg" id="confirm-done-modal" style="display:none;z-index:70">
@@ -1268,6 +1309,10 @@ tr:hover .del-btn{opacity:1}
 <div class="modal-bg" id="confirm-modal" style="display:none">
   <div class="modal" style="max-width:640px;padding:0;overflow:hidden">
     <div id="confirm-ticket" style="max-height:74vh;overflow:auto"></div>
+    <div style="padding:10px 16px;border-top:1px solid var(--border)">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.3px;text-transform:uppercase">Notes printed on the confirmation</label>
+      <textarea id="confirm-notes-input" rows="2" oninput="window._confirmNotesInput()" placeholder="e.g. Pricing valid 30 days. Material certs included. Partial shipments accepted." style="width:100%;box-sizing:border-box;margin-top:5px;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);background:var(--card)">
       <button class="btn" onclick="closeModal('confirm-modal')">Close</button>
       <button class="btn green" onclick="window.printConfirmation()"><i class="ti ti-printer"></i> Print / Save PDF</button>
@@ -1437,7 +1482,7 @@ tr:hover .del-btn{opacity:1}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, onValue, set, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getDatabase, ref, onValue, set, remove, get } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -2447,6 +2492,8 @@ window._showConfirmation=(id)=>{
   const r=orders.find(o=>o.id===id); if(!r) return;
   _confirmMeta={po:(r.po||'').trim(), customer:(r.customer||'').trim()};
   const items=orders.filter(o=>o.customer===r.customer && (o.po||'')===(r.po||''));
+  _confirmItems=items;
+  const _cnotes=items.find(i=>i.confirmNotes)?.confirmNotes || '';
   // dates
   const orderedDates=items.map(i=>i.ordered).filter(Boolean).sort();
   const dueDates=items.map(i=>i.due).filter(Boolean).sort();
@@ -2514,12 +2561,29 @@ window._showConfirmation=(id)=>{
 
     <div style="margin-top:8px;font-size:11px;color:#555">Lead time / completion based on due date above. This document confirms receipt of your order and is not an invoice.</div>
 
+    <div id="confirm-notes-block" style="margin-top:20px;${_cnotes?'':'display:none'}">
+      <div style="font-size:11px;font-weight:700;color:#222;letter-spacing:.3px;margin-bottom:4px">NOTES</div>
+      <div id="confirm-notes-text" style="font-size:12px;color:#333;white-space:pre-wrap;line-height:1.5"></div>
+    </div>
+
     <div style="display:flex;gap:40px;margin-top:60px">
       <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Received By</div>
       <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Date</div>
     </div>
   </div>`;
+  const _ct=document.getElementById('confirm-notes-text'); if(_ct) _ct.textContent=_cnotes;
+  const _ci=document.getElementById('confirm-notes-input'); if(_ci) _ci.value=_cnotes;
   openModalById('confirm-modal');
+};
+let _confirmItems=[];
+window._confirmNotesInput=()=>{
+  const val=(document.getElementById('confirm-notes-input').value||'');
+  const txt=document.getElementById('confirm-notes-text');
+  const block=document.getElementById('confirm-notes-block');
+  if(txt) txt.textContent=val;
+  if(block) block.style.display = val.trim() ? '' : 'none';
+  (_confirmItems||[]).forEach(i=>{ i.confirmNotes=val; });
+  saveDB();
 };
 function openModalById(mid){ const el=document.getElementById(mid); if(el) el.style.display='flex'; }
 window.printConfirmation=()=>{
@@ -3101,7 +3165,7 @@ window.showPage = (page) => {
   if(page==='cutlist') clInit();
   if(page==='archive') renderArchive();
   if(page==='trash') renderTrash();
-  if(page==='settings') renderDurationSettings();
+  if(page==='settings'){ renderDurationSettings(); if(typeof maybeAutoBackup==='function') maybeAutoBackup(); }
 };
 
 // ── Work Queues (per internal process, priority-ordered) ─────────────────────
@@ -3337,36 +3401,79 @@ function dispatchItems(){
   });
   return items;
 }
+// Build the full Today item set (production steps + Anahi's office tasks).
+function dispatchAllItems(){
+  const items=dispatchItems();
+  const _office=team.find(p=>(p.name||'').trim().toLowerCase()===OFFICE_ASSIGNEE.toLowerCase());
+  const officeItems=_office
+    ? orders.filter(r=>!r.archived && OFFICE_STATUSES.includes(r.status))
+            .map(r=>({office:true, action:(r.status==='Need Purchase Order'?'po':'invoice'), r, assignee:_office.id, health:{state:'soon',mustStart:null,slackDays:0}}))
+    : [];
+  return items.concat(officeItems);
+}
+function dispGroupKey(it){ return it.office ? it.assignee : (it.step.assignee && personById(it.step.assignee) ? it.step.assignee : '__none__'); }
+const _dispPrio=r=>(r.priority==null?2:r.priority);
+const _dispDue=r=>r.due?new Date(r.due+'T00:00:00').getTime():8.64e15;
+const _dispMs=it=>it.health.mustStart?it.health.mustStart.getTime():8.64e15;
+function dispCmp(a,b){ return (HEALTH_RANK[a.health.state]-HEALTH_RANK[b.health.state])||(_dispMs(a)-_dispMs(b))||(_dispPrio(a.r)-_dispPrio(b.r))||(_dispDue(a.r)-_dispDue(b.r)); }
+// Manual "today only" order. daySeq is honored only when stamped with today's date,
+// so each day starts in urgency order until someone arranges it.
+function _todayStr(){ return new Date().toISOString().slice(0,10); }
+function daySeqOf(r){ return (r.daySeqDate===_todayStr() && typeof r.daySeq==='number') ? r.daySeq : null; }
+function dispDayCmp(a,b){
+  const da=daySeqOf(a.r), db=daySeqOf(b.r);
+  if(da!=null && db!=null) return da-db;
+  if(da!=null) return -1;
+  if(db!=null) return 1;
+  return dispCmp(a,b);
+}
+function dispGroupsSorted(){
+  const groups=new Map();
+  dispatchAllItems().forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
+  groups.forEach(arr=>arr.sort(dispDayCmp));
+  return groups;
+}
+// Move a task up/down within its person's list and lock in today's manual order.
+window._dispMove = (id, dir, e) => {
+  if(e) e.stopPropagation();
+  const groups=dispGroupsSorted();
+  for(const arr of groups.values()){
+    const idx=arr.findIndex(it=>String(it.r.id)===String(id));
+    if(idx<0) continue;
+    const j= dir<0 ? idx-1 : idx+1;
+    if(j<0 || j>=arr.length) return;
+    const tmp=arr[idx]; arr[idx]=arr[j]; arr[j]=tmp;
+    const ds=_todayStr();
+    arr.forEach((it,i)=>{ it.r.daySeq=i+1; it.r.daySeqDate=ds; });   // renumber whole list for today
+    saveDB(); renderDispatch();
+    return;
+  }
+};
 function renderDispatch(){
   const sumEl=document.getElementById('dispatch-summary');
   const body=document.getElementById('dispatch-body');
   if(!body) return;
-  const items=dispatchItems();
-  const prio=r=>(r.priority==null?2:r.priority);
-  const dueVal=r=>r.due?new Date(r.due+'T00:00:00').getTime():8.64e15;
-  const msVal=it=>it.health.mustStart?it.health.mustStart.getTime():8.64e15;
-  const cmp=(a,b)=>(HEALTH_RANK[a.health.state]-HEALTH_RANK[b.health.state])||(msVal(a)-msVal(b))||(prio(a.r)-prio(b.r))||(dueVal(a.r)-dueVal(b.r));
-
-  const behindN=items.filter(i=>i.health.state==='behind').length;
-  const todayN=items.filter(i=>i.health.state==='today').length;
+  const allItems=dispatchAllItems();
+  const behindN=allItems.filter(i=>i.health.state==='behind').length;
+  const todayN=allItems.filter(i=>i.health.state==='today').length;
   const dateStr=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   if(sumEl) sumEl.innerHTML=`<div class="disp-summary">
     <div class="disp-date"><i class="ti ti-sun"></i> ${dateStr}</div>
     <div class="disp-counts">
-      <span class="disp-stat"><b>${items.length}</b> task${items.length!==1?'s':''} ready</span>
+      <span class="disp-stat"><b>${allItems.length}</b> task${allItems.length!==1?'s':''} ready</span>
       ${behindN?`<span class="disp-stat bad"><i class="ti ti-alert-triangle-filled"></i> <b>${behindN}</b> behind</span>`:''}
       ${todayN?`<span class="disp-stat warn"><i class="ti ti-clock-exclamation"></i> <b>${todayN}</b> start today</span>`:''}
     </div></div>`;
 
-  if(!items.length){
+  if(!allItems.length){
     body.innerHTML=`<div class="disp-empty"><i class="ti ti-coffee"></i><div>Nothing ready to dispatch right now</div><span>Every active job is either waiting on an upstream step or already moving. Check back as steps get completed.</span></div>`;
     renderDailyBrief(); renderTeamLoad();
     return;
   }
 
   const groups=new Map();
-  items.forEach(it=>{ const k=it.step.assignee && personById(it.step.assignee) ? it.step.assignee : '__none__'; if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
-  groups.forEach(arr=>arr.sort(cmp));
+  allItems.forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
+  groups.forEach(arr=>arr.sort(dispDayCmp));
   const worst=k=>Math.min(...groups.get(k).map(i=>HEALTH_RANK[i.health.state]));
   let keys=[...groups.keys()].sort((a,b)=>{
     if(a==='__none__') return 1; if(b==='__none__') return -1;
@@ -3379,11 +3486,19 @@ function renderDispatch(){
     const head = none
       ? `<div class="disp-phead none"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${arr.length} ready step${arr.length!==1?'s':''} with no owner — assign someone</div></div></div>`
       : `<div class="disp-phead"><span class="pc-dot lg" style="background:${person?.color||'#888'}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div></div>`;
-    return `<div class="disp-group${none?' none':''}">${head}<div class="disp-rows">${arr.map(dispatchRow).join('')}</div></div>`;
+    return `<div class="disp-group${none?' none':''}">${head}<div class="disp-rows">${arr.map((it,i)=>dispatchRow(it,i,arr.length)).join('')}</div></div>`;
   }).join('');
   renderDailyBrief(); renderTeamLoad();
 }
-function dispatchRow(it){
+function dispSeqBadge(idx){ return `<span class="disp-seq">${idx+1}</span>`; }
+function dispMoveCtl(r, idx, total){
+  return `<span class="disp-move">
+    <button class="dm-btn" ${idx===0?'disabled':''} title="Move up" onclick="window._dispMove('${r.id}',-1,event)"><i class="ti ti-chevron-up"></i></button>
+    <button class="dm-btn" ${idx===total-1?'disabled':''} title="Move down" onclick="window._dispMove('${r.id}',1,event)"><i class="ti ti-chevron-down"></i></button>
+  </span>`;
+}
+function dispatchRow(it, idx, total){
+  if(it.office) return officeDispatchRow(it, idx, total);
   const {r, step, health, ext}=it;
   const col=PROCESS_COLORS[step.name]||'#888';
   const due=r.due?fmtDate(r.due):'—';
@@ -3396,6 +3511,7 @@ function dispatchRow(it){
   const assignCtl = (op || !team.length) ? '' : `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>`;
   const openBtn = op ? '' : `<button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
   return `<div class="disp-row">
+    ${dispSeqBadge(idx)}
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
     <div class="disp-job"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</div>
@@ -3404,6 +3520,29 @@ function dispatchRow(it){
     ${qtyCtl}
     ${assignCtl}
     ${openBtn}
+    ${dispMoveCtl(r, idx, total)}
+  </div>`;
+}
+function officeDispatchRow(it, idx, total){
+  const {r, action}=it;
+  const isPO = action==='po';
+  const col = isPO ? (PROCESS_COLORS['Purchasing']||'#6b7a3a') : '#2d6010';
+  const icon = isPO ? procIcon('Purchasing',18) : '<i class="ti ti-file-invoice" style="font-size:18px"></i>';
+  const label = isPO ? 'Get PO' : 'Invoice';
+  const due = r.due?fmtDate(r.due):'—';
+  const dueOver = r.due && new Date(r.due+'T00:00:00') < new Date(new Date().toDateString());
+  const op = userRole==='operator';
+  const openBtn = op ? '' : `<button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
+  const statusChip = `<span class="status-badge ${STATUS_CLASS[r.status]||''}" style="font-size:10px">${esc2(r.status)}</span>`;
+  return `<div class="disp-row">
+    ${dispSeqBadge(idx)}
+    <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
+    <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
+    <div class="disp-job"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</div>
+    ${statusChip}
+    <span class="disp-dates"><span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
+    ${openBtn}
+    ${dispMoveCtl(r, idx, total)}
   </div>`;
 }
 
@@ -3720,6 +3859,172 @@ window.saveDurations = () => {
   set(durationsRef, out);
   alert('Lead times saved.');
 };
+
+// ── Backup & Restore ─────────────────────────────────────────────────────────
+const BACKUP_NODES = ['orders','trash','team','customers','durations','jobCounter','quotes','quoteArchive','config'];
+let _pendingRestore = null;
+window.downloadBackup = async () => {
+  const statusEl = document.getElementById('backup-status');
+  if(statusEl){ statusEl.style.color='var(--text2)'; statusEl.textContent='Preparing backup…'; }
+  try{
+    const data = {};
+    for(const n of BACKUP_NODES){
+      try{ const snap = await get(ref(db, n)); data[n] = snap.exists() ? snap.val() : null; }
+      catch(e){ data[n] = null; }   // a denied/missing node just backs up as empty
+    }
+    const counts = {
+      orders: Object.keys(data.orders||{}).length,
+      quotes: Object.keys(data.quotes||{}).length,
+      team:   Object.keys(data.team||{}).length
+    };
+    const backup = { _meta:{ app:'BSMP Order Tracker', version:1, createdAt:new Date().toISOString(), counts }, data };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+    const ts = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `bsmp-backup-${ts}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+    if(statusEl){ statusEl.style.color='var(--green)'; statusEl.innerHTML=`<i class="ti ti-check"></i> Backup downloaded — ${counts.orders} orders, ${counts.quotes} quotes, ${counts.team} team members.`; }
+  }catch(e){
+    if(statusEl){ statusEl.style.color='var(--red)'; statusEl.textContent='Backup failed: '+(e.message||e); }
+  }
+};
+window.handleRestoreFile = (input) => {
+  const file = input.files && input.files[0]; input.value='';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let backup;
+    try{ backup = JSON.parse(reader.result); }
+    catch(e){ alert('That file isn’t valid JSON — it may be corrupted or not a backup.'); return; }
+    const data = (backup && backup.data) ? backup.data : backup;   // accept wrapped or raw
+    if(!data || typeof data!=='object' || Array.isArray(data)){ alert('That file doesn’t look like a BSMP backup.'); return; }
+    _pendingRestore = data;
+    const oc=Object.keys(data.orders||{}).length, qc=Object.keys(data.quotes||{}).length, tc=Object.keys(data.team||{}).length;
+    const when = (backup._meta && backup._meta.createdAt) ? new Date(backup._meta.createdAt).toLocaleString() : 'unknown date';
+    document.getElementById('restore-summary').innerHTML = `Backup from <b>${esc2(when)}</b><br>${oc} orders · ${qc} quotes · ${tc} team members`;
+    document.getElementById('restore-confirm-input').value='';
+    document.getElementById('restore-err').textContent='';
+    document.getElementById('restore-modal').style.display='flex';
+  };
+  reader.readAsText(file);
+};
+window.confirmRestore = async () => {
+  const errEl = document.getElementById('restore-err');
+  if((document.getElementById('restore-confirm-input').value||'').trim().toUpperCase()!=='RESTORE'){ errEl.textContent='Type RESTORE to confirm.'; return; }
+  if(!_pendingRestore){ errEl.textContent='No backup loaded.'; return; }
+  window.closeModal('restore-modal');
+  const statusEl = document.getElementById('backup-status');
+  if(statusEl){ statusEl.style.color='var(--text2)'; statusEl.textContent='Restoring…'; }
+  try{
+    for(const n of BACKUP_NODES){
+      if(n in _pendingRestore){ const v=_pendingRestore[n]; await set(ref(db,n), v===undefined?null:v); }
+    }
+    _pendingRestore = null;
+    if(statusEl){ statusEl.style.color='var(--green)'; statusEl.innerHTML='<i class="ti ti-check"></i> Restore complete — data reloaded across all devices.'; }
+  }catch(e){
+    if(statusEl){ statusEl.style.color='var(--red)'; statusEl.textContent='Restore failed: '+(e.message||e)+'. Data may be partially changed — restore again or check your connection.'; }
+  }
+};
+
+// ── Automatic rolling snapshots (kept in Firebase) ───────────────────────────
+const AUTO_BACKUP_NODES = ['orders','trash','team','customers','durations','jobCounter'];
+const AUTO_BACKUP_INTERVAL_MS = 20*60*60*1000;   // ~daily (only one per ~20h)
+const AUTO_BACKUP_KEEP = 14;
+let _autoBackupBusy=false, _autoBackupTimer=null, _backupRulesOk=true;
+
+function scheduleAutoBackups(){
+  clearInterval(_autoBackupTimer);
+  setTimeout(()=>maybeAutoBackup(), 8000);                       // shortly after load
+  _autoBackupTimer=setInterval(()=>maybeAutoBackup(), 3*60*60*1000);  // re-check every 3h while open
+}
+async function maybeAutoBackup(){
+  if(_autoBackupBusy || userRole!=='manager') return;
+  try{
+    const idxSnap=await get(ref(db,'backupIndex'));
+    const idx=idxSnap.exists()?idxSnap.val():{};
+    let latest=0; Object.values(idx).forEach(e=>{ const t=Date.parse(e.createdAt||0); if(t>latest) latest=t; });
+    if(Date.now()-latest >= AUTO_BACKUP_INTERVAL_MS){ await createSnapshot(true); }
+    else { refreshBackupUI(idx); }
+  }catch(e){ _backupRulesOk=false; refreshBackupUI(null); console.warn('auto-backup check failed', e); }
+}
+async function createSnapshot(auto){
+  if(_autoBackupBusy) return;
+  _autoBackupBusy=true;
+  const statusEl=document.getElementById('backup-status');
+  try{
+    const data={};
+    for(const n of AUTO_BACKUP_NODES){ try{ const s=await get(ref(db,n)); data[n]=s.exists()?s.val():null; }catch{ data[n]=null; } }
+    const id=String(Date.now());
+    const createdAt=new Date().toISOString();
+    const counts={ orders:Object.keys(data.orders||{}).length, team:Object.keys(data.team||{}).length };
+    await set(ref(db,'backups/'+id), { createdAt, counts, auto:!!auto, data });
+    await set(ref(db,'backupIndex/'+id), { createdAt, counts, auto:!!auto });
+    _backupRulesOk=true;
+    await pruneSnapshots();
+    const idxSnap=await get(ref(db,'backupIndex'));
+    refreshBackupUI(idxSnap.exists()?idxSnap.val():{});
+    if(!auto && statusEl){ statusEl.style.color='var(--green)'; statusEl.innerHTML='<i class="ti ti-check"></i> Snapshot saved.'; }
+  }catch(e){
+    _backupRulesOk=false; refreshBackupUI(null);
+    if(!auto && statusEl){ statusEl.style.color='var(--red)'; statusEl.textContent='Couldn’t save snapshot: '+(e.message||e); }
+    console.warn('snapshot failed', e);
+  }finally{ _autoBackupBusy=false; }
+}
+async function pruneSnapshots(){
+  try{
+    const idxSnap=await get(ref(db,'backupIndex')); if(!idxSnap.exists()) return;
+    const idx=idxSnap.val();
+    const ids=Object.keys(idx).sort((a,b)=>Date.parse(idx[b].createdAt||0)-Date.parse(idx[a].createdAt||0));
+    for(const id of ids.slice(AUTO_BACKUP_KEEP)){ try{ await remove(ref(db,'backups/'+id)); await remove(ref(db,'backupIndex/'+id)); }catch{} }
+  }catch{}
+}
+window.backupNow = () => createSnapshot(false);
+window._restoreSnapshot = async (id) => {
+  const statusEl=document.getElementById('backup-status');
+  try{
+    const snap=await get(ref(db,'backups/'+id));
+    if(!snap.exists()){ if(statusEl){statusEl.style.color='var(--red)';statusEl.textContent='That snapshot is no longer available.';} return; }
+    const b=snap.val();
+    _pendingRestore=b.data||{};
+    const oc=(b.counts&&b.counts.orders)||Object.keys((b.data||{}).orders||{}).length;
+    const tc=(b.counts&&b.counts.team)||Object.keys((b.data||{}).team||{}).length;
+    const when=b.createdAt?new Date(b.createdAt).toLocaleString():'unknown date';
+    document.getElementById('restore-summary').innerHTML=`Snapshot from <b>${esc2(when)}</b><br>${oc} orders · ${tc} team members<br><span style="color:var(--text3);font-size:11px">(quotes are restored only from a downloaded full copy)</span>`;
+    document.getElementById('restore-confirm-input').value='';
+    document.getElementById('restore-err').textContent='';
+    document.getElementById('restore-modal').style.display='flex';
+  }catch(e){ if(statusEl){statusEl.style.color='var(--red)';statusEl.textContent='Couldn’t load snapshot: '+(e.message||e);} }
+};
+function timeAgo(iso){
+  const d=Date.now()-Date.parse(iso); if(isNaN(d)) return '';
+  const m=Math.round(d/60000); if(m<1) return 'just now'; if(m<60) return m+'m ago';
+  const h=Math.round(m/60); if(h<24) return h+'h ago';
+  return Math.round(h/24)+'d ago';
+}
+function refreshBackupUI(idx){
+  const statusEl=document.getElementById('backup-auto-status');
+  const listEl=document.getElementById('backup-list');
+  if(!statusEl||!listEl) return;
+  if(!_backupRulesOk){
+    statusEl.innerHTML='<span class="sync-dot" style="width:8px;height:8px;background:var(--amber)"></span> Automatic backups need a rules update';
+    listEl.innerHTML='<div style="padding:14px;font-size:12px;color:var(--text2)">Add <code>backups</code> and <code>backupIndex</code> to your Realtime Database rules (both <code>".read"/".write": "auth != null"</code>), then reopen this page.</div>';
+    return;
+  }
+  const entries = idx ? Object.keys(idx).map(id=>({id, ...idx[id]})).sort((a,b)=>Date.parse(b.createdAt||0)-Date.parse(a.createdAt||0)) : [];
+  const last = entries[0];
+  statusEl.innerHTML = `<span class="sync-dot live" style="width:8px;height:8px"></span> Automatic backups on${last?` · last ${timeAgo(last.createdAt)}`:''}`;
+  if(!entries.length){ listEl.innerHTML='<div style="padding:14px;font-size:12px;color:var(--text3)">No snapshots yet — one will be taken automatically.</div>'; return; }
+  listEl.innerHTML = entries.map(e=>{
+    const when=e.createdAt?new Date(e.createdAt).toLocaleString():'—';
+    const oc=(e.counts&&e.counts.orders)||0;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border)">
+      <i class="ti ti-${e.auto?'clock':'camera'}" style="color:var(--text3);font-size:15px"></i>
+      <div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600">${esc2(when)}</div><div style="font-size:11px;color:var(--text3)">${oc} orders · ${e.auto?'auto':'manual'}</div></div>
+      <button class="btn sm" style="font-size:11px;padding:4px 9px" onclick="window._restoreSnapshot('${e.id}')">Restore</button>
+    </div>`;
+  }).join('');
+}
 
 // ── Scheduling engine ─────────────────────────────────────────────────────────
 // order.schedule = { steps: [{name, enabled, duration, start(optional manual anchor)}] }
@@ -5029,6 +5334,7 @@ onAuthStateChanged(auth, (user) => {
     appRoot.style.display = 'flex';
     startDataListeners();
     applyRoleUI();
+    if(userRole==='manager') scheduleAutoBackups();
   } else {
     userRole = 'manager';
     document.body.classList.remove('role-operator');
