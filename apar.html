@@ -179,7 +179,9 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .acct-num .v.neg{color:var(--red)}
 .acct-num input{border:none;background:transparent;font-size:14px;font-weight:800;width:100%;padding:0;margin-top:2px;font-family:inherit;color:var(--text)}
 .acct-num input:focus{outline:none}
-.bal-hint{font-size:8px;font-weight:700;color:var(--navy);background:#2c57401a;border-radius:4px;padding:1px 4px;margin-left:4px;letter-spacing:.02em}
+.bal-hint{font-size:8.5px;font-weight:700;color:var(--navy);background:#2c57401a;border-radius:4px;padding:1px 5px;margin-left:4px;letter-spacing:.01em}
+.bal-preview{font-size:11px;font-weight:800;color:var(--green);white-space:nowrap;flex-shrink:0;margin-left:2px}
+.bal-preview.bad{color:var(--text3)}
 .bal-fresh{display:flex;align-items:center;gap:4px;font-size:10.5px;font-weight:600;color:var(--text3);margin-top:5px}
 .bal-fresh i{font-size:12px}
 .bal-fresh.stale{color:#8a4a00}
@@ -1564,8 +1566,8 @@ function renderCash(entries){
         <input class="acct-name" value="${esc(a.name)}" onchange="renameAccount('${id}',this.value)">
         <span class="acct-del" onclick="deleteAccount('${id}','${esc(a.name)}')" title="Delete account"><i class="ti ti-trash"></i></span>
       </div>
-      <div class="acct-num bal-row"><div class="l">Balance <span class="bal-hint">you enter</span></div>
-        <div class="bal-edit"><span class="bal-cur">$</span><input type="number" step="0.01" value="${bal}" onchange="setAccountBalance('${id}',this.value)"><i class="ti ti-pencil bal-pen"></i></div>
+      <div class="acct-num bal-row"><div class="l">Balance <span class="bal-hint">type a number or math, e.g. 5000-1200</span></div>
+        <div class="bal-edit"><span class="bal-cur">$</span><input type="text" inputmode="decimal" value="${bal}" data-acct="${id}" oninput="balPreview(this)" onkeydown="if(event.key==='Enter')this.blur()" onblur="setAccountBalance('${id}',this.value);this.nextElementSibling.nextElementSibling.textContent='';" onfocus="this.select()"><i class="ti ti-pencil bal-pen"></i><span class="bal-preview"></span></div>
       </div>
       ${(()=>{const f=balanceFreshness(a);return `<div class="bal-fresh${f.stale?' stale':''}"><i class="ti ti-${f.stale?'alert-triangle':'clock'}"></i> ${f.label}</div>`;})()}
       <div class="acct-num"><div class="l">Scheduled out</div><div class="v">${fmtMoney(sched)}</div></div>
@@ -1654,8 +1656,66 @@ window.renameAccount=(id,name)=>{
   if(!name||!name.trim()){render();return;}
   dbUpdate('apar/accounts/'+id,{name:name.trim()});
 };
+// Safely evaluate a simple arithmetic expression typed into a balance box.
+// Accepts only digits, . , + - * / ( ) and spaces — never code. Returns a Number or null.
+function evalMath(raw){
+  if(raw==null) return null;
+  let s=String(raw).trim();
+  if(s==='') return null;
+  s=s.replace(/[$,]/g,'').replace(/\s+/g,''); // strip $, thousands commas, spaces
+  // plain number fast-path
+  if(/^-?\d*\.?\d+$/.test(s)) return Number(s);
+  // only allow arithmetic characters
+  if(!/^[-+*/().\d]+$/.test(s)) return null;
+  // tokenize -> shunting-yard -> evaluate (no eval, no Function)
+  const toks=s.match(/(\d*\.?\d+)|[-+*/()]/g);
+  if(!toks||toks.join('')!==s) return null;
+  const prec={'+':1,'-':1,'*':2,'/':2};
+  const out=[],ops=[];
+  let prev=null;
+  for(const tk of toks){
+    if(/^\d*\.?\d+$/.test(tk)){ out.push(Number(tk)); prev='num'; }
+    else if(tk==='('){ ops.push(tk); prev='('; }
+    else if(tk===')'){
+      while(ops.length&&ops[ops.length-1]!=='(') out.push(ops.pop());
+      if(!ops.length) return null; ops.pop(); prev=')';
+    } else { // operator
+      // allow a single leading unary minus only (e.g. "-50"); reject mid-expression unary
+      // to avoid ambiguous/wrong results in a balance box.
+      if((tk==='-'||tk==='+')&&prev===null){ out.push(0); }
+      else if((tk==='-'||tk==='+')&&(prev==='op'||prev==='(')){ return null; }
+      while(ops.length&&prec[ops[ops.length-1]]>=prec[tk]) out.push(ops.pop());
+      ops.push(tk); prev='op';
+    }
+  }
+  while(ops.length){ const o=ops.pop(); if(o==='(') return null; out.push(o); }
+  // evaluate RPN
+  const st=[];
+  for(const t of out){
+    if(typeof t==='number'){ st.push(t); }
+    else {
+      const b=st.pop(), a=st.pop(); if(a===undefined||b===undefined) return null;
+      st.push(t==='+'?a+b:t==='-'?a-b:t==='*'?a*b:(b===0?NaN:a/b));
+    }
+  }
+  if(st.length!==1) return null;
+  const r=st[0];
+  return (typeof r==='number'&&isFinite(r))?r:null;
+}
+window.balPreview=(inp)=>{
+  const prev=inp.parentElement.querySelector('.bal-preview'); if(!prev)return;
+  const v=inp.value;
+  // only show the "= result" hint when they're actually typing an expression
+  if(/[-+*/()]/.test(v.replace(/^\s*-/,''))){ // contains an operator (ignore a leading minus)
+    const n=evalMath(v);
+    prev.textContent=(n!==null)?('= '+fmtMoney(Math.round(n*100)/100)):'…';
+    prev.classList.toggle('bad', n===null);
+  } else { prev.textContent=''; prev.classList.remove('bad'); }
+};
 window.setAccountBalance=(id,val)=>{
-  dbUpdate('apar/accounts/'+id,{balance:Number(val)||0,balanceUpdatedAt:Date.now()});
+  const n=evalMath(val);
+  if(n===null) return; // unparseable -> leave the stored balance unchanged
+  dbUpdate('apar/accounts/'+id,{balance:Math.round(n*100)/100,balanceUpdatedAt:Date.now()});
 };
 window.deleteAccount=(id,name)=>{
   if(!confirm(`Delete account "${name}"? Bills assigned to it will move to Unassigned.`))return;
