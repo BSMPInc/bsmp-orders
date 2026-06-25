@@ -271,6 +271,19 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
   .arch-when2{display:none}
 }
 /* trash view */
+.bk-wrap{display:flex;flex-direction:column;gap:14px;max-width:720px}
+.bk-card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:18px}
+.bk-card.bk-restore{border-color:#BA751740;background:#BA75170a}
+.bk-h{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bk-h i{color:var(--navy)}
+.bk-restore .bk-h i{color:var(--amber)}
+.bk-p{font-size:13px;color:var(--text2);line-height:1.55;margin:0 0 12px}
+.bk-counts{font-size:12px;font-weight:700;color:var(--text2);background:#f5f7fa;border:1px solid var(--border2);border-radius:8px;padding:8px 11px;margin-bottom:12px;display:inline-block}
+.bk-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.bk-toggle{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer}
+.bk-toggle input{width:16px;height:16px;accent-color:var(--navy);cursor:pointer}
+.bk-last{font-size:12px;color:var(--text3)}
+.bk-note{font-size:11.5px;color:var(--text3);margin:4px 0 0;line-height:1.5}
 .cf-search-bar{margin-bottom:12px}
 .cf-search-bar .list-search{min-width:280px;max-width:380px}
 .trash-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
@@ -586,6 +599,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</div>
     <div class="nav-item" onclick="openImport()"><i class="ti ti-table-import"></i> Import (CSV/paste)</div>
     <div class="nav-item" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</div>
+    <div class="nav-item" onclick="go('backup')"><i class="ti ti-shield-check"></i> Backup &amp; Restore</div>
     <div class="side-foot">
       Bert's Sheet Metal Products
       <div class="so" onclick="doSignOut()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
@@ -938,7 +952,8 @@ function go(p){
     payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance'],
     activity:['Activity','Who changed what — payments, deletions, and status changes'],
     forecast:['Cash Forecast','Week-by-week projection of where your cash is heading'],
-    trash:['Trash','Deleted entries — restore them or delete permanently']}[p];
+    trash:['Trash','Deleted entries — restore them or delete permanently'],
+    backup:['Backup & Restore','Download a safety copy of all your data, or load one back in']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
   renderPageHelpButton(p);
   render();
@@ -995,7 +1010,11 @@ const PAGE_HELP={
   trash:{title:'Trash',body:`<p>Deleted entries land here instead of vanishing — so an accidental delete is easy to undo.</p>
     <ul><li><b>Restore</b> sends an entry back where it came from.</li>
     <li>Delete-forever (the red button) or <b>Empty trash</b> removes it permanently — that can't be undone.</li>
-    <li>Nothing leaves your database until you purge it here.</li></ul>`}
+    <li>Nothing leaves your database until you purge it here.</li></ul>`},
+  backup:{title:'Backup & Restore',body:`<p>Your safety net against data loss. Download a complete JSON copy of everything in this tool and keep it off Firebase (a cloud drive is ideal).</p>
+    <ul><li><b>Backup now</b> downloads a full snapshot on demand.</li>
+    <li>With <b>auto-backup</b> on, the app downloads a fresh copy once a day when first opened.</li>
+    <li><b>Restore</b> loads a backup file back in — it replaces current data, and snapshots the current state first so it can be undone.</li></ul>`}
 };
 function renderPageHelpButton(p){
   const btn=$('page-help-btn'); if(!btn)return;
@@ -1023,6 +1042,7 @@ function render(){
   else if(page==='activity') renderActivity();
   else if(page==='forecast') renderForecast();
   else if(page==='trash') renderTrash();
+  else if(page==='backup') renderBackup();
 }
 function updateBadges(entries){
   const oa=entries.filter(e=>e.type==='ar'&&statusOf(e)==='over').length;
@@ -2237,6 +2257,39 @@ window.cashSearch=(v)=>{ cashQ=v; filterRows('.acct-bill',v);
 window.trashSearch=(v)=>{ trashQ=v; const items=document.querySelectorAll('.trash-row'); const q=v.trim().toLowerCase();
   items.forEach(el=>{ const hay=el.getAttribute('data-search')||''; el.style.display=(!q||hay.includes(q))?'':'none'; });
 };
+function renderBackup(){
+  let last=''; try{ last=localStorage.getItem('apar_last_backup')||''; }catch(e){}
+  const auto=autoBackupEnabled();
+  const c={ entries:Object.keys(overlay||{}).length, accounts:Object.keys(accounts||{}).length,
+    recurring:Object.keys(recurring||{}).length, audit:Object.keys(auditLog||{}).length };
+  const lastTxt=last?`Last backup: <b>${last===toISO(new Date())?'today':fmtDate(last)}</b>`:'No backup downloaded yet';
+  $('content').innerHTML=`
+    <div class="bk-wrap">
+      <div class="bk-card">
+        <div class="bk-h"><i class="ti ti-download"></i> Download a backup</div>
+        <p class="bk-p">Saves a single JSON file with <b>everything</b> in this tool — invoices, accounts, recurring bills, vendor settings, and the full activity log. Keep it somewhere safe like a cloud drive. Because it lives off Firebase, it protects you against any database problem.</p>
+        <div class="bk-counts">${c.entries} entries · ${c.accounts} accounts · ${c.recurring} recurring · ${c.audit} activity records</div>
+        <button class="btn primary" onclick="backupNow()"><i class="ti ti-download"></i> Backup now</button>
+      </div>
+
+      <div class="bk-card">
+        <div class="bk-h"><i class="ti ti-clock"></i> Automatic daily backup</div>
+        <p class="bk-p">When auto-backup is on, the app downloads a fresh snapshot once a day the first time someone opens it — so you always have a recent copy without thinking about it.</p>
+        <div class="bk-row">
+          <label class="bk-toggle"><input type="checkbox" ${auto?'checked':''} onchange="toggleAutoBackup()"> Auto-download a daily backup</label>
+          <span class="bk-last">${lastTxt}</span>
+        </div>
+        <p class="bk-note">Your browser may ask permission to download multiple files the first time, or save them to your Downloads folder automatically — that's expected.</p>
+      </div>
+
+      <div class="bk-card bk-restore">
+        <div class="bk-h"><i class="ti ti-upload"></i> Restore from a backup</div>
+        <p class="bk-p">Load a backup file back into Firebase. This <b>replaces</b> the current AP/AR data with the backup's contents. As a safety net, the app downloads a snapshot of your current data first, so a restore can itself be undone.</p>
+        <input type="file" id="bk-file" accept="application/json,.json" style="display:none" onchange="restoreBackup(this.files[0])">
+        <button class="btn" onclick="document.getElementById('bk-file').click()"><i class="ti ti-upload"></i> Choose a backup file to restore…</button>
+      </div>
+    </div>`;
+}
 function renderTrash(){
   const items=trashedEntries().sort((a,b)=>(b.trashedAt||0)-(a.trashedAt||0));
   const acctName=e=>e.account&&accounts[e.account]?accounts[e.account].name:'—';
@@ -2666,6 +2719,84 @@ window.saveManual=(type)=>{
 };
 
 // ── Export ───────────────────────────────────────────────────────────────────
+// ── Backup & restore ─────────────────────────────────────────────────────────
+// Captures every apar/* node into one JSON file you keep off Firebase.
+const BACKUP_NODES=['entries','accounts','recurring','depositBuckets','vendorAccounts','vendorPriority','customerDelay','vendorAliases','vendorAliasNames','audit','userNames'];
+function buildBackup(){
+  return {
+    _meta:{ app:'bsmp-apar', version:'1', exportedAt:new Date().toISOString(),
+      counts:{ entries:Object.keys(overlay||{}).length, accounts:Object.keys(accounts||{}).length,
+        recurring:Object.keys(recurring||{}).length, audit:Object.keys(auditLog||{}).length } },
+    data:{
+      entries:overlay||{}, accounts:accounts||{}, recurring:recurring||{},
+      depositBuckets:depositBuckets||{}, vendorAccounts:vendorAccounts||{},
+      vendorPriority:vendorPriority||{}, customerDelay:customerDelay||{},
+      vendorAliases:vendorAliases||{}, vendorAliasNames:vendorAliasNames||{},
+      audit:auditLog||{}, userNames:userNames||{}
+    }
+  };
+}
+function downloadBackup(reason){
+  const b=buildBackup();
+  const blob=new Blob([JSON.stringify(b,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='bsmp-apar-backup-'+toISO(new Date())+'.json';
+  a.click();
+  try{ localStorage.setItem('apar_last_backup', toISO(new Date())); }catch(e){}
+  return b._meta.counts;
+}
+window.backupNow=()=>{
+  const c=downloadBackup('manual');
+  // refresh the settings view if open so "last backup" updates
+  if(page==='settings')render();
+  alert(`Backup downloaded.\n\n${c.entries} entries · ${c.accounts} accounts · ${c.recurring} recurring · ${c.audit} activity records.\n\nKeep this file somewhere safe (cloud drive, etc.).`);
+};
+// Daily auto-backup: once per calendar day, when someone opens the app.
+function maybeAutoBackup(){
+  let last=''; try{ last=localStorage.getItem('apar_last_backup')||''; }catch(e){}
+  const today=toISO(new Date());
+  if(last===today) return; // already backed up today
+  // only back up if there's actually data (avoid dumping an empty file on a fresh/locked load)
+  if(!overlay || Object.keys(overlay).length===0) return;
+  if(autoBackupEnabled()){ downloadBackup('auto'); }
+}
+function autoBackupEnabled(){ try{ return localStorage.getItem('apar_autobackup')!=='off'; }catch(e){ return true; } }
+let _autoBackupChecked=false;
+function maybeAutoBackupOnce(){ if(_autoBackupChecked)return; _autoBackupChecked=true; setTimeout(maybeAutoBackup, 1500); }
+window.toggleAutoBackup=()=>{ try{ localStorage.setItem('apar_autobackup', autoBackupEnabled()?'off':'on'); }catch(e){} render(); };
+
+// Restore from a backup file — confirms loudly, and snapshots current state first.
+window.restoreBackup=(file)=>{
+  if(!file)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    let parsed;
+    try{ parsed=JSON.parse(String(r.result||'')); }
+    catch(e){ alert('That file isn\u2019t a valid backup (couldn\u2019t read the JSON).'); return; }
+    const d=parsed&&parsed.data?parsed.data:parsed; // tolerate a raw data object too
+    if(!d||typeof d!=='object'||(!d.entries&&!d.accounts)){ alert('That doesn\u2019t look like a BSMP AP/AR backup.'); return; }
+    const c={ entries:Object.keys(d.entries||{}).length, accounts:Object.keys(d.accounts||{}).length,
+      recurring:Object.keys(d.recurring||{}).length, audit:Object.keys(d.audit||{}).length };
+    const when=parsed&&parsed._meta&&parsed._meta.exportedAt?new Date(parsed._meta.exportedAt).toLocaleString():'unknown date';
+    if(!confirm(`Restore this backup?\n\nFrom: ${when}\nContains: ${c.entries} entries · ${c.accounts} accounts · ${c.recurring} recurring · ${c.audit} activity records.\n\nThis REPLACES the current AP/AR data in Firebase with the backup. A snapshot of your current data will be downloaded first so this can be undone.`)) return;
+    // safety: snapshot current state before overwriting
+    downloadBackup('pre-restore');
+    // write each node back
+    const writes=[];
+    BACKUP_NODES.forEach(node=>{
+      if(d[node]!==undefined){ writes.push(dbSet('apar/'+node, d[node], 'restore '+node)); }
+    });
+    Promise.allSettled(writes).then(()=>{
+      logAudit('add',{detail:`Restored from backup (${when}) — ${c.entries} entries, ${c.accounts} accounts`});
+      alert('Restore complete. Your data has been loaded back in.');
+      render();
+    });
+  };
+  r.onerror=()=>alert('Couldn\u2019t read that file.');
+  r.readAsText(file);
+};
+
 window.exportCSV=()=>{
   const rows=sortEntries(allEntries());
   const head=['Type','Party','Reference','Description','Amount','Paid','Balance','Issue','Due','Status','Source','Account','Last Payment Method','Last Payment Ref #'];
@@ -3019,7 +3150,7 @@ onAuthStateChanged(auth,(user)=>{
     $('login').style.display='none'; $('app').style.display='flex';
     watchConnection();
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
-    onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; autoArchiveOld(); render(); });
+    onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; autoArchiveOld(); render(); maybeAutoBackupOnce(); });
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
     onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
