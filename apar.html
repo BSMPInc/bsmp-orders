@@ -499,6 +499,19 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .li-tot{font-weight:700}
 .li-foot{border-top:1px solid var(--border);background:#fafbfd;font-weight:700}
 .li-foot span:first-child{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
+.combo-badge{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ap);background:#A8443A1a;border-radius:4px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+.combo-help{font-size:12px;color:var(--text2);line-height:1.5;margin:0 0 10px}
+.li-edit{border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.li-ehead{display:grid;grid-template-columns:1fr 110px;gap:8px;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);background:#f5f7fa;border-bottom:1px solid var(--border)}
+.li-ehead span:last-child{text-align:right}
+.li-erow{display:grid;grid-template-columns:1fr 110px;gap:8px;padding:6px 10px;align-items:center;border-top:1px solid var(--border2)}
+.li-erow:first-of-type{border-top:none}
+.li-ename{font-size:12.5px;font-weight:600;display:flex;flex-direction:column;gap:1px;min-width:0}
+.li-edesc{font-size:11px;font-weight:400;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li-eamt{width:100%;box-sizing:border-box;font-size:13px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;text-align:right}
+.li-etot{background:#fafbfd;font-weight:800;border-top:1px solid var(--border)}
+.li-etot span:first-child{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
+.li-etot span:last-child{text-align:right}
 .fld{margin:9px 0}
 .fld label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px}
 .fld input,.fld select,.fld textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:7px}
@@ -805,6 +818,7 @@ let vendorPriority = {};  // apar/vendorPriority node: {vendorKey:'critical'|'no
 let customerDelay = {};   // apar/customerDelay node: {customerKey:0|7|14|30} typical days late (forecast)
 let vendorAliases = {};   // apar/vendorAliases node: {variantKey: canonicalName} — fold duplicate vendor names into one
 let vendorAliasNames = {}; // apar/vendorAliasNames node: {variantKey: originalDisplayName} — for un-merge labels
+let apSplit = {};         // apar/apSplit node: {groupKey:true} -> keep this vendor+PO's steps as separate bills
 let auditLog = {};        // apar/audit node: {id:{ts,user,action,entryId,party,detail}}
 let currentUser = null;   // {email, name}
 
@@ -869,20 +883,65 @@ function deriveAR(){
   });
 }
 function deriveAP(){
-  const out=[];
+  // Gather every PO step across all orders.
+  const steps=[];
   Object.values(orders).filter(r=>r&&!r.archived).forEach(r=>{
-    const steps=(r.schedule&&r.schedule.steps)||[];
-    steps.forEach(s=>{
+    const ss=(r.schedule&&r.schedule.steps)||[];
+    ss.forEach(s=>{
       if(s&&s.vendorPO&&String(s.vendorPO).trim()){
         const proc=(s.name||'').replace(/^Outsource- |^Purchasing- /,'');
-        out.push({id:'ap_'+r.id+'_'+hash(s.name||''),type:'ap',
-          party:(s.vendor&&s.vendor.trim())||'(vendor)',
-          ref:'PO '+String(s.vendorPO).trim(),
-          rel:(r.part||r.desc||'')+(r.customer?(' · '+r.customer):''),
-          process:proc,detail:s.detail||'',
-          amount:null,issue:s.sentAt||'',auto:true});
+        steps.push({
+          orderId:r.id,
+          po:String(s.vendorPO).trim(),
+          vendor:(s.vendor&&s.vendor.trim())||'(vendor)',
+          proc, detail:s.detail||'',
+          part:(r.part||r.desc||''), customer:r.customer||'',
+          sentAt:s.sentAt||'',
+          stepName:s.name||''
+        });
       }
     });
+  });
+  // Group by vendor + PO number (the safest combine key). A user can opt a group out
+  // of combining via overlay flag apSplit[groupKey] -> then each step is its own bill.
+  const groups={};
+  steps.forEach(st=>{
+    const gkey=vendorKey(st.vendor)+'__'+st.po.toLowerCase();
+    (groups[gkey]=groups[gkey]||[]).push(st);
+  });
+  const out=[];
+  Object.entries(groups).forEach(([gkey,gsteps])=>{
+    const combineId='apc_'+gkey;
+    const splitThis=apSplit&&apSplit[gkey];
+    if(gsteps.length>1 && !splitThis){
+      // ONE combined bill for this vendor+PO, with each step as a line item.
+      const v=gsteps[0];
+      const parts=[...new Set(gsteps.map(s=>s.part).filter(Boolean))];
+      const custs=[...new Set(gsteps.map(s=>s.customer).filter(Boolean))];
+      const rel=(parts.join(', ')||'')+(custs.length?(' · '+custs.join(', ')):'');
+      const earliest=gsteps.map(s=>s.sentAt).filter(Boolean).sort()[0]||'';
+      const lineItems=gsteps.map(s=>({
+        part:s.proc||s.part||'(item)',
+        desc:[s.part,s.detail].filter(Boolean).join(' — '),
+        qty:1, unit:null, total:null,
+        srcOrder:s.orderId, srcStep:s.stepName
+      }));
+      out.push({id:combineId,type:'ap',
+        party:v.vendor, ref:'PO '+v.po,
+        rel:rel, process:gsteps.map(s=>s.proc).filter(Boolean).join(', '),
+        detail:'', amount:null, issue:earliest, auto:true,
+        combined:true, comboCount:gsteps.length, lineItems});
+    } else {
+      // Single step (or user split this PO) -> one bill per step, original behavior.
+      gsteps.forEach(s=>{
+        out.push({id:'ap_'+s.orderId+'_'+hash(s.stepName||''),type:'ap',
+          party:s.vendor, ref:'PO '+s.po,
+          rel:(s.part||'')+(s.customer?(' · '+s.customer):''),
+          process:s.proc, detail:s.detail||'',
+          amount:null, issue:s.sentAt||'', auto:true,
+          splitFrom: gsteps.length>1?gkey:undefined});
+      });
+    }
   });
   return out;
 }
@@ -894,13 +953,21 @@ function allEntriesRaw(){
   const merged=derived.map(e=>{
     seen.add(e.id);
     const o=overlay[e.id]||{};
-    const amount=(e.type==='ap'||o.amount!=null)?(o.amount!=null?Number(o.amount):e.amount):e.amount;
+    // Combined PO bills can store per-line totals in the overlay's lineItems; the bill amount
+    // is then the sum of those line totals. Fall back to the overlay amount, then derived.
+    const oLines=Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null);
+    let lineSum=null;
+    if(e.combined && Array.isArray(o.lineItems) && o.lineItems.some(li=>li&&li.total!=null)){
+      lineSum=o.lineItems.reduce((s,li)=>s+(Number(li&&li.total)||0),0);
+    }
+    const amount=(lineSum!=null)?lineSum
+      :((e.type==='ap'||o.amount!=null)?(o.amount!=null?Number(o.amount):e.amount):e.amount);
     const payments=Array.isArray(o.payments)?o.payments:[];
     const paid=payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:(e.lineItems||null)};
+    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -2590,10 +2657,27 @@ window.openEntry=(id)=>{
           return sum>0.005?`<div class="li-foot"><span>Items total</span><span></span><span></span><span class="li-tot">${fmtMoney(sum)}</span></div>`:'';})()}
       </div>`:''}
 
+      ${(e.combined && Array.isArray(e.lineItems) && e.lineItems.length)?`
+      <div class="m-sect">Combined PO · ${e.comboCount||e.lineItems.length} items <span class="combo-badge" title="These steps were combined because they share PO ${esc((e.ref||'').replace(/^PO /,''))} and the same vendor">auto-combined</span></div>
+      <p class="combo-help">This bill combines ${e.comboCount||e.lineItems.length} order steps that share <b>${esc(e.ref)}</b> from <b>${esc(e.party)}</b>. Enter each line's amount and the bill total adds up automatically.</p>
+      <div class="li-edit">
+        <div class="li-ehead"><span>Item</span><span>Amount</span></div>
+        ${e.lineItems.map((li,i)=>`<div class="li-erow">
+          <span class="li-ename" title="${esc(li.desc||'')}">${esc(li.part||'(item)')}${li.desc?`<span class="li-edesc">${esc(li.desc)}</span>`:''}</span>
+          <input type="number" step="0.01" class="li-eamt" data-li="${i}" value="${li.total!=null?li.total:''}" placeholder="0.00" oninput="comboLineSum()">
+        </div>`).join('')}
+        <div class="li-erow li-etot"><span>Combined total</span><span id="combo-total">${fmtMoney(e.lineItems.reduce((s,li)=>s+(Number(li.total)||0),0))}</span></div>
+      </div>
+      <div class="frow" style="margin-top:8px">
+        <button class="btn sm" onclick="saveComboLines('${e.id}')"><i class="ti ti-check"></i> Save line amounts</button>
+        <button class="btn sm" onclick="splitCombo('${e.id}')" title="Track each PO step as its own separate bill instead"><i class="ti ti-arrows-split"></i> Split apart</button>
+      </div>`:''}
+      ${e.splitFrom?`<div class="m-row"><span class="k"></span><span class="v"><button class="btn sm" onclick="recombineCombo('${esc(e.splitFrom).replace(/'/g,"\\'")}')" title="Combine this PO's steps back into one bill"><i class="ti ti-arrow-merge"></i> Re-combine this PO</button></span></div>`:''}
+
       <div class="m-sect">Invoice / terms</div>
       <div class="fld"><label>${isAR?'Invoice #':'Vendor invoice #'}</label><input id="d-ref" type="text" value="${esc(e.ref||'')}" placeholder="${isAR?'e.g. INV-1042':'e.g. 62366512'}"></div>
       <div class="frow">
-        <div class="fld"><label>${isAR?'Invoice':'Bill'} amount</label><input id="d-amt" type="number" step="0.01" value="${e.amount!=null?e.amount:''}" ${(isAR&&e.auto)?'':''}></div>
+        <div class="fld"><label>${isAR?'Invoice':'Bill'} amount${e.combined?' (from line items)':''}</label><input id="d-amt" type="number" step="0.01" value="${e.amount!=null?e.amount:''}" ${e.combined?'readonly title="Set by the line-item amounts above"':''}></div>
         <div class="fld"><label>Issue date</label><input id="d-issue" type="date" value="${e.issue||''}"></div>
       </div>
       <div class="frow">
@@ -2634,6 +2718,41 @@ window.openEntry=(id)=>{
 window.closePay=()=>{$('pay-modal').style.display='none';_cur=null;};
 function ovl(id){return overlay[id]?{...overlay[id]}:{};}
 function writeOverlay(id,o){ overlay[id]=o; dbSet('apar/entries/'+id,o) }
+window.comboLineSum=()=>{
+  let sum=0; document.querySelectorAll('.li-eamt').forEach(inp=>{ sum+=Number(inp.value)||0; });
+  const el=$('combo-total'); if(el)el.textContent=fmtMoney(sum);
+  const amt=$('d-amt'); if(amt)amt.value=sum?sum.toFixed(2):'';
+};
+window.saveComboLines=(id)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const lines=(e.lineItems||[]).map((li,i)=>{
+    const inp=document.querySelector(`.li-eamt[data-li="${i}"]`);
+    const total=inp&&inp.value!==''?Number(inp.value):null;
+    return {...li,total};
+  });
+  const o=ovl(id);
+  // auto bills need their identity stamped so the overlay sticks
+  o.lineItems=lines;
+  writeOverlay(id,o);
+  const sum=lines.reduce((s,li)=>s+(Number(li.total)||0),0);
+  logAudit('add',{entryId:id,party:e.party,detail:`Set combined PO line amounts · ${fmtMoney(sum)} (${lines.length} items)`});
+  render(); openEntry(id);
+};
+window.splitCombo=(id)=>{
+  // id is 'apc_'+groupKey
+  const gkey=id.replace(/^apc_/,'');
+  if(!confirm('Split this combined PO into separate bills — one per order step? You can re-combine later.'))return;
+  apSplit[gkey]=true; dbSet('apar/apSplit',apSplit,'split combined PO');
+  logAudit('add',{detail:`Split combined PO into separate bills`});
+  closePay(); render();
+};
+window.recombineCombo=(gkey)=>{
+  if(!gkey)return;
+  if(apSplit[gkey]){ delete apSplit[gkey]; }
+  dbSet('apar/apSplit',apSplit,'recombine PO');
+  logAudit('add',{detail:`Re-combined PO steps into one bill`});
+  closePay(); render();
+};
 window.saveMeta=()=>{
   if(!_cur)return; const e=_cur; const o=ovl(e.id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
@@ -2721,7 +2840,7 @@ window.saveManual=(type)=>{
 // ── Export ───────────────────────────────────────────────────────────────────
 // ── Backup & restore ─────────────────────────────────────────────────────────
 // Captures every apar/* node into one JSON file you keep off Firebase.
-const BACKUP_NODES=['entries','accounts','recurring','depositBuckets','vendorAccounts','vendorPriority','customerDelay','vendorAliases','vendorAliasNames','audit','userNames'];
+const BACKUP_NODES=['entries','accounts','recurring','depositBuckets','vendorAccounts','vendorPriority','customerDelay','vendorAliases','vendorAliasNames','apSplit','audit','userNames'];
 function buildBackup(){
   return {
     _meta:{ app:'bsmp-apar', version:'1', exportedAt:new Date().toISOString(),
@@ -2732,6 +2851,7 @@ function buildBackup(){
       depositBuckets:depositBuckets||{}, vendorAccounts:vendorAccounts||{},
       vendorPriority:vendorPriority||{}, customerDelay:customerDelay||{},
       vendorAliases:vendorAliases||{}, vendorAliasNames:vendorAliasNames||{},
+      apSplit:apSplit||{},
       audit:auditLog||{}, userNames:userNames||{}
     }
   };
@@ -3159,6 +3279,7 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/customerDelay'),snap=>{ customerDelay=snap.val()||{}; if(page==='forecast')render(); });
     onValue(ref(db,'apar/vendorAliases'),snap=>{ vendorAliases=snap.val()||{}; render(); });
     onValue(ref(db,'apar/vendorAliasNames'),snap=>{ vendorAliasNames=snap.val()||{}; });
+    onValue(ref(db,'apar/apSplit'),snap=>{ apSplit=snap.val()||{}; render(); });
     onValue(ref(db,'apar/audit'),snap=>{ auditLog=snap.val()||{}; if(page==='activity')render(); });
     onValue(ref(db,'apar/userNames'),snap=>{ userNames=snap.val()||{}; });
   }else{
