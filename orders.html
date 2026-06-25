@@ -3079,9 +3079,51 @@ let _activeQueue = INTERNAL_PROCESSES[0];
 let _queuePerson = ''; // '' = everyone
 window.setQueuePerson = (id) => { _queuePerson = id; renderQueues(); };
 window.selectQueue = (name) => { _activeQueue = name; renderQueues(); };
+
+// Status-driven "office" queue: orders needing a PO or ready to invoice, handled by one person.
+const OFFICE_QUEUE_KEY = '__office__';
+const OFFICE_ASSIGNEE  = 'Anahi Duenez';
+const OFFICE_STATUSES  = ['Need Purchase Order','Ready for Invoice'];
+function renderOfficeQueue(officeOrders, name){
+  document.getElementById('queue-title').textContent = 'Purchasing & Invoicing';
+  document.getElementById('queue-count').textContent = officeOrders.length ? `${officeOrders.length} open` : 'all clear';
+  const person = team.find(p=>(p.name||'').trim().toLowerCase()===name.toLowerCase());
+  const who = person
+    ? `<span class="pc-dot sm" style="background:${person.color||'#7a5cc0'}">${personInitials(person.name)}</span> ${esc2(person.name)}`
+    : `${esc2(name)} <span style="color:var(--red);font-size:11px;font-weight:600">— not on the Team yet (add them on the Team page)</span>`;
+  const head = `<div class="q-personbar"><span class="q-pb-label">Assigned to</span><span class="q-pchip" style="cursor:default;background:var(--navy3);border-color:var(--navy3);color:#fff">${who}</span></div>`;
+  const body = document.getElementById('queue-body');
+  if(!officeOrders.length){ body.innerHTML = head + `<div class="empty-state"><i class="ti ti-checks"></i><p>No orders need a PO or are ready to invoice right now.</p></div>`; return; }
+  const today = new Date(new Date().toDateString());
+  const op = userRole==='operator';
+  const section = (title, list) => {
+    if(!list.length) return '';
+    const rows = list.map(r=>{
+      const overdue = r.due && new Date(r.due+'T00:00:00') < today;
+      const lbl = [r.po&&('PO '+r.po), r.job&&('Job '+r.job), r.part].filter(Boolean).join(' · ') || '(no detail)';
+      const openCell = op ? '<td></td>' : `<td style="text-align:center"><button class="q-open-btn" title="Open in Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button></td>`;
+      return `<tr class="q-row"${op?'':` onclick="window._openInOrders('${r.id}',event)"`}>
+        <td><b>${esc2(r.customer||'—')}</b></td>
+        <td>${esc2(lbl)}</td>
+        <td style="text-align:center;color:var(--text2)">${r.qty||''}</td>
+        <td style="${overdue?'color:var(--red);font-weight:700':'color:var(--text2)'}">${r.due?fmtDate(r.due):'—'}</td>
+        <td style="font-weight:700">${fmtMoney(rowTotal(r))||''}</td>
+        ${openCell}
+      </tr>`;
+    }).join('');
+    return `<div style="margin:6px 0 18px">
+      <div style="font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin:8px 12px;display:flex;align-items:center;gap:8px">${title} <span class="queue-count-pill">${list.length}</span></div>
+      <div class="table-scroll"><table class="q-table"><thead><tr><th>Customer</th><th>PO / Job / Part</th><th style="text-align:center">Qty</th><th>Due</th><th>Total</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`;
+  };
+  body.innerHTML = head
+    + section('Need Purchase Order', officeOrders.filter(r=>r.status==='Need Purchase Order'))
+    + section('Ready to Invoice',   officeOrders.filter(r=>r.status==='Ready for Invoice'));
+}
 function renderQueues(){
   const tabsEl=document.getElementById('queue-tabs'); if(!tabsEl) return;
   const live = orders.filter(r=>!r.archived);
+  const officeOrders = live.filter(r=>OFFICE_STATUSES.includes(r.status));
   // open count per process = enabled + not done.
   // The "Purchasing" queue also gathers the external "Purchasing- …" PO steps.
   const openCount = {};
@@ -3095,7 +3137,7 @@ function renderQueues(){
       else if(s.name.startsWith('Purchasing-')){ openCount['Purchasing']++; }
     });
   });
-  if(!INTERNAL_PROCESSES.includes(_activeQueue)) _activeQueue=INTERNAL_PROCESSES[0];
+  if(_activeQueue!==OFFICE_QUEUE_KEY && !INTERNAL_PROCESSES.includes(_activeQueue)) _activeQueue=INTERNAL_PROCESSES[0];
   // tabs
   tabsEl.innerHTML = INTERNAL_PROCESSES.map(p=>{
     const active = p===_activeQueue;
@@ -3104,7 +3146,13 @@ function renderQueues(){
       <span class="qt-dot" style="background:${PROCESS_COLORS[p]}"></span>${p}
       ${cnt?`<span class="qt-badge">${cnt}</span>`:''}
     </button>`;
-  }).join('');
+  }).join('') + `<button class="queue-tab${_activeQueue===OFFICE_QUEUE_KEY?' active':''}" onclick="selectQueue('${OFFICE_QUEUE_KEY}')">
+      <span class="qt-dot" style="background:#7a5cc0"></span>Purchasing &amp; Invoicing
+      ${officeOrders.length?`<span class="qt-badge">${officeOrders.length}</span>`:''}
+    </button>`;
+
+  // Status-driven office queue (Need PO + Ready for Invoice), handled by one person
+  if(_activeQueue===OFFICE_QUEUE_KEY){ renderOfficeQueue(officeOrders, OFFICE_ASSIGNEE); return; }
 
   const proc=_activeQueue;
   const isPurchasingQueue = proc==='Purchasing';
