@@ -598,6 +598,15 @@ tr:hover .del-btn{opacity:1}
 .badge-red{background:var(--red) !important;color:#fff !important}
 /* Undo toast (after delete / archive) */
 .undo-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(140%);background:#1f2733;color:#fff;border-radius:12px;padding:11px 12px 11px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 8px 28px rgba(0,0,0,.28);z-index:3000;font-size:13.5px;max-width:92vw;opacity:0;transition:transform .26s cubic-bezier(.2,.8,.2,1),opacity .26s}
+/* Autosave indicator (bottom-right) */
+.autosave{position:fixed;right:18px;bottom:18px;z-index:4000;display:inline-flex;align-items:center;gap:8px;background:#1f2733;color:#fff;border-radius:20px;padding:8px 15px;font-size:12.5px;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.22);opacity:0;transform:translateY(12px) scale(.96);pointer-events:none;transition:opacity .25s ease,transform .25s cubic-bezier(.2,.8,.2,1)}
+.autosave.show{opacity:1;transform:translateY(0) scale(1)}
+.autosave.saved{background:#1d7a52}
+.autosave.error{background:#b53030}
+.autosave i{font-size:16px;line-height:1}
+.autosave .as-spin{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:as-rot .7s linear infinite}
+@keyframes as-rot{to{transform:rotate(360deg)}}
+@media (pointer:coarse){ .autosave{font-size:13.5px;padding:10px 17px} }
 .undo-toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .undo-toast .ut-msg{display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .undo-toast .ut-msg i{color:#ff9aa2;font-size:15px;flex-shrink:0}
@@ -740,6 +749,7 @@ tr:hover .del-btn{opacity:1}
 
 <div id="app-root" style="display:none;flex:1;min-height:100vh;width:100%">
 <div id="sidebar-edge-hint" style="position:fixed;left:0;top:0;bottom:0;width:5px;background:linear-gradient(90deg,#EC1C25,transparent);opacity:.35;z-index:39;pointer-events:none"></div>
+<div class="autosave" id="autosave" aria-live="polite"></div>
 <!-- Sidebar -->
 <nav class="sidebar auto-hide" id="app-sidebar">
   <button class="sidebar-pin" id="sidebar-pin-btn" onclick="window._toggleSidebarPin(event)" title="Keep sidebar open"><i class="ti ti-pin"></i></button>
@@ -1550,11 +1560,31 @@ function setSyncStatus(s) {
   else if(s==='saving'){dot.className='sync-dot saving';lbl.textContent='Saving…';}
   else{dot.className='sync-dot';lbl.textContent='Offline';}
 }
-function saveDB() {
-  setSyncStatus('saving'); clearTimeout(saveTimeout);
-  saveTimeout=setTimeout(()=>{ const o={}; orders.forEach(r=>o[r.id]=r); set(ordersRef,o).then(()=>setSyncStatus('live')); },400);
+let _asHideTimer=null;
+function autosavePill(state){
+  const el=document.getElementById('autosave'); if(!el) return;
+  clearTimeout(_asHideTimer);
+  if(state==='saving'){
+    el.className='autosave saving show';
+    el.innerHTML='<span class="as-spin"></span><span>Saving…</span>';
+  } else if(state==='error'){
+    el.className='autosave error show';
+    el.innerHTML='<i class="ti ti-cloud-off"></i><span>Couldn’t save — will retry</span>';
+  } else {
+    el.className='autosave saved show';
+    el.innerHTML='<i class="ti ti-rosette-discount-check-filled"></i><span>Saved</span>';
+    _asHideTimer=setTimeout(()=>{ el.classList.remove('show'); }, 1700);
+  }
 }
-function deleteDB(id) { remove(ref(db,'orders/'+id)); }
+function saveDB() {
+  setSyncStatus('saving'); autosavePill('saving'); clearTimeout(saveTimeout);
+  saveTimeout=setTimeout(()=>{
+    const o={}; orders.forEach(r=>o[r.id]=r);
+    set(ordersRef,o).then(()=>{ setSyncStatus('live'); autosavePill('saved'); })
+                    .catch(()=>{ setSyncStatus('error'); autosavePill('error'); });
+  },400);
+}
+function deleteDB(id) { autosavePill('saving'); remove(ref(db,'orders/'+id)).then(()=>autosavePill('saved')).catch(()=>autosavePill('error')); }
 
 // ── Recently Deleted (soft-delete bin) — deleted orders move here so they can be restored ──
 const trashRef = ref(db,'trash');
@@ -2834,7 +2864,7 @@ const PERSON_COLORS = ['#3a6ea5','#2f8f6b','#a8553a','#7a5cc0','#b0852a','#3f7d7
 function startTeamListener(){
   onValue(teamRef, (snap)=>{ const d=snap.val(); team = d?Object.values(d):[]; renderTeam(); refreshActivePage(); });
 }
-function saveTeamDB(){ const o={}; team.forEach(p=>o[p.id]=p); set(ref(db,'team'),o); }
+function saveTeamDB(){ const o={}; team.forEach(p=>o[p.id]=p); autosavePill('saving'); set(ref(db,'team'),o).then(()=>autosavePill('saved')).catch(()=>autosavePill('error')); }
 function personById(id){ return team.find(p=>p.id===id)||null; }
 function personInitials(name){ return (name||'').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
 function personChip(id, withName=true){
