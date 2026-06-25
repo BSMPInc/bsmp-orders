@@ -1037,10 +1037,12 @@ const PAGE_HELP={
     <li>Most pages flow from here — use the sidebar to dig into a specific area.</li></ul>`},
   ar:{title:'Receivables',body:`<p>Everything customers owe <b>you</b>. These build automatically from invoiced orders in the order tracker, and you can also add one manually.</p>
     <ul><li>Search by customer, invoice #, or description; group by customer with the toggle.</li>
+    <li>In grouped view, the merge icon on a customer combines duplicate names (e.g. two spellings of the same company) into one — applies to existing and future invoices, and can be undone.</li>
     <li>Click an invoice to record a payment or set how reliably that customer pays (used by the Forecast).</li>
     <li>Use <b>Add receivable</b> in the sidebar for anything not tied to an order.</li></ul>`},
   ap:{title:'Payables',body:`<p>Everything <b>you</b> owe vendors. These build from your vendor POs, plus anything you add by hand or via AI Extract.</p>
-    <ul><li>Assign each bill to the bank account it'll be paid from — that powers Cash Flow, Pay Run, and the Forecast.</li>
+    <ul><li>When several order steps share the <b>same vendor and PO number</b>, they combine into one bill with each step as a line item — enter an amount per line and the total adds up. Open it to <b>Split apart</b> (or re-combine) if you'd rather track them separately.</li>
+    <li>Assign each bill to the bank account it'll be paid from — that powers Cash Flow, Pay Run, and the Forecast.</li>
     <li>Click a bill to record payment, set its pay status, or attach early-pay discount terms.</li>
     <li><b>AI Extract</b> in the sidebar reads a PDF bill and fills the details for you.</li></ul>`},
   aging:{title:'Aging',body:`<p>Outstanding balances sorted by how overdue they are — the classic 0-30 / 31-60 / 61-90 / 90+ day buckets.</p>
