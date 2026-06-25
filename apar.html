@@ -501,6 +501,10 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .li-foot span:first-child{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
 .combo-badge{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ap);background:#A8443A1a;border-radius:4px;padding:2px 6px;margin-left:6px;vertical-align:middle}
 .combo-help{font-size:12px;color:var(--text2);line-height:1.5;margin:0 0 10px}
+.rc-smnote{font-size:11.5px;color:#8a4a00;background:#BA75170f;border:1px solid #BA751733;border-radius:7px;padding:7px 10px;margin-top:8px;line-height:1.45}
+.pr-emp-head{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);margin-bottom:6px}
+.pr-emp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
+.pr-emp-row input{font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:7px;width:100%;box-sizing:border-box}
 .li-edit{border:1px solid var(--border);border-radius:9px;overflow:hidden}
 .li-ehead{display:grid;grid-template-columns:1fr 110px;gap:8px;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);background:#f5f7fa;border-bottom:1px solid var(--border)}
 .li-ehead span:last-child{text-align:right}
@@ -1059,7 +1063,8 @@ const PAGE_HELP={
     <li>Set a vendor's priority (critical / normal / wait) to steer the plan.</li>
     <li><b>Commit</b> marks the chosen invoices as Scheduled — you can change any back in Cash Flow.</li></ul>`},
   recur:{title:'Recurring',body:`<p>Templates for bills that repeat — rent, utilities, loan payments, subscriptions. The app auto-creates the next bill each cycle.</p>
-    <ul><li>Set the amount, account, and cadence (monthly, bi-weekly, or weekly); it rolls the due date forward automatically.</li>
+    <ul><li>Set the amount, account, and cadence (monthly, semi-monthly, bi-weekly, or weekly); it rolls the due date forward automatically.</li>
+    <li><b>Set up payroll</b> creates one auto-generating bill per employee on your pay schedule — semi-monthly paydays (e.g. 10th & 25th) shift off weekends/holidays automatically, and each period pre-fills the last amount since pay varies.</li>
     <li>Pause a template to stop it generating without deleting it.</li>
     <li>Generated bills show up in Payables and Cash Flow like any other.</li></ul>`},
   deposit:{title:'Deposits Calculator',body:`<p>Split incoming money across your Profit First buckets (Profit, Owner's Pay, Tax, Operating, etc.).</p>
@@ -1745,7 +1750,46 @@ function daysSince(iso){ if(!iso)return null; const d=daysUntil(iso); return d==
 // Template: {vendor, amount, account, method, autopay, cadence:'monthly'|'weekly',
 //            day (1-31 for monthly), weekday (0-6 for weekly), nextDue (ISO),
 //            notes, paused, lastGenerated (ISO)}
-function advanceDue(iso,cadence,day,weekday){
+// US federal holidays (observed) for payday adjustment. Computed per-year, cached.
+const _holidayCache={};
+function usHolidays(year){
+  if(_holidayCache[year])return _holidayCache[year];
+  const iso=(y,m,d)=>toISO(new Date(y,m-1,d));
+  const nthWeekday=(y,m,wd,n)=>{ // n-th weekday(0=Sun) of month m(1-12)
+    let count=0; const last=new Date(y,m,0).getDate();
+    for(let d=1;d<=last;d++){ if(new Date(y,m-1,d).getDay()===wd){ if(++count===n)return iso(y,m,d); } }
+    return '';
+  };
+  const lastWeekday=(y,m,wd)=>{ const last=new Date(y,m,0).getDate();
+    for(let d=last;d>=1;d--){ if(new Date(y,m-1,d).getDay()===wd)return iso(y,m,d); } return ''; };
+  // observed: if holiday falls Sat -> Fri, Sun -> Mon
+  const observed=(isoDate)=>{ const dt=new Date(isoDate+'T00:00:00'); const w=dt.getDay();
+    if(w===6){dt.setDate(dt.getDate()-1);} else if(w===0){dt.setDate(dt.getDate()+1);} return toISO(dt); };
+  const fixed=[[1,1],[6,19],[7,4],[11,11],[12,25]].map(([m,d])=>observed(iso(year,m,d)));
+  const floating=[
+    nthWeekday(year,1,1,3),   // MLK day - 3rd Mon Jan
+    nthWeekday(year,2,1,3),   // Presidents - 3rd Mon Feb
+    lastWeekday(year,5,1),    // Memorial - last Mon May
+    nthWeekday(year,9,1,1),   // Labor - 1st Mon Sep
+    nthWeekday(year,10,1,2),  // Columbus - 2nd Mon Oct
+    nthWeekday(year,11,4,4)   // Thanksgiving - 4th Thu Nov
+  ];
+  const set=new Set([...fixed,...floating]);
+  _holidayCache[year]=set; return set;
+}
+// Move a date back to the last working day if it lands on a weekend or holiday.
+function adjustToWorkday(iso){
+  let d=new Date(iso+'T00:00:00'); let guard=0;
+  while(guard++<15){
+    const w=d.getDay();
+    const isHol=usHolidays(d.getFullYear()).has(toISO(d));
+    if(w!==0 && w!==6 && !isHol) break;
+    d.setDate(d.getDate()-1);
+  }
+  return toISO(d);
+}
+
+function advanceDue(iso,cadence,day,weekday,day2){
   // returns the next due date strictly after `iso` for the given cadence
   const d=new Date(iso+'T00:00:00');
   if(cadence==='weekly'){
@@ -1756,6 +1800,25 @@ function advanceDue(iso,cadence,day,weekday){
     d.setDate(d.getDate()+14);
     return toISO(d);
   }
+  if(cadence==='semimonthly'){
+    // pay on two nominal days each month (e.g. 10 & 25). Advance to the next nominal
+    // payday strictly after `iso`, then adjust weekends/holidays to the prior workday.
+    const days=[Number(day)||10, Number(day2)||25].sort((a,b)=>a-b);
+    // work from the NOMINAL anchor of the current due date (un-adjust isn't stored, so
+    // we derive the next nominal payday from the calendar, not from `iso` directly).
+    let y=d.getFullYear(), m=d.getMonth(); // 0-based month
+    // candidate nominal dates: this month's two days, then next month's
+    const candidates=[];
+    for(let mo=0;mo<2;mo++){
+      const yy=y+Math.floor((m+mo)/12), mm=(m+mo)%12;
+      const last=new Date(yy,mm+1,0).getDate();
+      days.forEach(dy=>candidates.push(toISO(new Date(yy,mm,Math.min(dy,last)))));
+    }
+    candidates.sort();
+    // next nominal payday whose ADJUSTED date is strictly after iso
+    for(const c of candidates){ if(adjustToWorkday(c)>iso) return adjustToWorkday(c); }
+    return adjustToWorkday(candidates[candidates.length-1]);
+  }
   // monthly: jump to next month, clamp day to month length
   const targetDay=day||d.getDate();
   let y=d.getFullYear(), m=d.getMonth()+1;
@@ -1763,6 +1826,20 @@ function advanceDue(iso,cadence,day,weekday){
   const lastOfMonth=new Date(y,m+1,0).getDate();
   const dd=Math.min(targetDay,lastOfMonth);
   return toISO(new Date(y,m,dd));
+}
+// First payday on/after today for a semimonthly schedule (used when setting up).
+function firstSemimonthly(day,day2){
+  const days=[Number(day)||10,Number(day2)||25].sort((a,b)=>a-b);
+  const now=new Date(); now.setHours(0,0,0,0); const todayISO=toISO(now);
+  const cands=[];
+  for(let mo=0;mo<2;mo++){
+    const yy=now.getFullYear()+Math.floor((now.getMonth()+mo)/12), mm=(now.getMonth()+mo)%12;
+    const last=new Date(yy,mm+1,0).getDate();
+    days.forEach(dy=>cands.push(toISO(new Date(yy,mm,Math.min(dy,last)))));
+  }
+  cands.sort();
+  for(const c of cands){ if(adjustToWorkday(c)>=todayISO) return adjustToWorkday(c); }
+  return adjustToWorkday(cands[0]);
 }
 function recurMethodNote(r){
   return [r.autopay?'AutoPay':'', r.method||''].filter(Boolean).join(' · ');
@@ -1772,20 +1849,28 @@ function generateRecurring(id,opts){
   const eid='rec_'+id+'_'+(r.nextDue||toISO(new Date())).replace(/-/g,'');
   // don't double-create the same cycle
   if(overlay[eid]&&!opts.force) return;
+  // For payroll (varies each period), start from last period's amount as a placeholder.
+  let amt=Number(r.amount)||0;
+  if(r.payroll && r.lastGenerated){
+    const prevId='rec_'+id+'_'+r.lastGenerated.replace(/-/g,'');
+    const prev=overlay[prevId];
+    if(prev && Number(prev.amount)>0) amt=Number(prev.amount);
+  }
   const o={manual:true,type:'ap',party:r.vendor||'(recurring)',
-    ref:r.autopay?'AutoPay':'Recurring',
+    ref:r.payroll?'Payroll':(r.autopay?'AutoPay':'Recurring'),
     rel:r.notes||'',
-    amount:Number(r.amount)||0,
+    amount:amt,
     issue:toISO(new Date()),
     dueDate:r.nextDue||toISO(new Date()),
     terms:0,
     account:r.account||'',
     planMethod:r.method||'',
     recurringId:id,
+    payroll:!!r.payroll,
     payments:[]};
   dbSet('apar/entries/'+eid,o); overlay[eid]=o;
   // advance the template to the next cycle
-  const next=advanceDue(r.nextDue,r.cadence,r.day,r.weekday);
+  const next=advanceDue(r.nextDue,r.cadence,r.day,r.weekday,r.day2);
   dbUpdate('apar/recurring/'+id,{nextDue:next,lastGenerated:r.nextDue});
   recurring[id]={...r,nextDue:next,lastGenerated:r.nextDue};
 }
@@ -1821,13 +1906,14 @@ function renderRecurring(){
   const ids=Object.keys(recurring);
   const monthlyTotal=ids.filter(id=>recurring[id]&&!recurring[id].paused).reduce((s,id)=>{
     const r=recurring[id]; const amt=Number(r.amount)||0;
-    return s+(r.cadence==='weekly'?amt*52/12:(r.cadence==='biweekly'?amt*26/12:amt)); // normalize to monthly
+    return s+(r.cadence==='weekly'?amt*52/12:(r.cadence==='biweekly'?amt*26/12:(r.cadence==='semimonthly'?amt*2:amt))); // normalize to monthly
   },0);
   const dueNow=ids.filter(id=>{const r=recurring[id];return r&&!r.paused&&daysUntil(r.nextDue)!=null&&daysUntil(r.nextDue)<=0;}).length;
 
   const cadenceTxt=r=>{
     if(r.cadence==='weekly'){const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][r.weekday||0];return `Weekly · ${wd}`;}
     if(r.cadence==='biweekly'){const wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][r.weekday||0];return `Bi-weekly · ${wd}`;}
+    if(r.cadence==='semimonthly'){return `Semi-monthly · ${r.day||10} & ${r.day2||25}`;}
     return `Monthly · day ${r.day||1}`;
   };
   const sorted=ids.slice().sort((a,a2)=>(recurring[a].nextDue||'9999').localeCompare(recurring[a2].nextDue||'9999'));
@@ -1860,6 +1946,7 @@ function renderRecurring(){
       <div class="stat over"><div class="l">Due now</div><div class="v">${dueNow}</div><div class="s">ready to generate</div></div>
     </div>
     <div class="toolbar"><button class="btn primary" onclick="openRecurEdit()"><i class="ti ti-plus"></i> Add recurring bill</button>
+      <button class="btn" onclick="openPayrollSetup()"><i class="ti ti-users"></i> Set up payroll</button>
       <div style="margin-left:auto;font-size:12px;color:var(--text3)">Bills auto-generate on their due date, or generate early anytime.</div>
     </div>
     ${ids.length? `<div class="recur-list">
@@ -1871,6 +1958,68 @@ function renderRecurring(){
 // ── Recurring template editor ─────────────────────────────────────────────────
 let _recurEditId=null;
 window.openRecurEdit=()=>{ _recurEditId=null; showRecurEditor({}); };
+// Payroll setup helper: enter employees once -> create one semi-monthly recurring per person.
+window.openPayrollSetup=()=>{
+  const acctOpts=Object.entries(accounts).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join('');
+  // suggest the account whose name contains "payroll"
+  const payrollId=Object.entries(accounts).find(([id,a])=>/payroll/i.test(a.name||''));
+  const rows=Array.from({length:6}).map((_,i)=>`<div class="pr-emp-row">
+    <input class="pr-emp-name" data-i="${i}" placeholder="Employee ${i+1} name">
+    <input class="pr-emp-amt" data-i="${i}" type="number" step="0.01" placeholder="Typical net pay (optional)">
+  </div>`).join('');
+  $('pay-body').innerHTML=`
+    <div class="m-head" style="background:var(--navy)"><div class="m-t"><div class="t1"><i class="ti ti-users"></i> Set up payroll</div><div class="t2">Creates one auto-generating bill per employee, each pay period</div></div>
+      <button class="m-x" onclick="closePay()"><i class="ti ti-x"></i></button></div>
+    <div class="m-body">
+      <p class="combo-help">Enter your employees once. The app will create a recurring <b>semi-monthly</b> payable for each, so all of them appear automatically every payday — you just fill in each check's actual amount. Amounts vary period to period, so we pre-fill the previous period's amount as a starting point.</p>
+      <div class="frow">
+        <div class="fld"><label>Pay from account</label><select id="pr-account">${acctOpts||'<option value="">No accounts — add one in Cash Flow first</option>'}</select></div>
+        <div class="fld"><label>Default method</label><select id="pr-method"><option value="">—</option><option>Check</option><option>ACH/Debit</option><option>Zelle</option><option>Wire</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>Payday 1 (day of month)</label><input id="pr-day1" type="number" min="1" max="31" value="10"></div>
+        <div class="fld"><label>Payday 2 (day of month)</label><input id="pr-day2" type="number" min="1" max="31" value="25"></div>
+      </div>
+      <div class="rc-smnote">If a payday lands on a weekend or holiday, it's moved to the last working day before it.</div>
+      <div class="m-sect" style="margin-top:14px">Employees</div>
+      <div class="pr-emp-head"><span>Name</span><span>Typical net pay (optional)</span></div>
+      <div id="pr-emp-list">${rows}</div>
+      <button class="btn sm" onclick="addPayrollRow()" style="margin-top:6px"><i class="ti ti-plus"></i> Add another</button>
+    </div>
+    <div class="m-foot"><button class="btn" onclick="closePay()">Cancel</button>
+      <button class="btn primary" onclick="savePayrollSetup()"><i class="ti ti-check"></i> Create payroll bills</button></div>`;
+  if(payrollId)setTimeout(()=>{const s=$('pr-account');if(s)s.value=payrollId[0];},0);
+  $('pay-modal').style.display='flex';
+};
+window.addPayrollRow=()=>{
+  const list=$('pr-emp-list'); if(!list)return;
+  const i=list.querySelectorAll('.pr-emp-row').length;
+  const div=document.createElement('div'); div.className='pr-emp-row';
+  div.innerHTML=`<input class="pr-emp-name" data-i="${i}" placeholder="Employee ${i+1} name"><input class="pr-emp-amt" data-i="${i}" type="number" step="0.01" placeholder="Typical net pay (optional)">`;
+  list.appendChild(div);
+};
+window.savePayrollSetup=()=>{
+  const account=$('pr-account')?$('pr-account').value:'';
+  const method=$('pr-method')?$('pr-method').value:'';
+  const day1=Number($('pr-day1').value)||10;
+  const day2=Number($('pr-day2').value)||25;
+  const names=[...document.querySelectorAll('.pr-emp-name')];
+  const amts=[...document.querySelectorAll('.pr-emp-amt')];
+  const emps=names.map((n,i)=>({name:n.value.trim(),amt:Number(amts[i].value)||0})).filter(e=>e.name);
+  if(!emps.length){ alert('Enter at least one employee name.'); return; }
+  if(!confirm(`Create ${emps.length} semi-monthly payroll bill${emps.length!==1?'s':''}, paid on the ${day1} & ${day2} of each month? They'll auto-generate every payday.`))return;
+  const first=firstSemimonthly(day1,day2);
+  emps.forEach((e,idx)=>{
+    const id='r_pay_'+Date.now().toString(36)+idx;
+    const r={ vendor:e.name, amount:e.amt, account, cadence:'semimonthly',
+      day:day1, day2:day2, weekday:null, nextDue:first, method,
+      autopay:false, payroll:true, notes:'Payroll', paused:false, lastGenerated:'' };
+    dbSet('apar/recurring/'+id,r); recurring[id]=r;
+  });
+  logAudit('add',{detail:`Set up payroll — ${emps.length} employees, semi-monthly (${day1} & ${day2})`});
+  closePay(); render();
+  alert(`Created ${emps.length} payroll bill${emps.length!==1?'s':''}. First payday: ${fmtDate(first)}. Fill in each check's amount when it appears.`);
+};
 window.editRecurring=(id)=>{ _recurEditId=id; showRecurEditor(recurring[id]||{}); };
 function showRecurEditor(r){
   const accOpts=`<option value="">Unassigned</option>`+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${r.account===id?'selected':''}>${esc(a.name)}</option>`).join('');
@@ -1889,14 +2038,20 @@ function showRecurEditor(r){
       <div class="frow">
         <div class="fld"><label>Cadence</label><select id="rc-cadence" onchange="recurCadenceToggle()">
           <option value="monthly" ${cadence==='monthly'?'selected':''}>Monthly</option>
+          <option value="semimonthly" ${cadence==='semimonthly'?'selected':''}>Semi-monthly (two days)</option>
           <option value="biweekly" ${cadence==='biweekly'?'selected':''}>Bi-weekly (every 2 weeks)</option>
           <option value="weekly" ${cadence==='weekly'?'selected':''}>Weekly</option>
         </select></div>
         <div class="fld" id="rc-day-wrap" style="${cadence!=='monthly'?'display:none':''}"><label>Day of month</label><input id="rc-day" type="number" min="1" max="31" value="${day}"></div>
-        <div class="fld" id="rc-wd-wrap" style="${cadence!=='monthly'?'':'display:none'}"><label>Weekday</label><select id="rc-weekday">
+        <div class="fld" id="rc-wd-wrap" style="${(cadence==='weekly'||cadence==='biweekly')?'':'display:none'}"><label>Weekday</label><select id="rc-weekday">
           ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'].map((n,i)=>`<option value="${i}" ${wd===i?'selected':''}>${n}</option>`).join('')}
         </select></div>
+        <div class="fld" id="rc-sm-wrap" style="${cadence==='semimonthly'?'':'display:none'};display:${cadence==='semimonthly'?'flex':'none'};gap:8px">
+          <div style="flex:1"><label>First day</label><input id="rc-day-sm1" type="number" min="1" max="31" value="${r.day||10}"></div>
+          <div style="flex:1"><label>Second day</label><input id="rc-day-sm2" type="number" min="1" max="31" value="${r.day2||25}"></div>
+        </div>
       </div>
+      ${cadence==='semimonthly'?'<div class="rc-smnote">If a payday lands on a weekend or holiday, it moves to the last working day before it.</div>':''}
       <div class="frow">
         <div class="fld"><label>Next due date</label><input id="rc-nextdue" type="date" value="${r.nextDue||toISO(new Date())}"></div>
         <div class="fld"><label>Default method</label><select id="rc-method">${methOpts}</select></div>
@@ -1913,8 +2068,10 @@ function showRecurEditor(r){
 window.recurCadenceToggle=()=>{
   const c=$('rc-cadence').value;
   const usesWeekday=(c==='weekly'||c==='biweekly');
-  $('rc-day-wrap').style.display=usesWeekday?'none':'';
+  const sm=(c==='semimonthly');
+  $('rc-day-wrap').style.display=(usesWeekday||sm)?'none':'';
   $('rc-wd-wrap').style.display=usesWeekday?'':'none';
+  if($('rc-sm-wrap'))$('rc-sm-wrap').style.display=sm?'flex':'none';
 };
 window.saveRecurring=()=>{
   const vendor=$('rc-vendor').value.trim(); if(!vendor){alert('Enter a vendor name');return;}
@@ -1924,7 +2081,8 @@ window.saveRecurring=()=>{
     amount:Number($('rc-amount').value)||0,
     account:$('rc-account').value||'',
     cadence,
-    day:cadence==='monthly'?(Number($('rc-day').value)||1):null,
+    day:cadence==='monthly'?(Number($('rc-day').value)||1):(cadence==='semimonthly'?(Number($('rc-day-sm1').value)||10):null),
+    day2:cadence==='semimonthly'?(Number($('rc-day-sm2').value)||25):null,
     weekday:(cadence==='weekly'||cadence==='biweekly')?(Number($('rc-weekday').value)||0):null,
     nextDue:$('rc-nextdue').value||toISO(new Date()),
     method:$('rc-method').value||'',
