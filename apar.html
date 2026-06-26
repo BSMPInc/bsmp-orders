@@ -157,6 +157,33 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .e-chk{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:17px;height:17px;cursor:pointer;accent-color:var(--navy);margin:0}
 .entry.sel{border-color:var(--navy);box-shadow:0 0 0 2px #2c574022}
 .entry.ar.sel{border-left-color:var(--ar)}.entry.ap.sel{border-left-color:var(--ap)}
+/* compact row view */
+.erows{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--card);box-shadow:var(--shadow)}
+.erow-head{display:grid;grid-template-columns:26px 1.6fr 1fr 1.1fr 1fr 84px;gap:10px;align-items:center;padding:6px 13px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
+.erow-head .er-amt{text-align:right}
+.erow{display:grid;grid-template-columns:26px 1.6fr 1fr 1.1fr 1fr 84px;gap:10px;align-items:center;padding:8px 13px;border-left:3px solid #888;border-top:1px solid var(--border2);cursor:pointer;background:var(--card);transition:background .1s}
+.erows .erow:first-child{border-top:none}
+.erow:hover{background:#f7f9fb}
+.erow.ar{border-left-color:var(--ar)}.erow.ap{border-left-color:var(--ap)}
+.erow.paid{opacity:.55}
+.erow.sel{background:#2c574010}
+.er-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--navy)}
+.er-party{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.er-ref{font-size:12px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.er-auto{font-size:8px;font-weight:700;text-transform:uppercase;color:var(--blue);background:#3a6ea51a;border-radius:3px;padding:1px 4px;margin-left:5px}
+.er-due{font-size:12px;color:var(--text2);white-space:nowrap}
+.er-due.over{color:var(--red);font-weight:700}
+.er-amt{font-size:13px;font-weight:700;text-align:right;white-space:nowrap}
+.er-bal{font-size:11px;font-weight:600;color:var(--text3)}
+.er-pill{justify-self:start}
+/* compact rows inside a group card */
+.vgroup-body.compact{padding:0}
+.vgroup-body.compact .erow{border-radius:0}
+@media(max-width:680px){
+  .erow-head{display:none}
+  .erow{grid-template-columns:20px 1fr auto;grid-template-areas:'chk party amt' 'chk ref due' 'chk pill pill';gap:3px 8px;row-gap:2px}
+  .er-chk{grid-area:chk}.er-party{grid-area:party}.er-ref{grid-area:ref}.er-due{grid-area:due;text-align:right}.er-amt{grid-area:amt}.er-pill{grid-area:pill}
+}
 /* list search box */
 .list-search{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 11px;min-width:240px}
 .sort-ctl{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:9px;padding:6px 10px;cursor:pointer}
@@ -190,6 +217,60 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 @media(max-width:720px){.selbar{left:0}}
 .empty{text-align:center;color:var(--text3);padding:30px 14px;border:1px dashed var(--border);border-radius:12px;background:#fafbfd;font-size:12.5px}
 .auto-tag{font-size:9px;font-weight:700;color:#8a93a5;text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--border);border-radius:4px;padding:0 4px;margin-left:6px}
+/* calendar */
+.cal-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.cal-navgroup{display:flex;align-items:center;gap:8px}
+.cal-month{font-size:17px;font-weight:800;min-width:160px;text-align:center}
+.cal-legend{display:flex;gap:8px}
+.cal-leg{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text3);background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 11px;cursor:pointer;transition:all .12s}
+.cal-leg .dot{width:10px;height:10px;border-radius:3px;background:#ccc}
+.cal-leg.ar.on{color:var(--ar);border-color:var(--ar)}.cal-leg.ar.on .dot{background:var(--ar)}
+.cal-leg.ap.on{color:var(--ap);border-color:var(--ap)}.cal-leg.ap.on .dot{background:var(--ap)}
+.cal-leg:not(.on){opacity:.5;text-decoration:line-through}
+.cal-overdue{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#A32D2D0d;border:1px solid #A32D2D33;border-radius:9px;padding:9px 13px;margin-bottom:10px;font-size:13px;color:var(--text2)}
+.cal-overdue i{color:var(--red)}
+.cal-overdue b.ar{color:var(--ar)}.cal-overdue b.ap{color:var(--ap)}
+.cal-monthsum{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.cms{font-size:13px;font-weight:700}
+.cms.ar{color:var(--ar)}.cms.ap{color:var(--ap)}
+.cms.crunch{color:var(--text2);font-weight:600;margin-left:auto;background:#BA75170f;border:1px solid #BA751733;border-radius:7px;padding:3px 10px;font-size:12px}
+.cal-layout{display:grid;grid-template-columns:1fr 290px;gap:16px;align-items:start}
+@media(max-width:900px){.cal-layout{grid-template-columns:1fr}}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;box-shadow:var(--shadow)}
+.cal-dow{text-align:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);padding-bottom:4px}
+.cal-cell{min-height:62px;border:1px solid var(--border2);border-radius:8px;padding:4px 5px;display:flex;flex-direction:column;gap:2px;background:#fcfdfe;transition:box-shadow .1s,border-color .1s}
+.cal-cell.empty{border:none;background:transparent}
+.cal-cell.has{cursor:pointer}
+.cal-cell.has:hover{border-color:var(--navy);box-shadow:0 2px 7px rgba(0,0,0,.08)}
+.cal-cell.past{opacity:.62}
+.cal-cell.today{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
+.cal-cell.sel{border-color:var(--navy);box-shadow:0 0 0 2px #2c574033}
+.cal-daynum{font-size:12px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:4px}
+.cal-todaydot{width:5px;height:5px;border-radius:50%;background:var(--navy)}
+.cal-amt{position:relative;border-radius:4px;overflow:hidden;height:15px;display:flex;align-items:center}
+.cal-bar{position:absolute;left:0;top:0;height:100%;opacity:.18;border-radius:4px}
+.cal-amt.ar .cal-bar{background:var(--ar)}.cal-amt.ap .cal-bar{background:var(--ap)}
+.cal-val{position:relative;font-size:10.5px;font-weight:700;padding:0 4px;white-space:nowrap}
+.cal-amt.ar .cal-val{color:var(--ar)}.cal-amt.ap .cal-val{color:var(--ap)}
+.cal-detail{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:14px;position:sticky;top:12px}
+.cal-detail.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--text3);min-height:160px;gap:8px}
+.cal-detail.empty i{font-size:30px;opacity:.4}
+.cal-detail.empty p{font-size:13px;margin:0;max-width:180px}
+.cald-head{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:800;margin-bottom:8px}
+.cald-x{border:none;background:transparent;color:var(--text3);cursor:pointer;padding:2px;border-radius:5px}
+.cald-x:hover{color:var(--text);background:#f0f2f5}
+.cald-tot{display:flex;flex-direction:column;gap:3px;margin-bottom:10px}
+.cald-t{font-size:13px;font-weight:700}
+.cald-t.ar{color:var(--ar)}.cald-t.ap{color:var(--ap)}
+.cald-t .n{font-weight:500;color:var(--text3);font-size:11px}
+.cald-list{display:flex;flex-direction:column;gap:5px;max-height:340px;overflow-y:auto}
+.cald-row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:7px 9px;border-radius:7px;border-left:3px solid #888;background:#fafbfd;cursor:pointer;transition:background .1s}
+.cald-row:hover{background:#f0f3f7}
+.cald-row.ar{border-left-color:var(--ar)}.cald-row.ap{border-left-color:var(--ap)}
+.cald-party{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cald-ref{font-size:11px;color:var(--text3);grid-column:1}
+.cald-amt{font-size:12.5px;font-weight:700;grid-row:1/3;align-self:center;white-space:nowrap}
+.cald-row.ar .cald-amt{color:var(--ar)}.cald-row.ap .cald-amt{color:var(--ap)}
 /* aging */
 .aging-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:var(--shadow);margin-bottom:16px}
 .aging-card h3{margin:0 0 12px;font-size:14px}
@@ -641,6 +722,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
     <div class="nav-item" id="nav-ar" onclick="go('ar')"><i class="ti ti-arrow-down-left"></i> Receivables <span class="nb" id="nb-ar" style="display:none"></span></div>
     <div class="nav-item" id="nav-ap" onclick="go('ap')"><i class="ti ti-arrow-up-right"></i> Payables <span class="nb" id="nb-ap" style="display:none"></span></div>
     <div class="nav-item" id="nav-aging" onclick="go('aging')"><i class="ti ti-clock-hour-4"></i> Aging</div>
+    <div class="nav-item" id="nav-calendar" onclick="go('calendar')"><i class="ti ti-calendar-month"></i> Calendar</div>
     <div class="nav-item" id="nav-cash" onclick="go('cash')"><i class="ti ti-building-bank"></i> Cash Flow</div>
     <div class="nav-item" id="nav-forecast" onclick="go('forecast')"><i class="ti ti-chart-line"></i> Forecast</div>
     <div class="nav-item" id="nav-payrun" onclick="go('payrun')"><i class="ti ti-cash"></i> Pay Run</div>
@@ -1062,6 +1144,7 @@ function go(p){
     payrun:['Pay Run','Per-account plan — which whole invoices to schedule from each balance'],
     activity:['Activity','Who changed what — payments, deletions, and status changes'],
     forecast:['Cash Forecast','Week-by-week projection of where your cash is heading'],
+    calendar:['Calendar','When receivables and payables land — see the crunch days at a glance'],
     trash:['Trash','Deleted entries — restore them or delete permanently'],
     backup:['Backup & Restore','Download a safety copy of all your data, or load one back in']}[p];
   $('pg-title').textContent=meta[0];$('pg-sub').textContent=meta[1];
@@ -1098,6 +1181,10 @@ const PAGE_HELP={
     <li>The <b>"Include expected customer payments"</b> toggle: on = realistic ins-and-outs; off = the conservative "if nobody pays us" floor.</li>
     <li>Each customer's invoice lands at their due date <i>plus</i> their typical delay — set that in the reliability panel or on the invoice.</li>
     <li>Amber = running low, red = goes negative. The banner names exactly which account and week to watch.</li></ul>`},
+  calendar:{title:'Calendar',body:`<p>A month view of when your money lands — receivables coming <b>in</b> (green) and payables going <b>out</b> (red), totaled per day.</p>
+    <ul><li>Taller bars and bigger numbers mean a heavier day — handy for spotting a crunch where several bills land together.</li>
+    <li>Click any day to see exactly which invoices and bills are due then; click one to open it.</li>
+    <li>Toggle Receivables or Payables off to focus on just one side. Overdue items (before today) are summarized in the banner up top.</li></ul>`},
   payrun:{title:'Pay Run',body:`<p>A per-account plan suggesting which <b>whole</b> invoices to schedule from each balance — it never splits an invoice.</p>
     <ul><li>Plans from the balance you set in Cash Flow, minus what's already scheduled.</li>
     <li>Protects the urgent ones first (critical vendors, overdue, expiring discounts), then pays down each vendor's oldest invoices first (FIFO).</li>
@@ -1148,6 +1235,7 @@ function render(){
   else if(page==='ar') renderList(entries.filter(e=>e.type==='ar'&&!isArchived(e)),'ar');
   else if(page==='ap') renderList(entries.filter(e=>e.type==='ap'&&!isArchived(e)),'ap');
   else if(page==='aging') renderAging(entries);
+  else if(page==='calendar') renderCalendar();
   else if(page==='cash') renderCash(entries);
   else if(page==='recur') renderRecurring();
   else if(page==='deposit') renderDeposit();
@@ -1168,8 +1256,26 @@ function updateBadges(entries){
   set('nb-trash',trashedEntries().length);
 }
 // list view state (per side): search text, group-by-vendor, selected ids
-const listState={ar:{q:'',group:false,sort:'due',sel:new Set(),focus:'all'},ap:{q:'',group:false,sort:'due',sel:new Set(),focus:'all'}};
+const listState={ar:{q:'',group:false,sort:'due',sel:new Set(),focus:'all',compact:false},ap:{q:'',group:false,sort:'due',sel:new Set(),focus:'all',compact:false}};
 let _curSide='ap';
+function entryRow(e,opts){
+  opts=opts||{};
+  const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
+  const dleft=daysUntil(e.due);
+  const dueCls=(st==='over')?' over':'';
+  const dueTxt=e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due';
+  const amtTxt=e.amount!=null?fmtMoney(e.amount):'<span style="color:var(--text3)">set amt</span>';
+  const balTxt=(e.paid>0.005&&e.amount!=null)?` <span class="er-bal">bal ${fmtMoney(bal)}</span>`:'';
+  const chk=opts.selectable?`<input type="checkbox" class="er-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
+  return `<div class="erow ${e.type}${st==='paid'?' paid':''}${opts.checked?' sel':''}" onclick="openEntry('${e.id}')">
+    ${chk}
+    <span class="er-party">${esc(e.party)}</span>
+    <span class="er-ref">${esc(e.ref||'')}${e.auto?'<span class="er-auto">auto</span>':''}</span>
+    <span class="er-due${dueCls}">${dueTxt}</span>
+    <span class="er-amt">${amtTxt}${balTxt}</span>
+    <span class="pill ${st} er-pill">${STATUS_LABEL[st]}</span>
+  </div>`;
+}
 function entryCard(e,opts){
   opts=opts||{};
   const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
@@ -1282,7 +1388,7 @@ function renderList(entries,side){
   const selTotal=selArr.reduce((s,e)=>s+(e.amount||0),0);
   const selBal=selArr.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
 
-  const card=e=>entryCard(e,{selectable:true,checked:S.sel.has(e.id)});
+  const card=e=>S.compact?entryRow(e,{selectable:true,checked:S.sel.has(e.id)}):entryCard(e,{selectable:true,checked:S.sel.has(e.id)});
 
   let body;
   if(!list.length){
@@ -1313,11 +1419,13 @@ function renderList(entries,side){
           <span class="vg-sum">${fmtMoney(gOut)} out</span>
           <button class="vg-merge" onclick="event.stopPropagation();openMergeVendor('${esc(name).replace(/'/g,"\\'")}','${side}')" title="Merge a differently-named ${side==='ar'?'customer':'vendor'} into this one"><i class="ti ti-arrow-merge"></i></button>
         </div>
-        ${collapsed?'':`<div class="vgroup-body">${g.map(card).join('')}</div>`}
+        ${collapsed?'':`<div class="vgroup-body${S.compact?' compact':''}">${g.map(card).join('')}</div>`}
       </div>`;
     }).join('');
   } else {
-    body=list.map(card).join('');
+    body=S.compact
+      ? `<div class="erow-head"><span></span><span class="er-party">${isAR?'Customer':'Vendor'}</span><span class="er-ref">Invoice</span><span class="er-due">Due</span><span class="er-amt">Amount</span><span class="er-pill">Status</span></div><div class="erows">${list.map(card).join('')}</div>`
+      : list.map(card).join('');
   }
 
   const selBar=S.sel.size?`<div class="selbar">
@@ -1384,6 +1492,7 @@ function renderList(entries,side){
     <div class="toolbar">
       <button class="btn ${isAR?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button>
       <button class="btn ${S.group?'primary':''}" onclick="toggleGroupMode()"><i class="ti ti-layout-list"></i> ${S.group?'Grouped':'Group by '+(isAR?'customer':'vendor')}</button>
+      <button class="btn ${S.compact?'primary':''}" onclick="toggleCompact()" title="${S.compact?'Switch to roomy cards':'Switch to compact rows — see more at once'}"><i class="ti ti-${S.compact?'layout-cards':'list-details'}"></i> ${S.compact?'Compact':'Compact rows'}</button>
       ${S.group?`<button class="btn" onclick="toggleCollapseAll()"><i class="ti ti-chevrons-${allCollapsed?'down':'up'}"></i> ${allCollapsed?'Expand all':'Collapse all'}</button>`:''}
       <label class="sort-ctl"><i class="ti ti-arrows-sort"></i><select id="list-sort" onchange="setListSort(this.value)">
         ${LIST_SORTS.map(s=>`<option value="${s.k}" ${S.sort===s.k?'selected':''}>${s.label}</option>`).join('')}
@@ -1409,6 +1518,7 @@ function renderList(entries,side){
 }
 window.toggleGroupMode=()=>{ listState[_curSide].group=!listState[_curSide].group; rerenderList(); };
 window.setListSort=(key)=>{ listState[_curSide].sort=key; rerenderList(); };
+window.toggleCompact=()=>{ listState[_curSide].compact=!listState[_curSide].compact; rerenderList(); };
 window.setListFocus=(f)=>{ const S=listState[_curSide]; S.focus=(S.focus===f)?'all':f; rerenderList(); };
 window.clearListFocus=()=>{ listState[_curSide].focus='all'; rerenderList(); };
 window.toggleCollapseAll=()=>{
@@ -1516,6 +1626,134 @@ function agingTable(title,entries,cls){
   return `<div class="aging-card"><h3>${title}</h3><div class="aging-grid">
     ${cell('Current',b.cur,'')}${cell('1–30',b.b30,'warn')}${cell('31–60',b.b60,'warn')}${cell('61–90',b.b90,'bad')}${cell('90+',b.b90p,'bad')}
   </div></div>`;
+}
+let _calMonth=null; // {y,m} currently shown; null = current month
+let _calSelDay=null; // ISO of selected day
+let _calShow={ar:true,ap:true};
+function fmtMoneyShort(v){
+  const n=Math.round(v);
+  if(n>=1000) return '$'+(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k';
+  return '$'+n;
+}
+function calMonthRef(){
+  if(_calMonth) return _calMonth;
+  const n=new Date(); return {y:n.getFullYear(), m:n.getMonth()};
+}
+window.calNav=(delta)=>{
+  const r=calMonthRef(); let m=r.m+delta, y=r.y;
+  while(m<0){m+=12;y--;} while(m>11){m-=12;y++;}
+  _calMonth={y,m}; _calSelDay=null; render();
+};
+window.calToday=()=>{ _calMonth=null; _calSelDay=null; render(); };
+window.calSelDay=(iso)=>{ _calSelDay=(_calSelDay===iso)?null:iso; render(); };
+window.calToggleSide=(side)=>{ _calShow[side]=!_calShow[side]; if(!_calShow.ar&&!_calShow.ap)_calShow[side]=true; render(); };
+function renderCalendar(){
+  const r=calMonthRef();
+  const monthStart=new Date(r.y,r.m,1);
+  const monthName=monthStart.toLocaleString('en-US',{month:'long',year:'numeric'});
+  const todayISO=toISO(new Date());
+  const unpaidOf=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  const live=allEntries().filter(e=>!isArchived(e)&&unpaidOf(e)>0.005&&e.due);
+  const byDay={};
+  live.forEach(e=>{
+    const k=e.due; const slot=byDay[k]=byDay[k]||{ar:0,ap:0,arN:0,apN:0,items:[]};
+    if(e.type==='ar'){slot.ar+=unpaidOf(e);slot.arN++;} else {slot.ap+=unpaidOf(e);slot.apN++;}
+    slot.items.push(e);
+  });
+  const overdue=live.filter(e=>e.due<todayISO);
+  const odAR=overdue.filter(e=>e.type==='ar').reduce((s,e)=>s+unpaidOf(e),0);
+  const odAP=overdue.filter(e=>e.type==='ap').reduce((s,e)=>s+unpaidOf(e),0);
+  const inMonth=iso=>{const d=new Date(iso+'T00:00:00');return d.getFullYear()===r.y&&d.getMonth()===r.m;};
+  let monthAR=0,monthAP=0;
+  Object.entries(byDay).forEach(([iso,s])=>{ if(inMonth(iso)){monthAR+=s.ar;monthAP+=s.ap;} });
+  let crunch=null;
+  Object.entries(byDay).forEach(([iso,s])=>{ if(inMonth(iso)&&_calShow.ap&&s.ap>0){ if(!crunch||s.ap>crunch.ap)crunch={iso,ap:s.ap}; } });
+  let maxDay=0;
+  Object.entries(byDay).forEach(([iso,s])=>{ if(inMonth(iso)){ maxDay=Math.max(maxDay,_calShow.ar?s.ar:0,_calShow.ap?s.ap:0); } });
+
+  const firstDow=monthStart.getDay();
+  const daysInMonth=new Date(r.y,r.m+1,0).getDate();
+  const cells=[];
+  for(let i=0;i<firstDow;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+  while(cells.length%7!==0)cells.push(null);
+
+  const dayCell=(d)=>{
+    if(d==null)return '<div class="cal-cell empty"></div>';
+    const iso=toISO(new Date(r.y,r.m,d));
+    const s=byDay[iso];
+    const isToday=iso===todayISO;
+    const isSel=iso===_calSelDay;
+    const isPast=iso<todayISO;
+    let chips='';
+    if(s){
+      const barW=v=>maxDay>0?Math.max(6,Math.round(v/maxDay*100)):0;
+      if(_calShow.ar&&s.ar>0) chips+=`<div class="cal-amt ar"><span class="cal-bar" style="width:${barW(s.ar)}%"></span><span class="cal-val">+${fmtMoneyShort(s.ar)}</span></div>`;
+      if(_calShow.ap&&s.ap>0) chips+=`<div class="cal-amt ap"><span class="cal-bar" style="width:${barW(s.ap)}%"></span><span class="cal-val">−${fmtMoneyShort(s.ap)}</span></div>`;
+    }
+    const hasContent=s&&((_calShow.ar&&s.ar>0)||(_calShow.ap&&s.ap>0));
+    return `<div class="cal-cell${isToday?' today':''}${isSel?' sel':''}${isPast?' past':''}${hasContent?' has':''}" ${hasContent?`onclick="calSelDay('${iso}')"`:''}>
+      <div class="cal-daynum">${d}${isToday?'<span class="cal-todaydot"></span>':''}</div>
+      ${chips}
+    </div>`;
+  };
+
+  const dow=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const grid=`<div class="cal-grid">
+    ${dow.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
+    ${cells.map(dayCell).join('')}
+  </div>`;
+
+  let detail='';
+  if(_calSelDay&&byDay[_calSelDay]){
+    const s=byDay[_calSelDay];
+    const dt=new Date(_calSelDay+'T00:00:00').toLocaleString('en-US',{weekday:'long',month:'long',day:'numeric'});
+    const rowFor=e=>{
+      const isAR=e.type==='ar';
+      return `<div class="cald-row ${e.type}" onclick="openEntry('${e.id}')">
+        <span class="cald-party">${esc(e.party)}</span>
+        <span class="cald-ref">${esc(e.ref||'')}</span>
+        <span class="cald-amt">${isAR?'+':'−'}${fmtMoney(unpaidOf(e))}</span>
+      </div>`;
+    };
+    const items=[...s.items].sort((a,b)=>(a.type===b.type?0:(a.type==='ar'?-1:1))||unpaidOf(b)-unpaidOf(a));
+    detail=`<div class="cal-detail">
+      <div class="cald-head"><span>${dt}</span><button class="cald-x" onclick="calSelDay('${_calSelDay}')"><i class="ti ti-x"></i></button></div>
+      <div class="cald-tot">${_calShow.ar&&s.ar>0?`<span class="cald-t ar">+${fmtMoney(s.ar)} in <span class="n">(${s.arN})</span></span>`:''}${_calShow.ap&&s.ap>0?`<span class="cald-t ap">−${fmtMoney(s.ap)} out <span class="n">(${s.apN})</span></span>`:''}</div>
+      <div class="cald-list">${items.filter(e=>_calShow[e.type]).map(rowFor).join('')}</div>
+    </div>`;
+  } else {
+    detail=`<div class="cal-detail empty"><i class="ti ti-calendar-event"></i><p>Click a day with activity to see what's due.</p></div>`;
+  }
+
+  $('content').innerHTML=`
+    <div class="cal-toolbar">
+      <div class="cal-navgroup">
+        <button class="btn sm" onclick="calNav(-1)"><i class="ti ti-chevron-left"></i></button>
+        <span class="cal-month">${monthName}</span>
+        <button class="btn sm" onclick="calNav(1)"><i class="ti ti-chevron-right"></i></button>
+        <button class="btn sm" onclick="calToday()">Today</button>
+      </div>
+      <div class="cal-legend">
+        <button class="cal-leg ar${_calShow.ar?' on':''}" onclick="calToggleSide('ar')"><span class="dot"></span> Receivables in</button>
+        <button class="cal-leg ap${_calShow.ap?' on':''}" onclick="calToggleSide('ap')"><span class="dot"></span> Payables out</button>
+      </div>
+    </div>
+    ${(odAR>0.005||odAP>0.005)?`<div class="cal-overdue">
+      <i class="ti ti-alert-triangle"></i>
+      <span>Overdue (before today):</span>
+      ${odAR>0.005?`<b class="ar">+${fmtMoney(odAR)} in</b>`:''}
+      ${odAP>0.005?`<b class="ap">−${fmtMoney(odAP)} out</b>`:''}
+    </div>`:''}
+    <div class="cal-monthsum">
+      ${_calShow.ar?`<span class="cms ar">+${fmtMoney(monthAR)} expected in</span>`:''}
+      ${_calShow.ap?`<span class="cms ap">−${fmtMoney(monthAP)} due out</span>`:''}
+      ${crunch?`<span class="cms crunch">Biggest out: ${fmtMoney(crunch.ap)} on ${fmtDate(crunch.iso)}</span>`:''}
+    </div>
+    <div class="cal-layout">
+      ${grid}
+      ${detail}
+    </div>`;
 }
 function renderAging(entries){
   $('content').innerHTML=agingTable('Receivables aging',entries.filter(e=>e.type==='ar'),'ar')
