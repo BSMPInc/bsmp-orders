@@ -1064,6 +1064,7 @@ const PAGE_HELP={
   payrun:{title:'Pay Run',body:`<p>A per-account plan suggesting which <b>whole</b> invoices to schedule from each balance — it never splits an invoice.</p>
     <ul><li>Plans from the balance you set in Cash Flow, minus what's already scheduled.</li>
     <li>Protects the urgent ones first (critical vendors, overdue, expiring discounts), then pays down each vendor's oldest invoices first (FIFO).</li>
+    <li>Search or filter by status and due date to focus the view — this changes what you see, not which bills the plan considers.</li>
     <li>Set a vendor's priority (critical / normal / wait) to steer the plan.</li>
     <li><b>Commit</b> marks the chosen invoices as Scheduled — you can change any back in Cash Flow.</li></ul>`},
   recur:{title:'Recurring',body:`<p>Templates for bills that repeat — rent, utilities, loan payments, subscriptions. The app auto-creates the next bill each cycle.</p>
@@ -2518,6 +2519,22 @@ function filterRows(selector,q){
   });
 }
 let archiveQ='', payrunQ='', cashQ='';
+let payrunFilter={status:'all',due:'all'};
+function payrunBillMatchesFilter(e){
+  const st=e.payStatus||'open';
+  if(payrunFilter.status!=='all' && st!==payrunFilter.status) return false;
+  if(payrunFilter.due!=='all'){
+    const d=daysUntil(e.due);
+    if(payrunFilter.due==='overdue'){ if(!(d!=null&&d<0)) return false; }
+    else if(payrunFilter.due==='week'){ if(!(d!=null&&d>=0&&d<=7)) return false; }
+    else if(payrunFilter.due==='month'){ if(!(d!=null&&d>=0&&d<=31)) return false; }
+    else if(payrunFilter.due==='nodate'){ if(e.due) return false; }
+  }
+  return true;
+}
+function payrunFilterActive(){ return payrunFilter.status!=='all'||payrunFilter.due!=='all'; }
+window.setPayrunFilter=(key,val)=>{ payrunFilter[key]=val; render(); };
+window.clearPayrunFilters=()=>{ payrunFilter={status:'all',due:'all'}; render(); };
 window.archiveSearch=(v)=>{ archiveQ=v; filterRows('.arch-row2',v);
   document.querySelectorAll('.arch-group').forEach(g=>{
     const rows=g.querySelectorAll('.arch-row2');
@@ -2792,7 +2809,7 @@ function renderPayRun(){
     const tags=[];
     if(a.disc) tags.push(`<span class="pr-tag disc" title="${a.disc.pct}% off if paid within ${a.disc.days} days">save ${a.disc.pct}% · ${a.disc.daysLeft}d left</span>`);
     if(a.over) tags.push(`<span class="pr-tag over">overdue</span>`);
-    return `<div class="pr-row${picked?'':' skip'}" data-search="${esc([a.e.party,a.e.ref].filter(Boolean).join(' ').toLowerCase())}" onclick="openEntry('${a.e.id}')">
+    return `<div class="pr-row${picked?'':' skip'}" data-search="${esc([a.e.party,a.e.ref,a.e.planMethod].filter(Boolean).join(' ').toLowerCase())}" onclick="openEntry('${a.e.id}')">
       <div class="pr-v"><span class="pr-name">${esc(a.e.party)}</span> ${tags.join(' ')}<div class="pr-sub">${esc(a.e.ref||'')} · due ${dueTxt}</div></div>
       ${priSelect(a.e.party)}
       <span class="pr-owed">${fmtMoney(a.amt)}</span>
@@ -2804,7 +2821,10 @@ function renderPayRun(){
     const c=colorFor(p.accId); const a=accounts[p.accId];
     const picked=p.bills.filter(b=>p.chosen.has(b.e.id));
     const notpicked=p.bills.filter(b=>!p.chosen.has(b.e.id));
-    const ordered=[...picked,...notpicked];
+    let ordered=[...picked,...notpicked];
+    // focused filters affect what's shown for review, not the plan math
+    if(payrunFilterActive()) ordered=ordered.filter(b=>payrunBillMatchesFilter(b.e));
+    if(payrunFilterActive() && p.bills.length && !ordered.length) return ''; // hide cards with no matches
     const body = p.bills.length
       ? `<div class="pr-rows"><div class="pr-rowhead"><span>Vendor</span><span>Priority</span><span>Invoice</span><span>This run</span></div>${ordered.map(b=>rowFor(b,p.chosen.has(b.e.id))).join('')}</div>`
       : '<div class="acct-empty" style="padding:14px">No open invoices assigned to this account.</div>';
@@ -2830,8 +2850,23 @@ function renderPayRun(){
       <div class="stat"><div class="l">Open candidates</div><div class="v">${totalCandidates}</div><div class="s">unpaid, assigned bills</div></div>
     </div>
     <div class="pr-legend"><i class="ti ti-info-circle"></i> Each account is planned from the balance you set in Cash Flow, minus what's already scheduled. Invoices are paid <b>whole</b> — never split. Protected bills (critical vendors, overdue, expiring discounts) come first, then each vendor's <b>oldest</b> invoice, then the rest oldest-first within each vendor (longest-outstanding debt paid down first). <b>Commit</b> marks the chosen invoices as Scheduled in Cash Flow; change any back there anytime.</div>
-    ${plans.length?`<div class="cf-search-bar"><div class="list-search"><i class="ti ti-search"></i><input id="payrun-q" placeholder="Search vendor or invoice #…" value="${esc(payrunQ)}" oninput="payrunSearch(this.value)"></div></div>`:''}
-    ${plans.map(cardFor).join('')}`;
+    ${plans.length?`<div class="cf-toolbar">
+      <div class="list-search"><i class="ti ti-search"></i><input id="payrun-q" placeholder="Search vendor, invoice #, method…" value="${esc(payrunQ)}" oninput="payrunSearch(this.value)"></div>
+      <label class="cf-filter"><i class="ti ti-flag"></i><select onchange="setPayrunFilter('status',this.value)">
+        <option value="all" ${payrunFilter.status==='all'?'selected':''}>All statuses</option>
+        ${PAY_STATUSES.filter(s=>s.k==='open'||s.k==='attention').map(s=>`<option value="${s.k}" ${payrunFilter.status===s.k?'selected':''}>${s.label}</option>`).join('')}
+      </select></label>
+      <label class="cf-filter"><i class="ti ti-calendar"></i><select onchange="setPayrunFilter('due',this.value)">
+        <option value="all" ${payrunFilter.due==='all'?'selected':''}>Any due date</option>
+        <option value="overdue" ${payrunFilter.due==='overdue'?'selected':''}>Overdue</option>
+        <option value="week" ${payrunFilter.due==='week'?'selected':''}>Due ≤ 7 days</option>
+        <option value="month" ${payrunFilter.due==='month'?'selected':''}>Due ≤ 30 days</option>
+        <option value="nodate" ${payrunFilter.due==='nodate'?'selected':''}>No due date</option>
+      </select></label>
+      ${payrunFilterActive()?`<button class="btn sm" onclick="clearPayrunFilters()"><i class="ti ti-x"></i> Clear</button>`:''}
+    </div>`:''}
+    ${(()=>{const cards=plans.map(cardFor).join('');
+      return cards.trim()?cards:(payrunFilterActive()?'<div class="empty">No invoices match these filters. <a href="#" onclick="clearPayrunFilters();return false">Clear filters</a></div>':cards);})()}`;
   if(payrunQ){ payrunSearch(payrunQ); const q=$('payrun-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 
