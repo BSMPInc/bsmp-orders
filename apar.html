@@ -79,6 +79,31 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .content{padding:14px 26px 40px}
 /* Stat strip */
 .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+/* receivables/payables summary snapshot */
+.sum-panel{display:grid;grid-template-columns:1.1fr 1.3fr 1.3fr;gap:18px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:16px 18px;margin-bottom:16px;max-width:760px}
+@media(max-width:820px){.sum-panel{grid-template-columns:1fr;gap:14px}}
+.sum-figs{display:flex;flex-direction:column;gap:10px;justify-content:center}
+.sum-fig .sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.sum-fig .sv{font-size:20px;font-weight:800;line-height:1.1;margin-top:1px}
+.sum-fig .ss{font-size:11px;color:var(--text3);margin-top:1px}
+.sum-aging{display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--border2);padding-left:18px}
+.sum-aging-head{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px}
+.sum-aging-tot{font-size:13px;font-weight:800;color:var(--text);text-transform:none;letter-spacing:0}
+.aging-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#eef2f7}
+.aging-seg{height:100%;transition:width .3s}
+.aging-seg:not(:last-child){border-right:1.5px solid #fff}
+.aging-key{display:flex;flex-wrap:wrap;gap:10px;margin-top:9px}
+.ak{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.ak-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.ak b{color:var(--text);font-weight:700}
+.sum-top{display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--border2);padding-left:18px}
+.sum-top-head{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:8px}
+.sum-top-row{display:grid;grid-template-columns:1fr 60px auto;gap:8px;align-items:center;margin-bottom:6px}
+.sum-top-row:last-child{margin-bottom:0}
+.stp-name{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stp-bar{height:7px;background:#eef2f7;border-radius:4px;overflow:hidden}
+.stp-fill{display:block;height:100%;border-radius:4px}
+.stp-amt{font-size:12px;font-weight:700;text-align:right;white-space:nowrap}
 @media(max-width:1000px){.stats{grid-template-columns:repeat(2,1fr)}}
 .stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;box-shadow:var(--shadow)}
 .stat .l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text3)}
@@ -140,6 +165,7 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .vg-merge{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:none;background:transparent;color:var(--text3);border-radius:7px;cursor:pointer;transition:color .12s,background .12s}
 .vg-merge:hover{color:var(--navy);background:#fff}
 .vg-merge i{font-size:16px}
+.vg-variants{font-size:9px;font-weight:700;color:var(--blue);background:#3a6ea51a;border-radius:4px;padding:1px 6px;margin-left:7px;vertical-align:middle;cursor:help}
 .merge-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
 .merge-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;font-weight:600;background:#f5f7fa;border:1px solid var(--border2);border-radius:8px;padding:7px 11px}
 .merge-row i{color:var(--navy);font-size:14px;margin-right:4px}
@@ -1242,15 +1268,22 @@ function renderList(entries,side){
   if(!list.length){
     body=`<div class="empty">${q?'No matches for “'+esc(S.q)+'”.':'Nothing here yet.'}</div>`;
   } else if(S.group){
-    // group by party name
+    // group by NORMALIZED key so punctuation/spacing variants ("Corp" vs "Corp.",
+    // "Inc." vs ", Inc.") collapse into one card automatically. The displayed name is
+    // the most common spelling among the grouped entries (ties -> the longest).
     const groups={};
-    list.forEach(e=>{ const k=e.party||'—'; (groups[k]=groups[k]||[]).push(e); });
-    const names=Object.keys(groups).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
-    body=names.map(name=>{
-      const g=groups[name];
+    list.forEach(e=>{ const k=vendorKey(e.party||'—'); (groups[k]=groups[k]||[]).push(e); });
+    const displayName=g=>{
+      const counts={};
+      g.forEach(e=>{ const n=e.party||'—'; counts[n]=(counts[n]||0)+1; });
+      return Object.keys(counts).sort((a,b)=> counts[b]-counts[a] || b.length-a.length || a.localeCompare(b))[0];
+    };
+    const keys=Object.keys(groups).sort((a,b)=>displayName(groups[a]).toLowerCase().localeCompare(displayName(groups[b]).toLowerCase()));
+    body=keys.map(key=>{
+      const g=groups[key];
+      const name=displayName(g);
       const gOut=g.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
       const gid='grp_'+hash(name);
-      // expanded if searching (so matches are visible) or not manually collapsed
       const collapsed=!q && S.collapsed && S.collapsed[name];
       return `<div class="vgroup">
         <div class="vgroup-head" onclick="toggleGroup('${esc(name).replace(/'/g,"\\'")}')">
@@ -1258,7 +1291,7 @@ function renderList(entries,side){
           <span class="vg-name">${esc(name)}</span>
           <span class="vg-cnt">${g.length}</span>
           <span class="vg-sum">${fmtMoney(gOut)} out</span>
-          <button class="vg-merge" onclick="event.stopPropagation();openMergeVendor('${esc(name).replace(/'/g,"\\'")}','${side}')" title="Merge this vendor into another (same company, different name)"><i class="ti ti-arrow-merge"></i></button>
+          <button class="vg-merge" onclick="event.stopPropagation();openMergeVendor('${esc(name).replace(/'/g,"\\'")}','${side}')" title="Merge a differently-named ${side==='ar'?'customer':'vendor'} into this one"><i class="ti ti-arrow-merge"></i></button>
         </div>
         ${collapsed?'':`<div class="vgroup-body">${g.map(card).join('')}</div>`}
       </div>`;
@@ -1281,6 +1314,52 @@ function renderList(entries,side){
     allCollapsed = groupNames.length>0 && groupNames.every(n=>S.collapsed&&S.collapsed[n]);
   }
 
+  // ── Summary snapshot (top of the list) ──────────────────────────────────────
+  const unpaidOf=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  const active=all.filter(e=>unpaidOf(e)>0.005); // only things still owed
+  const totalOut=active.reduce((s,e)=>s+unpaidOf(e),0);
+  const overdueAmt=active.filter(e=>statusOf(e)==='over').reduce((s,e)=>s+unpaidOf(e),0);
+  const overdueCount=active.filter(e=>statusOf(e)==='over').length;
+  const dueWeekAmt=active.filter(e=>{const d=daysUntil(e.due);return d!=null&&d>=0&&d<=7;}).reduce((s,e)=>s+unpaidOf(e),0);
+  // aging buckets by days overdue (current = not yet due or due today)
+  const buckets={cur:0,b30:0,b60:0,b90:0};
+  active.forEach(e=>{ const d=daysUntil(e.due); const amt=unpaidOf(e);
+    if(d==null||d>=0) buckets.cur+=amt;            // not yet due / no date
+    else { const od=-d; if(od<=30)buckets.b30+=amt; else if(od<=60)buckets.b60+=amt; else buckets.b90+=amt; }
+  });
+  const agingTotal=buckets.cur+buckets.b30+buckets.b60+buckets.b90;
+  const pct=v=>agingTotal>0?(v/agingTotal*100):0;
+  const agingSegs=[
+    {k:'cur',label:'Current',v:buckets.cur,c:'var(--ar)'},
+    {k:'b30',label:'1–30 late',v:buckets.b30,c:'#BA7517'},
+    {k:'b60',label:'31–60 late',v:buckets.b60,c:'#d2691e'},
+    {k:'b90',label:'60+ late',v:buckets.b90,c:'var(--red)'}
+  ].filter(s=>s.v>0.005);
+  // top parties by outstanding (already canonicalized upstream)
+  const byParty={};
+  active.forEach(e=>{ const p=e.party||'—'; byParty[p]=(byParty[p]||0)+unpaidOf(e); });
+  const topParties=Object.entries(byParty).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const maxParty=topParties.length?topParties[0][1]:0;
+  const partyWord=isAR?'customers':'vendors';
+  const accent=isAR?'var(--ar)':'var(--ap)';
+
+  const summary=active.length?`<div class="sum-panel">
+    <div class="sum-figs">
+      <div class="sum-fig"><div class="sl">${isAR?'Owed to you':'You owe'}</div><div class="sv" style="color:${accent}">${fmtMoney(totalOut)}</div><div class="ss">${active.length} open invoice${active.length!==1?'s':''}</div></div>
+      <div class="sum-fig"><div class="sl">Overdue</div><div class="sv" style="color:${overdueAmt>0.005?'var(--red)':'var(--text3)'}">${fmtMoney(overdueAmt)}</div><div class="ss">${overdueCount} past due</div></div>
+      <div class="sum-fig"><div class="sl">Due in 7 days</div><div class="sv">${fmtMoney(dueWeekAmt)}</div><div class="ss">coming up</div></div>
+    </div>
+    ${agingTotal>0.005?`<div class="sum-aging">
+      <div class="sum-aging-head"><span>Aging</span><span class="sum-aging-tot">${fmtMoney(agingTotal)}</span></div>
+      <div class="aging-bar">${agingSegs.map(s=>`<div class="aging-seg" style="width:${pct(s.v)}%;background:${s.c}" title="${s.label}: ${fmtMoney(s.v)}"></div>`).join('')}</div>
+      <div class="aging-key">${agingSegs.map(s=>`<span class="ak"><span class="ak-dot" style="background:${s.c}"></span>${s.label} <b>${fmtMoney(s.v)}</b></span>`).join('')}</div>
+    </div>`:''}
+    ${topParties.length?`<div class="sum-top">
+      <div class="sum-top-head">Top ${partyWord}</div>
+      ${topParties.map(([p,v])=>`<div class="sum-top-row"><span class="stp-name">${esc(p)}</span><span class="stp-bar"><span class="stp-fill" style="width:${maxParty>0?(v/maxParty*100):0}%;background:${accent}"></span></span><span class="stp-amt">${fmtMoney(v)}</span></div>`).join('')}
+    </div>`:''}
+  </div>`:'';
+
   $('content').innerHTML=`
     <div class="toolbar">
       <button class="btn ${isAR?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button>
@@ -1292,6 +1371,7 @@ function renderList(entries,side){
       <div class="list-search"><i class="ti ti-search"></i><input id="list-q" placeholder="Search ${isAR?'customer':'vendor'}, invoice #, description…" value="${esc(S.q)}"></div>
       <div style="margin-left:auto;font-weight:800">${fmtMoney(outstanding)} outstanding · ${all.length} item${all.length!==1?'s':''}</div>
     </div>
+    ${summary}
     <div style="max-width:760px;padding-bottom:${S.sel.size?'64px':'0'}">${body}</div>
     ${selBar}`;
 
@@ -1319,8 +1399,19 @@ window.toggleGroup=(name)=>{ const S=listState[_curSide]; S.collapsed=S.collapse
 let _mergeSrc='', _mergeSide='ar';
 window.openMergeVendor=(name,side)=>{
   _mergeSrc=name; _mergeSide=side;
-  const names=[...new Set(allEntries().filter(e=>e.type===side&&!e.archived&&!e.void&&!e.trashed).map(e=>e.party))]
-    .filter(n=>n && n!==name).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  // Candidate targets = distinct normalized groups on this side (so we don't list
+  // punctuation variants of the same name, which already group together).
+  const byKey={};
+  allEntries().filter(e=>e.type===side&&!e.archived&&!e.void&&!e.trashed).forEach(e=>{
+    const k=vendorKey(e.party||''); if(!k)return;
+    (byKey[k]=byKey[k]||[]).push(e.party);
+  });
+  const srcKey=vendorKey(name);
+  const names=Object.keys(byKey).filter(k=>k!==srcKey).map(k=>{
+    // most common spelling for that group
+    const counts={}; byKey[k].forEach(n=>{counts[n]=(counts[n]||0)+1;});
+    return Object.keys(counts).sort((a,b)=>counts[b]-counts[a]||b.length-a.length)[0];
+  }).filter(n=>n&&n!==name).sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
   const isAR=side==='ar';
   const opts=names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
   // names currently merged INTO this one (so they can be unmerged)
@@ -1366,7 +1457,11 @@ window.confirmMergeVendor=()=>{
   if(!target||!_mergeSrc)return;
   const srcKey=vendorKey(_mergeSrc);
   const tgtName=target;
-  if(srcKey===vendorKey(tgtName)){ closePay(); return; }
+  if(srcKey===vendorKey(tgtName)){
+    // Same normalized key — these already group together automatically; nothing to merge.
+    alert('Those two names already count as the same '+(_mergeSide==='ar'?'customer':'vendor')+' (they only differ by punctuation or spacing), so they\u2019re shown together already.');
+    closePay(); return;
+  }
   vendorAliases[srcKey]=tgtName;
   vendorAliasNames[srcKey]=_mergeSrc; // remember the real original name for unmerge display
   // Re-point any aliases that resolved to the source so chains collapse onto the new target.
@@ -3467,9 +3562,31 @@ function updateAiStatus(){
 function vendorKey(name){ return (name||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'_'; }
 // Resolve a raw vendor/customer name to its canonical name via the alias map.
 // vendorAliases maps a variant's key -> canonical display name. If no alias, return as-is.
+// Map of normalized key -> preferred (most-common, then longest) spelling, so that
+// punctuation/spacing variants of the same name resolve to ONE consistent display
+// everywhere (lists, aging, forecast, totals). Rebuilt when the underlying data changes.
+let _spellingMap=null, _spellingStamp='';
+function buildSpellingMap(){
+  const stamp=Object.keys(overlay).length+'|'+Object.keys(orders).length;
+  if(_spellingMap && _spellingStamp===stamp) return _spellingMap;
+  const counts={}; // key -> {name:count}
+  const tally=nm=>{ if(!nm)return; const k=vendorKey(nm); (counts[k]=counts[k]||{})[nm]=(counts[k][nm]||0)+1; };
+  Object.values(overlay).forEach(o=>{ if(o&&o.party) tally(o.party); });
+  Object.values(orders).forEach(r=>{ if(r&&r.customer) tally(r.customer); });
+  const map={};
+  Object.keys(counts).forEach(k=>{
+    map[k]=Object.keys(counts[k]).sort((a,b)=> counts[k][b]-counts[k][a] || b.length-a.length || a.localeCompare(b))[0];
+  });
+  _spellingMap=map; _spellingStamp=stamp; return map;
+}
 function canonicalParty(name){
-  const canon=vendorAliases[vendorKey(name||'')];
-  return canon||name;
+  if(!name) return name;
+  // 1) explicit alias (user merged different-looking names) wins
+  const alias=vendorAliases[vendorKey(name)];
+  if(alias) return alias;
+  // 2) otherwise normalize to the preferred spelling for this key (folds "Corp"/"Corp.")
+  const pref=buildSpellingMap()[vendorKey(name)];
+  return pref||name;
 }
 function fillAccountSelect(selId){
   const sel=$('ai-account'); if(!sel)return;
