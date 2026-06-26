@@ -86,6 +86,17 @@ body{margin:0;font-family:'Inter',-apple-system,Segoe UI,Arial,sans-serif;backgr
 .sum-fig .sl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
 .sum-fig .sv{font-size:20px;font-weight:800;line-height:1.1;margin-top:1px}
 .sum-fig .ss{font-size:11px;color:var(--text3);margin-top:1px}
+.sum-fig.clickable{cursor:pointer;border-radius:8px;padding:5px 8px;margin:-5px -8px;transition:background .12s,box-shadow .12s}
+.sum-fig.clickable:hover{background:#f5f7fa}
+.sum-fig.clickable.active{background:#3a6ea50f;box-shadow:inset 0 0 0 1.5px var(--blue)}
+.ff-on{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--blue);background:#3a6ea51a;border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:middle}
+.focus-chips{display:inline-flex;gap:6px;align-items:center}
+.fchip{display:inline-flex;align-items:center;gap:5px;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:8px;padding:6px 11px;cursor:pointer;transition:all .12s}
+.fchip:hover{border-color:var(--navy);color:var(--navy)}
+.fchip i{font-size:15px}
+.fchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.fchip.clear{padding:6px 8px;color:var(--text3)}
+.fchip.clear:hover{color:var(--red);border-color:var(--red)}
 .sum-aging{display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--border2);padding-left:18px}
 .sum-aging-head{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);margin-bottom:7px}
 .sum-aging-tot{font-size:13px;font-weight:800;color:var(--text);text-transform:none;letter-spacing:0}
@@ -1157,7 +1168,7 @@ function updateBadges(entries){
   set('nb-trash',trashedEntries().length);
 }
 // list view state (per side): search text, group-by-vendor, selected ids
-const listState={ar:{q:'',group:false,sort:'due',sel:new Set()},ap:{q:'',group:false,sort:'due',sel:new Set()}};
+const listState={ar:{q:'',group:false,sort:'due',sel:new Set(),focus:'all'},ap:{q:'',group:false,sort:'due',sel:new Set(),focus:'all'}};
 let _curSide='ap';
 function entryCard(e,opts){
   opts=opts||{};
@@ -1256,7 +1267,16 @@ function renderList(entries,side){
   // apply search filter
   const q=S.q.trim().toLowerCase();
   const match=e=>!q||[e.party,e.ref,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q));
-  const list=all.filter(match);
+  // quick-focus filter (overdue / due in 7 days), driven by the summary figures
+  const focus=S.focus||'all';
+  const focusMatch=e=>{
+    if(focus==='all')return true;
+    if(Math.max(0,(e.amount||0)-(e.paid||0))<=0.005)return false; // only unpaid
+    if(focus==='overdue')return statusOf(e)==='over';
+    if(focus==='week'){const d=daysUntil(e.due);return d!=null&&d>=0&&d<=7;}
+    return true;
+  };
+  const list=all.filter(e=>match(e)&&focusMatch(e));
   const outstanding=all.reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
   const selArr=all.filter(e=>S.sel.has(e.id));
   const selTotal=selArr.reduce((s,e)=>s+(e.amount||0),0);
@@ -1266,7 +1286,7 @@ function renderList(entries,side){
 
   let body;
   if(!list.length){
-    body=`<div class="empty">${q?'No matches for “'+esc(S.q)+'”.':'Nothing here yet.'}</div>`;
+    body=`<div class="empty">${q?'No matches for “'+esc(S.q)+'”.':(focus!=='all'?'Nothing '+(focus==='overdue'?'overdue':'due in the next 7 days')+'. <a href="#" onclick="clearListFocus();return false">Show all</a>':'Nothing here yet.')}</div>`;
   } else if(S.group){
     // group by NORMALIZED key so punctuation/spacing variants ("Corp" vs "Corp.",
     // "Inc." vs ", Inc.") collapse into one card automatically. The displayed name is
@@ -1346,8 +1366,8 @@ function renderList(entries,side){
   const summary=active.length?`<div class="sum-panel">
     <div class="sum-figs">
       <div class="sum-fig"><div class="sl">${isAR?'Owed to you':'You owe'}</div><div class="sv" style="color:${accent}">${fmtMoney(totalOut)}</div><div class="ss">${active.length} open invoice${active.length!==1?'s':''}</div></div>
-      <div class="sum-fig"><div class="sl">Overdue</div><div class="sv" style="color:${overdueAmt>0.005?'var(--red)':'var(--text3)'}">${fmtMoney(overdueAmt)}</div><div class="ss">${overdueCount} past due</div></div>
-      <div class="sum-fig"><div class="sl">Due in 7 days</div><div class="sv">${fmtMoney(dueWeekAmt)}</div><div class="ss">coming up</div></div>
+      <div class="sum-fig clickable${focus==='overdue'?' active':''}" onclick="setListFocus('overdue')" title="Click to show only overdue ${partyWord==='customers'?'invoices':'bills'}"><div class="sl">Overdue ${focus==='overdue'?'<span class="ff-on">filtering</span>':''}</div><div class="sv" style="color:${overdueAmt>0.005?'var(--red)':'var(--text3)'}">${fmtMoney(overdueAmt)}</div><div class="ss">${overdueCount} past due</div></div>
+      <div class="sum-fig clickable${focus==='week'?' active':''}" onclick="setListFocus('week')" title="Click to show only items due within 7 days"><div class="sl">Due in 7 days ${focus==='week'?'<span class="ff-on">filtering</span>':''}</div><div class="sv">${fmtMoney(dueWeekAmt)}</div><div class="ss">coming up</div></div>
     </div>
     ${agingTotal>0.005?`<div class="sum-aging">
       <div class="sum-aging-head"><span>Aging</span><span class="sum-aging-tot">${fmtMoney(agingTotal)}</span></div>
@@ -1368,6 +1388,11 @@ function renderList(entries,side){
       <label class="sort-ctl"><i class="ti ti-arrows-sort"></i><select id="list-sort" onchange="setListSort(this.value)">
         ${LIST_SORTS.map(s=>`<option value="${s.k}" ${S.sort===s.k?'selected':''}>${s.label}</option>`).join('')}
       </select></label>
+      <div class="focus-chips">
+        <button class="fchip${focus==='overdue'?' on':''}" onclick="setListFocus('overdue')"><i class="ti ti-alert-triangle"></i> Overdue</button>
+        <button class="fchip${focus==='week'?' on':''}" onclick="setListFocus('week')"><i class="ti ti-clock"></i> Due ≤ 7 days</button>
+        ${focus!=='all'?`<button class="fchip clear" onclick="clearListFocus()"><i class="ti ti-x"></i></button>`:''}
+      </div>
       <div class="list-search"><i class="ti ti-search"></i><input id="list-q" placeholder="Search ${isAR?'customer':'vendor'}, invoice #, description…" value="${esc(S.q)}"></div>
       <div style="margin-left:auto;font-weight:800">${fmtMoney(outstanding)} outstanding · ${all.length} item${all.length!==1?'s':''}</div>
     </div>
@@ -1384,6 +1409,8 @@ function renderList(entries,side){
 }
 window.toggleGroupMode=()=>{ listState[_curSide].group=!listState[_curSide].group; rerenderList(); };
 window.setListSort=(key)=>{ listState[_curSide].sort=key; rerenderList(); };
+window.setListFocus=(f)=>{ const S=listState[_curSide]; S.focus=(S.focus===f)?'all':f; rerenderList(); };
+window.clearListFocus=()=>{ listState[_curSide].focus='all'; rerenderList(); };
 window.toggleCollapseAll=()=>{
   const S=listState[_curSide]; S.collapsed=S.collapsed||{};
   // determine current group names from the live list
