@@ -33,8 +33,9 @@
 .nav-item i,.nav-item svg.nav-ico{color:rgba(255,255,255,.7);stroke:rgba(255,255,255,.7)}
 .nav-item.active i,.nav-item.active svg.nav-ico{color:#fff;stroke:#fff}
 .sidebar-section-label{color:rgba(255,255,255,.5)!important}
-/* square corners (circles via border-radius:50% stay round) */
-.btn,.filterbar input[type=text],select,textarea,.proc-btn,.notes-input,.q-qty,.ss-assignee,.sdate,.sdate-input,.menu-toggle,.sidebar-pin,.status-badge,.stat-card,.card,.po-card,.po-mini,.queue-tab,.modal,.nav-item,.nav-badge,.role-badge,.logo-icon,.disp-group,.q-open-btn,.dm-btn,.autosave,.undo-toast{border-radius:0!important}
+/* square corners globally (brand rule); true circles re-rounded immediately after */
+*{border-radius:0!important}
+.pc-dot,.sync-dot,.qt-dot,.queue-tab .qt-dot,.pv-bubble,.spinner,.io-prio,.co-dot,.autosave .as-spin,.cal-cell.today .cal-daynum,.proc-btn.icon-btn.add .add-badge,[style*="border-radius:50%"]{border-radius:50%!important}
 /* continuous 2.25px red rule under the header band (plate + top bar) */
 .topbar{border-bottom:2.25px solid var(--spark)}
 .sidebar-logo{border-bottom:2.25px solid var(--spark)!important}
@@ -629,12 +630,12 @@ tr:hover .del-btn{opacity:1}
 .tl-row{display:flex;align-items:center;gap:10px;padding:5px 0}
 .tl-row .pc-dot{flex-shrink:0}
 .tl-name{font-size:12.5px;font-weight:600;color:var(--text);width:120px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tl-track{flex:1;min-width:60px;height:14px;background:#eef1f6;border-radius:7px;overflow:hidden}
-.tl-fill{height:100%;border-radius:7px;min-width:2px;transition:width .3s}
+.tl-track{flex:1;min-width:60px;height:14px;background:#eef1f6;border-radius:0;overflow:hidden}
+.tl-fill{height:100%;border-radius:0;min-width:2px;transition:width .3s}
 .tl-count{font-size:12px;font-weight:700;color:var(--text2);width:120px;flex-shrink:0;text-align:right}
 .tl-behind{color:var(--red);font-weight:700;font-size:10.5px;margin-left:3px}
 .tl-free{color:var(--text3);font-weight:500;font-size:10.5px;margin-left:3px;font-style:italic}
-.tl-row.none .tl-name{color:#BA7517}
+.tl-row.none .tl-name{color:var(--text3)}
 @media(max-width:760px){ .tl-name{width:90px} .tl-count{width:auto} }
 .badge-red{background:var(--red) !important;color:#fff !important}
 /* Undo toast (after delete / archive) */
@@ -2959,6 +2960,9 @@ const teamRef = ref(db, 'team');
 let team = [];
 let editPersonId = null;
 const PERSON_COLORS = ['#3a6ea5','#2f8f6b','#a8553a','#7a5cc0','#b0852a','#3f7d7a','#9c4567','#5a7d2a','#b5532f','#2c6e8f'];
+// Avatars use only the three sibling-app signature colors, assigned deterministically per person.
+const SIG_COLORS = ['#6a1f2e','#1e3a5f','#1f4d38'];
+function sigColor(p){ if(!p) return '#9aa1ad'; const s=String(p.id||p.name||''); let h=0; for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return SIG_COLORS[h%SIG_COLORS.length]; }
 function startTeamListener(){
   onValue(teamRef, (snap)=>{ const d=snap.val(); team = d?Object.values(d):[]; renderTeam(); refreshActivePage(); });
 }
@@ -2967,7 +2971,7 @@ function personById(id){ return team.find(p=>p.id===id)||null; }
 function personInitials(name){ return (name||'').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
 function personChip(id, withName=true){
   const p=personById(id); if(!p) return '';
-  return `<span class="person-chip" title="${esc2(p.name)}"><span class="pc-dot" style="background:${p.color||'#888'}">${personInitials(p.name)}</span>${withName?`<span class="pc-name">${esc2(p.name)}</span>`:''}</span>`;
+  return `<span class="person-chip" title="${esc2(p.name)}"><span class="pc-dot" style="background:${sigColor(p)}">${personInitials(p.name)}</span>${withName?`<span class="pc-name">${esc2(p.name)}</span>`:''}</span>`;
 }
 const ALL_PROCESSES = ()=>[...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 // dropdown options for assigning a step — people who can run this process first
@@ -2993,7 +2997,7 @@ function renderTeam(){
     const chips = procs.length ? procs.map(pr=>`<span class="tm-proc" style="color:${PROCESS_COLORS[pr]||'#888'}">${procIcon(pr,13)} ${shortProc(pr)}</span>`).join('') : '<span style="font-size:11px;color:var(--text3)">No processes set</span>';
     return `<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span class="pc-dot lg" style="background:${p.color||'#888'}">${personInitials(p.name)}</span>
+        <span class="pc-dot lg" style="background:${sigColor(p)}">${personInitials(p.name)}</span>
         <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${esc2(p.name)}</div>
           ${openAssigned?`<div style="font-size:11px;color:var(--text2)">${openAssigned} open step${openAssigned!==1?'s':''} assigned</div>`:'<div style="font-size:11px;color:var(--text3)">No open steps assigned</div>'}</div>
         <button class="btn sm" onclick="openEditPerson('${p.id}')"><i class="ti ti-edit"></i></button>
@@ -3217,7 +3221,7 @@ function renderOfficeQueue(officeOrders, name){
   document.getElementById('queue-count').textContent = officeOrders.length ? `${officeOrders.length} open` : 'all clear';
   const person = team.find(p=>(p.name||'').trim().toLowerCase()===name.toLowerCase());
   const who = person
-    ? `<span class="pc-dot sm" style="background:${person.color||'#7a5cc0'}">${personInitials(person.name)}</span> ${esc2(person.name)}`
+    ? `<span class="pc-dot sm" style="background:${sigColor(person)}">${personInitials(person.name)}</span> ${esc2(person.name)}`
     : `${esc2(name)} <span style="color:var(--red);font-size:11px;font-weight:600">— not on the Team yet (add them on the Team page)</span>`;
   const head = `<div class="q-personbar"><span class="q-pb-label">Assigned to</span><span class="q-pchip" style="cursor:default;background:var(--navy3);border-color:var(--navy3);color:#fff">${who}</span></div>`;
   const body = document.getElementById('queue-body');
@@ -3308,7 +3312,7 @@ function renderQueues(){
     ${team.filter(pp=>(pp.processes||[]).some(x=>queueProcs.includes(x)) || items.some(i=>i.step.assignee===pp.id))
         .sort((a,b)=>a.name.localeCompare(b.name))
         .map(pp=>{ const n=items.filter(i=>i.step.assignee===pp.id && i.status!=='completed').length;
-          return `<button class="q-pchip${_queuePerson===pp.id?' on':''}" onclick="setQueuePerson('${pp.id}')"><span class="pc-dot sm" style="background:${pp.color||'#888'}">${personInitials(pp.name)}</span>${esc2(pp.name)}${n?`<span class="q-pchip-n">${n}</span>`:''}</button>`; }).join('')}
+          return `<button class="q-pchip${_queuePerson===pp.id?' on':''}" onclick="setQueuePerson('${pp.id}')"><span class="pc-dot sm" style="background:${sigColor(pp)}">${personInitials(pp.name)}</span>${esc2(pp.name)}${n?`<span class="q-pchip-n">${n}</span>`:''}</button>`; }).join('')}
   </div>` : '';
   if(_queuePerson && !team.some(p=>p.id===_queuePerson)) _queuePerson='';
   if(_queuePerson) items = items.filter(i => (i.step.assignee||'')===_queuePerson);
@@ -3519,7 +3523,7 @@ function renderDispatch(){
     const behindCount=arr.filter(i=>i.health.state==='behind').length;
     const head = none
       ? `<div class="disp-phead none"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${arr.length} ready step${arr.length!==1?'s':''} with no owner — assign someone</div></div></div>`
-      : `<div class="disp-phead"><span class="pc-dot lg" style="background:${person?.color||'#888'}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div></div>`;
+      : `<div class="disp-phead"><span class="pc-dot lg" style="background:${sigColor(person)}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div></div>`;
     return `<div class="disp-group${none?' none':''}">${head}<div class="disp-rows">${arr.map((it,i)=>dispatchRow(it,i,arr.length)).join('')}</div></div>`;
   }).join('');
   renderDailyBrief(); renderTeamLoad();
@@ -3730,16 +3734,16 @@ function renderTeamLoad(){
   rows.sort((a,b)=>(b.behind-a.behind)||(b.today-a.today)||a.p.name.localeCompare(b.p.name));
   const bar=(n,behind,color)=>{
     const pct=Math.round(n/maxN*100);
-    return `<div class="tl-track"><div class="tl-fill" style="width:${pct}%;background:${behind?'var(--red)':color}"></div></div>`;
+    return `<div class="tl-track"><div class="tl-fill" style="width:${pct}%;background:${behind?'#bf5b54':'#cbd0d8'}"></div></div>`;
   };
   const personRow=r=>`<div class="tl-row">
-    <span class="pc-dot" style="background:${r.p.color||'#888'}">${personInitials(r.p.name)}</span>
+    <span class="pc-dot" style="background:${sigColor(r.p)}">${personInitials(r.p.name)}</span>
     <span class="tl-name">${esc2(r.p.name)}</span>
     ${bar(r.today, r.behind, r.p.color||'#3a6ea5')}
     <span class="tl-count">${r.today}${r.behind?` <span class="tl-behind">${r.behind} behind</span>`:''}${r.today===0?'<span class="tl-free">free</span>':''}</span>
   </div>`;
   const unRow = unassigned ? `<div class="tl-row none">
-    <span class="pc-dot" style="background:#BA7517"><i class="ti ti-help" style="font-size:12px"></i></span>
+    <span class="pc-dot" style="background:#9aa1ad"><i class="ti ti-help" style="font-size:12px"></i></span>
     <span class="tl-name">Unassigned</span>
     ${bar(unassigned, unassignedBehind, '#BA7517')}
     <span class="tl-count">${unassigned}${unassignedBehind?` <span class="tl-behind">${unassignedBehind} behind</span>`:''}</span>
