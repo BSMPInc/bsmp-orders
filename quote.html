@@ -453,7 +453,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 
 /* New Quote: two-column layout with sticky pricing summary */
-.quote-grid { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 18px; align-items: start; }
+#panel-quote { max-width: none; }
+.quote-grid { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 18px; align-items: start; max-width: 1380px; margin: 0 auto; }
 .quote-main { min-width: 0; }
 .quote-side { position: sticky; top: 0; align-self: start; }
 .quote-side .card { margin-bottom: 0; }
@@ -474,6 +475,19 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .opt-btn:hover { background: var(--cool-bg); color: var(--text); }
 .opt-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .opt-btn.active .ti { color: #fff; transform: rotate(45deg); }
+
+/* Cost composition panel */
+.mix-bar { display: flex; height: 14px; width: 100%; overflow: hidden; border: 1px solid var(--border); }
+.mix-bar span { display: block; height: 100%; }
+.mix-legend { margin-top: 12px; }
+.mix-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; }
+.mix-dot { width: 9px; height: 9px; flex-shrink: 0; }
+.mix-k { color: var(--text2); }
+.mix-v { margin-left: auto; font-weight: 600; }
+.mix-pct { width: 36px; text-align: right; color: var(--text3); }
+.mix-foot { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-top: 1px solid var(--border); }
+.mix-foot:first-of-type { margin-top: 10px; }
+.mix-foot span:last-child { font-weight: 700; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -801,6 +815,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <button class="opt-btn" data-card="inspection-card" onclick="toggleOptCard(this,'inspection-card')"><i class="ti ti-plus"></i>Inspection</button>
       <button class="opt-btn" data-card="weld-card" onclick="toggleOptCard(this,'weld-card')"><i class="ti ti-plus"></i>Welding</button>
       <button class="opt-btn" data-card="cnc-card" onclick="toggleOptCard(this,'cnc-card')"><i class="ti ti-plus"></i>CNC mill</button>
+      <button class="opt-btn" data-card="hardware-card" onclick="toggleOptCard(this,'hardware-card')"><i class="ti ti-plus"></i>Hardware</button>
+      <button class="opt-btn" data-card="outsource-card" onclick="toggleOptCard(this,'outsource-card')"><i class="ti ti-plus"></i>Outsource</button>
+      <button class="opt-btn" data-card="gang-nest-card" onclick="toggleOptCard(this,'gang-nest-card')"><i class="ti ti-plus"></i>Gang nest</button>
+      <button class="opt-btn" data-card="qtybreaks-card" onclick="toggleOptCard(this,'qtybreaks-card')"><i class="ti ti-plus"></i>Qty breaks</button>
     </div>
   </div>
 
@@ -1258,7 +1276,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Hardware -->
-  <div class="card">
+  <div class="card" id="hardware-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
       Hardware
@@ -1271,7 +1289,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Outsource -->
-  <div class="card">
+  <div class="card" id="outsource-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
       Outsource
@@ -1290,7 +1308,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Gang / Shared Nest -->
-  <div class="card" id="gang-nest-card">
+  <div class="card" id="gang-nest-card" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div class="card-title" style="margin-bottom:0">
         <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" width="14" height="14"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
@@ -1314,7 +1332,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Quantity Breaks -->
-  <div class="card">
+  <div class="card" id="qtybreaks-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Quantity Breaks
@@ -1433,6 +1451,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         Save to history
       </button>
     </div>
+  </div>
+  <div class="card" id="cost-mix-card" style="margin-top:16px">
+    <div class="card-title"><i class="ti ti-chart-pie"></i> Cost composition</div>
+    <div id="cost-mix"><div style="font-size:12px;color:var(--text3)">Fill in the quote to see where the cost goes.</div></div>
   </div>
   </aside>
   </div><!-- /quote-grid -->
@@ -1946,6 +1968,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">More grouping + cost composition</div>
+        <ul class="changelog-list">
+          <li>Hardware, Outsource, Gang nest, and Quantity breaks are now collapsed under the "Add detail" buttons too, so the page stays tidy until you need them</li>
+          <li>New "Cost composition" panel under the pricing summary shows where each dollar of the part cost goes (material, labor, welding, CNC, inspection, programming, hardware, outsource) as a live stacked bar</li>
+          <li>The New Quote layout is now centered with a slightly wider summary rail, so there's less empty space to the right on large monitors</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">New Quote layout</div>
@@ -3748,7 +3779,8 @@ function calculate(){
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Job total (×${qty})</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('breakdown').innerHTML=bd;
 
-  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc};
+  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
+  if(typeof renderCostMix==='function') renderCostMix();
 }
 
 // ===================== FILE HANDLING =====================
@@ -7937,17 +7969,44 @@ function toggleOptCard(btn,id){
   if(btn)btn.classList.toggle('active',hidden);
   if(hidden){ try{el.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){} }
 }
+function renderCostMix(){
+  var d=window._calc, el=document.getElementById('cost-mix'); if(!el)return; if(!d){return;}
+  var fmt=function(v){return '$'+(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
+  var segs=[
+    {k:'Material',v:d.matCostPart||0,c:'#1e3a5f'},
+    {k:'Labor / ops',v:d.laborCostPart||0,c:'#2563b0'},
+    {k:'Welding',v:d.weldCostPart||0,c:'#0f7a4f'},
+    {k:'CNC mill',v:d.cncCostPart||0,c:'#6a1f2e'},
+    {k:'Inspection',v:d.inspCostPart||0,c:'#2f7d8c'},
+    {k:'Programming',v:d.progCostPart||0,c:'#7a5c1e'},
+    {k:'Hardware',v:d.hwCostPart||0,c:'#b06a00'},
+    {k:'Outsource',v:d.outCostPart||0,c:'#8a93a5'},
+    {k:'Purchasing',v:d.purchasing||0,c:'#3a4049'}
+  ].filter(function(s){return s.v>0.005;});
+  var cost=(d.totalCostPart!=null)?d.totalCostPart:segs.reduce(function(a,s){return a+s.v;},0);
+  var known=segs.reduce(function(a,s){return a+s.v;},0);
+  if(cost-known>0.01){ segs.push({k:'Other',v:cost-known,c:'#c9c2b0'}); }
+  if(cost<=0.005){ el.innerHTML='<div style="font-size:12px;color:var(--text3)">Fill in the quote to see where the cost goes.</div>'; return; }
+  var bar='<div class="mix-bar">'+segs.map(function(s){return '<span style="width:'+(s.v/cost*100).toFixed(2)+'%;background:'+s.c+'" title="'+s.k+' '+fmt(s.v)+'"></span>';}).join('')+'</div>';
+  var legend='<div class="mix-legend">'+segs.map(function(s){return '<div class="mix-row"><span class="mix-dot" style="background:'+s.c+'"></span><span class="mix-k">'+s.k+'</span><span class="mix-v">'+fmt(s.v)+'</span><span class="mix-pct">'+Math.round(s.v/cost*100)+'%</span></div>';}).join('')+'</div>';
+  var foot='<div class="mix-foot"><span>Cost / part</span><span>'+fmt(cost)+'</span></div>'+
+           '<div class="mix-foot"><span>Margin added</span><span>'+fmt(d.markupCost)+'</span></div>';
+  el.innerHTML=bar+legend+foot;
+}
 window.syncOptCards=function(){
   document.querySelectorAll('.opt-btn').forEach(function(b){
     var el=document.getElementById(b.dataset.card);
     if(el){ b.classList.toggle('active', getComputedStyle(el).display!=='none'); }
   });
-  [['weld-enabled','weld-card'],['cnc-enabled','cnc-card']].forEach(function(p){
+  [['weld-enabled','weld-card'],['cnc-enabled','cnc-card'],['gang-enabled','gang-nest-card']].forEach(function(p){
     var c=document.getElementById(p[0]), card=document.getElementById(p[1]);
     if(c&&c.checked&&card){ card.style.display=''; var b=document.querySelector('.opt-btn[data-card="'+p[1]+'"]'); if(b)b.classList.add('active'); }
   });
 };
-(function(){ if(document.readyState!=='loading') syncOptCards(); else document.addEventListener('DOMContentLoaded',syncOptCards); })();
+(function(){
+  function init(){ try{syncOptCards();}catch(e){} try{ if(typeof renderCostMix==='function') renderCostMix(); }catch(e){} }
+  if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
+})();
 </script>
 <div id="toast-host" aria-live="polite"></div>
 </body>
