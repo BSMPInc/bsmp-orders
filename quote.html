@@ -337,7 +337,7 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .history-table .num { white-space: nowrap; }
 .history-table td select { min-width: 104px; }
 #history-body, #assembly-picker-body { overflow-x: auto; }
-.hist-filter { font-size: 13px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border2); background: var(--surface); color: var(--text); max-width: 170px; }
+.hist-filter { font-size: 13px; height: 36px; padding: 0 10px; border-radius: 0; border: 1px solid var(--border2); background: var(--surface); color: var(--text); max-width: 170px; }
 .hist-filter:focus { outline: none; border-color: var(--navy); }
 .history-table tr.row-selected td { background: var(--sky-light); }
 .history-table tr.row-selected td:first-child { box-shadow: inset 3px 0 0 var(--navy); }
@@ -361,12 +361,12 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
   display: inline-block; font-size: 11px; font-weight: 700;
   padding: 2px 9px; border-radius: 20px; letter-spacing: .01em;
 }
-.badge-navy { background: var(--sky-mid); color: #1e40af; }
+.badge-navy { background: var(--surface2); color: var(--text2); font-weight: 600; }
 .badge-green { background: var(--success-bg); color: #065f46; }
 .badge-amber { background: #fef3c7; color: #92400e; }
 .history-thumb {
   width: 46px; height: 36px; object-fit: contain;
-  border-radius: 5px; background: var(--surface2);
+  border-radius: 0; background: var(--surface2);
   border: 1px solid var(--border);
 }
 .history-thumb-empty {
@@ -490,6 +490,24 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .mix-foot { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-top: 1px solid var(--border); }
 .mix-foot:first-of-type { margin-top: 10px; }
 .mix-foot span:last-child { font-weight: 700; }
+
+/* ── Quote History (clean rebuild) ── */
+.hist-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+.hist-stat { background: var(--surface); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(16,24,40,.05); padding: 14px 16px; }
+.hist-stat-label { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
+.hist-stat-value { font-size: 24px; font-weight: 700; color: var(--text); margin-top: 5px; line-height: 1.1; }
+.hist-stat-sub { font-size: 11px; color: var(--text3); margin-top: 3px; min-height: 14px; }
+.hist-tier-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11.5px; margin-bottom: 16px; color: var(--text2); }
+.hist-tier-line .tier-lead { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); margin-right: 2px; }
+.hist-tier-line .tier-chip { font-weight: 600; }
+.hist-tier-line .tier-sep { color: var(--border2); }
+.hist-filter-card { padding: 12px 14px; margin-bottom: 16px; }
+.hist-filters { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+.hist-search { flex: 1; min-width: 200px; }
+.hist-search input { width: 100%; }
+.hist-actions { display: flex; gap: 8px; margin-left: auto; }
+.hist-showing { font-size: 12px; color: var(--text3); margin-bottom: 10px; }
+@media (max-width: 900px){ .hist-stat-grid { grid-template-columns: repeat(2,1fr); } .hist-actions { margin-left: 0; } }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -1464,43 +1482,50 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 <!-- ===== HISTORY PANEL ===== -->
 <div class="panel" id="panel-history">
-  <div class="page-header">
-    <h2>Quote History</h2>
-    <p>All saved quotes — stored in your browser</p>
+  <div class="page-header"><h2>Quote History</h2><p>All saved quotes — stored in your browser</p></div>
+
+  <div class="hist-stat-grid">
+    <div class="hist-stat"><div class="hist-stat-label">Quotes</div><div class="hist-stat-value" id="hs-total">0</div><div class="hist-stat-sub" id="hs-showing"></div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Accepted</div><div class="hist-stat-value" id="hs-accepted" style="color:var(--success)">0</div><div class="hist-stat-sub" id="hs-winrate"></div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Pending</div><div class="hist-stat-value" id="hs-pending" style="color:#2563b0">0</div><div class="hist-stat-sub" id="hs-stale"></div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Quoted value</div><div class="hist-stat-value" id="hs-value">$0</div><div class="hist-stat-sub" id="hs-won"></div></div>
   </div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px">
-      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <div id="history-count" style="font-size:13px;color:var(--text2);font-weight:500"></div>
-        <div id="history-stats" style="font-size:12px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap"></div>
-        <div id="history-tier-stats" style="font-size:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;margin-top:4px"></div>
+  <div class="hist-tier-line" id="history-tier-stats" style="display:none"></div>
+
+  <div class="card hist-filter-card">
+    <div class="hist-filters">
+      <div class="search-box hist-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="history-search" placeholder="Part # or customer…" oninput="renderHistory()">
       </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-        <div class="search-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="history-search" placeholder="Part # or customer…" style="width:170px" oninput="renderHistory()">
-        </div>
-        <select id="history-filter-customer" class="hist-filter" onchange="renderHistory()" title="Filter by customer"><option value="">All customers</option></select>
-        <select id="history-filter-material" class="hist-filter" onchange="renderHistory()" title="Filter by material"><option value="">All materials</option></select>
-        <input type="date" id="history-filter-from" class="hist-filter" onchange="renderHistory()" title="From date" style="width:150px">
-        <input type="date" id="history-filter-to" class="hist-filter" onchange="renderHistory()" title="To date" style="width:150px">
-        <select id="history-status-filter" class="hist-filter" onchange="renderHistory()">
-          <option value="all">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="accepted">Accepted</option>
-          <option value="declined">Declined</option>
-          <option value="noresponse">No Response</option>
-          <option value="stale">⚑ Needs follow-up</option>
-        </select>
-        <button class="btn btn-sm" onclick="clearHistoryFilters()" title="Reset all filters">Clear filters</button>
+      <select id="history-filter-customer" class="hist-filter" onchange="renderHistory()" title="Filter by customer"><option value="">All customers</option></select>
+      <select id="history-filter-material" class="hist-filter" onchange="renderHistory()" title="Filter by material"><option value="">All materials</option></select>
+      <select id="history-status-filter" class="hist-filter" onchange="renderHistory()">
+        <option value="all">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="accepted">Accepted</option>
+        <option value="declined">Declined</option>
+        <option value="noresponse">No Response</option>
+        <option value="stale">⚑ Needs follow-up</option>
+      </select>
+      <input type="date" id="history-filter-from" class="hist-filter" onchange="renderHistory()" title="From date">
+      <input type="date" id="history-filter-to" class="hist-filter" onchange="renderHistory()" title="To date">
+      <button class="btn btn-sm" onclick="clearHistoryFilters()" title="Reset all filters">Clear filters</button>
+      <div class="hist-actions">
         <button class="btn btn-sm" onclick="exportBackup()" title="Download a backup of all your saved data (quotes, prices, rates, settings)">⤓ Backup</button>
         <button class="btn btn-sm" onclick="buildCombinedQuote()" id="combine-btn" style="white-space:nowrap">Combine selected (0)</button>
         <button class="btn btn-sm btn-danger" onclick="clearHistory()">Clear all</button>
       </div>
     </div>
-    <div id="combine-selected-bar" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius)"></div>
+  </div>
+
+  <div id="combine-selected-bar" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--accent-soft);border:1px solid var(--border)"></div>
+
+  <div class="card hist-table-card">
+    <div id="history-count" class="hist-showing"></div>
     <div id="history-body"></div>
   </div>
+
 </div>
 
 <!-- ===== RATES PANEL ===== -->
@@ -1970,6 +1995,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">Quote History cleanup</div>
+        <ul class="changelog-list">
+          <li>Replaced the crowded rows of colored stat pills with four clean summary cards: Quotes, Accepted (with win rate), Pending (with follow-up count), and Quoted value (with amount won)</li>
+          <li>The per-tier win rates are now a single understated line instead of big colored badges</li>
+          <li>Filters moved into their own tidy card, and the table sits in its own card with a "showing N" caption; customer tags are now quiet neutral chips</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">More grouping + cost composition</div>
@@ -4665,7 +4699,7 @@ function renderHistory(){
   const body=document.getElementById('history-body');
   if(!filtered.length){
     body.innerHTML=`<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><h3>No quotes saved yet</h3><p>Build a quote and click "Save to history" — it will appear here.</p></div>`;
-    const se=document.getElementById('history-stats'); if(se) se.innerHTML='';
+    renderHistoryStats(filtered);
     return;
   }
   const fmt=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4763,35 +4797,31 @@ function isStale(q){
 }
 
 function renderHistoryStats(list){
-  const el = document.getElementById('history-stats');
-  if(!el) return;
-  let pending=0, accepted=0, declined=0, noresponse=0, stale=0, acceptedValue=0;
+  let pending=0, accepted=0, declined=0, noresponse=0, stale=0, acceptedValue=0, quotedValue=0;
   list.forEach(q=>{
     const s = q.status || 'pending';
+    quotedValue += (q.jobTotal||0);
     if(s==='accepted'){ accepted++; acceptedValue += (q.jobTotal||0); }
     else if(s==='declined') declined++;
     else if(s==='noresponse') noresponse++;
     else { pending++; if(isStale(q)) stale++; }
   });
-  // Win rate counts only quotes the customer actually decided on.
   const decided = accepted + declined;
   const winRate = decided > 0 ? Math.round(accepted/decided*100) : null;
-  const fmt = v => '$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
-  const pill = (txt,color,bg) => `<span style="background:${bg};color:${color};border-radius:10px;padding:2px 9px;font-weight:600">${txt}</span>`;
-  let h = '';
-  h += pill(`${accepted} accepted`, '#065f46', '#d1fae5');
-  h += pill(`${pending} pending`, '#92400e', '#fef3c7');
-  h += pill(`${declined} declined`, '#991b1b', '#fee2e2');
-  if(noresponse>0) h += pill(`${noresponse} no response`, '#475569', '#f1f5f9');
-  if(winRate!==null) h += pill(`${winRate}% win rate`, '#1e3a8a', '#dbeafe');
-  if(acceptedValue>0) h += pill(`${fmt(acceptedValue)} won`, '#065f46', '#ecfdf5');
-  if(stale>0) h += pill(`⚑ ${stale} need follow-up`, '#9a3412', '#ffedd5');
-  el.innerHTML = h;
+  const fmt0 = v => '$'+v.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+  const set=(id,txt)=>{const e=document.getElementById(id); if(e) e.textContent=txt;};
+  set('hs-total', list.length);
+  set('hs-accepted', accepted);
+  set('hs-pending', pending);
+  set('hs-value', fmt0(quotedValue));
+  set('hs-winrate', winRate!==null ? (winRate+'% win rate') : '');
+  set('hs-won', acceptedValue>0 ? (fmt0(acceptedValue)+' won') : '');
+  set('hs-stale', stale>0 ? ('\u2691 '+stale+' need follow-up') : (declined>0 ? (declined+' declined') : ''));
 
-  // Per-tier win rate — the feedback loop for pricing. Shown below the main stats.
+  // Subtle per-tier win-rate line — the pricing feedback loop, kept understated.
   const tierEl = document.getElementById('history-tier-stats');
   if(tierEl){
-    let th = '';
+    const parts=[];
     TIER_DEFS.forEach(t=>{
       let a=0,d=0;
       list.forEach(q=>{
@@ -4802,10 +4832,11 @@ function renderHistoryStats(list){
       const dec=a+d;
       if(dec>0){
         const wr=Math.round(a/dec*100);
-        th += `<span style="background:${t.bg};color:${t.color};border-radius:10px;padding:2px 9px;font-weight:600">${t.label}: ${wr}% win <span style="opacity:.7">(${a}/${dec})</span></span>`;
+        parts.push(`<span class="tier-chip" style="color:${t.color}">${t.label} ${wr}% <span style="opacity:.55">(${a}/${dec})</span></span>`);
       }
     });
-    tierEl.innerHTML = th ? `<span style="color:var(--text3);font-size:11px;margin-right:4px">Win rate by tier:</span>${th}` : '';
+    tierEl.innerHTML = parts.length ? (`<span class="tier-lead">Win rate by tier</span>` + parts.join('<span class="tier-sep">&middot;</span>')) : '';
+    tierEl.style.display = parts.length ? 'flex' : 'none';
   }
 }
 
