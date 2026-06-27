@@ -517,7 +517,14 @@ tr:hover .del-btn{opacity:1}
 
 /* ── Schedule steps in detail row ── */
 .sched-steps{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.sched-step{display:grid;grid-template-columns:18px 16px 14px 22px minmax(110px,1fr) 56px minmax(0,2.2fr) minmax(72px,98px) 16px;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
+.sched-step{display:grid;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
+.sched-steps.grp-int .sched-step{grid-template-columns:18px 16px 14px 22px minmax(110px,max-content) 56px auto auto auto auto 1fr minmax(86px,auto) 16px}
+.sched-steps.grp-ext .sched-step{grid-template-columns:18px 16px 14px 22px minmax(110px,max-content) 56px auto auto auto auto auto auto 1fr minmax(86px,auto) 16px}
+.ss-spacer{min-width:0}
+.sched-grp-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:12px 0 5px;padding-left:2px}
+.sched-grp-label.ext{color:var(--blue)}
+.sched-grp-label.int{color:var(--text3)}
+.sched-steps.grp-ext .sched-step .ss-name,.sched-steps.grp-int .sched-step .ss-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sched-step.ss-done{opacity:.6}
 .ss-check{font-size:17px}
 .ss-move{display:flex;flex-direction:column;line-height:.6}
@@ -2252,7 +2259,7 @@ function detailInner(r){
   const msInfo=computeMustStart(r);
   const msMap={}; if(msInfo) msInfo.perStep.forEach((x,i)=>{ if(x) msMap[i]=x; });
   const todayWS=atWorkStart(new Date(new Date().toDateString())).getTime();
-  const seqRows = ord.map((step,idx)=>{
+  const renderRow = (step,idx)=>{
     const p=step.name; const ext=isExternal(p);
     const cd=computedMap[p];
     const done=!!step.done;
@@ -2289,11 +2296,15 @@ function detailInner(r){
       <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,20)}</span>
       <span class="ss-name${done?' done':''}">${p}${anchorIcon}</span>
       <span class="ss-assignee-cell">${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}</span>
-      <span class="ss-ctrls">${rightControls}</span>
+      ${rightControls}
+      <span class="ss-spacer"></span>
       <span class="ss-date${done?' done':''}">${dateLabel}</span>
       <i class="ti ti-x ss-rm" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
     </div>`;
-  }).join('');
+  };
+  const rowsOf = (pred)=>ord.map((s,i)=>({s,i})).filter(o=>pred(o.s)).map(o=>renderRow(o.s,o.i)).join('');
+  const extRows = rowsOf(s=>isExternal(s.name));
+  const intRows = rowsOf(s=>!isExternal(s.name));
   const doneCount = ord.filter(s=>s.done).length;
   const progressPill = ord.length ? `<span style="font-size:11px;font-weight:600;color:${doneCount===ord.length?'var(--green)':'var(--text2)'};background:${doneCount===ord.length?'#eaf5d8':'#eef1f6'};border-radius:10px;padding:2px 9px;margin-left:8px">${doneCount}/${ord.length} done</span>` : '';
   const addBtns=(list)=>list.filter(p=>!sch.steps.find(s=>s.name===p&&s.enabled))
@@ -2333,7 +2344,10 @@ function detailInner(r){
           <div class="sched-disc-body" style="font-size:11px;color:var(--text3)">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps are tracked on the Work Queues page (check off or enter parts completed). External steps are lead-time gates in business days that drive the calendar/Gantt; set a date to pin one as a fixed anchor (📌). Tap a bubble on the left to mark a process active or done.</div>
         </details>
       </div>
-      ${ord.length ? `<div class="sched-steps">${seqRows}</div>` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them with “Add step” above.</div>`}
+      ${ord.length ? `
+        ${extRows ? `<div class="sched-grp-label ext">Outsourced steps — vendor coordination</div><div class="sched-steps grp-ext">${extRows}</div>` : ''}
+        ${intRows ? `<div class="sched-grp-label int">In-house steps</div><div class="sched-steps grp-int">${intRows}</div>` : ''}
+      ` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them with “Add step” above.</div>`}
       <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">
         ${r.ordered?`<span style="font-size:11px;color:var(--text2)"><b>Ordered:</b> ${fmtDate(r.ordered)}</span>`:''}
         ${r.due?`<span style="font-size:11px;color:var(--text2)"><b>Due:</b> ${fmtDate(r.due)}</span>`:''}
