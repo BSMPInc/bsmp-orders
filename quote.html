@@ -508,6 +508,25 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .hist-actions { display: flex; gap: 8px; margin-left: auto; }
 .hist-showing { font-size: 12px; color: var(--text3); margin-bottom: 10px; }
 @media (max-width: 900px){ .hist-stat-grid { grid-template-columns: repeat(2,1fr); } .hist-actions { margin-left: 0; } }
+
+/* ── Quote History insights rail ── */
+#panel-history { max-width: 1460px; margin: 0 auto; }
+.hist-main-grid { display: grid; grid-template-columns: minmax(0,1fr) 300px; gap: 18px; align-items: start; }
+.hist-side { position: sticky; top: 0; align-self: start; }
+.hist-side .card { margin-bottom: 0; }
+@media (max-width: 1280px){ .hist-main-grid { grid-template-columns: 1fr; } .hist-side { position: static; } }
+.hs-pipeline { padding: 2px 0 14px; border-bottom: 1px solid var(--border); }
+.hs-pipe-label, .hs-section-label { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text3); }
+.hs-pipe-value { font-size: 28px; font-weight: 700; color: var(--accent); margin-top: 4px; line-height: 1.05; }
+.hs-pipe-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+.hs-section-label { display: block; margin: 14px 0 8px; }
+.hi-empty { font-size: 12px; color: var(--text3); }
+.hi-cust { margin-bottom: 9px; }
+.hi-cust-row { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 3px; }
+.hi-cust-name { color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hi-cust-val { font-weight: 600; white-space: nowrap; }
+.hi-cust-bar { height: 6px; background: var(--surface2); overflow: hidden; }
+.hi-cust-bar span { display: block; height: 100%; background: var(--accent); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -1521,9 +1540,25 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
   <div id="combine-selected-bar" style="display:none;margin-bottom:14px;padding:10px 12px;background:var(--accent-soft);border:1px solid var(--border)"></div>
 
-  <div class="card hist-table-card">
-    <div id="history-count" class="hist-showing"></div>
-    <div id="history-body"></div>
+  <div class="hist-main-grid">
+    <div class="card hist-table-card">
+      <div id="history-count" class="hist-showing"></div>
+      <div id="history-body"></div>
+    </div>
+    <aside class="hist-side">
+      <div class="card">
+        <div class="card-title"><i class="ti ti-chart-bar"></i> Insights</div>
+        <div class="hs-pipeline">
+          <div class="hs-pipe-label">Open pipeline</div>
+          <div class="hs-pipe-value" id="hi-pipeline">$0</div>
+          <div class="hs-pipe-sub" id="hi-pipeline-sub">0 open quotes</div>
+        </div>
+        <div class="hs-section-label">Status mix</div>
+        <div id="hi-statusmix"></div>
+        <div class="hs-section-label">Top customers by value</div>
+        <div id="hi-customers"></div>
+      </div>
+    </aside>
   </div>
 
 </div>
@@ -1995,6 +2030,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">History insights rail</div>
+        <ul class="changelog-list">
+          <li>The space to the right of the history table now holds an Insights panel: your open pipeline (total value of pending quotes), a status-mix bar, and top customers by quoted value</li>
+          <li>The panel stays pinned while you scroll, and tucks below the table on smaller screens</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">Quote History cleanup</div>
@@ -4796,6 +4839,45 @@ function isStale(q){
   return s === 'pending' && quoteAgeDays(q) >= STALE_DAYS;
 }
 
+function renderHistoryInsights(list){
+  const fmt0 = v => '$'+Math.round(v||0).toLocaleString('en-US');
+  let pipeline=0, openCount=0;
+  const counts={accepted:0,pending:0,declined:0,noresponse:0};
+  const byCust={};
+  list.forEach(q=>{
+    const s=q.status||'pending';
+    counts[s]=(counts[s]||0)+1;
+    if(s==='pending'||s==='noresponse'){ pipeline+=(q.jobTotal||0); openCount++; }
+    const c=(q.customer && q.customer!=='\u2014' && q.customer.trim()) ? q.customer : '(no customer)';
+    byCust[c]=(byCust[c]||0)+(q.jobTotal||0);
+  });
+  const set=(id,t)=>{const e=document.getElementById(id); if(e) e.textContent=t;};
+  set('hi-pipeline', fmt0(pipeline));
+  set('hi-pipeline-sub', openCount+' open quote'+(openCount!==1?'s':''));
+
+  const segs=[
+    {k:'Accepted',v:counts.accepted||0,c:'#0f7a4f'},
+    {k:'Pending',v:counts.pending||0,c:'#b08400'},
+    {k:'No response',v:counts.noresponse||0,c:'#94a3b8'},
+    {k:'Declined',v:counts.declined||0,c:'#b91c1c'}
+  ].filter(x=>x.v>0);
+  const tot=segs.reduce((a,x)=>a+x.v,0);
+  const mixEl=document.getElementById('hi-statusmix');
+  if(mixEl){
+    mixEl.innerHTML = tot<=0 ? '<div class="hi-empty">No quotes yet.</div>'
+      : '<div class="mix-bar">'+segs.map(x=>`<span style="width:${(x.v/tot*100).toFixed(1)}%;background:${x.c}" title="${x.k} ${x.v}"></span>`).join('')+'</div>'
+        +'<div class="mix-legend">'+segs.map(x=>`<div class="mix-row"><span class="mix-dot" style="background:${x.c}"></span><span class="mix-k">${x.k}</span><span class="mix-v">${x.v}</span></div>`).join('')+'</div>';
+  }
+
+  const custEl=document.getElementById('hi-customers');
+  if(custEl){
+    const top=Object.entries(byCust).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const max=top.length?top[0][1]:1;
+    custEl.innerHTML = !top.length ? '<div class="hi-empty">No quotes yet.</div>'
+      : top.map(([n,v])=>`<div class="hi-cust"><div class="hi-cust-row"><span class="hi-cust-name" title="${n}">${n}</span><span class="hi-cust-val">${fmt0(v)}</span></div><div class="hi-cust-bar"><span style="width:${Math.max(4,v/max*100).toFixed(0)}%"></span></div></div>`).join('');
+  }
+}
+
 function renderHistoryStats(list){
   let pending=0, accepted=0, declined=0, noresponse=0, stale=0, acceptedValue=0, quotedValue=0;
   list.forEach(q=>{
@@ -4838,6 +4920,7 @@ function renderHistoryStats(list){
     tierEl.innerHTML = parts.length ? (`<span class="tier-lead">Win rate by tier</span>` + parts.join('<span class="tier-sep">&middot;</span>')) : '';
     tierEl.style.display = parts.length ? 'flex' : 'none';
   }
+  renderHistoryInsights(list);
 }
 
 function deleteQuote(id){
