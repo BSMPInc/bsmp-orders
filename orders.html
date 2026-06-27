@@ -816,6 +816,15 @@ body.sb-pinned .dock{left:var(--sb)}
 .dock-tab i{font-size:21px}
 .dock-tab.active{color:var(--accent);background:var(--accent-soft);border-top-color:var(--spark)}
 .dock-tab:hover{color:var(--accent)}
+
+/* ===== Scrollbars: slim + subtle app-wide; hidden on the nav rail ===== */
+*{scrollbar-width:thin;scrollbar-color:rgba(120,128,140,.35) transparent}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(120,128,140,.34);border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:rgba(90,98,110,.55);background-clip:padding-box}
+.sidebar{scrollbar-width:none!important}
+.sidebar::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
 </style>
 </head>
 <body>
