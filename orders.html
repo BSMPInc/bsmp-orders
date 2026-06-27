@@ -80,7 +80,7 @@ body.sb-pinned .sidebar{width:var(--sb);min-width:var(--sb)}
 /* main + topbar offset; clear the flagged plate, tighten when pinned */
 .main{margin-left:var(--rail);transition:margin-left .18s ease}
 body.sb-pinned .main{margin-left:var(--sb)}
-.topbar{min-height:84px;box-sizing:border-box;padding-left:172px}
+.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:172px;border-bottom:2.25px solid var(--spark)!important}
 body.sb-pinned .topbar{padding-left:24px}
 .menu-toggle{display:none!important}
 .content{padding-bottom:calc(20px + var(--dock-h))!important}
@@ -118,8 +118,9 @@ body.sb-pinned .dock{left:var(--sb)}
 .sidebar-section{padding:20px 12px 6px}
 .sidebar-section-label{font-size:10px;color:#e8c9cf;letter-spacing:1px;text-transform:uppercase;padding:0 8px;margin-bottom:6px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;color:#fff;font-size:13px;font-weight:500;transition:all .15s;margin-bottom:1px}
-.nav-item:hover{background:var(--navy3);color:#fff}
-.nav-item.active{background:rgba(255,255,255,.08);color:#fff;box-shadow:inset 3px 0 0 var(--spark)}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.08)!important;color:#fff;box-shadow:inset 3px 0 0 var(--spark)}
+.nav-item.active:hover{background:rgba(255,255,255,.12)!important}
 .nav-item.active i{color:#fff}
 .nav-item i{font-size:16px;color:#e8c9cf}
 .nav-item svg.nav-ico{width:16px;height:16px;stroke:#e8c9cf;fill:none;flex-shrink:0}
@@ -5453,7 +5454,7 @@ window.openHelp = () => { document.getElementById('help-modal').style.display='f
   const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
   let pinned = false;
   const stored = (()=>{ try{ return localStorage.getItem('bsmp_sidebar_pinned'); }catch{ return null; } })();
-  if(stored==null){ pinned = isTouch; }      // touch devices can't hover → start with the menu open
+  if(stored==null){ pinned = false; }      // default: collapsed icon rail (tap the pin to lock it open)
   else { pinned = stored==='1'; }
   function apply(){
     sb.classList.toggle('auto-hide', !pinned);
