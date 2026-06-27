@@ -791,20 +791,22 @@ body.sb-pinned .sidebar{width:var(--sb);min-width:var(--sb)}
 .sidebar.auto-hide:not(:hover) .sidebar-footer{display:none!important}
 .sidebar.auto-hide:not(:hover) .sidebar-section{padding-left:0;padding-right:0;padding-top:8px}
 .sidebar-pin{top:8px;right:8px}
-.sidebar.auto-hide:not(:hover) .sidebar-pin{opacity:1!important;pointer-events:auto!important;left:50%;right:auto;transform:translateX(-50%)}
+.sidebar.auto-hide:not(:hover) .sidebar-pin{opacity:0!important;pointer-events:none!important}
 /* logo plate: fixed 224x84, flags out over content when the rail is collapsed */
-.sidebar-logo{position:fixed!important;top:0;left:0;width:var(--sb);height:84px;margin:0!important;padding:0!important;display:flex;align-items:center;justify-content:center;background:var(--accent);z-index:60;border-bottom:2.25px solid var(--spark)!important}
+.sidebar-logo{position:fixed!important;top:0;left:0;width:var(--sb);height:84px;margin:0!important;padding:0!important;display:flex;align-items:center;justify-content:center;background:var(--accent);z-index:60;border-bottom:2.25px solid var(--spark)!important;box-shadow:4px 5px 16px rgba(0,0,0,.24)}
 .sidebar-logo > div{display:none}
 .sidebar-logo img{max-width:200px!important;max-height:62px!important;width:auto!important;height:auto!important;object-fit:contain;margin:0 auto!important;display:block}
 /* main + topbar offset; clear the flagged plate, tighten when pinned */
 .main{margin-left:var(--rail);transition:margin-left .18s ease}
 body.sb-pinned .main{margin-left:var(--sb)}
-.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:160px;border-bottom:2.25px solid var(--spark)!important}
+.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:196px;border-bottom:2.25px solid var(--spark)!important}
 .topbar-title{font-size:31.5px!important;font-weight:800!important;color:var(--text)!important;letter-spacing:-.01em;line-height:1.05}
 body.sb-pinned .topbar{padding-left:24px}
 /* pin lives at the bottom of the rail */
-.sidebar-pin{position:fixed!important;top:auto!important;bottom:14px!important;left:32px!important;right:auto!important;transform:translateX(-50%)!important;z-index:55;opacity:1!important;pointer-events:auto!important}
-body.sb-pinned .sidebar-pin{left:112px!important}
+.sidebar-pin{position:fixed!important;top:auto!important;bottom:16px!important;left:182px!important;right:auto!important;transform:none!important;width:30px!important;height:30px!important;border-radius:0!important;background:rgba(255,255,255,.10)!important;border:1px solid rgba(255,255,255,.20)!important;color:#e8c9cf;display:flex;align-items:center;justify-content:center;z-index:55;opacity:1!important;pointer-events:auto!important}
+body.sb-pinned .sidebar-pin{left:182px!important}
+.sidebar-pin:hover{background:rgba(255,255,255,.18)!important;color:#fff!important}
+.sidebar-pin.active{background:rgba(212,43,43,.30)!important;border-color:rgba(212,43,43,.55)!important;color:#fff!important}
 .menu-toggle{display:none!important}
 .content{padding-bottom:calc(20px + var(--dock-h))!important}
 /* bottom dock — always-on shortcuts */
