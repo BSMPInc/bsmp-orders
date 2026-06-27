@@ -456,9 +456,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 #panel-quote { max-width: none; }
 .quote-grid { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 18px; align-items: start; max-width: 1380px; margin: 0 auto; }
 .quote-main { min-width: 0; }
-.quote-side { position: sticky; top: 0; align-self: start; }
+.quote-side { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 188px); overflow-y: auto; overflow-x: hidden; }
 .quote-side .card { margin-bottom: 0; }
-.quote-side .results-metrics { grid-template-columns: 1fr 1fr !important; gap: 8px; margin-bottom: 14px; }
+.quote-side .results-metrics { grid-template-columns: repeat(2, minmax(0,1fr)) !important; gap: 8px; margin-bottom: 14px; }
+.quote-side .results-metrics .metric-card { align-self: stretch; }
+.quote-side .results-metrics .metric-card.highlight { grid-column: 1 / -1; }
 .quote-side .metric-card { padding: 10px 12px; }
 .quote-side .metric-value { font-size: 18px; }
 .quote-side .btn-row { justify-content: stretch; }
@@ -1402,7 +1404,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div id="qty-breaks-result"></div>
   </div>
   </div><!-- /quote-main -->
-  <aside class="quote-side">
+  <aside class="quote-side scrl">
   <!-- Results -->
   <div class="card">
     <div class="card-title">
