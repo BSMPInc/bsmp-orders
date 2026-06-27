@@ -781,12 +781,14 @@ tr:hover .del-btn{opacity:1}
 .sidebar.auto-hide:not(:hover) *{opacity:1;pointer-events:auto}
 .sidebar.auto-hide:hover{width:var(--sb);min-width:var(--sb)}
 body.sb-pinned .sidebar{width:var(--sb);min-width:var(--sb)}
+.sidebar.auto-hide:not(:hover) .nav-item{font-size:0!important;justify-content:center;gap:0;padding-left:0;padding-right:0}
+.sidebar.auto-hide:not(:hover) .nav-item i{font-size:16px!important}
+.sidebar.auto-hide:not(:hover) .nav-item .nav-ico{width:16px!important;height:16px!important}
 .sidebar.auto-hide:not(:hover) .nav-label,
-.sidebar.auto-hide:not(:hover) .sidebar-section-label,
-.sidebar.auto-hide:not(:hover) .nav-badge,
-.sidebar.auto-hide:not(:hover) .sidebar-footer{opacity:0!important;pointer-events:none}
-.sidebar.auto-hide:not(:hover) .nav-item{justify-content:center;gap:0;padding-left:0;padding-right:0}
-.sidebar.auto-hide:not(:hover) .sidebar-section{padding-left:0;padding-right:0}
+.sidebar.auto-hide:not(:hover) .nav-badge{display:none!important}
+.sidebar.auto-hide:not(:hover) .sidebar-section-label{display:none!important}
+.sidebar.auto-hide:not(:hover) .sidebar-footer{display:none!important}
+.sidebar.auto-hide:not(:hover) .sidebar-section{padding-left:0;padding-right:0;padding-top:8px}
 .sidebar-pin{top:8px;right:8px}
 .sidebar.auto-hide:not(:hover) .sidebar-pin{opacity:1!important;pointer-events:auto!important;left:50%;right:auto;transform:translateX(-50%)}
 /* logo plate: fixed 224x84, flags out over content when the rail is collapsed */
