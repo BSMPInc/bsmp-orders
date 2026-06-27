@@ -273,7 +273,7 @@ tr:last-child td{border-bottom:none}
 .pv-bubble{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);transition:all .12s;flex-shrink:0;padding:0}
 .pv-bubble:hover{border-color:var(--green);color:var(--green2)}
 .pv-bubble.active{background:#fff8e6;color:#8a5c00;border-color:#d4880a}
-.pv-bubble.done{background:#f0f8e8;color:#3a6b10;border-color:var(--green)}
+.pv-bubble.done{background:#eef0f2;color:#8a93a5;border-color:#d7d2c1}
 .ss-ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:20px;height:20px}
 .notes-input{width:100%;font-size:12px;border:1px solid var(--border2);border-radius:10px;padding:8px 10px;background:#fff;color:var(--text);resize:none;min-height:56px;font-family:inherit}
 .notes-input:focus{outline:none;border-color:var(--green)}
@@ -517,9 +517,25 @@ tr:hover .del-btn{opacity:1}
 
 /* ── Schedule steps in detail row ── */
 .sched-steps{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.sched-step{display:flex;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:4px 7px;min-width:0}
+.sched-step{display:grid;grid-template-columns:18px 16px 14px 22px minmax(0,1fr) 56px 240px minmax(72px,98px) 16px;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
+.sched-step.ss-done{opacity:.6}
+.ss-check{font-size:17px}
+.ss-move{display:flex;flex-direction:column;line-height:.6}
+.ss-seq{font-size:10px;font-weight:700;color:var(--text2);text-align:center}
+.ss-assignee-cell{display:flex;justify-content:center;min-width:0}
+.ss-ctrls{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-width:0}
+.ss-date{font-size:10px;color:var(--text2);text-align:right;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
+.ss-date.done{color:var(--text3);font-weight:600}
+.ss-rm{justify-self:center}
+.sched-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;margin-bottom:8px}
+.sched-disc>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:var(--text2);background:var(--card);border:1px solid var(--border);padding:5px 10px;user-select:none}
+.sched-disc>summary::-webkit-details-marker{display:none}
+.sched-disc>summary:hover{color:var(--accent);border-color:var(--border2)}
+.sched-disc[open]>summary{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft)}
+.sched-disc .sched-disc-body{margin-top:6px}
 .sched-step .ss-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
-.sched-step .ss-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.sched-step .ss-name{min-width:0;font-weight:500;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
+.sched-step .ss-name.done{text-decoration:line-through;color:var(--text3)}
 .sched-step input[type=date]{font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:6px;font-family:inherit}
 .sched-step input[type=number]{width:48px;font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:6px;font-family:inherit;text-align:center}
 .sched-step .ss-toggle{cursor:pointer;color:var(--text3);font-size:14px}
@@ -2263,19 +2279,19 @@ function detailInner(r){
          ${sdate('needBy', step.needBy, 'Need this step finished by', false)}
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
          <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`;
-    return`<div class="sched-step ss-on" style="${done?'opacity:.62':''}">
-      <i class="ti ti-${done?'circle-check-filled':'circle'}" style="cursor:pointer;font-size:17px;color:${done?'var(--green)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${p}',event)"></i>
-      <span style="display:flex;flex-direction:column;line-height:.6">
+    return`<div class="sched-step ss-on${done?' ss-done':''}">
+      <i class="ti ti-${done?'circle-check-filled':'circle'} ss-check" style="cursor:pointer;color:${done?'var(--text3)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${p}',event)"></i>
+      <span class="ss-move">
         <i class="ti ti-chevron-up" style="cursor:pointer;font-size:13px;color:${idx===0?'var(--border2)':'var(--text2)'}" onclick="window._moveStep('${r.id}','${p}',-1,event)"></i>
         <i class="ti ti-chevron-down" style="cursor:pointer;font-size:13px;color:${idx===ord.length-1?'var(--border2)':'var(--text2)'}" onclick="window._moveStep('${r.id}','${p}',1,event)"></i>
       </span>
-      <span style="font-size:10px;font-weight:700;color:var(--text2);min-width:14px;text-align:center">${idx+1}</span>
+      <span class="ss-seq">${idx+1}</span>
       <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,20)}</span>
-      <span class="ss-name" style="flex:1;${done?'text-decoration:line-through;color:var(--text3)':''}">${p}${anchorIcon}</span>
-      ${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}
-      ${rightControls}
-      <span style="font-size:10px;color:${done?'var(--green)':'var(--text2)'};min-width:0;flex-shrink:0;text-align:right;white-space:nowrap;${done?'font-weight:600':''}">${dateLabel}</span>
-      <i class="ti ti-x" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
+      <span class="ss-name${done?' done':''}">${p}${anchorIcon}</span>
+      <span class="ss-assignee-cell">${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}</span>
+      <span class="ss-ctrls">${rightControls}</span>
+      <span class="ss-date${done?' done':''}">${dateLabel}</span>
+      <i class="ti ti-x ss-rm" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
     </div>`;
   }).join('');
   const doneCount = ord.filter(s=>s.done).length;
@@ -2288,25 +2304,36 @@ function detailInner(r){
     const st=procState(r,p);
     return`<button class="pv-bubble${st==='done'?' done':st==='active'?' active':''}" title="${p}${st?' — '+(st==='done'?'done':'in progress'):''}" aria-label="${p}" onclick="window._tp('${r.id}','${p}',event)">${procIcon(p,18)}</button>`;
   };
+  const usedInt = INTERNAL_PROCESSES.filter(p=>sch.steps.find(s=>s.name===p&&s.enabled));
+  const usedExt = EXTERNAL_PROCESSES.filter(p=>sch.steps.find(s=>s.name===p&&s.enabled));
   return`<div class="detail-inner">
     <div class="detail-section proc-col">
       <div class="detail-label" style="text-align:center">Process</div>
       <div class="proc-vcol">
-        <div class="pv-group-label">Internal</div>
-        ${INTERNAL_PROCESSES.map(procBubble).join('')}
-        <div class="pv-group-label">External</div>
-        ${EXTERNAL_PROCESSES.map(procBubble).join('')}
+        ${usedInt.length?`<div class="pv-group-label">Internal</div>${usedInt.map(procBubble).join('')}`:''}
+        ${usedExt.length?`<div class="pv-group-label">External</div>${usedExt.map(procBubble).join('')}`:''}
+        ${(!usedInt.length&&!usedExt.length)?`<div style="font-size:9px;color:var(--text3);text-align:center;padding:4px 0">none yet</div>`:''}
       </div>
     </div>
     <div class="detail-section sched-col">
       <div class="detail-label">Production Schedule${progressPill}${msInfo&&HEALTH_META[msInfo.state]?`<span style="margin-left:8px">${healthBadge(msInfo)}</span>`:''}</div>
       ${msInfo&&HEALTH_META[msInfo.state]?`<div style="font-size:11.5px;color:${HEALTH_META[msInfo.state].color};margin-bottom:6px">${healthTip(msInfo)}.</div>`:''}
-      <div style="font-size:11px;color:var(--text3);margin-bottom:6px">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps are tracked on the Work Queues page (check off or enter parts completed). External steps are lead-time gates in business days that drive the calendar/Gantt; set a date to pin one as a fixed anchor (📌). Tap a bubble on the left to mark a process active or done.</div>
-      ${ord.length ? `<div class="sched-steps">${seqRows}</div>` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them below in the order they should run.</div>`}
-      ${subLabel('Add internal step')}
-      <div class="process-grid">${addBtns(INTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
-      ${subLabel('Add external step')}
-      <div class="process-grid">${addBtns(EXTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
+      <div class="sched-toolbar">
+        <details class="sched-disc" onclick="event.stopPropagation()">
+          <summary><i class="ti ti-plus"></i> Add step</summary>
+          <div class="sched-disc-body">
+            ${subLabel('Internal')}
+            <div class="process-grid">${addBtns(INTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
+            ${subLabel('External')}
+            <div class="process-grid">${addBtns(EXTERNAL_PROCESSES)||'<span style="font-size:11px;color:var(--text3)">all added</span>'}</div>
+          </div>
+        </details>
+        <details class="sched-disc" onclick="event.stopPropagation()">
+          <summary><i class="ti ti-help-circle"></i> How this works</summary>
+          <div class="sched-disc-body" style="font-size:11px;color:var(--text3)">Steps run top-to-bottom in this order — use ▲▼ to resequence. Internal steps are tracked on the Work Queues page (check off or enter parts completed). External steps are lead-time gates in business days that drive the calendar/Gantt; set a date to pin one as a fixed anchor (📌). Tap a bubble on the left to mark a process active or done.</div>
+        </details>
+      </div>
+      ${ord.length ? `<div class="sched-steps">${seqRows}</div>` : `<div style="font-size:11px;color:var(--text3);padding:8px 0">No steps yet — add them with “Add step” above.</div>`}
       <div style="margin-top:10px;display:flex;gap:14px;flex-wrap:wrap">
         ${r.ordered?`<span style="font-size:11px;color:var(--text2)"><b>Ordered:</b> ${fmtDate(r.ordered)}</span>`:''}
         ${r.due?`<span style="font-size:11px;color:var(--text2)"><b>Due:</b> ${fmtDate(r.due)}</span>`:''}
