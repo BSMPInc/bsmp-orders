@@ -1465,10 +1465,10 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <div class="metric-label">Margin</div>
         <div class="metric-value" id="r-margin">—</div>
       </div>
-      <div class="metric-card" style="border:1px solid #b8d0e8;background:var(--sky-light)">
-        <div class="metric-label" id="r-sheets-label" style="color:#1e40af">Sheets needed</div>
-        <div class="metric-value" id="r-sheets" style="color:#1e40af">—</div>
-        <div id="r-sheets-sub" style="font-size:11px;color:#3b82f6;margin-top:3px;font-family:'DM Mono',monospace"></div>
+      <div class="metric-card" style="border:1px solid var(--border);background:var(--cool-bg)">
+        <div class="metric-label" id="r-sheets-label" style="color:var(--text3)">Sheets needed</div>
+        <div class="metric-value" id="r-sheets" style="color:var(--accent)">—</div>
+        <div id="r-sheets-sub" style="font-size:11px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace"></div>
       </div>
     </div>
     <div id="breakdown"></div>
@@ -1506,7 +1506,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <div class="hist-stat-grid">
     <div class="hist-stat"><div class="hist-stat-label">Quotes</div><div class="hist-stat-value" id="hs-total">0</div><div class="hist-stat-sub" id="hs-showing"></div></div>
     <div class="hist-stat"><div class="hist-stat-label">Accepted</div><div class="hist-stat-value" id="hs-accepted" style="color:var(--success)">0</div><div class="hist-stat-sub" id="hs-winrate"></div></div>
-    <div class="hist-stat"><div class="hist-stat-label">Pending</div><div class="hist-stat-value" id="hs-pending" style="color:#2563b0">0</div><div class="hist-stat-sub" id="hs-stale"></div></div>
+    <div class="hist-stat"><div class="hist-stat-label">Pending</div><div class="hist-stat-value" id="hs-pending" style="color:var(--accent)">0</div><div class="hist-stat-sub" id="hs-stale"></div></div>
     <div class="hist-stat"><div class="hist-stat-label">Quoted value</div><div class="hist-stat-value" id="hs-value">$0</div><div class="hist-stat-sub" id="hs-won"></div></div>
   </div>
   <div class="hist-tier-line" id="history-tier-stats" style="display:none"></div>
@@ -2030,6 +2030,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">Calmer color palette</div>
+        <ul class="changelog-list">
+          <li>The cost-composition bar is now a single navy gradient instead of nine different colors</li>
+          <li>Tier badges, status pills, and the status-mix bar share one muted set of tones (navy, slate, soft green, gold, clay) so the pages read calmer and less candy-colored</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">History insights rail</div>
@@ -4757,7 +4765,7 @@ function renderHistory(){
             ${q.img?`<img src="${q.img}" class="history-thumb" alt="">`:'<div class="history-thumb-empty"></div>'}
             <div>
               <div style="font-weight:600;font-size:13px">${q.partNum}${q.quoteNo?` <span style="display:inline-block;font-size:10px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">Quote #${q.quoteNo}</span>`:''}</div>
-              <div style="font-size:11px;color:var(--text3)">${q.tier?(()=>{const t=TIER_DEFS.find(d=>d.key===q.tier);return t?`<span style="display:inline-block;font-size:10px;font-weight:700;color:${t.color};background:${t.bg};border-radius:4px;padding:1px 6px;margin-right:5px">${t.label}</span>`:'';})():''}Rev ${q.revision}${isStale(q)?` <span style="display:inline-block;font-size:10px;font-weight:700;color:#9a3412;background:#ffedd5;border-radius:4px;padding:1px 6px;margin-left:4px" title="Pending ${quoteAgeDays(q)} days — consider a follow-up call">⚑ ${quoteAgeDays(q)}d — follow up</span>`:''}</div>
+              <div style="font-size:11px;color:var(--text3)">${q.tier?(()=>{const t=TIER_DEFS.find(d=>d.key===q.tier);return t?`<span style="display:inline-block;font-size:10px;font-weight:700;color:${t.color};background:${t.bg};border-radius:4px;padding:1px 6px;margin-right:5px">${t.label}</span>`:'';})():''}Rev ${q.revision}${isStale(q)?` <span style="display:inline-block;font-size:10px;font-weight:700;color:#8a6d2f;background:#f6f0e0;border-radius:4px;padding:1px 6px;margin-left:4px" title="Pending ${quoteAgeDays(q)} days — consider a follow-up call">⚑ ${quoteAgeDays(q)}d — follow up</span>`:''}</div>
             </div>
           </div>
         </td>
@@ -4789,10 +4797,10 @@ function renderHistory(){
 }
 
 const QUOTE_STATUSES = {
-  pending:    { label:'Pending',     color:'#92400e', bg:'#fef3c7', border:'#fcd34d' },
-  accepted:   { label:'Accepted',    color:'#065f46', bg:'#d1fae5', border:'#6ee7b7' },
-  declined:   { label:'Declined',    color:'#991b1b', bg:'#fee2e2', border:'#fca5a5' },
-  noresponse: { label:'No Response', color:'#475569', bg:'#f1f5f9', border:'#cbd5e1' }
+  pending:    { label:'Pending',     color:'#8a6d2f', bg:'#f6f0e0', border:'#e6d8b0' },
+  accepted:   { label:'Accepted',    color:'#2f7a55', bg:'#e6f1ea', border:'#bfdcca' },
+  declined:   { label:'Declined',    color:'#9c4f44', bg:'#f4e7e3', border:'#e2c8c1' },
+  noresponse: { label:'No Response', color:'#5b6675', bg:'#edf0f4', border:'#d5dbe3' }
 };
 
 function statusDropdown(q){
@@ -4856,10 +4864,10 @@ function renderHistoryInsights(list){
   set('hi-pipeline-sub', openCount+' open quote'+(openCount!==1?'s':''));
 
   const segs=[
-    {k:'Accepted',v:counts.accepted||0,c:'#0f7a4f'},
-    {k:'Pending',v:counts.pending||0,c:'#b08400'},
-    {k:'No response',v:counts.noresponse||0,c:'#94a3b8'},
-    {k:'Declined',v:counts.declined||0,c:'#b91c1c'}
+    {k:'Accepted',v:counts.accepted||0,c:'#2f7a55'},
+    {k:'Pending',v:counts.pending||0,c:'#9c7b35'},
+    {k:'No response',v:counts.noresponse||0,c:'#8a93a5'},
+    {k:'Declined',v:counts.declined||0,c:'#9c4f44'}
   ].filter(x=>x.v>0);
   const tot=segs.reduce((a,x)=>a+x.v,0);
   const mixEl=document.getElementById('hi-statusmix');
@@ -6338,13 +6346,13 @@ let matMode = 'sheet';
 // Each job can be classified into a tier that suggests a markup posture.
 // Markups are editable in Settings and stored in localStorage.
 const TIER_DEFS = [
-  { key:'commodity', label:'Commodity', markup:20, color:'#0369a1', bg:'#e0f2fe',
+  { key:'commodity', label:'Commodity', markup:20, color:'#5b6675', bg:'#edf0f4',
     hint:'Simple/flat parts, loose tolerances, no critical finish. Win on price & turnaround — fill-the-machine work.' },
-  { key:'standard',  label:'Standard',  markup:30, color:'#065f46', bg:'#d1fae5',
+  { key:'standard',  label:'Standard',  markup:30, color:'#1e3a5f', bg:'#e7edf4',
     hint:'Multi-bend, normal tolerances, some secondary ops. Your bread-and-butter — fair, competitive markup.' },
-  { key:'precision', label:'Precision', markup:45, color:'#7c2d12', bg:'#ffedd5',
+  { key:'precision', label:'Precision', markup:45, color:'#8a6d2f', bg:'#f4eedf',
     hint:'Tight tolerances, critical finishes, inspection-heavy, complex forming. You are paid for capability & risk.' },
-  { key:'rush',      label:'Rush / Pain', markup:60, color:'#991b1b', bg:'#fee2e2',
+  { key:'rush',      label:'Rush / Pain', markup:60, color:'#9c4f44', bg:'#f3e6e2',
     hint:'Disrupts the floor, hot due date, awkward one-off, or high-maintenance account. Must pay for the disruption.' }
 ];
 
@@ -8090,18 +8098,18 @@ function renderCostMix(){
   var fmt=function(v){return '$'+(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
   var segs=[
     {k:'Material',v:d.matCostPart||0,c:'#1e3a5f'},
-    {k:'Labor / ops',v:d.laborCostPart||0,c:'#2563b0'},
-    {k:'Welding',v:d.weldCostPart||0,c:'#0f7a4f'},
-    {k:'CNC mill',v:d.cncCostPart||0,c:'#6a1f2e'},
-    {k:'Inspection',v:d.inspCostPart||0,c:'#2f7d8c'},
-    {k:'Programming',v:d.progCostPart||0,c:'#7a5c1e'},
-    {k:'Hardware',v:d.hwCostPart||0,c:'#b06a00'},
-    {k:'Outsource',v:d.outCostPart||0,c:'#8a93a5'},
-    {k:'Purchasing',v:d.purchasing||0,c:'#3a4049'}
+    {k:'Labor / ops',v:d.laborCostPart||0,c:'#335982'},
+    {k:'Welding',v:d.weldCostPart||0,c:'#4b76a0'},
+    {k:'CNC mill',v:d.cncCostPart||0,c:'#6790ba'},
+    {k:'Inspection',v:d.inspCostPart||0,c:'#86abce'},
+    {k:'Programming',v:d.progCostPart||0,c:'#a6c3dd'},
+    {k:'Hardware',v:d.hwCostPart||0,c:'#c2d6e8'},
+    {k:'Outsource',v:d.outCostPart||0,c:'#d8e4ef'},
+    {k:'Purchasing',v:d.purchasing||0,c:'#b9b29c'}
   ].filter(function(s){return s.v>0.005;});
   var cost=(d.totalCostPart!=null)?d.totalCostPart:segs.reduce(function(a,s){return a+s.v;},0);
   var known=segs.reduce(function(a,s){return a+s.v;},0);
-  if(cost-known>0.01){ segs.push({k:'Other',v:cost-known,c:'#c9c2b0'}); }
+  if(cost-known>0.01){ segs.push({k:'Other',v:cost-known,c:'#cfc7b5'}); }
   if(cost<=0.005){ el.innerHTML='<div style="font-size:12px;color:var(--text3)">Fill in the quote to see where the cost goes.</div>'; return; }
   var bar='<div class="mix-bar">'+segs.map(function(s){return '<span style="width:'+(s.v/cost*100).toFixed(2)+'%;background:'+s.c+'" title="'+s.k+' '+fmt(s.v)+'"></span>';}).join('')+'</div>';
   var legend='<div class="mix-legend">'+segs.map(function(s){return '<div class="mix-row"><span class="mix-dot" style="background:'+s.c+'"></span><span class="mix-k">'+s.k+'</span><span class="mix-v">'+fmt(s.v)+'</span><span class="mix-pct">'+Math.round(s.v/cost*100)+'%</span></div>';}).join('')+'</div>';
