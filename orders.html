@@ -794,18 +794,22 @@ body.sb-pinned .sidebar{width:var(--sb);min-width:var(--sb)}
 /* logo plate: fixed 224x84, flags out over content when the rail is collapsed */
 .sidebar-logo{position:fixed!important;top:0;left:0;width:var(--sb);height:84px;margin:0!important;padding:0!important;display:flex;align-items:center;justify-content:center;background:var(--accent);z-index:60;border-bottom:2.25px solid var(--spark)!important}
 .sidebar-logo > div{display:none}
-.sidebar-logo img{max-width:190px!important;height:58px!important;width:auto!important;margin:0 auto!important;display:block}
+.sidebar-logo img{max-width:200px!important;max-height:62px!important;width:auto!important;height:auto!important;object-fit:contain;margin:0 auto!important;display:block}
 /* main + topbar offset; clear the flagged plate, tighten when pinned */
 .main{margin-left:var(--rail);transition:margin-left .18s ease}
 body.sb-pinned .main{margin-left:var(--sb)}
-.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:172px;border-bottom:2.25px solid var(--spark)!important}
+.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:160px;border-bottom:2.25px solid var(--spark)!important}
+.topbar-title{font-size:31.5px!important;font-weight:800!important;color:var(--text)!important;letter-spacing:-.01em;line-height:1.05}
 body.sb-pinned .topbar{padding-left:24px}
+/* pin lives at the bottom of the rail */
+.sidebar-pin{position:fixed!important;top:auto!important;bottom:14px!important;left:32px!important;right:auto!important;transform:translateX(-50%)!important;z-index:55;opacity:1!important;pointer-events:auto!important}
+body.sb-pinned .sidebar-pin{left:112px!important}
 .menu-toggle{display:none!important}
 .content{padding-bottom:calc(20px + var(--dock-h))!important}
 /* bottom dock — always-on shortcuts */
-.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;justify-content:center;z-index:46;transition:left .18s ease}
+.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;justify-content:flex-start;padding-left:8px;z-index:46;transition:left .18s ease}
 body.sb-pinned .dock{left:var(--sb)}
-.dock-tab{flex:1;max-width:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text2);font-size:11.5px;font-weight:700;letter-spacing:.02em;background:none;border:none;border-top:2.25px solid transparent;font-family:inherit}
+.dock-tab{flex:none;width:118px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text2);font-size:11.5px;font-weight:700;letter-spacing:.02em;background:none;border:none;border-top:2.25px solid transparent;font-family:inherit}
 .dock-tab i{font-size:21px}
 .dock-tab.active{color:var(--accent);background:var(--accent-soft);border-top-color:var(--spark)}
 .dock-tab:hover{color:var(--accent)}
