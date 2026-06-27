@@ -57,40 +57,7 @@
 .s-ready{background:#e7f4ee!important;color:#1f7d57!important}
 .s-invoiced{background:#eef0f2!important;color:#5b6675!important}
 body{font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--text);background:var(--bg);display:flex;height:100vh;overflow:hidden;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-/* ===== Shell: 64px icon-rail sidebar, flag-out logo plate, bottom dock ===== */
-:root{--rail:64px;--sb:224px;--dock-h:64px}
-.sidebar{position:fixed;left:0;top:84px;bottom:0;height:auto;min-height:0;width:var(--rail);min-width:var(--rail);padding-top:10px;overflow-y:auto;overflow-x:hidden;z-index:50;transition:width .18s ease}
-.sidebar.auto-hide:not(:hover){width:var(--rail)!important;min-width:var(--rail)!important;background:var(--accent)!important}
-.sidebar.auto-hide:not(:hover)::after{display:none}
-.sidebar.auto-hide:not(:hover) *{opacity:1;pointer-events:auto}
-.sidebar.auto-hide:hover{width:var(--sb);min-width:var(--sb)}
-body.sb-pinned .sidebar{width:var(--sb);min-width:var(--sb)}
-.sidebar.auto-hide:not(:hover) .nav-label,
-.sidebar.auto-hide:not(:hover) .sidebar-section-label,
-.sidebar.auto-hide:not(:hover) .nav-badge,
-.sidebar.auto-hide:not(:hover) .sidebar-footer{opacity:0!important;pointer-events:none}
-.sidebar.auto-hide:not(:hover) .nav-item{justify-content:center;gap:0;padding-left:0;padding-right:0}
-.sidebar.auto-hide:not(:hover) .sidebar-section{padding-left:0;padding-right:0}
-.sidebar-pin{top:8px;right:8px}
-.sidebar.auto-hide:not(:hover) .sidebar-pin{opacity:1!important;pointer-events:auto!important;left:50%;right:auto;transform:translateX(-50%)}
-/* logo plate: fixed 224x84, flags out over content when the rail is collapsed */
-.sidebar-logo{position:fixed!important;top:0;left:0;width:var(--sb);height:84px;margin:0!important;padding:0!important;display:flex;align-items:center;justify-content:center;background:var(--accent);z-index:60;border-bottom:2.25px solid var(--spark)!important}
-.sidebar-logo > div{display:none}
-.sidebar-logo img{max-width:190px!important;height:58px!important;width:auto!important;margin:0 auto!important;display:block}
-/* main + topbar offset; clear the flagged plate, tighten when pinned */
-.main{margin-left:var(--rail);transition:margin-left .18s ease}
-body.sb-pinned .main{margin-left:var(--sb)}
-.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:172px;border-bottom:2.25px solid var(--spark)!important}
-body.sb-pinned .topbar{padding-left:24px}
-.menu-toggle{display:none!important}
-.content{padding-bottom:calc(20px + var(--dock-h))!important}
-/* bottom dock — always-on shortcuts */
-.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;justify-content:center;z-index:46;transition:left .18s ease}
-body.sb-pinned .dock{left:var(--sb)}
-.dock-tab{flex:1;max-width:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text2);font-size:11.5px;font-weight:700;letter-spacing:.02em;background:none;border:none;border-top:2.25px solid transparent;font-family:inherit}
-.dock-tab i{font-size:21px}
-.dock-tab.active{color:var(--accent);background:var(--accent-soft);border-top-color:var(--spark)}
-.dock-tab:hover{color:var(--accent)}
+
 
 /* ── Sidebar ── */
 .sidebar{width:240px;min-width:240px;background:var(--navy);display:flex;flex-direction:column;min-height:100vh;position:sticky;top:0;height:100vh;overflow-y:auto;overflow-x:hidden;transition:width .18s ease,min-width .18s ease;z-index:40}
@@ -804,6 +771,42 @@ tr:hover .del-btn{opacity:1}
   th,td{font-size:9pt;padding:4px 6px}
   .status-badge,.pay-badge{border:1px solid #ccc!important;background:none!important;color:#000!important}
 }
+
+/* ===== Shell overrides (placed last so they win over the original shell rules) ===== */
+/* ===== Shell: 64px icon-rail sidebar, flag-out logo plate, bottom dock ===== */
+:root{--rail:64px;--sb:224px;--dock-h:64px}
+.sidebar{position:fixed;left:0;top:84px;bottom:0;height:auto;min-height:0;width:var(--rail);min-width:var(--rail);padding-top:10px;overflow-y:auto;overflow-x:hidden;z-index:50;transition:width .18s ease}
+.sidebar.auto-hide:not(:hover){width:var(--rail)!important;min-width:var(--rail)!important;background:var(--accent)!important}
+.sidebar.auto-hide:not(:hover)::after{display:none}
+.sidebar.auto-hide:not(:hover) *{opacity:1;pointer-events:auto}
+.sidebar.auto-hide:hover{width:var(--sb);min-width:var(--sb)}
+body.sb-pinned .sidebar{width:var(--sb);min-width:var(--sb)}
+.sidebar.auto-hide:not(:hover) .nav-label,
+.sidebar.auto-hide:not(:hover) .sidebar-section-label,
+.sidebar.auto-hide:not(:hover) .nav-badge,
+.sidebar.auto-hide:not(:hover) .sidebar-footer{opacity:0!important;pointer-events:none}
+.sidebar.auto-hide:not(:hover) .nav-item{justify-content:center;gap:0;padding-left:0;padding-right:0}
+.sidebar.auto-hide:not(:hover) .sidebar-section{padding-left:0;padding-right:0}
+.sidebar-pin{top:8px;right:8px}
+.sidebar.auto-hide:not(:hover) .sidebar-pin{opacity:1!important;pointer-events:auto!important;left:50%;right:auto;transform:translateX(-50%)}
+/* logo plate: fixed 224x84, flags out over content when the rail is collapsed */
+.sidebar-logo{position:fixed!important;top:0;left:0;width:var(--sb);height:84px;margin:0!important;padding:0!important;display:flex;align-items:center;justify-content:center;background:var(--accent);z-index:60;border-bottom:2.25px solid var(--spark)!important}
+.sidebar-logo > div{display:none}
+.sidebar-logo img{max-width:190px!important;height:58px!important;width:auto!important;margin:0 auto!important;display:block}
+/* main + topbar offset; clear the flagged plate, tighten when pinned */
+.main{margin-left:var(--rail);transition:margin-left .18s ease}
+body.sb-pinned .main{margin-left:var(--sb)}
+.topbar{min-height:84px;height:84px;box-sizing:border-box;padding-left:172px;border-bottom:2.25px solid var(--spark)!important}
+body.sb-pinned .topbar{padding-left:24px}
+.menu-toggle{display:none!important}
+.content{padding-bottom:calc(20px + var(--dock-h))!important}
+/* bottom dock — always-on shortcuts */
+.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;justify-content:center;z-index:46;transition:left .18s ease}
+body.sb-pinned .dock{left:var(--sb)}
+.dock-tab{flex:1;max-width:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:var(--text2);font-size:11.5px;font-weight:700;letter-spacing:.02em;background:none;border:none;border-top:2.25px solid transparent;font-family:inherit}
+.dock-tab i{font-size:21px}
+.dock-tab.active{color:var(--accent);background:var(--accent-soft);border-top-color:var(--spark)}
+.dock-tab:hover{color:var(--accent)}
 </style>
 </head>
 <body>
