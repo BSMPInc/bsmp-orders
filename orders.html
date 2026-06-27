@@ -517,7 +517,7 @@ tr:hover .del-btn{opacity:1}
 
 /* ── Schedule steps in detail row ── */
 .sched-steps{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.sched-step{display:grid;grid-template-columns:18px 16px 14px 22px minmax(0,1fr) 56px 330px minmax(72px,98px) 16px;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
+.sched-step{display:grid;grid-template-columns:18px 16px 14px 22px minmax(110px,1fr) 56px minmax(0,330px) minmax(72px,98px) 16px;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
 .sched-step.ss-done{opacity:.6}
 .ss-check{font-size:17px}
 .ss-move{display:flex;flex-direction:column;line-height:.6}
@@ -534,7 +534,7 @@ tr:hover .del-btn{opacity:1}
 .sched-disc[open]>summary{color:var(--accent);background:var(--accent-soft);border-color:var(--accent-soft)}
 .sched-disc .sched-disc-body{margin-top:6px}
 .sched-step .ss-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
-.sched-step .ss-name{min-width:0;font-weight:500;white-space:normal;overflow-wrap:anywhere;line-height:1.15}
+.sched-step .ss-name{min-width:0;font-weight:500;white-space:normal;overflow-wrap:break-word;line-height:1.15}
 .sched-step .ss-name.done{text-decoration:line-through;color:var(--text3)}
 .sched-step input[type=date]{font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:6px;font-family:inherit}
 .sched-step input[type=number]{width:48px;font-size:11px;padding:3px 5px;border:1px solid var(--border2);border-radius:6px;font-family:inherit;text-align:center}
