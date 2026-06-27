@@ -272,7 +272,7 @@ tr:last-child td{border-bottom:none}
 .pv-group-label{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text3);margin:6px 0 1px;text-align:center}
 .pv-bubble{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);transition:all .12s;flex-shrink:0;padding:0}
 .pv-bubble:hover{border-color:var(--green);color:var(--green2)}
-.pv-bubble.active{background:#fff8e6;color:#8a5c00;border-color:#d4880a}
+.pv-bubble.active{background:#eaf5d8;color:#2d6010;border-color:var(--green)}
 .pv-bubble.done{background:#eef0f2;color:#8a93a5;border-color:#d7d2c1}
 .ss-ico{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:20px;height:20px}
 .notes-input{width:100%;font-size:12px;border:1px solid var(--border2);border-radius:10px;padding:8px 10px;background:#fff;color:var(--text);resize:none;min-height:56px;font-family:inherit}
@@ -517,7 +517,7 @@ tr:hover .del-btn{opacity:1}
 
 /* ── Schedule steps in detail row ── */
 .sched-steps{display:flex;flex-direction:column;gap:5px;margin-top:6px}
-.sched-step{display:grid;grid-template-columns:18px 16px 14px 22px minmax(0,1fr) 56px 240px minmax(72px,98px) 16px;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
+.sched-step{display:grid;grid-template-columns:18px 16px 14px 22px minmax(0,1fr) 56px 330px minmax(72px,98px) 16px;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
 .sched-step.ss-done{opacity:.6}
 .ss-check{font-size:17px}
 .ss-move{display:flex;flex-direction:column;line-height:.6}
@@ -2269,10 +2269,10 @@ function detailInner(r){
     const pJs=p.replace(/'/g,"\\'");
     const sdate=(kind,val,title,disabled)=>`<button type="button" class="sdate${val?'':' empty'}" title="${title}" ${disabled?'disabled':''} onclick="window._editStepDate(event,'${r.id}','${pJs}','${kind}')">${val?fmtDate(val):'mm/dd/yy'}</button>`;
     const rightControls = ext
-      ? `<input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Lead time in business days" style="width:44px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
-         <span style="font-size:10px;color:var(--text3);min-width:24px">days</span>
-         <span style="font-size:10px;color:var(--text3)">need by</span>
+      ? `<span style="font-size:10px;color:var(--text3)">need by</span>
          ${sdate('needBy', step.needBy, 'Need this step finished/back by — also shows in Work Queues', false)}
+         <input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Lead time in business days" style="width:44px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
+         <span style="font-size:10px;color:var(--text3);min-width:24px">days</span>
          <span style="font-size:10px;color:var(--text3)" title="Optional: pin the start date as a fixed schedule anchor">start</span>
          ${sdate('start', step.start, 'Pin the start date (optional anchor)', done)}`
       : `<span style="font-size:10px;color:var(--text3)">need by</span>
