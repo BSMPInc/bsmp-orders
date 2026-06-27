@@ -451,6 +451,29 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .qb-total { font-size:13px; font-weight:600; color:var(--sky); font-family:'DM Mono',monospace; }
 .qb-sub { font-size:11px; color:var(--text3); font-family:'DM Mono',monospace; }
 
+
+/* New Quote: two-column layout with sticky pricing summary */
+.quote-grid { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 18px; align-items: start; }
+.quote-main { min-width: 0; }
+.quote-side { position: sticky; top: 0; align-self: start; }
+.quote-side .card { margin-bottom: 0; }
+.quote-side .results-metrics { grid-template-columns: 1fr 1fr !important; gap: 8px; margin-bottom: 14px; }
+.quote-side .metric-card { padding: 10px 12px; }
+.quote-side .metric-value { font-size: 18px; }
+.quote-side .btn-row { justify-content: stretch; }
+.quote-side .btn-row .btn { flex: 1 1 auto; justify-content: center; }
+@media (max-width: 1100px){ .quote-grid { grid-template-columns: 1fr; } .quote-side { position: static; } }
+
+/* Optional detail cards toggle bar */
+.opt-bar .card-title { margin-bottom: 14px; }
+.opt-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px;
+  border: 1px solid var(--border2); background: #fff; color: var(--text2);
+  font-family: 'Hanken Grotesk', sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: all .12s; }
+.opt-btn .ti { font-size: 15px; color: var(--text3); transition: transform .15s; }
+.opt-btn:hover { background: var(--cool-bg); color: var(--text); }
+.opt-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.opt-btn.active .ti { color: #fff; transform: rotate(45deg); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -503,6 +526,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 <!-- ===== QUOTE PANEL ===== -->
 <div class="panel active" id="panel-quote">
+  <div class="quote-grid">
+  <div class="quote-main">
   <div class="page-header">
     <h2>New Quote</h2>
     <p>Upload a drawing or enter part details manually</p>
@@ -764,8 +789,23 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
   </div>
 
+  <!-- Optional detail cards -->
+  <div class="card opt-bar">
+    <div class="card-title"><i class="ti ti-plus"></i> Add detail &mdash; optional calculators</div>
+    <div class="opt-btns">
+      <button class="opt-btn" data-card="batch-deburr-card" onclick="toggleOptCard(this,'batch-deburr-card')"><i class="ti ti-plus"></i>Batch de-burr</button>
+      <button class="opt-btn" data-card="orbital-sand-card" onclick="toggleOptCard(this,'orbital-sand-card')"><i class="ti ti-plus"></i>Orbital sanding</button>
+      <button class="opt-btn" data-card="batch-tap-card" onclick="toggleOptCard(this,'batch-tap-card')"><i class="ti ti-plus"></i>Tap / drill / c'sink</button>
+      <button class="opt-btn" data-card="sheet-load-card" onclick="toggleOptCard(this,'sheet-load-card')"><i class="ti ti-plus"></i>Sheet loading</button>
+      <button class="opt-btn" data-card="programming-card" onclick="toggleOptCard(this,'programming-card')"><i class="ti ti-plus"></i>Programming</button>
+      <button class="opt-btn" data-card="inspection-card" onclick="toggleOptCard(this,'inspection-card')"><i class="ti ti-plus"></i>Inspection</button>
+      <button class="opt-btn" data-card="weld-card" onclick="toggleOptCard(this,'weld-card')"><i class="ti ti-plus"></i>Welding</button>
+      <button class="opt-btn" data-card="cnc-card" onclick="toggleOptCard(this,'cnc-card')"><i class="ti ti-plus"></i>CNC mill</button>
+    </div>
+  </div>
+
   <!-- Batch De-burr Calculator -->
-  <div class="card" id="batch-deburr-card">
+  <div class="card" id="batch-deburr-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       Batch De-Burr Calculator
@@ -800,7 +840,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Orbital Sanding Calculator -->
-  <div class="card">
+  <div class="card" id="orbital-sand-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
       Orbital Sanding Calculator
@@ -829,7 +869,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Machine Operations Calculator (Tap, Drill, C'sink) -->
-  <div class="card" id="batch-tap-card">
+  <div class="card" id="batch-tap-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
       Machine Operations Calculator
@@ -865,7 +905,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Sheet Loading Calculator -->
-  <div class="card">
+  <div class="card" id="sheet-load-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 2,7 12,12 22,7"/><polyline points="2,17 12,22 22,17"/><polyline points="2,12 12,17 22,12"/></svg>
       Sheet Loading / Unloading
@@ -926,7 +966,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Programming Calculator -->
-  <div class="card">
+  <div class="card" id="programming-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
       Programming
@@ -968,7 +1008,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Inspection / First Article Calculator -->
-  <div class="card">
+  <div class="card" id="inspection-card" style="display:none">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
       Inspection / First Article
@@ -1022,7 +1062,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- ===================== WELDING ESTIMATOR ===================== -->
-  <div class="card" id="weld-card">
+  <div class="card" id="weld-card" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
       <div class="card-title" style="margin-bottom:0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21l6-6m0 0l8.5-8.5a2.12 2.12 0 013 3L12 18m-3-3l3 3"/><path d="M14 4l6 6"/></svg>
@@ -1123,7 +1163,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- ===================== CNC MILL ESTIMATOR ===================== -->
-  <div class="card" id="cnc-card">
+  <div class="card" id="cnc-card" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
       <div class="card-title" style="margin-bottom:0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/></svg>
@@ -1273,56 +1313,6 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
   </div>
 
-  <!-- Results -->
-  <div class="card">
-    <div class="card-title">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Pricing Summary
-    </div>
-    <div class="results-metrics" style="grid-template-columns:repeat(5,1fr)">
-      <div class="metric-card">
-        <div class="metric-label">Cost / part</div>
-        <div class="metric-value" id="r-cost">—</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Price / part</div>
-        <div class="metric-value" id="r-price">—</div>
-      </div>
-      <div class="metric-card highlight">
-        <div class="metric-label">Job total</div>
-        <div class="metric-value" id="r-total">—</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Margin</div>
-        <div class="metric-value" id="r-margin">—</div>
-      </div>
-      <div class="metric-card" style="border:1px solid #b8d0e8;background:var(--sky-light)">
-        <div class="metric-label" id="r-sheets-label" style="color:#1e40af">Sheets needed</div>
-        <div class="metric-value" id="r-sheets" style="color:#1e40af">—</div>
-        <div id="r-sheets-sub" style="font-size:11px;color:#3b82f6;margin-top:3px;font-family:'DM Mono',monospace"></div>
-      </div>
-    </div>
-    <div id="breakdown"></div>
-    <div class="btn-row">
-      <button class="btn" onclick="copyQuote()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-        Copy quote
-      </button>
-      <button class="btn" onclick="printCustomerQuote()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-        Print quote
-      </button>
-      <button class="btn" onclick="resetForm()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
-        New part
-      </button>
-      <button class="btn btn-primary" onclick="saveQuote()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save to history
-      </button>
-    </div>
-  </div>
-
   <!-- Quantity Breaks -->
   <div class="card">
     <div class="card-title">
@@ -1393,6 +1383,59 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
     <div id="qty-breaks-result"></div>
   </div>
+  </div><!-- /quote-main -->
+  <aside class="quote-side">
+  <!-- Results -->
+  <div class="card">
+    <div class="card-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Pricing Summary
+    </div>
+    <div class="results-metrics" style="grid-template-columns:repeat(5,1fr)">
+      <div class="metric-card">
+        <div class="metric-label">Cost / part</div>
+        <div class="metric-value" id="r-cost">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Price / part</div>
+        <div class="metric-value" id="r-price">—</div>
+      </div>
+      <div class="metric-card highlight">
+        <div class="metric-label">Job total</div>
+        <div class="metric-value" id="r-total">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Margin</div>
+        <div class="metric-value" id="r-margin">—</div>
+      </div>
+      <div class="metric-card" style="border:1px solid #b8d0e8;background:var(--sky-light)">
+        <div class="metric-label" id="r-sheets-label" style="color:#1e40af">Sheets needed</div>
+        <div class="metric-value" id="r-sheets" style="color:#1e40af">—</div>
+        <div id="r-sheets-sub" style="font-size:11px;color:#3b82f6;margin-top:3px;font-family:'DM Mono',monospace"></div>
+      </div>
+    </div>
+    <div id="breakdown"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="copyQuote()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+        Copy quote
+      </button>
+      <button class="btn" onclick="printCustomerQuote()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print quote
+      </button>
+      <button class="btn" onclick="resetForm()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+        New part
+      </button>
+      <button class="btn btn-primary" onclick="saveQuote()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save to history
+      </button>
+    </div>
+  </div>
+  </aside>
+  </div><!-- /quote-grid -->
 </div>
 
 <!-- ===== HISTORY PANEL ===== -->
@@ -1903,6 +1946,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">New Quote layout</div>
+        <ul class="changelog-list">
+          <li>The pricing summary now sits in a sticky column on the right, staying visible as you fill in the quote</li>
+          <li>The optional calculators (batch de-burr, orbital sanding, tap/drill, sheet loading, programming, inspection, welding, CNC mill) are collapsed by default — use the "Add detail" buttons after the Material card to show the ones you need</li>
+          <li>A calculator opens automatically if it's already contributing cost (e.g. an enabled welding or CNC section), so nothing is hidden silently</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">Print assembly quotes</div>
@@ -2657,7 +2709,6 @@ function init(){
   addHw(); addOut();
   populateWeldRateCodes();
   populateCncRateCodes();
-  loadResmedExample(true);
   calculate();
   migrateThumbnails();
   // After a backup restore, the page reloads — show a confirmation toast once.
@@ -2998,6 +3049,7 @@ function loadCargoHookExample(auto){
   set('weld-ndt-type','mpi'); weldNdtManual=true; set('weld-ndt-cost','35');
   set('weld-ht-cost','140'); set('weld-finish-cost','95');
   set('weld-mark-min','10'); set('weld-cert-min','25'); set('weld-cert-rate','1100 Inspection');
+  if(typeof syncOptCards==='function') syncOptCards();
   calculate();
 }
 
@@ -3154,6 +3206,7 @@ function loadResmedExample(auto){
   set('material','');
   set('costsheet','0');
   if(typeof calcInspection==='function') calcInspection();
+  if(typeof syncOptCards==='function') syncOptCards();
   calculate();
 }
 
@@ -7875,6 +7928,26 @@ function updateChrome(name){
   if(document.readyState!=='loading'){ try{updateChrome(activePanelName());}catch(e){} }
   else document.addEventListener('DOMContentLoaded', function(){ try{updateChrome(activePanelName());}catch(e){} });
 })();
+</script>
+<script>
+function toggleOptCard(btn,id){
+  var el=document.getElementById(id); if(!el)return;
+  var hidden=(el.style.display==='none')||(getComputedStyle(el).display==='none');
+  el.style.display=hidden?'':'none';
+  if(btn)btn.classList.toggle('active',hidden);
+  if(hidden){ try{el.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(e){} }
+}
+window.syncOptCards=function(){
+  document.querySelectorAll('.opt-btn').forEach(function(b){
+    var el=document.getElementById(b.dataset.card);
+    if(el){ b.classList.toggle('active', getComputedStyle(el).display!=='none'); }
+  });
+  [['weld-enabled','weld-card'],['cnc-enabled','cnc-card']].forEach(function(p){
+    var c=document.getElementById(p[0]), card=document.getElementById(p[1]);
+    if(c&&c.checked&&card){ card.style.display=''; var b=document.querySelector('.opt-btn[data-card="'+p[1]+'"]'); if(b)b.classList.add('active'); }
+  });
+};
+(function(){ if(document.readyState!=='loading') syncOptCards(); else document.addEventListener('DOMContentLoaded',syncOptCards); })();
 </script>
 <div id="toast-host" aria-live="polite"></div>
 </body>
