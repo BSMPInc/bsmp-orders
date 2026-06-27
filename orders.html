@@ -825,6 +825,13 @@ body.sb-pinned .dock{left:var(--sb)}
 ::-webkit-scrollbar-thumb:hover{background:rgba(90,98,110,.55);background-clip:padding-box}
 .sidebar{scrollbar-width:none!important}
 .sidebar::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
+
+/* ===== Collapsible Open Orders stat strip (default collapsed for max space) ===== */
+.stats-toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);padding:7px 12px;border:1px solid var(--border);background:var(--card);margin-bottom:16px;font-family:inherit;box-shadow:var(--shadow)}
+.stats-toggle:hover{color:var(--accent);border-color:var(--border2)}
+.stats-toggle i{transition:transform .15s ease;font-size:15px}
+body.stats-open .stats-toggle i{transform:rotate(90deg)}
+body:not(.stats-open) #summary{display:none!important}
 </style>
 </head>
 <body>
@@ -932,6 +939,7 @@ body.sb-pinned .dock{left:var(--sb)}
 
   <div class="content">
     <div id="orders-page">
+    <button class="stats-toggle no-print" id="stats-toggle" onclick="window._toggleStats()" aria-label="Show or hide stats"><i class="ti ti-chevron-right"></i> <span>Stats</span></button>
     <div class="summary" id="summary"></div>
 
     <div class="filterbar no-print">
@@ -5499,6 +5507,13 @@ window.openHelp = () => { document.getElementById('help-modal').style.display='f
   });
   apply();
 })();
+// Open Orders stat strip: collapsible, default collapsed
+(function(){ try{ if(localStorage.getItem('bsmp_orders_stats_open')==='1') document.body.classList.add('stats-open'); }catch{} })();
+window._toggleStats = () => {
+  const open = !document.body.classList.contains('stats-open');
+  document.body.classList.toggle('stats-open', open);
+  try{ localStorage.setItem('bsmp_orders_stats_open', open?'1':'0'); }catch{}
+};
 document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window._login(); });
 </script>
 </body>
