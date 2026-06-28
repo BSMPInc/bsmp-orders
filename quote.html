@@ -527,6 +527,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .hi-cust-val { font-weight: 600; white-space: nowrap; }
 .hi-cust-bar { height: 6px; background: var(--surface2); overflow: hidden; }
 .hi-cust-bar span { display: block; height: 100%; background: var(--accent); }
+
+/* ── Insights rails on Archive / Prices / Laser ── */
+#panel-archive, #panel-prices, #panel-laser { max-width: 1460px; margin: 0 auto; }
+.ins-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ins-chip { font-size: 11px; font-weight: 600; color: var(--text2); background: var(--surface2); padding: 2px 8px; }
+.li-stat { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 1px; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -1915,6 +1921,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <h2>Printed Quote Archive</h2>
     <p>A permanent record of every quote/invoice that has been printed. Click any entry to re-open and reprint it exactly as it was.</p>
   </div>
+  <div class="hist-main-grid">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -1930,6 +1937,22 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
     <div id="archive-body"></div>
   </div>
+  <aside class="hist-side">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-bar"></i> Insights</div>
+      <div class="hs-pipeline">
+        <div class="hs-pipe-label">Archived value</div>
+        <div class="hs-pipe-value" id="ai-total">$0</div>
+        <div class="hs-pipe-sub" id="ai-total-sub">0 printed quotes</div>
+      </div>
+      <div class="hs-section-label">This month</div>
+      <div class="li-stat" id="ai-month">0 this month</div>
+      <div class="hs-pipe-sub" id="ai-month-sub">&mdash;</div>
+      <div class="hs-section-label">Top customers by value</div>
+      <div id="ai-customers"></div>
+    </div>
+  </aside>
+  </div><!-- /hist-main-grid -->
 </div>
 
 <!-- ===== MATERIAL PRICES PANEL ===== -->
@@ -1972,6 +1995,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 
   <!-- Price Index Table -->
+  <div class="hist-main-grid">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div class="card-title" style="margin-bottom:0">
@@ -1988,6 +2012,21 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
     <div id="price-index-body"></div>
   </div>
+  <aside class="hist-side">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-bar"></i> Insights</div>
+      <div class="hs-pipeline">
+        <div class="hs-pipe-label">Materials priced</div>
+        <div class="hs-pipe-value" id="pi-total">0</div>
+        <div class="hs-pipe-sub" id="pi-total-sub">0 vendors</div>
+      </div>
+      <div class="hs-section-label">By material family</div>
+      <div id="pi-family"></div>
+      <div class="hs-section-label">Top vendors</div>
+      <div id="pi-vendors"></div>
+    </div>
+  </aside>
+  </div><!-- /hist-main-grid -->
 </div>
 
 
@@ -1998,6 +2037,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <p>Adjust cut speed and pierce time per material/thickness. Changes apply immediately to all quotes.</p>
   </div>
 
+  <div class="hist-main-grid">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
       <div style="font-size:12px;color:var(--text2)">
@@ -2013,6 +2053,27 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
     <div id="laser-speeds-body"></div>
   </div>
+  <aside class="hist-side">
+    <div class="card">
+      <div class="card-title"><i class="ti ti-chart-bar"></i> Insights</div>
+      <div class="hs-pipeline">
+        <div class="hs-pipe-label">Cut profiles</div>
+        <div class="hs-pipe-value" id="li-total">0</div>
+        <div class="hs-pipe-sub" id="li-total-sub">0 material groups</div>
+      </div>
+      <div class="hs-section-label">Materials covered</div>
+      <div id="li-covered" class="ins-chips"></div>
+      <div class="hs-section-label">Thickness range</div>
+      <div class="li-stat" id="li-thk">&mdash;</div>
+      <div class="hs-section-label">Fastest cut</div>
+      <div class="li-stat" id="li-fast">&mdash;</div>
+      <div class="hs-pipe-sub" id="li-fast-sub"></div>
+      <div class="hs-section-label">Slowest cut</div>
+      <div class="li-stat" id="li-slow">&mdash;</div>
+      <div class="hs-pipe-sub" id="li-slow-sub"></div>
+    </div>
+  </aside>
+  </div><!-- /hist-main-grid -->
 </div>
 
 
@@ -2030,6 +2091,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <span style="font-size:12px;color:var(--text3);margin-left:4px">June 2026</span>
     </div>
     <div id="changelog-entries">
+
+      <div class="changelog-entry">
+        <div class="changelog-version">Insights on more pages</div>
+        <ul class="changelog-list">
+          <li>Printed Archive now has an insights rail: total archived value, activity this month, and top customers by printed value</li>
+          <li>Material Prices shows a rail with how many materials are priced, a by-material-family breakdown (aluminum / stainless / steel), and your top vendors</li>
+          <li>Laser Speeds shows cut-profile count, materials covered, the thickness range, and your fastest/slowest cuts</li>
+        </ul>
+      </div>
 
       <div class="changelog-entry">
         <div class="changelog-version">Calmer color palette</div>
@@ -2676,6 +2746,33 @@ function archivePrintedQuote(q, kind){
   } catch(e){ console.error('Archive failed', e); }
 }
 
+function renderArchiveInsights(){
+  const fmt0 = v => '$'+Math.round(v||0).toLocaleString('en-US');
+  const list = ARCHIVE;
+  let total=0, monthCount=0, monthVal=0;
+  const now=new Date(), ym=now.getFullYear()+'-'+now.getMonth();
+  const byCust={};
+  list.forEach(a=>{
+    const t=a.total||0; total+=t;
+    const d=a.id?new Date(a.id):null;
+    if(d && !isNaN(d.getTime()) && (d.getFullYear()+'-'+d.getMonth())===ym){ monthCount++; monthVal+=t; }
+    const c=(a.customerName && a.customerName.trim())?a.customerName:'(no customer)';
+    byCust[c]=(byCust[c]||0)+t;
+  });
+  const set=(id,t)=>{const e=document.getElementById(id); if(e) e.textContent=t;};
+  set('ai-total', fmt0(total));
+  set('ai-total-sub', list.length+' printed quote'+(list.length!==1?'s':''));
+  set('ai-month', monthCount+' this month');
+  set('ai-month-sub', monthCount? (fmt0(monthVal)+' printed') : '\u2014');
+  const custEl=document.getElementById('ai-customers');
+  if(custEl){
+    const top=Object.entries(byCust).sort((a,b)=>b[1]-a[1]).slice(0,4);
+    const max=top.length?top[0][1]:1;
+    custEl.innerHTML = !top.length ? '<div class="hi-empty">No printed quotes yet.</div>'
+      : top.map(([n,v])=>`<div class="hi-cust"><div class="hi-cust-row"><span class="hi-cust-name" title="${n}">${n}</span><span class="hi-cust-val">${fmt0(v)}</span></div><div class="hi-cust-bar"><span style="width:${Math.max(4,v/max*100).toFixed(0)}%"></span></div></div>`).join('');
+  }
+}
+
 function renderArchive(){
   const search = (document.getElementById('archive-search').value||'').toLowerCase();
   const body = document.getElementById('archive-body');
@@ -2686,6 +2783,7 @@ function renderArchive(){
     (a.desc||'').toLowerCase().includes(search)
   );
   if(countEl) countEl.textContent = `${filtered.length} printed quote${filtered.length!==1?'s':''}`;
+  renderArchiveInsights();
 
   if(!filtered.length){
     body.innerHTML = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg><h3>No printed quotes yet</h3><p>Every quote you print will be archived here automatically.</p></div>`;
@@ -6184,6 +6282,39 @@ function savePriceItems() {
   setPriceStatus('success', `Saved ${saved.length} price item${saved.length!==1?'s':''} to index.`);
 }
 
+function renderPriceInsights(){
+  const list = PRICE_INDEX;
+  const set=(id,t)=>{const e=document.getElementById(id); if(e) e.textContent=t;};
+  const vendors=new Set();
+  const fam={Aluminum:0,Stainless:0,Steel:0,Other:0};
+  const famOf=g=>{ g=(g||'').toLowerCase();
+    if(/alum|6061|5052|2024|3003|\balu/.test(g)) return 'Aluminum';
+    if(/stainless|\bss\b|304|316|321|17-4|15-5/.test(g)) return 'Stainless';
+    if(/crs|cold roll|hot roll|\bhr\b|a36|1018|1008|steel|galv/.test(g)) return 'Steel';
+    return 'Other';
+  };
+  list.forEach(p=>{ if(p.vendor) vendors.add(p.vendor); fam[famOf(p.material_grade)]++; });
+  set('pi-total', list.length);
+  set('pi-total-sub', vendors.size+' vendor'+(vendors.size!==1?'s':''));
+  const segs=[
+    {k:'Aluminum',v:fam.Aluminum,c:'#6790ba'},
+    {k:'Stainless',v:fam.Stainless,c:'#335982'},
+    {k:'Steel',v:fam.Steel,c:'#1e3a5f'},
+    {k:'Other',v:fam.Other,c:'#b9b29c'}
+  ].filter(x=>x.v>0);
+  const tot=segs.reduce((a,x)=>a+x.v,0);
+  const mixEl=document.getElementById('pi-family');
+  if(mixEl){ mixEl.innerHTML = tot<=0 ? '<div class="hi-empty">No prices saved yet.</div>'
+    : '<div class="mix-bar">'+segs.map(x=>`<span style="width:${(x.v/tot*100).toFixed(1)}%;background:${x.c}"></span>`).join('')+'</div>'
+      +'<div class="mix-legend">'+segs.map(x=>`<div class="mix-row"><span class="mix-dot" style="background:${x.c}"></span><span class="mix-k">${x.k}</span><span class="mix-v">${x.v}</span></div>`).join('')+'</div>'; }
+  const byV={};
+  list.forEach(p=>{ const v=p.vendor||'(unknown)'; byV[v]=(byV[v]||0)+1; });
+  const vEl=document.getElementById('pi-vendors');
+  if(vEl){ const top=Object.entries(byV).sort((a,b)=>b[1]-a[1]).slice(0,4); const max=top.length?top[0][1]:1;
+    vEl.innerHTML = !top.length ? '<div class="hi-empty">\u2014</div>'
+      : top.map(([n,c])=>`<div class="hi-cust"><div class="hi-cust-row"><span class="hi-cust-name" title="${n}">${n}</span><span class="hi-cust-val">${c}</span></div><div class="hi-cust-bar"><span style="width:${Math.max(4,c/max*100).toFixed(0)}%"></span></div></div>`).join(''); }
+}
+
 function renderPriceIndex() {
   const search = (document.getElementById('price-search')?.value||'').toLowerCase();
   const filtered = search
@@ -6194,6 +6325,7 @@ function renderPriceIndex() {
       )
     : [...PRICE_INDEX]; // show all when no search
   const body = document.getElementById('price-index-body');
+  renderPriceInsights();
   if (!filtered.length) {
     body.innerHTML = '<div class="empty-state"><h3>No prices saved yet</h3><p>Upload a vendor quote to get started.</p></div>';
     return;
@@ -7145,6 +7277,33 @@ const LASER_GROUPS = [
   {label:'2024 Aluminum', match:k=>k.includes('2024')},
 ];
 
+function renderLaserInsights(){
+  const groups=(typeof LASER_GROUPS!=='undefined'?LASER_GROUPS:[]);
+  const allKeys=Object.keys(LASER_SPEEDS);
+  const covered=[]; let shown=[];
+  groups.forEach(g=>{ const ks=allKeys.filter(g.match); if(ks.length){ covered.push({label:g.label,n:ks.length}); shown=shown.concat(ks); } });
+  shown=[...new Set(shown)];
+  const set=(id,t)=>{const e=document.getElementById(id); if(e) e.textContent=t;};
+  set('li-total', shown.length);
+  set('li-total-sub', covered.length+' material group'+(covered.length!==1?'s':''));
+  const short=l=>{ const m=l.match(/\(([^)]+)\)/); if(m) return m[1]; return l.replace(' Stainless Steel',' SS').replace(' Aluminum',' Al'); };
+  const cov=document.getElementById('li-covered');
+  if(cov) cov.innerHTML = covered.length ? covered.map(c=>`<span class="ins-chip">${short(c.label)} <span style="opacity:.55">${c.n}</span></span>`).join('') : '<div class="hi-empty">\u2014</div>';
+  let minT=Infinity,maxT=-Infinity,fast=null,slow=null;
+  shown.forEach(k=>{
+    const m=k.match(/([\d.]+)\s*thk/); if(m){ const t=parseFloat(m[1]); if(t<minT)minT=t; if(t>maxT)maxT=t; }
+    const ips=LASER_SPEEDS[k].ips;
+    if(!fast||ips>fast.ips) fast={k,ips};
+    if(!slow||ips<slow.ips) slow={k,ips};
+  });
+  const clean=k=>k.replace(/^\./,'0.');
+  set('li-thk', (isFinite(minT)?'0'+minT.toFixed(3).replace(/^0/,''):'\u2014')+'" \u2013 '+(isFinite(maxT)?maxT.toFixed(3):'\u2014')+'"');
+  set('li-fast', fast?fast.ips.toFixed(2)+' IPS':'\u2014');
+  set('li-fast-sub', fast?clean(fast.k):'');
+  set('li-slow', slow?slow.ips.toFixed(2)+' IPS':'\u2014');
+  set('li-slow-sub', slow?clean(slow.k):'');
+}
+
 function renderLaserSpeeds(){
   const container = document.getElementById('laser-speeds-body');
   const allKeys = Object.keys(LASER_SPEEDS);
@@ -7179,6 +7338,7 @@ function renderLaserSpeeds(){
     html += `</div></div>`;
   });
   container.innerHTML = html;
+  renderLaserInsights();
 }
 
 function saveLaserSpeeds(){
