@@ -853,6 +853,26 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
 .dash-aging-key .adot{width:8px;height:8px;border-radius:2px;display:inline-block;flex-shrink:0}
 .dash-aging-key b{color:var(--text);font-weight:700}
 .dc-empty{font-size:12.5px;color:var(--text3);padding:8px 0}
+
+/* AI Daily Brief (dashboard top) */
+.ab-card{background:var(--surface,#fff);border:1px solid var(--border);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px}
+.ab-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.ab-title{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;color:var(--accent)}
+.ab-title i{font-size:16px;color:var(--aiGreen,#0f7a4f)}
+.ab-btn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;background:var(--aiGreen,#0f7a4f);color:#fff;border:none;padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer}
+.ab-btn:hover{filter:brightness(1.08)}
+.ab-btn:disabled{opacity:.6;cursor:default}
+.ab-text{display:flex;flex-direction:column;gap:5px}
+.ab-li{display:flex;gap:7px;font-size:13px;color:var(--text);line-height:1.45}
+.ab-dot{color:var(--aiGreen,#0f7a4f);font-weight:800;flex-shrink:0}
+.ab-p{font-size:13px;color:var(--text);line-height:1.45}
+.ab-meta{margin-top:9px;font-size:11px;color:var(--text3)}
+.ab-empty{font-size:12.5px;color:var(--text2)}
+.ab-loading{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text2)}
+.ab-error{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ap,#a8443a)}
+.ab-loading i,.ab-error i{font-size:15px}
+@keyframes abspin{to{transform:rotate(360deg)}}
+.ab-spin{display:inline-block;animation:abspin 1s linear infinite}
 </style>
 </head>
 <body>
@@ -1490,6 +1510,68 @@ function colHtml(side,entries){
     ${cards}
   </div>`;
 }
+let _aparBrief={text:'',at:'',loading:false,error:''};
+try{ const c=JSON.parse(localStorage.getItem('bsmp_apar_brief')||'null'); if(c && c.date===new Date().toDateString()){ _aparBrief.text=c.text; _aparBrief.at=c.at; } }catch{}
+async function aparNarrate(promptText){
+  const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:700,messages:[{role:'user',content:promptText}]})});
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message||'API error');
+  return (data.content||[]).map(c=>c.text||'').join('').trim();
+}
+function aparFmtBrief(t){
+  return (t||'').split(/\n+/).map(x=>x.trim()).filter(Boolean).map(ln=>{
+    const m=ln.match(/^[-*•]\s+(.*)$/);
+    return m?`<div class="ab-li"><span class="ab-dot">•</span><span>${esc(m[1])}</span></div>`:`<div class="ab-p">${esc(ln)}</div>`;
+  }).join('');
+}
+function buildAparSnapshot(){
+  const entries=allEntries();
+  const unpaidOf=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  const liveAR=entries.filter(e=>e.type==='ar'&&!isArchived(e));
+  const liveAP=entries.filter(e=>e.type==='ap'&&!isArchived(e));
+  const acctIds=Object.keys(accounts);
+  const cashOnHand=Math.round(acctIds.reduce((t,id)=>t+(Number(accounts[id].balance)||0),0));
+  const scheduledOut=Math.round(liveAP.filter(e=>(e.payStatus||'')==='scheduled').reduce((t,e)=>t+unpaidOf(e),0));
+  const staleBalances=acctIds.filter(id=>balanceFreshness(accounts[id]).stale).map(id=>accounts[id].name).filter(Boolean);
+  const recOf=e=>{const d=daysUntil(e.due);return {party:e.party||'',ref:e.ref||'',amount:Math.round(unpaidOf(e)),due:e.due||null,daysLate:(d!=null&&d<0)?-d:0};};
+  const arOverdue=liveAR.filter(e=>statusOf(e)==='over'&&unpaidOf(e)>0.005).map(recOf).sort((a,b)=>b.daysLate-a.daysLate);
+  const apOverdue=liveAP.filter(e=>statusOf(e)==='over'&&unpaidOf(e)>0.005).map(recOf).sort((a,b)=>b.daysLate-a.daysLate);
+  const in7=e=>{const d=daysUntil(e.due);return d!=null&&d>=0&&d<=7;};
+  const arDueWeek=liveAR.filter(e=>e.due&&in7(e)&&unpaidOf(e)>0.005).map(recOf);
+  const apDueWeek=liveAP.filter(e=>e.due&&in7(e)&&unpaidOf(e)>0.005).map(recOf);
+  const arTotal=Math.round(liveAR.reduce((t,e)=>t+unpaidOf(e),0));
+  const apTotal=Math.round(liveAP.reduce((t,e)=>t+unpaidOf(e),0));
+  const debt={}; liveAR.forEach(e=>{const k=e.party||'(unknown)';debt[k]=(debt[k]||0)+unpaidOf(e);});
+  const cred={}; liveAP.forEach(e=>{const k=e.party||'(unknown)';cred[k]=(cred[k]||0)+unpaidOf(e);});
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([party,v])=>({party,amount:Math.round(v)}));
+  const ag=bucketize(liveAR);
+  return {
+    date:new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}),
+    cash:{onHand:cashOnHand, scheduledOut, projectedAfter:cashOnHand-scheduledOut, staleBalances},
+    receivables:{total:arTotal, overdueTotal:Math.round(arOverdue.reduce((t,e)=>t+e.amount,0)), aging:{current:Math.round(ag.cur),d1_30:Math.round(ag.b30),d31_60:Math.round(ag.b60),d60plus:Math.round(ag.b90+ag.b90p)}, overdue:arOverdue.slice(0,10), dueThisWeek:arDueWeek.slice(0,10), topCustomers:top(debt)},
+    payables:{total:apTotal, overdueTotal:Math.round(apOverdue.reduce((t,e)=>t+e.amount,0)), scheduledOut, overdue:apOverdue.slice(0,10), dueThisWeek:apDueWeek.slice(0,10), topVendors:top(cred)},
+    netPosition:arTotal-apTotal
+  };
+}
+const APAR_BRIEF_PROMPT=`You are the bookkeeping assistant for Bert's Sheet Metal Products, a metal fabrication shop. Below is today's AP/AR status, ALREADY COMPUTED. Treat every number, party, and invoice as authoritative — do not recalculate, invent entries, or add anything not present. Write concise morning money notes the owner can read at the daily stand-up.
+Rules:
+- 4 to 7 short lines or "- " bullets. No heading, no preamble, no sign-off.
+- Lead with cash on hand and the projected balance after scheduled payments; flag if cash looks tight against what is going out.
+- Call out the biggest OVERDUE receivables to chase (name the customer + invoice #) and overdue payables to pay.
+- Note receivables/payables due in the next 7 days (money in vs money out).
+- If one customer or vendor dominates, say so. Mention any bank balance that needs updating.
+- All amounts are whole dollars.
+TODAY'S AP/AR STATUS (JSON):
+`;
+window.genAparBrief=async ()=>{
+  _aparBrief.loading=true; _aparBrief.error=''; render();
+  try{
+    const text=await aparNarrate(APAR_BRIEF_PROMPT+JSON.stringify(buildAparSnapshot()));
+    _aparBrief.text=text; _aparBrief.at=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    try{ localStorage.setItem('bsmp_apar_brief', JSON.stringify({date:new Date().toDateString(), text, at:_aparBrief.at})); }catch{}
+  }catch(e){ _aparBrief.error=e.message||'Could not generate notes'; }
+  _aparBrief.loading=false; render();
+};
 function renderDash(entries){
   const arOut=entries.filter(e=>e.type==='ar').reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
   const apOut=entries.filter(e=>e.type==='ap').reduce((s,e)=>s+Math.max(0,(e.amount||0)-(e.paid||0)),0);
@@ -1515,7 +1597,20 @@ function renderDash(entries){
   const agTot=ag.cur+ag.b30+ag.b60+ag60p;
   const aseg=(v,c)=>agTot>0?`<span style="width:${(v/agTot*100).toFixed(1)}%;background:${c}"></span>`:'';
   const plur=(n,w)=>n+' '+w+(n!==1?'s':'');
+  const _ab=_aparBrief;
+  const _abBody=_ab.loading
+    ? `<div class="ab-loading"><i class="ti ti-loader-2 ab-spin"></i> Reading the books…</div>`
+    : _ab.error
+      ? `<div class="ab-error"><i class="ti ti-alert-triangle"></i> ${esc(_ab.error)}. The numbers below are still accurate — try again in a moment.</div>`
+      : _ab.text
+        ? `<div class="ab-text">${aparFmtBrief(_ab.text)}</div><div class="ab-meta">Generated ${esc(_ab.at)} from your current books — double-check the figures below.</div>`
+        : `<div class="ab-empty">Plain-English money notes for the morning — cash position, who to chase, what is due, and what is going out this week.</div>`;
+  const _abBtn=`<button class="ab-btn" onclick="event.stopPropagation();genAparBrief()" ${_ab.loading?'disabled':''}><i class="ti ti-${_ab.loading?'loader-2 ab-spin':(_ab.text?'refresh':'wand')}"></i> ${_ab.text?'Refresh notes':'Write today’s money notes'}</button>`;
   $('content').innerHTML=`
+    <div class="ab-card">
+      <div class="ab-head"><span class="ab-title"><i class="ti ti-sparkles"></i> AI Daily Brief</span>${_abBtn}</div>
+      ${_abBody}
+    </div>
     <div class="ai-cta" onclick="openAI()">
       <i class="ti ti-sparkles"></i>
       <div><div class="t">AI Extract an invoice or bill</div><div class="s">Drop a PDF or photo — Claude fills in the receivable or payable for you</div></div>
