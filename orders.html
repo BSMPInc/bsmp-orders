@@ -849,6 +849,39 @@ body.sb-pinned .dock{left:var(--sb)}
 .sidebar{scrollbar-width:none!important}
 .sidebar::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
 
+
+/* ── Dashboard (manager home) ── */
+.dash-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:4px}
+@media(max-width:1000px){.dash-grid{grid-template-columns:1fr}}
+.dash-card{background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);padding:15px 17px}
+.dc-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--text);margin-bottom:12px}
+.dc-title>i{font-size:16px;color:var(--accent)}
+.dc-title .dc-link{margin-left:auto;font-size:11px;font-weight:600;color:var(--text3);cursor:pointer}
+.dc-title .dc-link:hover{color:var(--accent)}
+.dc-empty{font-size:12.5px;color:var(--text3);padding:6px 0}
+.dstatus-bar{display:flex;height:16px;overflow:hidden;background:var(--inset-bg);margin-bottom:12px}
+.dstatus-bar span{height:100%}
+.dstatus-bar span+span{border-left:1.5px solid #fff}
+.dstatus-legend{display:flex;flex-direction:column;gap:6px}
+.dstatus-legend span{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text2);cursor:pointer}
+.dstatus-legend span:hover{color:var(--text)}
+.dstatus-legend .ddot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.dstatus-legend b{margin-left:auto;color:var(--text);font-weight:700}
+.dact-list{display:flex;flex-direction:column}
+.dact-row{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--border);cursor:pointer}
+.dact-row:last-child{border-bottom:none}
+.dact-row:hover{background:var(--accent-soft)}
+.dact-row i{font-size:17px;color:var(--text3)}
+.dact-row i.red{color:var(--red)}.dact-row i.amber{color:var(--amber)}.dact-row i.green{color:var(--green2)}
+.dact-l{font-size:13px;color:var(--text);font-weight:500}
+.dact-n{margin-left:auto;font-size:16px;font-weight:800;color:var(--text3)}
+.dact-n.red{color:var(--red)}.dact-n.amber{color:var(--amber)}.dact-n.green{color:var(--green2)}
+.dcust{margin-bottom:9px}
+.dcust-row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;margin-bottom:3px}
+.dcust-name{color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dcust-val{color:var(--text2);font-weight:700;flex-shrink:0}
+.dcust-bar{height:6px;background:var(--inset-bg);overflow:hidden}
+.dcust-bar span{display:block;height:100%;background:var(--accent)}
 </style>
 </head>
 <body>
@@ -882,8 +915,9 @@ body.sb-pinned .dock{left:var(--sb)}
   <div class="sidebar-section">
     <div class="sidebar-section-label mgr-only">Orders</div>
     <div class="sidebar-section-label op-only" style="display:none">Shop Floor</div>
+    <div class="nav-item active mgr-only" id="nav-dashboard" onclick="showPage('dashboard')"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
     <div class="nav-item" id="nav-dispatch" onclick="showPage('dispatch')"><i class="ti ti-sun"></i> <span class="nav-label">Today</span><span class="nav-badge" id="badge-dispatch" style="display:none"></span></div>
-    <div class="nav-item active mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
+    <div class="nav-item mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item mgr-only" id="nav-stats" onclick="showPage('stats')"><i class="ti ti-chart-bar"></i> Stats</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
     <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
@@ -930,6 +964,7 @@ body.sb-pinned .dock{left:var(--sb)}
 
 <!-- Bottom dock: always-on shortcuts -->
 <div class="dock" id="app-dock">
+  <button class="dock-tab mgr-only" id="dock-dashboard" onclick="showPage('dashboard')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
   <button class="dock-tab mgr-only" id="dock-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i>Open Orders</button>
   <button class="dock-tab" id="dock-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i>Work Queues</button>
   <button class="dock-tab" id="dock-dispatch" onclick="showPage('dispatch')"><i class="ti ti-sun"></i>Today</button>
@@ -956,6 +991,7 @@ body.sb-pinned .dock{left:var(--sb)}
   </div>
 
   <div class="content">
+    <div id="dashboard-page" style="display:none"><div id="dash-body"></div></div>
     <div id="stats-page" style="display:none">
       <div class="summary" id="summary"></div>
     </div>
@@ -1812,9 +1848,63 @@ function updateNavBadges(){
   const tb=document.getElementById('badge-trash');
   if(tb){ const n=(typeof trashedOrders!=='undefined')?trashedOrders.length:0; if(n>0){ tb.textContent=n; tb.style.display=''; } else tb.style.display='none'; }
 }
+function renderDashboard(){
+  const body=document.getElementById('dash-body'); if(!body) return;
+  const active=orders.filter(r=>!r.archived);
+  const open=active.filter(r=>r.status!=='Invoiced');
+  const v=r=>rowTotal(r);
+  const openVal=open.reduce((t,r)=>t+v(r),0);
+  let overdue=0,dueWk=0;
+  open.forEach(r=>{ if(!r.due)return; const d=daysUntil(r.due); if(d==null)return; if(d<0)overdue++; else if(d<=7)dueWk++; });
+  let behind=0;
+  open.forEach(r=>{ if(['Completed','Invoiced'].includes(r.status))return; try{ if(jobHealth(r).state==='behind')behind++; }catch(e){} });
+  const readyArr=active.filter(r=>r.status==='Ready for Invoice');
+  const ready=readyArr.length;
+  const needpo=active.filter(r=>r.status==='Need Purchase Order').length;
+  const outstanding=active.filter(r=>['Invoiced','Ready for Invoice'].includes(r.status)&&r.payment!=='Paid').reduce((t,r)=>t+v(r),0);
+  const sc={}; STATUSES.forEach(st=>{ if(st!=='Invoiced') sc[st]=0; });
+  open.forEach(r=>{ if(sc[r.status]!=null) sc[r.status]++; });
+  const scList=Object.keys(sc).filter(st=>sc[st]>0);
+  const scTot=scList.reduce((t,st)=>t+sc[st],0);
+  const seg=st=>`<span style="width:${(sc[st]/scTot*100).toFixed(1)}%;background:${STATUS_ACCENT[st]||'#9aa3b2'}" title="${st}: ${sc[st]}"></span>`;
+  const cust={}; open.forEach(r=>{ const c=(r.customer||'').trim()||'(no customer)'; cust[c]=(cust[c]||0)+v(r); });
+  const topC=Object.entries(cust).sort((a,b)=>b[1]-a[1]).slice(0,5); const cMax=topC.length?topC[0][1]:1;
+  const money=n=>fmtMoney(n)||'$0.00';
+  const aRow=(ic,label,n,onclick,cls)=>`<div class="dact-row" onclick="${onclick}"><i class="ti ${ic} ${cls||''}"></i><span class="dact-l">${label}</span><span class="dact-n ${n>0?(cls||''):''}">${n}</span></div>`;
+  body.innerHTML=`
+    <div class="summary">
+      <div class="stat"><div class="stat-label">Open orders</div><div class="stat-val">${open.length}</div></div>
+      <div class="stat"><div class="stat-label">Open value</div><div class="stat-val">${money(openVal)}</div></div>
+      <div class="stat"><div class="stat-label">Overdue</div><div class="stat-val ${overdue?'red':''}">${overdue}</div></div>
+      <div class="stat"><div class="stat-label">Due \u2264 7 days</div><div class="stat-val ${dueWk?'blue':''}">${dueWk}</div></div>
+      <div class="stat"><div class="stat-label">Ready to invoice</div><div class="stat-val ${ready?'green':''}">${ready}</div></div>
+      <div class="stat"><div class="stat-label">Outstanding</div><div class="stat-val">${money(outstanding)}</div></div>
+    </div>
+    <div class="dash-grid">
+      <div class="dash-card">
+        <div class="dc-title"><i class="ti ti-chart-bar"></i> Order status <span class="dc-link" onclick="showPage('orders');setFilter('')">Open Orders \u203a</span></div>
+        ${scTot>0?`<div class="dstatus-bar">${scList.map(seg).join('')}</div>
+        <div class="dstatus-legend">${scList.map(st=>`<span onclick="setFilter('${st}')"><i class="ddot" style="background:${STATUS_ACCENT[st]||'#9aa3b2'}"></i>${st} <b>${sc[st]}</b></span>`).join('')}</div>`:'<div class="dc-empty">No open orders.</div>'}
+      </div>
+      <div class="dash-card">
+        <div class="dc-title"><i class="ti ti-alert-circle"></i> Needs attention</div>
+        <div class="dact-list">
+          ${aRow('ti-clock-exclamation','Behind schedule',behind,"showPage('dispatch')",'red')}
+          ${aRow('ti-calendar-x','Overdue orders',overdue,"showPage('orders');setFilter('')",'red')}
+          ${aRow('ti-alert-circle','Need PO',needpo,"showPage('needpo')",'amber')}
+          ${aRow('ti-file-dollar','Ready to invoice',ready,"setFilter('Ready for Invoice')",'green')}
+        </div>
+      </div>
+      <div class="dash-card">
+        <div class="dc-title"><i class="ti ti-users"></i> Top customers <span class="dc-link">by open value</span></div>
+        ${topC.length?topC.map(([n,val])=>`<div class="dcust"><div class="dcust-row"><span class="dcust-name" title="${n}">${n}</span><span class="dcust-val">${money(val)}</span></div><div class="dcust-bar"><span style="width:${Math.max(4,val/cMax*100).toFixed(0)}%"></span></div></div>`).join(''):'<div class="dc-empty">No open orders.</div>'}
+      </div>
+    </div>`;
+}
 function render(){
   invalidateSched();
   updateNavBadges();
+  if(document.getElementById('dashboard-page')&&document.getElementById('dashboard-page').style.display!=='none'){try{renderDashboard();}catch(e){}}
   // toggle which view is visible
   const isCard = viewMode==='card';
   const tv=document.getElementById('table-view'), cg=document.getElementById('cards'), sb=document.getElementById('sortbar');
@@ -3262,6 +3352,7 @@ function autoIndexCustomer(name, poNotes) {
 
 // ── Page switching ─────────────────────────────────────────────────────────────
 const PAGE_META = {
+  dashboard: {title:'Dashboard',     sub:'Shop status at a glance \u2014 orders, schedule, and money'},
   dispatch: {title:'Today',          sub:'Each person\u2019s tasks for today, most urgent first'},
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   stats:    {title:'Stats',           sub:'Order counts and dollar figures at a glance'},
@@ -3278,7 +3369,7 @@ const PAGE_META = {
 };
 window.showPage = (page) => {
   if(userRole==='operator' && !['queues','dispatch'].includes(page)) page='queues';   // operators: Work Queues + Today only
-  ['orders','stats','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','trash','settings'].forEach(p=>{
+  ['dashboard','orders','stats','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','trash','settings'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -3290,6 +3381,7 @@ window.showPage = (page) => {
   { const impBtn=document.getElementById('topbar-import-btn'); if(impBtn) impBtn.style.display = ordersOnly ? '' : 'none'; }
   { const cb=document.getElementById('topbar-combine-btn'); if(cb && !ordersOnly) cb.style.display='none'; }
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(page==='dashboard') document.getElementById('nav-dashboard')?.classList.add('active');
   if(page==='orders') document.getElementById('nav-orders')?.classList.add('active');
   if(page==='stats') document.getElementById('nav-stats')?.classList.add('active');
   if(page==='dispatch') document.getElementById('nav-dispatch')?.classList.add('active');
@@ -3303,6 +3395,7 @@ window.showPage = (page) => {
   if(page==='archive') document.getElementById('nav-archive')?.classList.add('active');
   if(page==='trash') document.getElementById('nav-trash')?.classList.add('active');
   if(page==='settings') document.getElementById('nav-settings')?.classList.add('active');
+  if(page==='dashboard') renderDashboard();
   if(page==='queues') renderQueues();
   if(page==='stats') renderSummary();
   if(page==='dispatch') renderDispatch();
@@ -3315,7 +3408,7 @@ window.showPage = (page) => {
   if(page==='archive') renderArchive();
   if(page==='trash') renderTrash();
   if(page==='settings'){ renderDurationSettings(); if(typeof maybeAutoBackup==='function') maybeAutoBackup(); }
-  { const dm={orders:'dock-orders',queues:'dock-queues',dispatch:'dock-dispatch'};
+  { const dm={dashboard:'dock-dashboard',orders:'dock-orders',queues:'dock-queues',dispatch:'dock-dispatch'};
     document.querySelectorAll('.dock-tab').forEach(t=>t.classList.remove('active'));
     if(dm[page]) document.getElementById(dm[page])?.classList.add('active'); }
 };
@@ -5471,7 +5564,7 @@ function applyRoleUI(){
   }
   const pill = document.getElementById('topbar-op-pill');
   if(pill) pill.style.display = op ? 'inline-flex' : 'none';
-  if(op){ showPage('queues'); }
+  if(op){ showPage('queues'); } else { showPage('dashboard'); }
 }
 
 // ── Authentication gate ───────────────────────────────────────────────────────
