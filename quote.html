@@ -8334,6 +8334,19 @@ const db = getDatabase(app);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 let _qUser = null;
+let _qSynced = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_quote_synced')||'[]')); }catch(e){ return new Set(); } })();
+function _qSaveSynced(){ try{ localStorage.setItem('bsmp_quote_synced', JSON.stringify([..._qSynced])); }catch(e){} }
+function _qLocalQuotes(){ try{ const a=JSON.parse(localStorage.getItem('bsmp_history')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
+async function _qPush(q){ await set(ref(db,'quotes/'+q.id), quotePayload(q)); _qSynced.add(q.id); _qSaveSynced(); }
+async function _qSyncList(list){ let ok=0,fail=0; for(const q of list){ if(q && q.id!=null){ try{ await _qPush(q); ok++; }catch(e){ fail++; } } } return {ok,fail}; }
+async function _qAutoBackfill(){
+  const pending=_qLocalQuotes().filter(q=>q && q.id!=null && !_qSynced.has(q.id));
+  if(!pending.length){ setSync('ok','Synced'); return; }
+  setSync('busy','Syncing '+pending.length+'\u2026');
+  const {ok,fail}=await _qSyncList(pending);
+  setSync(fail?'err':'ok', fail?'Sync failed':'Synced');
+  const st=$q('q-syncall-status'); if(st){ st.textContent = fail ? (fail+' quote(s) failed to sync \u2014 the database rules may be blocking writes to "quotes".') : ('Auto-synced '+ok+' new quote'+(ok!==1?'s':'')+' to the Order Tracker.'); }
+}
 const $q = id => document.getElementById(id);
 function setSync(state, txt){
   const dot=$q('q-sync-dot'), t=$q('q-sync-txt');
@@ -8366,24 +8379,23 @@ function quotePayload(q){
 }
 window._qCloudSyncQuote = async (q) => {
   if(!_qUser || !q || q.id==null) return;
-  try{ setSync('busy','Syncing…'); await set(ref(db,'quotes/'+q.id), quotePayload(q)); setSync('ok','Synced'); }
-  catch(e){ setSync('err','Sync failed'); console.warn('quote sync failed', e); }
+  try{ setSync('busy','Syncing\u2026'); await _qPush(q); setSync('ok','Synced'); }
+  catch(e){ setSync('err','Sync failed \u2014 check DB rules'); console.warn('quote sync failed', e); }
 };
 window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
-  try{ await remove(ref(db,'quotes/'+id)); }catch(e){ console.warn('quote remove failed', e); }
+  try{ await remove(ref(db,'quotes/'+id)); _qSynced.delete(id); _qSaveSynced(); }catch(e){ console.warn('quote remove failed', e); }
 };
 window._qSyncAll = async () => {
   const st = $q('q-syncall-status');
   if(!_qUser){ if(st) st.textContent='Sign in first to sync.'; return; }
-  let list=[]; try{ list=JSON.parse(localStorage.getItem('bsmp_history')||'[]'); }catch(e){}
-  if(!Array.isArray(list) || !list.length){ if(st) st.textContent='No quotes to sync.'; return; }
-  if(st) st.textContent='Syncing '+list.length+' quote'+(list.length!==1?'s':'')+'…';
-  setSync('busy','Syncing…');
-  let ok=0, fail=0;
-  for(const q of list){ if(q && q.id!=null){ try{ await set(ref(db,'quotes/'+q.id), quotePayload(q)); ok++; }catch(e){ fail++; } } }
+  const list=_qLocalQuotes();
+  if(!list.length){ if(st) st.textContent='No quotes to sync.'; return; }
+  if(st) st.textContent='Syncing '+list.length+' quote'+(list.length!==1?'s':'')+'\u2026';
+  setSync('busy','Syncing\u2026');
+  const {ok,fail}=await _qSyncList(list);
   setSync(fail?'err':'ok', fail?'Sync failed':'Synced');
-  if(st) st.textContent='Synced '+ok+' quote'+(ok!==1?'s':'')+(fail?(' · '+fail+' failed'):'')+'.';
+  if(st) st.textContent = fail ? ('Synced '+ok+', '+fail+' failed \u2014 the database rules may be blocking writes to "quotes".') : ('Synced all '+ok+' quote'+(ok!==1?'s':'')+' to the Order Tracker.');
 };
 window._qLogin = async () => {
   const email=($q('q-login-email').value||'').trim();
@@ -8398,7 +8410,7 @@ window._qLogout = () => { signOut(auth); };
 onAuthStateChanged(auth, (user) => {
   _qUser = user || null;
   const ov=$q('q-login');
-  if(user){ if(ov) ov.style.display='none'; setSync('ok', user.email ? user.email.split('@')[0] : 'Synced'); }
+  if(user){ if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); }
   else { if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
 });
 document.addEventListener('keydown', (e) => {
