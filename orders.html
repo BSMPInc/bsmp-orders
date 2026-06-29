@@ -882,6 +882,32 @@ body.sb-pinned .dock{left:var(--sb)}
 .dcust-val{color:var(--text2);font-weight:700;flex-shrink:0}
 .dcust-bar{height:6px;background:var(--inset-bg);overflow:hidden}
 .dcust-bar span{display:block;height:100%;background:var(--accent)}
+
+/* ── Dashboard: AI de-brief + needs-attention tables ── */
+.dash-brief{margin-bottom:14px}
+.dash-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media(max-width:1000px){.dash-two{grid-template-columns:1fr}}
+.dash-attention{margin-top:14px}
+.att-grid{display:flex;flex-direction:column;gap:18px}
+.att-sec{min-width:0}
+.att-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.att-badge{min-width:20px;height:20px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.att-badge.red{background:var(--red)}.att-badge.amber{background:var(--amber)}.att-badge.green{background:var(--green2)}
+.att-t{font-size:12.5px;font-weight:800;color:var(--text)}
+.att-more{margin-left:auto;font-size:11px;font-weight:600;color:var(--text3);cursor:pointer}
+.att-more:hover{color:var(--accent)}
+.att-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+.att-table th{text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);padding:5px 8px;background:var(--inset-bg);border-bottom:1px solid var(--border)}
+.att-table th:nth-child(1){width:46%}.att-table th:nth-child(2){width:27%}.att-table th:nth-child(3){width:27%}
+.att-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-table tbody tr{cursor:pointer}
+.att-table tbody tr:hover{background:var(--accent-soft)}
+.att-cust{color:var(--text);font-weight:600}
+.att-po{font-variant-numeric:tabular-nums}
+.att-due small{color:var(--text3);font-weight:600;font-size:10.5px}
+.att-due.late{color:var(--red);font-weight:700}
+.att-due.late small{color:var(--red)}
+.att-morerow td{text-align:center;color:var(--text3);font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
@@ -1848,19 +1874,61 @@ function updateNavBadges(){
   const tb=document.getElementById('badge-trash');
   if(tb){ const n=(typeof trashedOrders!=='undefined')?trashedOrders.length:0; if(n>0){ tb.textContent=n; tb.style.display=''; } else tb.style.display='none'; }
 }
+let _dashBrief={text:'',at:'',loading:false,error:''};
+try{ const c=JSON.parse(localStorage.getItem('bsmp_dash_brief')||'null'); if(c && c.date===new Date().toDateString()){ _dashBrief.text=c.text; _dashBrief.at=c.at; } }catch{}
+window._dashOpenOrder=(id)=>{ showPage('orders'); setTimeout(()=>{ try{ openEdit(id); }catch(e){} },60); };
+function buildDashSnapshot(){
+  const active=orders.filter(r=>!r.archived);
+  const open=active.filter(r=>r.status!=='Invoiced');
+  const v=r=>rowTotal(r);
+  const rec=r=>{ const d=daysUntil(r.due); return {customer:r.customer||'', po:r.po||'', part:r.part||r.desc||'', status:r.status||'', due:r.due||null, daysLate:(d!=null&&d<0)?-d:0, value:Math.round(v(r))}; };
+  const overdue=open.filter(r=>{const d=daysUntil(r.due);return d!=null&&d<0;}).map(rec).sort((a,b)=>b.daysLate-a.daysLate);
+  const dueWeek=open.filter(r=>{const d=daysUntil(r.due);return d!=null&&d>=0&&d<=7;}).map(rec);
+  const behind=open.filter(r=>{ if(['Completed','Invoiced'].includes(r.status))return false; try{return jobHealth(r).state==='behind';}catch(e){return false;} }).map(rec);
+  const needPO=active.filter(r=>r.status==='Need Purchase Order').map(rec);
+  const readyToInvoice=active.filter(r=>r.status==='Ready for Invoice').map(rec);
+  const cust={}; open.forEach(r=>{ const c=(r.customer||'').trim()||'(no customer)'; cust[c]=(cust[c]||0)+v(r); });
+  const topCustomers=Object.entries(cust).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([name,val])=>({name,openValue:Math.round(val)}));
+  const outstanding=active.filter(r=>['Invoiced','Ready for Invoice'].includes(r.status)&&r.payment!=='Paid').reduce((t,r)=>t+v(r),0);
+  return { date:new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}),
+    totals:{openOrders:open.length, openValue:Math.round(open.reduce((t,r)=>t+v(r),0)), overdue:overdue.length, dueThisWeek:dueWeek.length, behindSchedule:behind.length, needPO:needPO.length, readyToInvoice:readyToInvoice.length, outstanding:Math.round(outstanding)},
+    overdue:overdue.slice(0,12), behindSchedule:behind.slice(0,12), dueThisWeek:dueWeek.slice(0,12), needPO:needPO.slice(0,12), readyToInvoice:readyToInvoice.slice(0,12), topCustomers };
+}
+const DASH_BRIEF_PROMPT=`You are the operations assistant for Bert's Sheet Metal Products, a metal fabrication shop. Below is today's order-book status, ALREADY COMPUTED. Treat every number, customer, and PO as authoritative \u2014 do not recalculate, invent orders, or add details not present. Write concise morning meeting notes the shop manager can read aloud at the daily stand-up.
+Rules:
+- 4 to 7 short lines or "- " bullets. No heading, no preamble, no sign-off.
+- Lead with overdue and behind-schedule orders; name the customer and PO #.
+- Call out what is Ready to Invoice (money to collect) and anything that still Needs a PO.
+- Note what is due in the next 7 days the shop should push on.
+- If one customer dominates the open value or the problems, say so.
+- If nothing is overdue or behind, say so plainly and mention what is coming up.
+Be concrete and scannable; use exact customer and PO names.
+
+TODAY'S ORDER STATUS (JSON):
+`;
+window.genDashBrief=async ()=>{
+  _dashBrief.loading=true; _dashBrief.error=''; renderDashboard();
+  try{
+    const snap=buildDashSnapshot();
+    const text=await aiNarrate(DASH_BRIEF_PROMPT+JSON.stringify(snap));
+    _dashBrief.text=text; _dashBrief.at=new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    try{ localStorage.setItem('bsmp_dash_brief', JSON.stringify({date:new Date().toDateString(), text, at:_dashBrief.at})); }catch{}
+  }catch(e){ _dashBrief.error=e.message||'Could not generate notes'; }
+  _dashBrief.loading=false; renderDashboard();
+};
 function renderDashboard(){
   const body=document.getElementById('dash-body'); if(!body) return;
   const active=orders.filter(r=>!r.archived);
   const open=active.filter(r=>r.status!=='Invoiced');
   const v=r=>rowTotal(r);
   const openVal=open.reduce((t,r)=>t+v(r),0);
-  let overdue=0,dueWk=0;
-  open.forEach(r=>{ if(!r.due)return; const d=daysUntil(r.due); if(d==null)return; if(d<0)overdue++; else if(d<=7)dueWk++; });
-  let behind=0;
-  open.forEach(r=>{ if(['Completed','Invoiced'].includes(r.status))return; try{ if(jobHealth(r).state==='behind')behind++; }catch(e){} });
-  const readyArr=active.filter(r=>r.status==='Ready for Invoice');
-  const ready=readyArr.length;
-  const needpo=active.filter(r=>r.status==='Need Purchase Order').length;
+  let dueWk=0;
+  open.forEach(r=>{ const d=daysUntil(r.due); if(d!=null&&d>=0&&d<=7)dueWk++; });
+  const overdueList=open.filter(r=>{const d=daysUntil(r.due);return d!=null&&d<0;}).sort((a,b)=>(daysUntil(a.due)||0)-(daysUntil(b.due)||0));
+  const behindList=open.filter(r=>{ if(['Completed','Invoiced'].includes(r.status))return false; try{return jobHealth(r).state==='behind';}catch(e){return false;} });
+  const needpoList=active.filter(r=>r.status==='Need Purchase Order');
+  const readyList=active.filter(r=>r.status==='Ready for Invoice');
+  const overdue=overdueList.length, behind=behindList.length, ready=readyList.length, needpo=needpoList.length;
   const outstanding=active.filter(r=>['Invoiced','Ready for Invoice'].includes(r.status)&&r.payment!=='Paid').reduce((t,r)=>t+v(r),0);
   const sc={}; STATUSES.forEach(st=>{ if(st!=='Invoiced') sc[st]=0; });
   open.forEach(r=>{ if(sc[r.status]!=null) sc[r.status]++; });
@@ -1870,8 +1938,28 @@ function renderDashboard(){
   const cust={}; open.forEach(r=>{ const c=(r.customer||'').trim()||'(no customer)'; cust[c]=(cust[c]||0)+v(r); });
   const topC=Object.entries(cust).sort((a,b)=>b[1]-a[1]).slice(0,5); const cMax=topC.length?topC[0][1]:1;
   const money=n=>fmtMoney(n)||'$0.00';
-  const aRow=(ic,label,n,onclick,cls)=>`<div class="dact-row" onclick="${onclick}"><i class="ti ${ic} ${cls||''}"></i><span class="dact-l">${label}</span><span class="dact-n ${n>0?(cls||''):''}">${n}</span></div>`;
+  const dueCell=r=>{ const d=daysUntil(r.due); if(!r.due) return '<td class="att-due">\u2014</td>'; const lbl=d<0?Math.abs(d)+'d late':(d===0?'today':d+'d'); return `<td class="att-due ${d<0?'late':''}">${fmtDate(r.due)} <small>${lbl}</small></td>`; };
+  const attRow=r=>`<tr onclick="_dashOpenOrder('${r.id}')"><td class="att-cust" title="${esc2(r.customer||'')}">${esc2(r.customer||'\u2014')}</td><td class="att-po">${esc2(r.po||'verbal')}</td>${dueCell(r)}</tr>`;
+  const attSec=(title,list,cls,more)=>{ if(!list.length) return ''; const cap=8, shown=list.slice(0,cap), extra=list.length-shown.length;
+    return `<div class="att-sec"><div class="att-h"><span class="att-badge ${cls}">${list.length}</span><span class="att-t">${title}</span><span class="att-more" onclick="${more}">view \u203a</span></div>
+    <table class="att-table"><thead><tr><th>Customer</th><th>PO #</th><th>Due</th></tr></thead><tbody>${shown.map(attRow).join('')}${extra>0?`<tr class="att-morerow" onclick="${more}"><td colspan="3">+${extra} more</td></tr>`:''}</tbody></table></div>`; };
+  const attnTotal=overdue+behind+needpo+ready;
+  const attnHtml = attnTotal ? `<div class="att-grid">${attSec('Behind schedule',behindList,'red',"showPage('dispatch')")}${attSec('Overdue',overdueList,'red',"showPage('orders');setFilter('')")}${attSec('Need PO',needpoList,'amber',"showPage('needpo')")}${attSec('Ready to invoice',readyList,'green',"setFilter('Ready for Invoice')")}</div>`
+    : '<div class="dc-empty">Nothing needs attention right now \u2014 no overdue, behind-schedule, Need-PO, or ready-to-invoice orders.</div>';
+  const db=_dashBrief;
+  const dbBody = db.loading
+    ? `<div class="brief-loading"><i class="ti ti-loader-2 spin"></i> Reading the order book\u2026</div>`
+    : db.error
+      ? `<div class="brief-error"><i class="ti ti-alert-triangle"></i> ${esc2(db.error)}. The cards below are still accurate \u2014 try again in a moment.</div>`
+      : db.text
+        ? `<div class="brief-text">${fmtBrief(db.text)}</div><div class="brief-meta">Generated ${esc2(db.at)} from the current board \u2014 double-check against the orders below.</div>`
+        : `<div class="brief-empty">Generate plain-English meeting notes for the morning stand-up \u2014 what\u2019s overdue, what to invoice, and what to push this week.</div>`;
+  const dbBtn = `<button class="btn ai" onclick="genDashBrief()" ${db.loading?'disabled':''}><i class="ti ti-${db.loading?'loader-2 spin':(db.text?'refresh':'wand')}"></i> ${db.text?'Refresh notes':'Write today\u2019s meeting notes'}</button>`;
   body.innerHTML=`
+    <div class="brief-card dash-brief">
+      <div class="brief-head"><span class="brief-title"><i class="ti ti-sparkles"></i> AI Daily De-brief</span>${dbBtn}</div>
+      ${dbBody}
+    </div>
     <div class="summary">
       <div class="stat"><div class="stat-label">Open orders</div><div class="stat-val">${open.length}</div></div>
       <div class="stat"><div class="stat-label">Open value</div><div class="stat-val">${money(openVal)}</div></div>
@@ -1880,25 +1968,20 @@ function renderDashboard(){
       <div class="stat"><div class="stat-label">Ready to invoice</div><div class="stat-val ${ready?'green':''}">${ready}</div></div>
       <div class="stat"><div class="stat-label">Outstanding</div><div class="stat-val">${money(outstanding)}</div></div>
     </div>
-    <div class="dash-grid">
+    <div class="dash-two">
       <div class="dash-card">
         <div class="dc-title"><i class="ti ti-chart-bar"></i> Order status <span class="dc-link" onclick="showPage('orders');setFilter('')">Open Orders \u203a</span></div>
         ${scTot>0?`<div class="dstatus-bar">${scList.map(seg).join('')}</div>
         <div class="dstatus-legend">${scList.map(st=>`<span onclick="setFilter('${st}')"><i class="ddot" style="background:${STATUS_ACCENT[st]||'#9aa3b2'}"></i>${st} <b>${sc[st]}</b></span>`).join('')}</div>`:'<div class="dc-empty">No open orders.</div>'}
       </div>
       <div class="dash-card">
-        <div class="dc-title"><i class="ti ti-alert-circle"></i> Needs attention</div>
-        <div class="dact-list">
-          ${aRow('ti-clock-exclamation','Behind schedule',behind,"showPage('dispatch')",'red')}
-          ${aRow('ti-calendar-x','Overdue orders',overdue,"showPage('orders');setFilter('')",'red')}
-          ${aRow('ti-alert-circle','Need PO',needpo,"showPage('needpo')",'amber')}
-          ${aRow('ti-file-dollar','Ready to invoice',ready,"setFilter('Ready for Invoice')",'green')}
-        </div>
-      </div>
-      <div class="dash-card">
         <div class="dc-title"><i class="ti ti-users"></i> Top customers <span class="dc-link">by open value</span></div>
-        ${topC.length?topC.map(([n,val])=>`<div class="dcust"><div class="dcust-row"><span class="dcust-name" title="${n}">${n}</span><span class="dcust-val">${money(val)}</span></div><div class="dcust-bar"><span style="width:${Math.max(4,val/cMax*100).toFixed(0)}%"></span></div></div>`).join(''):'<div class="dc-empty">No open orders.</div>'}
+        ${topC.length?topC.map(([n,val])=>`<div class="dcust"><div class="dcust-row"><span class="dcust-name" title="${esc2(n)}">${esc2(n)}</span><span class="dcust-val">${money(val)}</span></div><div class="dcust-bar"><span style="width:${Math.max(4,val/cMax*100).toFixed(0)}%"></span></div></div>`).join(''):'<div class="dc-empty">No open orders.</div>'}
       </div>
+    </div>
+    <div class="dash-card dash-attention">
+      <div class="dc-title"><i class="ti ti-alert-circle"></i> Needs attention <span class="dc-link">${attnTotal} order${attnTotal!==1?'s':''}</span></div>
+      ${attnHtml}
     </div>`;
 }
 function render(){
