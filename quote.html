@@ -570,6 +570,20 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 <!-- MAIN -->
 <main class="appmain">
+  <div id="q-login" style="position:fixed;inset:0;background:var(--navy);z-index:9000;display:flex;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;padding:30px;width:340px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,.3)">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:18px;font-weight:800;color:#1e2227"><span style="color:var(--navy)">BSMP</span> Quote Tool</div>
+        <div style="font-size:12px;color:#5b6675;margin-top:4px">Sign in to sync quotes to the Order Tracker</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input id="q-login-email" type="email" placeholder="Email" autocomplete="username" style="font-size:14px;padding:10px 12px;border:1px solid #d7d2c1;border-radius:9px;font-family:inherit;outline:none">
+        <input id="q-login-pass" type="password" placeholder="Password" autocomplete="current-password" style="font-size:14px;padding:10px 12px;border:1px solid #d7d2c1;border-radius:9px;font-family:inherit;outline:none">
+        <div id="q-login-err" style="font-size:12px;color:#a32d2d;min-height:14px"></div>
+        <button id="q-login-btn" onclick="window._qLogin()" style="height:40px;font-size:14px;font-weight:700;color:#fff;background:var(--navy);border:none;border-radius:9px;cursor:pointer">Sign in</button>
+      </div>
+    </div>
+  </div>
   <header class="topbar">
     <div>
       <h1 id="tb-title">New Quote</h1>
@@ -577,6 +591,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
     <div class="topbar-actions">
       <span class="status-chip"><span class="dot"></span>Saved</span>
+      <span class="status-chip" id="q-sync-chip" title="Cloud sync to Order Tracker"><span class="dot" id="q-sync-dot" style="background:#8a93a5"></span><span id="q-sync-txt">Cloud</span></span>
+      <button class="icon-btn" title="Sign out" onclick="window._qLogout()"><i class="ti ti-logout"></i></button>
       <button class="icon-btn" title="Print" onclick="tbPrint()"><i class="ti ti-printer"></i></button>
       <button class="topbar-primary" id="tb-action" onclick="tbAction()"><i class="ti ti-device-floppy" id="tb-action-ico"></i><span id="tb-action-label">Save quote</span></button>
     </div>
@@ -1507,7 +1523,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 <!-- ===== HISTORY PANEL ===== -->
 <div class="panel" id="panel-history">
-  <div class="page-header"><h2>Quote History</h2><p>All saved quotes — stored in your browser</p></div>
+  <div class="page-header"><h2>Quote History</h2><p>All saved quotes — stored in your browser, and synced to the Order Tracker when signed in</p></div>
+  <div style="display:flex;align-items:center;gap:10px;margin:0 0 12px;flex-wrap:wrap">
+    <button class="btn btn-sm" onclick="window._qSyncAll()"><i class="ti ti-cloud-upload"></i> Sync all to cloud</button>
+    <span id="q-syncall-status" style="font-size:12px;color:#5b6675"></span>
+  </div>
 
   <div class="hist-stat-grid">
     <div class="hist-stat"><div class="hist-stat-label">Quotes</div><div class="hist-stat-value" id="hs-total">0</div><div class="hist-stat-sub" id="hs-showing"></div></div>
@@ -4745,6 +4765,7 @@ function saveQuote(){
   };
   HISTORY.unshift(quote);
   if(HISTORY.length>500) HISTORY.pop();
+  try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(quote); }catch(e){}
   const persistResult = persistHistory();
 
   // Confirmation: toast + brief button state change.
@@ -5031,6 +5052,7 @@ function renderHistoryStats(list){
 
 function deleteQuote(id){
   HISTORY=HISTORY.filter(q=>q.id!==id);
+  try{ if(window._qCloudRemoveQuote) window._qCloudRemoveQuote(id); }catch(e){}
   localStorage.setItem('bsmp_history',JSON.stringify(HISTORY));
   renderHistory();
 }
@@ -6152,6 +6174,7 @@ function saveAssembly() {
   };
   HISTORY.unshift(quote);
   if (HISTORY.length > 500) HISTORY.pop();
+  try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(quote); }catch(e){}
   localStorage.setItem('bsmp_history', JSON.stringify(HISTORY));
   const btn = event.target.closest('button');
   const orig = btn.innerHTML; btn.innerHTML='✓ Saved!'; btn.style.background='var(--success)';
@@ -8293,5 +8316,95 @@ window.syncOptCards=function(){
 })();
 </script>
 <div id="toast-host" aria-live="polite"></div>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, set, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+const firebaseConfig = {
+  apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
+  authDomain: "bsmp-orders.firebaseapp.com",
+  databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com",
+  projectId: "bsmp-orders",
+  storageBucket: "bsmp-orders.firebasestorage.app",
+  messagingSenderId: "924947028289",
+  appId: "1:924947028289:web:c58c74e37ee51aa1b9e9c0"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+let _qUser = null;
+const $q = id => document.getElementById(id);
+function setSync(state, txt){
+  const dot=$q('q-sync-dot'), t=$q('q-sync-txt');
+  if(t) t.textContent = txt;
+  if(dot) dot.style.background = state==='ok'?'#1f7d57': state==='busy'?'#9a6212': state==='err'?'#a32d2d':'#8a93a5';
+}
+// Trim a saved quote down to exactly what the Order Tracker imports (drops images & the heavy reload snapshot).
+function quotePayload(q){
+  return {
+    id: q.id,
+    quoteNo: q.quoteNo || q.quoteno || '',
+    date: q.date || '',
+    status: q.status || '',
+    partNum: q.partNum || '',
+    revision: q.revision || '',
+    customer: q.customer || '',
+    qty: (q.qty!=null ? q.qty : ''),
+    material: q.material || '',
+    costPerPart: (q.costPerPart!=null ? q.costPerPart : ''),
+    pricePerPart: (q.pricePerPart!=null ? q.pricePerPart : ''),
+    jobTotal: (q.jobTotal!=null ? q.jobTotal : ''),
+    poNumber: q.poNumber || '',
+    dueDate: q.dueDate || '',
+    laborLines: (q.laborLines||[]).map(l=>({ op:String(l.op||''), mins:String(l.mins!=null?l.mins:'') })),
+    outLines:   (q.outLines||[]).map(o=>({ desc:String(o.desc||''), q:String(o.q!=null?o.q:''), c:String(o.c!=null?o.c:'') })),
+    hwLines:    (q.hwLines||[]).map(h=>({ desc:String(h.desc||''), q:String(h.q!=null?h.q:''), c:String(h.c!=null?h.c:'') })),
+    notes: q.notes || '',
+    syncedAt: Date.now()
+  };
+}
+window._qCloudSyncQuote = async (q) => {
+  if(!_qUser || !q || q.id==null) return;
+  try{ setSync('busy','Syncing…'); await set(ref(db,'quotes/'+q.id), quotePayload(q)); setSync('ok','Synced'); }
+  catch(e){ setSync('err','Sync failed'); console.warn('quote sync failed', e); }
+};
+window._qCloudRemoveQuote = async (id) => {
+  if(!_qUser || id==null) return;
+  try{ await remove(ref(db,'quotes/'+id)); }catch(e){ console.warn('quote remove failed', e); }
+};
+window._qSyncAll = async () => {
+  const st = $q('q-syncall-status');
+  if(!_qUser){ if(st) st.textContent='Sign in first to sync.'; return; }
+  let list=[]; try{ list=JSON.parse(localStorage.getItem('bsmp_history')||'[]'); }catch(e){}
+  if(!Array.isArray(list) || !list.length){ if(st) st.textContent='No quotes to sync.'; return; }
+  if(st) st.textContent='Syncing '+list.length+' quote'+(list.length!==1?'s':'')+'…';
+  setSync('busy','Syncing…');
+  let ok=0, fail=0;
+  for(const q of list){ if(q && q.id!=null){ try{ await set(ref(db,'quotes/'+q.id), quotePayload(q)); ok++; }catch(e){ fail++; } } }
+  setSync(fail?'err':'ok', fail?'Sync failed':'Synced');
+  if(st) st.textContent='Synced '+ok+' quote'+(ok!==1?'s':'')+(fail?(' · '+fail+' failed'):'')+'.';
+};
+window._qLogin = async () => {
+  const email=($q('q-login-email').value||'').trim();
+  const pass=$q('q-login-pass').value;
+  const err=$q('q-login-err'), btn=$q('q-login-btn');
+  err.textContent=''; btn.disabled=true; btn.textContent='Signing in…';
+  try{ await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e){ err.textContent=(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found')?'Incorrect email or password.':('Sign-in error: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='Sign in'; }
+};
+window._qLogout = () => { signOut(auth); };
+onAuthStateChanged(auth, (user) => {
+  _qUser = user || null;
+  const ov=$q('q-login');
+  if(user){ if(ov) ov.style.display='none'; setSync('ok', user.email ? user.email.split('@')[0] : 'Synced'); }
+  else { if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
+});
+document.addEventListener('keydown', (e) => {
+  const ov=$q('q-login');
+  if(e.key==='Enter' && ov && ov.style.display!=='none' && document.activeElement && (document.activeElement.id==='q-login-email'||document.activeElement.id==='q-login-pass')) window._qLogin();
+});
+</script>
 </body>
 </html>
