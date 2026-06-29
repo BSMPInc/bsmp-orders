@@ -927,6 +927,17 @@ body.sb-pinned .dock{left:var(--sb)}
 
 .po-mini.flash{animation:miniFlash 1.6s ease-out}
 @keyframes miniFlash{0%{box-shadow:0 0 0 2px var(--spark),0 0 0 6px rgba(212,43,43,.25)}60%{box-shadow:0 0 0 2px var(--spark),0 0 0 6px rgba(212,43,43,.12)}100%{box-shadow:none}}
+
+/* detail panel: compact horizontal action icons (between drawing & notes) */
+.detail-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.act-ico{width:40px;height:40px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:9px;cursor:pointer;transition:background .12s,border-color .12s,color .12s,transform .08s}
+.act-ico:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.act-ico:active{transform:scale(.94)}
+.act-ico i{font-size:19px}
+.act-ico.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.act-ico.primary:hover{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
+.act-ico.green{background:var(--green2);border-color:var(--green2);color:#fff}
+.act-ico.green:hover{filter:brightness(1.1);color:#fff}
 </style>
 </head>
 <body>
@@ -1710,7 +1721,7 @@ const ordersRef = ref(db, 'orders');
 const STATUSES = ['Received','Confirmed','In Progress','Need Purchase Order','Completed','Ready for Invoice','Invoiced'];
 const STATUS_CLASS = {'Received':'s-received','Confirmed':'s-confirmed','In Progress':'s-in-progress','Need Purchase Order':'s-need-po','Completed':'s-completed','Ready for Invoice':'s-ready','Invoiced':'s-invoiced'};
 const STATUS_ACCENT = {'Received':'#15607a','Confirmed':'#1a4a90','In Progress':'#b07a00','Need Purchase Order':'#b53030','Completed':'#8a93a5','Ready for Invoice':'#4a8a1a','Invoiced':'#0a7050'};
-const INTERNAL_PROCESSES = ['Inventory Check','Purchasing','Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly','Delivery'];
+const INTERNAL_PROCESSES = ['Inventory Check','Purchasing','Program','Laser','Shear/Sawing','De-Burr/Finish','Form','Machining','Weld','Hardware/Assembly','Inspection/First Article','Delivery'];
 const EXTERNAL_PROCESSES = ['Purchasing- Material','Purchasing- Hardware','Purchasing- Tooling','Outsource- Plating','Outsource- Paint','Outsource- Machining','Outsource- Other'];
 const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 const EXTERNAL_SET = new Set(EXTERNAL_PROCESSES);
@@ -1730,6 +1741,7 @@ const PROCESS_COLORS = {
   'Machining':GROUP_COLORS.internal,
   'Weld':GROUP_COLORS.internal,
   'Hardware/Assembly':GROUP_COLORS.internal,
+  'Inspection/First Article':GROUP_COLORS.internal,
   'Delivery':GROUP_COLORS.delivery,
   'Purchasing- Material':GROUP_COLORS.purchasing,'Purchasing- Hardware':GROUP_COLORS.purchasing,'Purchasing- Tooling':GROUP_COLORS.purchasing,
   'Outsource- Plating':GROUP_COLORS.outsource,'Outsource- Paint':GROUP_COLORS.outsource,'Outsource- Machining':GROUP_COLORS.outsource,'Outsource- Other':GROUP_COLORS.outsource
@@ -1749,6 +1761,7 @@ const PROC_ICON_PATHS = {
   'Machining':'<path fill-rule="evenodd" d="M12 2.8 14.45 6.09 18.51 5.49 17.91 9.55 21.2 12 17.91 14.45 18.51 18.51 14.45 17.91 12 21.2 9.55 17.91 5.49 18.51 6.09 14.45 2.8 12 6.09 9.55 5.49 5.49 9.55 6.09Z M15 12a3 3 0 1 0 -6 0 3 3 0 0 0 6 0Z"/>',
   'Weld':'<rect x="3" y="18" width="18" height="2.2" rx="1.1"/><path d="M12 4.5l1.15 4.55 4.55 -1.15 -3.4 3.4 3.4 3.4 -4.55 -1.15 -1.15 4.55 -1.15 -4.55 -4.55 1.15 3.4 -3.4 -3.4 -3.4 4.55 1.15z"/><path d="M17.5 2.5l3.5 3.5 -3.2 3.2 -3.5 -3.5z"/>',
   'Hardware/Assembly':'<path d="M12 2l5.3 3.05v6.1L12 14.2 6.7 11.15v-6.1z"/><path d="M9.7 12h4.6v6l-2.3 3.4 -2.3 -3.4z"/>',
+  'Inspection/First Article':'<path fill-rule="evenodd" d="M10.4 2.8a6.8 6.8 0 1 0 4.1 12.2l4.3 4.3 1.9 -1.9 -4.3 -4.3a6.8 6.8 0 0 0 -6 -10.3zm0 2.5a4.3 4.3 0 1 1 0 8.6 4.3 4.3 0 0 1 0 -8.6z"/><path d="M9.6 9.1l1.35 1.35 2.65 -2.65 1.05 1.05 -3.7 3.7 -2.4 -2.4z"/>',
   'Purchasing- Material':'<path d="M4 7.2l8 -3.2 8 3.2 -8 3.2z"/><path d="M4 11.4l8 3.2 8 -3.2v1.7l-8 3.2 -8 -3.2z"/><path d="M4 16.1l8 3.2 8 -3.2v1.7l-8 3.2 -8 -3.2z"/>',
   'Purchasing- Hardware':'<path fill-rule="evenodd" d="M12 3l8 4.6v8.8L12 21l-8 -4.6V7.6zm0 5.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0 -7.2z"/>',
   'Purchasing- Tooling':'<path fill-rule="evenodd" d="M20.8 5.4l-3.1 3.1a3.1 3.1 0 0 1 -3.2 -3.2l3.1 -3.1a5 5 0 0 0 -6.5 6.5l-7.9 7.9a2.05 2.05 0 1 0 2.9 2.9l7.9 -7.9a5 5 0 0 0 6.8 -6.2z"/>',
@@ -2575,12 +2588,14 @@ function detailInner(r){
     <div class="detail-section">
       <div class="detail-label">Drawing</div>
       ${drawingBlock(r)}
+      <div class="detail-actions">
+        <button class="act-ico" title="Edit full details" aria-label="Edit full details" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i></button>
+        <button class="act-ico primary" title="Add part to this PO" aria-label="Add part to this PO" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i></button>
+        <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
+        <button class="act-ico green" title="Customer confirmation" aria-label="Customer confirmation" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i></button>
+      </div>
       <div class="detail-label" style="margin-top:14px">Notes</div>
       <textarea class="notes-input" placeholder="Add notes…" onchange="window._sn('${r.id}',this.value)" onclick="event.stopPropagation()">${r.notes||''}</textarea>
-      <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i> Edit Full Details</button>
-      <button class="btn sm primary" style="margin-top:8px;align-self:flex-start" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i> Add Part to this PO</button>
-      <button class="btn sm" style="margin-top:8px;align-self:flex-start" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i> Archive order</button>
-      <button class="btn sm green" style="margin-top:8px;align-self:flex-start" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i> Customer Confirmation</button>
       <button class="btn sm" style="margin-top:8px;align-self:flex-start;color:var(--red);border-color:#f0c9c9" onclick="window._deleteOrder('${r.id}');event.stopPropagation()"><i class="ti ti-trash"></i> Delete order</button>
     </div>
   </div>`;
