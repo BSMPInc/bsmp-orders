@@ -8354,20 +8354,21 @@ function setSync(state, txt){
   if(dot) dot.style.background = state==='ok'?'#1f7d57': state==='busy'?'#9a6212': state==='err'?'#a32d2d':'#8a93a5';
 }
 // Trim a saved quote down to exactly what the Order Tracker imports (drops images & the heavy reload snapshot).
+function _qNum(v){ const n = (typeof v==='number') ? v : Number(v); return Number.isFinite(n) ? n : ''; }
 function quotePayload(q){
   return {
-    id: q.id,
+    id: Number.isFinite(q.id) ? q.id : Date.now(),
     quoteNo: q.quoteNo || q.quoteno || '',
     date: q.date || '',
     status: q.status || '',
     partNum: q.partNum || '',
     revision: q.revision || '',
     customer: q.customer || '',
-    qty: (q.qty!=null ? q.qty : ''),
+    qty: _qNum(q.qty),
     material: q.material || '',
-    costPerPart: (q.costPerPart!=null ? q.costPerPart : ''),
-    pricePerPart: (q.pricePerPart!=null ? q.pricePerPart : ''),
-    jobTotal: (q.jobTotal!=null ? q.jobTotal : ''),
+    costPerPart: _qNum(q.costPerPart),
+    pricePerPart: _qNum(q.pricePerPart),
+    jobTotal: _qNum(q.jobTotal),
     poNumber: q.poNumber || '',
     dueDate: q.dueDate || '',
     laborLines: (q.laborLines||[]).map(l=>({ op:String(l.op||''), mins:String(l.mins!=null?l.mins:'') })),
@@ -8380,7 +8381,7 @@ function quotePayload(q){
 window._qCloudSyncQuote = async (q) => {
   if(!_qUser || !q || q.id==null) return;
   try{ setSync('busy','Syncing\u2026'); await _qPush(q); setSync('ok','Synced'); }
-  catch(e){ setSync('err','Sync failed \u2014 check DB rules'); console.warn('quote sync failed', e); }
+  catch(e){ setSync('err','Sync failed'); const c=$q('q-sync-chip'); if(c) c.title='Last sync error: '+((e&&e.message)||e); console.warn('quote sync failed', e); }
 };
 window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
