@@ -1732,7 +1732,7 @@ let orders=[], expanded=new Set(), collapsedGroups=new Set();
 let _didInitCollapse=false;
 let sortKey='', sortDir=1, editId=null, aiParsed=[];
 let viewMode='card';                 // 'card' | 'table' — card is the default (iPad-friendly)
-let cardSortKey='due', cardSortDir=1; // due | customer | value | status | newest
+let cardSortKey='due', cardSortDir=1; // due | overdue | customer | value | status | newest
 let selectedPO=null;                 // master-detail: which PO group is shown on the right
 let hideInvoiced=false;              // toggle: remove fully-invoiced POs from the active list
 let onlyIncomplete=false;            // toggle: show only orders missing key info
@@ -1985,6 +1985,7 @@ function render(){
 // ── Card / Tile view (one card per PO) ───────────────────────────────────────
 const CARD_SORTS=[
   {key:'due',      label:'Due Date', icon:'calendar-due'},
+  {key:'overdue',  label:'Overdue',  icon:'calendar-x'},
   {key:'customer', label:'Customer', icon:'user'},
   {key:'value',    label:'Value',    icon:'currency-dollar'},
   {key:'status',   label:'Status',   icon:'flag'},
@@ -2075,6 +2076,13 @@ function sortGroups(groups){
       case 'value':    c=b.gtotal-a.gtotal; break;
       case 'status':   c=(STATUS_SORT_ORDER[a.statuses[0]]??99)-(STATUS_SORT_ORDER[b.statuses[0]]??99); break;
       case 'newest':   c=(b.newest>a.newest?1:b.newest<a.newest?-1:0); break;
+      case 'overdue': {
+        const ao=a.dueOverdue?0:1, bo=b.dueOverdue?0:1;
+        if(ao!==bo){ c=ao-bo; break; }                  // overdue POs float to the top
+        if(ao===0){ c=(a.gdays??0)-(b.gdays??0); }        // both overdue: most overdue (most days late) first
+        else { if(!a.gdue&&!b.gdue)c=0; else if(!a.gdue)c=1; else if(!b.gdue)c=-1; else c=a.gdue<b.gdue?-1:a.gdue>b.gdue?1:0; } // rest: soonest due first
+        break;
+      }
       case 'due':
       default:
         if(!a.gdue&&!b.gdue)c=0; else if(!a.gdue)return 1; else if(!b.gdue)return -1;
