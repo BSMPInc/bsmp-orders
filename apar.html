@@ -823,6 +823,36 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
   .topbar h1{ font-size:24px; }
   .dock-switch .lbl{ display:none; }
 }
+
+/* dashboard cross-tab insights */
+.dash-insights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+@media(max-width:1024px){.dash-insights{grid-template-columns:1fr}}
+.dash-card{background:#fff;border:1px solid var(--border);box-shadow:var(--shadow);padding:14px 16px;cursor:pointer;transition:border-color .12s,box-shadow .12s;display:flex;flex-direction:column}
+.dash-card:hover{border-color:var(--border2);box-shadow:0 2px 9px rgba(16,24,40,.08)}
+.dc-head{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);margin-bottom:9px}
+.dc-head>i{font-size:15px;color:var(--accent)}
+.dc-head .dc-link{margin-left:auto;font-size:10.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--text3)}
+.dc-big{font-size:24px;font-weight:800;line-height:1;color:var(--text)}
+.dc-sub{font-size:11.5px;color:var(--text3);margin-top:3px}
+.dc-rows{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.dc-row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--text2)}
+.dc-row b{font-weight:700}
+.dc-warn{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--amber);margin-top:3px}
+.dc-warn i{font-size:14px}
+.dc-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.dc-l{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3)}
+.dc-v{font-size:19px;font-weight:800;line-height:1.1;margin-top:2px}
+.dc-n{font-size:11px;color:var(--text3);margin-top:1px}
+.dc-net{margin-top:auto;padding-top:9px;border-top:1px solid var(--border);font-size:12.5px;color:var(--text2);display:flex;justify-content:space-between;align-items:baseline}
+.dc-net b{font-weight:800}
+.dash-aging-bar{display:flex;height:14px;overflow:hidden;background:#eef1f6;margin:2px 0 10px}
+.dash-aging-bar span{height:100%}
+.dash-aging-bar span+span{border-left:1.5px solid #fff}
+.dash-aging-key{display:flex;flex-wrap:wrap;gap:8px 14px}
+.dash-aging-key span{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--text2)}
+.dash-aging-key .adot{width:8px;height:8px;border-radius:2px;display:inline-block;flex-shrink:0}
+.dash-aging-key b{color:var(--text);font-weight:700}
+.dc-empty{font-size:12.5px;color:var(--text3);padding:8px 0}
 </style>
 </head>
 <body>
@@ -887,7 +917,7 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
     <div class="content" id="content"><div class="loading"><i class="ti ti-loader"></i> Loading…</div></div>
     <footer class="dock">
       <div class="dock-tabs">
-        <div class="dock-tab active" id="dock-dash" onclick="go('dash')"><i class="ti ti-arrows-exchange"></i><span>Dashboard</span></div>
+        <div class="dock-tab" id="dock-cash" onclick="go('cash')"><i class="ti ti-building-bank"></i><span>Cash Flow</span></div>
         <div class="dock-tab" id="dock-ar" onclick="go('ar')"><i class="ti ti-arrow-down-left"></i><span>Receivables</span></div>
         <div class="dock-tab" id="dock-ap" onclick="go('ap')"><i class="ti ti-arrow-up-right"></i><span>Payables</span></div>
         <div class="dock-tab" id="dock-calendar" onclick="go('calendar')"><i class="ti ti-calendar-month"></i><span>Calendar</span></div>
@@ -1466,6 +1496,25 @@ function renderDash(entries){
   const arOver=entries.filter(e=>e.type==='ar'&&statusOf(e)==='over').reduce((s,e)=>s+((e.amount||0)-(e.paid||0)),0);
   const apOver=entries.filter(e=>e.type==='ap'&&statusOf(e)==='over').reduce((s,e)=>s+((e.amount||0)-(e.paid||0)),0);
   const net=arOut-apOut;
+  // ---- cross-tab snapshot (Cash Flow / Calendar / Aging) ----
+  const unpaidOf=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  const liveAR=entries.filter(e=>e.type==='ar'&&!isArchived(e));
+  const liveAP=entries.filter(e=>e.type==='ap'&&!isArchived(e));
+  const acctIds=Object.keys(accounts);
+  const totalBal=acctIds.reduce((t,id)=>t+(Number(accounts[id].balance)||0),0);
+  const sched=liveAP.filter(e=>(e.payStatus||'')==='scheduled').reduce((t,e)=>t+unpaidOf(e),0);
+  const proj=totalBal-sched;
+  const staleN=acctIds.filter(id=>balanceFreshness(accounts[id]).stale).length;
+  const in7d=e=>{const d=daysUntil(e.due);return d!=null&&d>=0&&d<=7;};
+  const arWeek=liveAR.filter(e=>e.due&&in7d(e)&&unpaidOf(e)>0.005);
+  const apWeek=liveAP.filter(e=>e.due&&in7d(e)&&unpaidOf(e)>0.005);
+  const in7=arWeek.reduce((t,e)=>t+unpaidOf(e),0);
+  const out7=apWeek.reduce((t,e)=>t+unpaidOf(e),0);
+  const net7=in7-out7;
+  const ag=bucketize(liveAR); const ag60p=ag.b90+ag.b90p;
+  const agTot=ag.cur+ag.b30+ag.b60+ag60p;
+  const aseg=(v,c)=>agTot>0?`<span style="width:${(v/agTot*100).toFixed(1)}%;background:${c}"></span>`:'';
+  const plur=(n,w)=>n+' '+w+(n!==1?'s':'');
   $('content').innerHTML=`
     <div class="ai-cta" onclick="openAI()">
       <i class="ti ti-sparkles"></i>
@@ -1479,6 +1528,36 @@ function renderDash(entries){
       <div class="stat"><div class="l">Net position</div><div class="v" style="color:${net>=0?'var(--ar)':'var(--red)'}">${fmtMoney(net)}</div><div class="s">receivable − payable</div></div>
       <div class="stat over"><div class="l">Overdue in</div><div class="v">${fmtMoney(arOver)}</div><div class="s">past-due receivables</div></div>
       <div class="stat over"><div class="l">Overdue out</div><div class="v">${fmtMoney(apOver)}</div><div class="s">past-due payables</div></div>
+    </div>
+    <div class="dash-insights">
+      <div class="dash-card" onclick="go('cash')">
+        <div class="dc-head"><i class="ti ti-building-bank"></i><span>Cash on hand</span><span class="dc-link">Cash Flow ›</span></div>
+        <div class="dc-big">${fmtMoney(totalBal)}</div>
+        <div class="dc-sub">${acctIds.length?('across '+plur(acctIds.length,'account')):'no accounts set up yet'}</div>
+        <div class="dc-rows">
+          <div class="dc-row"><span>Scheduled out</span><b style="color:var(--ap)">${sched>0.005?'−'+fmtMoney(sched):fmtMoney(0)}</b></div>
+          <div class="dc-row"><span>Projected after</span><b style="color:${proj>=0?'var(--text)':'var(--ap)'}">${fmtMoney(proj)}</b></div>
+          ${staleN>0?`<div class="dc-warn"><i class="ti ti-alert-triangle"></i> ${plur(staleN,'balance')} need updating</div>`:''}
+        </div>
+      </div>
+      <div class="dash-card" onclick="go('calendar')">
+        <div class="dc-head"><i class="ti ti-calendar-month"></i><span>Due in 7 days</span><span class="dc-link">Calendar ›</span></div>
+        <div class="dc-pair">
+          <div><div class="dc-l">Coming in</div><div class="dc-v" style="color:var(--ar)">${fmtMoney(in7)}</div><div class="dc-n">${plur(arWeek.length,'receivable')}</div></div>
+          <div><div class="dc-l">Going out</div><div class="dc-v" style="color:var(--ap)">${fmtMoney(out7)}</div><div class="dc-n">${plur(apWeek.length,'payable')}</div></div>
+        </div>
+        <div class="dc-net"><span>Net this week</span><b style="color:${net7>=0?'var(--ar)':'var(--ap)'}">${(net7>=0?'+':'')+fmtMoney(net7)}</b></div>
+      </div>
+      <div class="dash-card" onclick="go('aging')">
+        <div class="dc-head"><i class="ti ti-clock-hour-4"></i><span>Receivables aging</span><span class="dc-link">Aging ›</span></div>
+        ${agTot>0?`<div class="dash-aging-bar">${aseg(ag.cur,'#2f8f6b')}${aseg(ag.b30,'#7cc4a3')}${aseg(ag.b60,'#ba7517')}${aseg(ag60p,'#a32d2d')}</div>
+        <div class="dash-aging-key">
+          <span><i class="adot" style="background:#2f8f6b"></i>Current <b>${fmtMoneyShort(ag.cur)}</b></span>
+          <span><i class="adot" style="background:#7cc4a3"></i>1–30 <b>${fmtMoneyShort(ag.b30)}</b></span>
+          <span><i class="adot" style="background:#ba7517"></i>31–60 <b>${fmtMoneyShort(ag.b60)}</b></span>
+          <span><i class="adot" style="background:#a32d2d"></i>60+ <b>${fmtMoneyShort(ag60p)}</b></span>
+        </div>`:'<div class="dc-empty">No open receivables.</div>'}
+      </div>
     </div>
     <div class="board">${colHtml('ar',entries)}${colHtml('ap',entries)}</div>`;
 }
@@ -4082,7 +4161,7 @@ function toggleSidebarPin(){
   var ic=document.getElementById('pin-ico'); if(ic) ic.className='ti '+(pinned?'ti-pinned':'ti-pin');
 }
 (function(){
-  var DOCK={dash:'dock-dash',ar:'dock-ar',ap:'dock-ap',calendar:'dock-calendar'};
+  var DOCK={cash:'dock-cash',ar:'dock-ar',ap:'dock-ap',calendar:'dock-calendar'};
   function syncDock(){
     var active=document.querySelector('.sidebar .nav-item.active');
     var view=active?(active.id||'').replace('nav-',''):'dash';
