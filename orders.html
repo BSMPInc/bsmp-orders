@@ -896,10 +896,10 @@ body.sb-pinned .dock{left:var(--sb)}
 .att-t{font-size:12.5px;font-weight:800;color:var(--text)}
 .att-more{margin-left:auto;font-size:11px;font-weight:600;color:var(--text3);cursor:pointer}
 .att-more:hover{color:var(--accent)}
-.att-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+.att-table{width:100%!important;min-width:0!important;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
 .att-table th{text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);padding:5px 8px;background:var(--inset-bg);border-bottom:1px solid var(--border)}
-.att-table th:nth-child(1){width:46%}.att-table th:nth-child(2){width:27%}.att-table th:nth-child(3){width:27%}
-.att-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.att-table th:nth-child(1){width:43%}.att-table th:nth-child(2){width:24%}.att-table th:nth-child(3){width:33%}
+.att-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:top}
 .att-table tbody tr{cursor:pointer}
 .att-table tbody tr:hover{background:var(--accent-soft)}
 .att-cust{color:var(--text);font-weight:600}
@@ -908,6 +908,22 @@ body.sb-pinned .dock{left:var(--sb)}
 .att-due.late{color:var(--red);font-weight:700}
 .att-due.late small{color:var(--red)}
 .att-morerow td{text-align:center;color:var(--text3);font-weight:600;cursor:pointer}
+
+.att-section-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--text);margin:14px 0 10px}
+.att-section-head>i{font-size:16px;color:var(--accent)}
+.att-section-head .dc-link{margin-left:auto;font-size:11px;font-weight:600;color:var(--text3)}
+.att-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+@media(max-width:1000px){.att-cards{grid-template-columns:1fr}}
+.att-card{min-width:0}
+.att-card .dc-title{margin-bottom:8px}
+.att-scroll{max-height:380px;overflow-y:auto;overflow-x:hidden;min-width:0}
+.att-scroll .att-table{width:100%}
+.att-scroll .att-table thead th{position:sticky;top:0;z-index:1}
+
+.att-table td.att-cust{white-space:normal;overflow:visible}
+.att-cust-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);font-weight:600;line-height:1.25}
+.att-proc{display:flex;align-items:center;gap:3px;margin-top:1px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.att-proc i{font-size:11px;color:var(--accent);flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1939,13 +1955,10 @@ function renderDashboard(){
   const topC=Object.entries(cust).sort((a,b)=>b[1]-a[1]).slice(0,5); const cMax=topC.length?topC[0][1]:1;
   const money=n=>fmtMoney(n)||'$0.00';
   const dueCell=r=>{ const d=daysUntil(r.due); if(!r.due) return '<td class="att-due">\u2014</td>'; const lbl=d<0?Math.abs(d)+'d late':(d===0?'today':d+'d'); return `<td class="att-due ${d<0?'late':''}">${fmtDate(r.due)} <small>${lbl}</small></td>`; };
-  const attRow=r=>`<tr onclick="_dashOpenOrder('${r.id}')"><td class="att-cust" title="${esc2(r.customer||'')}">${esc2(r.customer||'\u2014')}</td><td class="att-po">${esc2(r.po||'verbal')}</td>${dueCell(r)}</tr>`;
-  const attSec=(title,list,cls,more)=>{ if(!list.length) return ''; const cap=8, shown=list.slice(0,cap), extra=list.length-shown.length;
-    return `<div class="att-sec"><div class="att-h"><span class="att-badge ${cls}">${list.length}</span><span class="att-t">${title}</span><span class="att-more" onclick="${more}">view \u203a</span></div>
-    <table class="att-table"><thead><tr><th>Customer</th><th>PO #</th><th>Due</th></tr></thead><tbody>${shown.map(attRow).join('')}${extra>0?`<tr class="att-morerow" onclick="${more}"><td colspan="3">+${extra} more</td></tr>`:''}</tbody></table></div>`; };
-  const attnTotal=overdue+behind+needpo+ready;
-  const attnHtml = attnTotal ? `<div class="att-grid">${attSec('Behind schedule',behindList,'red',"showPage('dispatch')")}${attSec('Overdue',overdueList,'red',"showPage('orders');setFilter('')")}${attSec('Need PO',needpoList,'amber',"showPage('needpo')")}${attSec('Ready to invoice',readyList,'green',"setFilter('Ready for Invoice')")}</div>`
-    : '<div class="dc-empty">Nothing needs attention right now \u2014 no overdue, behind-schedule, Need-PO, or ready-to-invoice orders.</div>';
+  const procLabel=r=>{ if(['Completed','Invoiced','Ready for Invoice'].includes(r.status)) return ''; const p=shortProc(r.currentProcess||''); return p?`<div class="att-proc"><i class="ti ti-arrow-right"></i>${esc2(p)}</div>`:''; };
+  const attRow=r=>`<tr onclick="_dashOpenOrder('${r.id}')"><td class="att-cust"><div class="att-cust-name" title="${esc2(r.customer||'')}">${esc2(r.customer||'—')}</div>${procLabel(r)}</td><td class="att-po">${esc2(r.po||'verbal')}</td>${dueCell(r)}</tr>`;
+  const attCard=(title,list,cls,more)=>`<div class="dash-card att-card"><div class="dc-title"><span class="att-badge ${cls}">${list.length}</span><span class="att-t">${title}</span><span class="dc-link" onclick="${more}">view ›</span></div>${list.length?`<div class="att-scroll"><table class="att-table"><thead><tr><th>Customer</th><th>PO #</th><th>Due</th></tr></thead><tbody>${list.map(attRow).join('')}</tbody></table></div>`:'<div class="dc-empty">None right now.</div>'}</div>`;
+  const attnTotal=overdue+behind+ready;
   const db=_dashBrief;
   const dbBody = db.loading
     ? `<div class="brief-loading"><i class="ti ti-loader-2 spin"></i> Reading the order book\u2026</div>`
@@ -1979,9 +1992,11 @@ function renderDashboard(){
         ${topC.length?topC.map(([n,val])=>`<div class="dcust"><div class="dcust-row"><span class="dcust-name" title="${esc2(n)}">${esc2(n)}</span><span class="dcust-val">${money(val)}</span></div><div class="dcust-bar"><span style="width:${Math.max(4,val/cMax*100).toFixed(0)}%"></span></div></div>`).join(''):'<div class="dc-empty">No open orders.</div>'}
       </div>
     </div>
-    <div class="dash-card dash-attention">
-      <div class="dc-title"><i class="ti ti-alert-circle"></i> Needs attention <span class="dc-link">${attnTotal} order${attnTotal!==1?'s':''}</span></div>
-      ${attnHtml}
+    <div class="att-section-head"><i class="ti ti-alert-circle"></i> Needs attention <span class="dc-link">${attnTotal} order${attnTotal!==1?'s':''}</span></div>
+    <div class="att-cards">
+      ${attCard('Overdue',overdueList,'red',"showPage('orders');setFilter('')")}
+      ${attCard('Behind schedule',behindList,'red',"showPage('dispatch')")}
+      ${attCard('Ready to invoice',readyList,'green',"setFilter('Ready for Invoice')")}
     </div>`;
 }
 function render(){
