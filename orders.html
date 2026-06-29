@@ -924,6 +924,9 @@ body.sb-pinned .dock{left:var(--sb)}
 .att-cust-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text);font-weight:600;line-height:1.25}
 .att-proc{display:flex;align-items:center;gap:3px;margin-top:1px;font-size:10px;font-weight:600;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
 .att-proc i{font-size:11px;color:var(--accent);flex-shrink:0}
+
+.po-mini.flash{animation:miniFlash 1.6s ease-out}
+@keyframes miniFlash{0%{box-shadow:0 0 0 2px var(--spark),0 0 0 6px rgba(212,43,43,.25)}60%{box-shadow:0 0 0 2px var(--spark),0 0 0 6px rgba(212,43,43,.12)}100%{box-shadow:none}}
 </style>
 </head>
 <body>
@@ -1892,7 +1895,26 @@ function updateNavBadges(){
 }
 let _dashBrief={text:'',at:'',loading:false,error:''};
 try{ const c=JSON.parse(localStorage.getItem('bsmp_dash_brief')||'null'); if(c && c.date===new Date().toDateString()){ _dashBrief.text=c.text; _dashBrief.at=c.at; } }catch{}
-window._dashOpenOrder=(id)=>{ showPage('orders'); setTimeout(()=>{ try{ openEdit(id); }catch(e){} },60); };
+window._dashOpenOrder=(id)=>{
+  const o=orders.find(r=>r.id===id);
+  showPage('orders');
+  if(!o) return;
+  // clear any active filters so the target card is guaranteed to be in the list
+  try{ const s=document.getElementById('search'); if(s) s.value=''; }catch(e){}
+  try{ const fs=document.getElementById('filter-status'); if(fs) fs.value=''; }catch(e){}
+  try{ const fp=document.getElementById('filter-process'); if(fp) fp.value=''; }catch(e){}
+  onlyIncomplete=false; onlyAtRisk=false;
+  document.getElementById('incomplete-btn')?.classList.remove('active');
+  document.getElementById('atrisk-btn')?.classList.remove('active');
+  viewMode='card';                                  // card view = the PO cards
+  selectedPO=o.customer+'||'+(o.po||'verbal');       // open this order's PO card (matches poGroups key)
+  render();
+  setTimeout(()=>{
+    const el=document.querySelector('.po-mini.active');
+    if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1600); }
+    if(window.innerWidth<=900){ document.querySelector('.po-detail')?.scrollIntoView({behavior:'smooth',block:'start'}); }
+  },90);
+};
 function buildDashSnapshot(){
   const active=orders.filter(r=>!r.archived);
   const open=active.filter(r=>r.status!=='Invoiced');
