@@ -873,6 +873,26 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
 .ab-loading i,.ab-error i{font-size:15px}
 @keyframes abspin{to{transform:rotate(360deg)}}
 .ab-spin{display:inline-block;animation:abspin 1s linear infinite}
+
+/* Deposit log — lightweight record of each deposit run */
+.dep-log-note{height:36px;padding:0 10px;border:1px solid var(--border2);background:var(--surface,#fff);font-family:inherit;font-size:13px;color:var(--text);outline:none;min-width:190px;flex:1 1 190px;max-width:280px}
+.dep-log-note:focus{border-color:var(--accent)}
+.dlog-section{margin-top:24px}
+.dlog-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--text);margin-bottom:10px}
+.dlog-count{font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:1px 8px}
+.dlog-empty{font-size:12.5px;color:var(--text3);padding:10px 0;line-height:1.5}
+.dlog-entry{background:var(--surface,#fff);border:1px solid var(--border);box-shadow:var(--shadow);padding:10px 12px;margin-bottom:8px}
+.dlog-top{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.dlog-when{font-size:12px;font-weight:700;color:var(--text2)}
+.dlog-note{font-size:11.5px;color:var(--text3);font-style:italic}
+.dlog-amt{font-size:15px;font-weight:800;color:var(--ar);margin-left:auto}
+.dlog-del{color:var(--text3);cursor:pointer;font-size:14px;display:inline-flex}
+.dlog-del:hover{color:var(--ap)}
+.dlog-lines{display:flex;flex-wrap:wrap;gap:6px 14px}
+.dlog-line{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)}
+.dlog-line i{font-size:12px;color:var(--text3)}
+.dlog-line b{color:var(--text);font-weight:700}
+.dlog-line.leftover,.dlog-line.leftover b{color:var(--text3);font-weight:600}
 </style>
 </head>
 <body>
@@ -1135,6 +1155,7 @@ let overlay = {};         // apar/entries node: payments + manual entries + edit
 let accounts = {};        // apar/accounts node: {id:{name,balance}} bank sub-accounts
 let recurring = {};       // apar/recurring node: recurring bill templates
 let depositBuckets = {};  // apar/depositBuckets node: Profit First allocation buckets
+let depositLog = {};      // apar/depositLog node: per-deposit snapshots (what was moved & when)
 let vendorAccounts = {};  // apar/vendorAccounts node: {vendorKey:accountId} learned assignments
 let vendorPriority = {};  // apar/vendorPriority node: {vendorKey:'critical'|'normal'|'wait'}
 let customerDelay = {};   // apar/customerDelay node: {customerKey:0|7|14|30} typical days late (forecast)
@@ -2916,9 +2937,51 @@ function renderDeposit(){
       </div>
     </div>
     ${pctOff?`<div class="dep-warn"><i class="ti ti-alert-triangle"></i> Your percentages add up to ${(Math.round(totalPct*10)/10)}%, not 100%. ${totalPct<100?'The remainder stays unallocated.':'You\'re over 100% — splits will exceed the deposit.'}</div>`:''}
-    <div class="toolbar" style="margin-top:14px"><button class="btn primary" onclick="addBucket()"><i class="ti ti-plus"></i> Add bucket</button>
+    <div class="toolbar" style="margin-top:14px;flex-wrap:wrap;gap:8px">
+      <input id="dep-log-note" class="dep-log-note" placeholder="Note (optional, e.g. AM deposit)" autocomplete="off">
+      <button class="btn primary" onclick="logDeposit()"><i class="ti ti-device-floppy"></i> Log this deposit</button>
+      <button class="btn" onclick="addBucket()"><i class="ti ti-plus"></i> Add bucket</button>
       <button class="btn" onclick="normalizeBuckets()" title="Scale all percentages so they total 100%">Balance to 100%</button>
+    </div>
+    ${depositLogHtml()}`;
+}
+function depositLogHtml(){
+  const logs=Object.values(depositLog||{}).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0));
+  const rows=logs.map(e=>{
+    const when=new Date(e.at||0).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+    const lines=(e.lines||[]).map(l=>`<span class="dlog-line">${esc(l.name||'')}${l.acct?` <i class="ti ti-arrow-right"></i> ${esc(l.acct)}`:''} <b>${fmtMoney(l.amount)}</b></span>`).join('');
+    const lo=(e.leftover>0.005)?`<span class="dlog-line leftover">Unallocated <b>${fmtMoney(e.leftover)}</b></span>`:'';
+    return `<div class="dlog-entry">
+      <div class="dlog-top"><span class="dlog-when">${when}</span>${e.note?`<span class="dlog-note">${esc(e.note)}</span>`:''}<span class="dlog-amt">${fmtMoney(e.amount)}</span><span class="dlog-del" title="Delete entry" onclick="deleteDepositLog('${e.id}')"><i class="ti ti-trash"></i></span></div>
+      <div class="dlog-lines">${lines}${lo}</div>
     </div>`;
+  }).join('');
+  return `<div class="dlog-section">
+    <div class="dlog-head"><span>Recent deposits</span>${logs.length?`<span class="dlog-count">${logs.length}</span>`:''}</div>
+    ${logs.length?rows:'<div class="dlog-empty">No deposits logged yet. Enter an amount, then press <b>Log this deposit</b> to snapshot how it was split across your accounts.</div>'}
+  </div>`;
+}
+window.logDeposit=()=>{
+  const amt=_depAmount;
+  if(!amt || amt<=0){ alert('Enter a deposit amount first.'); return; }
+  const noteEl=document.getElementById('dep-log-note');
+  const note=noteEl?(noteEl.value||'').trim():'';
+  const lines=bucketList().map(b=>{
+    const a=Math.round(amt*(Number(b.pct)||0)/100*100)/100;
+    return {name:b.name||'', acct:(b.account&&accounts[b.account]?accounts[b.account].name:''), pct:Number(b.pct)||0, amount:a};
+  }).filter(l=>l.amount>0.005);
+  const allocated=lines.reduce((s,l)=>s+l.amount,0);
+  const leftover=Math.round((amt-allocated)*100)/100;
+  const id='dl_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
+  const entry={id, at:Date.now(), amount:Math.round(amt*100)/100, note, lines, leftover};
+  depositLog[id]=entry; dbSet('apar/depositLog/'+id, entry);
+  if(noteEl) noteEl.value='';
+  if(typeof showToast==='function'){ try{ showToast('Deposit logged \u00b7 '+fmtMoney(entry.amount)); }catch(e){} }
+  render();
+};
+window.deleteDepositLog=(id)=>{
+  if(!confirm('Remove this deposit log entry? This only clears the snapshot, not any account balances.'))return;
+  delete depositLog[id]; dbRemove('apar/depositLog/'+id); render();
 }
 window.setBucket=(id,field,val)=>{
   const b=depositBuckets[id]; if(!b)return;
@@ -4232,6 +4295,7 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
     onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
+    onValue(ref(db,'apar/depositLog'),snap=>{ depositLog=snap.val()||{}; render(); });
     onValue(ref(db,'apar/vendorAccounts'),snap=>{ vendorAccounts=snap.val()||{}; });
     onValue(ref(db,'apar/vendorPriority'),snap=>{ vendorPriority=snap.val()||{}; if(page==='payrun')render(); });
     onValue(ref(db,'apar/customerDelay'),snap=>{ customerDelay=snap.val()||{}; if(page==='forecast')render(); });
