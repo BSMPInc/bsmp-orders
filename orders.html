@@ -761,6 +761,14 @@ tr:hover .del-btn{opacity:1}
 .ci-price.invoiceable .ci-ea{color:#3B6D11}
 .ci-price.invoiceable .ci-line{color:#5a8a2a;font-weight:600}
 .ci-noprice{color:var(--text3);font-weight:400}
+.ci-build{display:inline-flex;align-items:center;gap:4px;background:#eef0f2;border:1px solid #d9dde2;color:#5b6675;border-radius:6px;padding:2px 7px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.ci-build i{font-size:11px}
+.ci-row.build-only{background:#fafbfc}
+.ci-row.build-only .ci-desc-main{color:var(--text2)}
+.inv-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 12px;padding:8px 12px;background:#eef7e3;border:1px solid #d4e8bd;border-radius:8px;font-size:12px;color:#33500f}
+.inv-summary .is-total{font-weight:800;font-size:13px;color:#2e4a0c}
+.inv-summary .is-sep{color:#9fb87f}
+.inv-summary .is-build{color:#5b6675;font-weight:600}
 .ci-due{font-size:11px;color:var(--text2);white-space:nowrap}
 .ci-due small{color:var(--text3);margin-left:3px}
 .ci-row .status-badge{justify-self:start;font-size:10px;padding:2px 8px}
@@ -1585,6 +1593,12 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="form-group"><label>Cost / Part ($)</label><input id="f-cost" type="number" step="0.01" placeholder="0.00"></div>
       <div class="form-group"><label>Order Date</label><input id="f-ordered" type="date"></div>
       <div class="form-group"><label>Due Date</label><input id="f-due" type="date"></div>
+      <div class="form-group full" style="display:flex;align-items:flex-start;gap:9px;padding:4px 2px 0">
+        <input id="f-buildonly" type="checkbox" onchange="window._toggleBuildOnly(this.checked)" style="width:17px;height:17px;margin-top:1px;flex-shrink:0;accent-color:var(--text2);cursor:pointer">
+        <label for="f-buildonly" style="cursor:pointer;font-weight:600">Build-only sub-component
+          <span style="display:block;font-weight:400;color:var(--text3);font-size:11px;margin-top:1px">Fabricated in-house but <b>not invoiced separately</b> — its cost is built into another charge line on this PO. Hides the price and won't flag a missing-price warning.</span>
+        </label>
+      </div>
     </div>
   </div>
   <div class="section-card">
@@ -1874,7 +1888,7 @@ function missingFields(r){
   const miss=[];
   if(!r.due) miss.push('due date');
   if(!r.qty) miss.push('qty');
-  if(!(r.qty&&r.cost)&&!parseFloat(r.total)) miss.push('price');
+  if(!(r.qty&&r.cost)&&!parseFloat(r.total)&&!r.buildOnly) miss.push('price');
   if(!r.desc&&!r.part) miss.push('description/part #');
   if(!(r.drawing&&r.drawing.url)) miss.push('drawing');
   if(!r.po || !r.po.trim()) miss.push('PO # (or enter "verbal")');
@@ -2242,7 +2256,7 @@ function poItemsHtml(g){
     const osLine=os?(()=>{const k=extKind(os.name);return `<span class="ci-out" title="${shortProc(os.name)}: ${k.a} ${fmtDate(toISO(os.start))} → ${k.b} ${fmtDate(toISO(os.end))}"><span class="co-dot" style="background:${PROCESS_COLORS[os.name]||'#888'}"></span>${shortProc(os.name)} ${k.a} ${fmtDate(toISO(os.start))}</span>`;})():'';
     const miss=missingFields(r);
     const missBadge=miss.length?`<i class="ti ti-alert-triangle ci-miss" title="Missing: ${miss.join(', ')}"></i>`:'';
-    return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}" onclick="window._tl('${r.id}',event)">
+    return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}${r.buildOnly?' build-only':''}" onclick="window._tl('${r.id}',event)">
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
         <span class="ci-desc-main" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}">${missBadge}${clip}${r.desc||r.part||'<span style="color:var(--text3)">(no description)</span>'}</span>
@@ -2251,6 +2265,7 @@ function poItemsHtml(g){
       </div>
       <span class="ci-qty">${r.qty||''}</span>
       ${(()=>{ const inv=['Ready for Invoice','Invoiced'].includes(r.status);
+        if(r.buildOnly) return `<span class="ci-build" title="Build-only sub-component — fabricated in-house, not invoiced separately. Its cost is included in this PO's charge line(s)."><i class="ti ti-tools"></i>Build only</span>`;
         return r.cost ? `<span class="ci-price${inv?' invoiceable':''}" title="${fmtMoney(r.cost)} per part × ${r.qty||0} = ${fmtMoney(rowTotal(r))}"><span class="ci-ea">${fmtMoney(r.cost)}<small>/ea</small></span><span class="ci-line">${fmtMoney(rowTotal(r))}</span></span>`
                        : `<span class="ci-price ci-noprice" title="No price set">—</span>`; })()}
       <span class="ci-due">${r.due?fmtDate(r.due):'—'}${r.due?' '+cardDaysLabel(days):''}</span>
@@ -2323,6 +2338,25 @@ function vendorPOsHtml(g){
     </div>${itemLine}${x.detail?`<div class="po-ref-detail">${x.detail}</div>`:''}`;}).join('')}
   </div>`;
 }
+// Shown when a PO reaches invoicing: makes the billable picture unambiguous so
+// build-only sub-components don't read as missing prices or extra invoice lines.
+function invSummaryHtml(g){
+  const inv=g.statuses.some(s=>['Ready for Invoice','Invoiced'].includes(s));
+  if(!inv) return '';
+  const charge=g.items.filter(r=>!r.buildOnly);
+  const build=g.items.filter(r=>r.buildOnly);
+  if(!build.length) return '';   // nothing to clarify — behaves exactly as before
+  const total=charge.reduce((s,r)=>s+rowTotal(r),0);
+  const n=charge.length, m=build.length;
+  return `<div class="inv-summary" title="Build-only lines are fabrication sub-components included in the charge line(s) above — do not add them to the invoice.">
+    <i class="ti ti-file-invoice"></i>
+    <span><b>${n}</b> charge line${n!==1?'s':''}</span>
+    <span class="is-sep">·</span>
+    <span class="is-total">${fmtMoney(total)||'$0.00'}</span>
+    <span class="is-sep">·</span>
+    <span class="is-build"><i class="ti ti-tools"></i> ${m} build-only ${m!==1?'components':'component'} (not billed)</span>
+  </div>`;
+}
 function poDetailHtml(g){
   const accColor=STATUS_ACCENT[g.statuses[0]]||'#9aa3b2';
   const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
@@ -2347,6 +2381,7 @@ function poDetailHtml(g){
       ${outsourceStripHtml(g)}
     </div>
     ${vendorPOsHtml(g)}
+    ${invSummaryHtml(g)}
     ${poItemsHtml(g)}
   </div>`;
 }
@@ -2988,6 +3023,7 @@ window.openAdd=()=>{
   ['qty','cost'].forEach(f=>document.getElementById('f-'+f).value='');
   document.getElementById('f-status').value='Received';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
   document.getElementById('f-ordered').value='';document.getElementById('f-due').value='';
+  document.getElementById('f-buildonly').checked=false;window._toggleBuildOnly(false);
   document.getElementById('add-modal').style.display='flex';
 };
 function openEdit(id){
@@ -2999,8 +3035,19 @@ function openEdit(id){
   document.getElementById('f-cost').value=r.cost||'';document.getElementById('f-ordered').value=r.ordered||'';
   document.getElementById('f-due').value=r.due||'';document.getElementById('f-status').value=r.status||'Confirmed';
   document.getElementById('f-invoice').value=r.invoice||'';document.getElementById('f-payment').value=r.payment||'Unpaid';
-  document.getElementById('f-notes').value=r.notes||'';document.getElementById('add-modal').style.display='flex';
+  document.getElementById('f-notes').value=r.notes||'';
+  document.getElementById('f-buildonly').checked=!!r.buildOnly;
+  window._toggleBuildOnly(!!r.buildOnly);
+  document.getElementById('add-modal').style.display='flex';
 }
+// Grey out the cost field when a line is marked build-only (it isn't billed separately).
+window._toggleBuildOnly=(on)=>{
+  const cost=document.getElementById('f-cost');
+  if(!cost) return;
+  cost.disabled=!!on;
+  cost.style.opacity=on?'0.45':'';
+  if(on) cost.value='';
+};
 window.addPartToPO = (id) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
   openAdd();
@@ -3030,7 +3077,8 @@ window.addPartToPO = (id) => {
 };
 window.saveOrder=()=>{
   const customer=document.getElementById('f-customer').value.trim();if(!customer){alert('Customer name is required.');return;}
-  const qty=parseFloat(document.getElementById('f-qty').value)||0,cost=parseFloat(document.getElementById('f-cost').value)||0;
+  const buildOnly=document.getElementById('f-buildonly').checked;
+  const qty=parseFloat(document.getElementById('f-qty').value)||0,cost=buildOnly?0:(parseFloat(document.getElementById('f-cost').value)||0);
   const ex=editId?orders.find(o=>o.id===editId):{};
   // Start from the existing record so fields the edit form doesn't touch — drawing,
   // schedule, process state, priority, archive flags, timestamps — are preserved.
@@ -3038,7 +3086,7 @@ window.saveOrder=()=>{
     id:editId||uid(),customer,
     po:document.getElementById('f-po').value.trim(),job:document.getElementById('f-job').value.trim(),
     part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),
-    qty,cost,total:qty&&cost?qty*cost:0,
+    qty,cost,total:qty&&cost?qty*cost:0,buildOnly,
     ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,
     status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),
     payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),
