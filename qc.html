@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>BSMP Inspection / QC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<style>
+:root{
+  --bg:#f5f2ea; --card:#ffffff; --surface:#ffffff;
+  --text:#23262b; --text2:#5b6470; --text3:#8a93a0;
+  --border:#e6e0d3; --border2:#d7d0c0;
+  --accent:#3a4049; --accent-2:#23272e; --accent-soft:#eceef1; --spark:#d42b2b;
+  --green:#1f7d57; --green-soft:#e7f1ec; --red:#a32d2d; --red-soft:#f7ebeb;
+  --amber:#9a6212; --amber-soft:#f6efdf; --blue:#2c5d86;
+  --shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06);
+  --rail:64px; --sb:224px; --dock-h:64px; --radius:0;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:'Hanken Grotesk',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.01em}
+
+/* ===== Login ===== */
+#qc-login{position:fixed;inset:0;background:var(--accent);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px}
+#qc-login .card{background:#fff;padding:30px;width:340px;max-width:94vw;box-shadow:0 12px 48px rgba(0,0,0,.3)}
+#qc-login .ttl{font-size:18px;font-weight:800;text-align:center}
+#qc-login .sub{font-size:12px;color:var(--text2);text-align:center;margin:4px 0 18px}
+#qc-login input{width:100%;height:40px;padding:0 12px;border:1px solid var(--border2);background:#fff;outline:none;margin-bottom:10px}
+#qc-login input:focus{border-color:var(--accent)}
+#qc-login .err{font-size:12px;color:var(--red);min-height:15px;margin-bottom:6px}
+#qc-login button{width:100%;height:40px;font-weight:700;color:#fff;background:var(--accent);border:none;cursor:pointer}
+#qc-login button:hover{background:var(--accent-2)}
+#qc-login .lang{display:flex;justify-content:center;gap:0;margin-top:14px}
+#qc-login .lang button{width:auto;height:26px;padding:0 12px;background:#fff;color:var(--text3);border:1px solid var(--border);border-right:none;font-size:11px;font-weight:800}
+#qc-login .lang button:last-child{border-right:1px solid var(--border)}
+#qc-login .lang button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* ===== Shell ===== */
+#qc-app{display:none;min-height:100vh;width:100%}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--rail);background:var(--accent);display:flex;flex-direction:column;overflow:hidden;z-index:48;transition:width .18s ease}
+.sidebar:hover,body.sb-pinned .sidebar{width:var(--sb)}
+.sb-logo{background:var(--accent);padding:14px 14px 12px;border-bottom:2.25px solid var(--spark);min-height:64px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sb-logo img{max-width:188px;max-height:54px;width:auto;height:auto;object-fit:contain;display:block}
+.sb-pin{position:absolute;top:8px;right:8px;background:rgba(255,255,255,.12);border:none;color:#fff;width:26px;height:26px;cursor:pointer;display:none;align-items:center;justify-content:center}
+.sidebar:hover .sb-pin,body.sb-pinned .sb-pin{display:flex}
+.nav{padding:10px 0;flex:1;overflow-y:auto}
+.nav-sec{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.45);padding:14px 0 6px 20px;white-space:nowrap}
+.nav-item{display:flex;align-items:center;gap:12px;padding:0 20px;height:42px;color:rgba(255,255,255,.82);cursor:pointer;white-space:nowrap;font-weight:600;border-left:3px solid transparent}
+.nav-item i{font-size:20px;flex:none;width:20px;text-align:center}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.10);color:#fff;border-left-color:var(--spark)}
+.nav-label{opacity:0;transition:opacity .12s}
+.sidebar:hover .nav-label,body.sb-pinned .nav-label{opacity:1}
+.sb-foot{padding:10px 18px;border-top:1px solid rgba(255,255,255,.12);font-size:11px;color:rgba(255,255,255,.6);white-space:nowrap;display:flex;align-items:center;gap:8px}
+.sb-foot .dot{width:8px;height:8px;border-radius:50%;background:#8a93a0;flex:none}
+
+main{margin-left:var(--rail);min-height:100vh;display:flex;flex-direction:column;transition:margin-left .18s ease}
+body.sb-pinned main{margin-left:var(--sb)}
+.topbar{height:64px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;padding:0 22px;position:sticky;top:0;z-index:30}
+.topbar h1{font-size:20px}
+.topbar .sub{font-size:12px;color:var(--text2)}
+.topbar .sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;border:1px solid var(--border);background:#fff}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:#8a93a0}
+#qc-lang{display:inline-flex;border:1px solid var(--border)}
+#qc-lang button{height:30px;padding:0 10px;background:#fff;border:none;border-right:1px solid var(--border);font-weight:800;font-size:11px;color:var(--text3);cursor:pointer}
+#qc-lang button:last-child{border-right:none}
+#qc-lang button.on{background:var(--accent);color:#fff}
+.icon-btn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.content{flex:1;padding:22px 22px calc(26px + var(--dock-h));max-width:1100px;width:100%}
+
+/* ===== Dock ===== */
+.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;padding-left:8px;z-index:46;transition:left .18s ease}
+body.sb-pinned .dock{left:var(--sb)}
+.dock-tab{flex:none;width:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--text2);font-size:10.5px;font-weight:700;background:none;border:none;border-top:2.25px solid transparent;font-family:inherit;text-align:center}
+.dock-tab i{font-size:19px}
+.dock-tab.active{color:var(--accent);background:var(--accent-soft);border-top-color:var(--spark)}
+.dock-tab:hover{color:var(--accent)}
+.dock-switch{display:flex;align-items:center;gap:10px;padding-left:16px;margin-left:8px;border-left:1px solid var(--border)}
+.dock-switch .lbl{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.dock-chips{display:flex;gap:7px}
+.dock-chip{width:34px;height:34px;display:flex;align-items:center;justify-content:center;color:#fff;opacity:.92}
+.dock-chip:hover{opacity:1}
+.dock-chip.cur{outline:2px solid #fff;outline-offset:-2px;box-shadow:0 0 0 2px var(--accent)}
+.dock-chip i{font-size:17px}
+
+/* ===== Components ===== */
+.btn{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 14px;border:1px solid var(--border2);background:#fff;color:var(--text);font-weight:700;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn i{font-size:17px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.green{background:var(--green);border-color:var(--green);color:#fff}
+.btn.danger{color:var(--red);border-color:#e7c9c9}
+.btn.sm{height:32px;padding:0 10px;font-size:12.5px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.page-head{margin-bottom:16px}
+.page-head h2{font-size:18px}
+.page-head p{margin:3px 0 0;font-size:12.5px;color:var(--text2)}
+.muted{color:var(--text3)}
+.empty{padding:34px 16px;text-align:center;color:var(--text3);font-size:13px}
+
+label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--text2);margin:0 0 5px}
+.field{margin-bottom:13px}
+.in,select.in,textarea.in{width:100%;min-height:38px;padding:8px 11px;border:1px solid var(--border2);background:#fff;outline:none}
+.in:focus,select.in:focus,textarea.in:focus{border-color:var(--accent)}
+textarea.in{min-height:72px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 14px}
+@media(max-width:680px){.grid2,.grid3{grid-template-columns:1fr}}
+
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl th{text-align:left;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--border)}
+table.tbl td{padding:9px 10px;border-bottom:1px solid var(--border)}
+table.tbl tr.click{cursor:pointer}
+table.tbl tr.click:hover td{background:var(--accent-soft)}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:2px 9px;border:1px solid transparent;white-space:nowrap}
+.badge.ok{background:var(--green-soft);color:var(--green)}
+.badge.flag{background:var(--red-soft);color:var(--red)}
+.badge.warn{background:var(--amber-soft);color:var(--amber)}
+.badge.neutral{background:var(--accent-soft);color:var(--text2)}
+
+.char-tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}
+.char-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);font-weight:700;padding:6px 6px;border-bottom:1px solid var(--border);text-align:left}
+.char-tbl td{padding:4px 5px;border-bottom:1px solid var(--border);vertical-align:top}
+.char-tbl input,.char-tbl textarea{width:100%;border:1px solid var(--border);background:#fff;padding:6px 7px;outline:none;min-height:32px}
+.char-tbl input:focus,.char-tbl textarea:focus{border-color:var(--accent)}
+.char-tbl .cno{width:48px;text-align:center;font-weight:700;color:var(--text2)}
+.char-tbl .rm{color:var(--text3);cursor:pointer;text-align:center}
+.char-tbl .rm:hover{color:var(--red)}
+.char-tbl tr.oot td{background:var(--red-soft)}
+
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
+.seg{display:inline-flex;border:1px solid var(--border2)}
+.seg button{height:36px;padding:0 14px;background:#fff;border:none;border-right:1px solid var(--border2);cursor:pointer;font-weight:700;color:var(--text2)}
+.seg button:last-child{border-right:none}
+.seg button.on{background:var(--accent);color:#fff}
+.res-pick{display:flex;gap:10px}
+.res-pick .opt{flex:1;border:1px solid var(--border2);padding:14px;text-align:center;cursor:pointer;font-weight:800}
+.res-pick .opt.pass.on{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.res-pick .opt.flag.on{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.hint{font-size:12px;color:var(--text3);margin-top:4px}
+.aiwip{font-size:11.5px;color:var(--text3);border:1px dashed var(--border2);padding:9px 11px;margin-top:8px;display:flex;align-items:center;gap:8px}
+body.role-operator .mgr-only{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- ===== Login gate ===== -->
+<div id="qc-login">
+  <div class="card">
+    <div class="ttl"><span style="color:var(--accent)">BSMP</span> Inspection / QC</div>
+    <div class="sub" data-t="Sign in to continue">Sign in to continue</div>
+    <input id="qc-email" type="email" data-tph="Email" placeholder="Email" autocomplete="username">
+    <input id="qc-pass" type="password" data-tph="Password" placeholder="Password" autocomplete="current-password">
+    <div class="err" id="qc-login-err"></div>
+    <button id="qc-login-btn" data-t="Sign in" onclick="window._qcLogin()">Sign in</button>
+    <div class="lang" id="qc-lang-login">
+      <button data-lang="en" onclick="qcSetLang('en')">EN</button>
+      <button data-lang="es" onclick="qcSetLang('es')">ES</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== App ===== -->
+<div id="qc-app">
+  <nav class="sidebar" id="qc-sidebar">
+    <button class="sb-pin" id="qc-pin" title="Keep menu open" onclick="window._qcPin(event)"><i class="ti ti-pin"></i></button>
+    <div class="sb-logo"><img src="data:image/png;base64,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" alt="Bert's Sheet Metal Products"></div>
+    <div class="nav" id="qc-nav">
+      <div class="nav-sec" data-t="Quality">Quality</div>
+      <div class="nav-item" id="nav-selfcheck" onclick="showPage('selfcheck')"><i class="ti ti-camera-check"></i><span class="nav-label" data-t="New Self-Check">New Self-Check</span></div>
+      <div class="nav-item" id="nav-inspections" onclick="showPage('inspections')"><i class="ti ti-checklist"></i><span class="nav-label" data-t="Inspections">Inspections</span></div>
+      <div class="nav-item" id="nav-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span class="nav-label" data-t="First Articles">First Articles</span></div>
+      <div class="nav-item" id="nav-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span class="nav-label" data-t="Nonconformances">Nonconformances</span></div>
+      <div class="nav-sec" data-t="Records">Records</div>
+      <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
+    </div>
+    <div class="sb-foot"><span class="dot" id="qc-foot-dot"></span><span class="nav-label" id="qc-foot-txt" data-t="Connecting…">Connecting…</span></div>
+  </nav>
+
+  <main>
+    <header class="topbar">
+      <div>
+        <h1 id="tb-title">Inspections</h1>
+        <div class="sub" id="tb-sub">Quality control</div>
+      </div>
+      <span class="sp"></span>
+      <div id="qc-lang"><button data-lang="en" onclick="qcSetLang('en')">EN</button><button data-lang="es" onclick="qcSetLang('es')">ES</button></div>
+      <span class="chip" id="qc-role-chip" style="display:none"><i class="ti ti-shield-check"></i><span id="qc-role-txt">Manager</span></span>
+      <button class="icon-btn" id="qc-signout" title="Sign out" onclick="window._qcLogout()"><i class="ti ti-logout"></i></button>
+    </header>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<!-- ===== Dock ===== -->
+<div class="dock" id="qc-dock" style="display:none">
+  <button class="dock-tab" id="dock-selfcheck" onclick="showPage('selfcheck')"><i class="ti ti-camera-check"></i><span data-t="dock:selfcheck">Self-Check</span></button>
+  <button class="dock-tab" id="dock-inspections" onclick="showPage('inspections')"><i class="ti ti-checklist"></i><span data-t="dock:inspections">Inspections</span></button>
+  <button class="dock-tab" id="dock-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span data-t="dock:firstarticles">First Articles</span></button>
+  <button class="dock-tab" id="dock-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span data-t="dock:ncr">NCRs</span></button>
+  <div class="dock-switch">
+    <span class="lbl" data-t="Switch app">Switch app</span>
+    <div class="dock-chips">
+      <a class="dock-chip" title="Quote" href="quote.html" style="background:#1e3a5f"><i class="ti ti-file-invoice"></i></a>
+      <a class="dock-chip" title="Orders" href="orders.html" style="background:#6a1f2e"><i class="ti ti-clipboard-list"></i></a>
+      <a class="dock-chip" title="AP / AR" href="apar.html" style="background:#1f4d38"><i class="ti ti-cash"></i></a>
+      <span class="dock-chip cur" title="Inspection / QC" style="background:#3a4049"><i class="ti ti-ruler-measure"></i></span>
+    </div>
+  </div>
+</div>
+
+<!-- ================= UI logic (classic; renders even before Firebase loads) ================= -->
+<script>
+/* ---------- i18n ---------- */
+const I18N = {
+  en: {
+    'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs',
+    'nav:materialcerts':'Material Certs'
+  },
+  es: {
+    // shell / auth
+    'Sign in to continue':'Inicia sesión para continuar','Email':'Correo','Password':'Contraseña','Sign in':'Iniciar sesión',
+    'Signing in…':'Iniciando sesión…','Incorrect email or password.':'Correo o contraseña incorrectos.','Sign-in error: ':'Error al iniciar sesión: ',
+    'Quality':'Calidad','Records':'Registros','New Self-Check':'Autoinspección','Inspections':'Inspecciones',
+    'First Articles':'Primeros artículos','Nonconformances':'No conformidades','Material Certs':'Certificados de material',
+    'Connecting…':'Conectando…','Signed out':'Sesión cerrada','Switch app':'Cambiar app','Manager':'Gerente','Operator':'Operador','Sign out':'Cerrar sesión',
+    'dock:selfcheck':'Autoinsp.','dock:inspections':'Inspecc.','dock:firstarticles':'1.er Art.','dock:ncr':'No conf.','nav:materialcerts':'Certificados',
+    // page subs
+    'Quality control':'Control de calidad','Operator self-checks and first articles':'Autoinspecciones y primeros artículos',
+    'Confirm your work before sign-off':'Confirma tu trabajo antes de aprobarlo','Formal first-article reports':'Reportes formales de primer artículo',
+    'First-article report':'Reporte de primer artículo','Flagged parts and corrective action':'Partes marcadas y acción correctiva',
+    'Mill & material certifications':'Certificados de molino y material','Self-Check':'Autoinspección','First Article':'Primer artículo',
+    // inspections list
+    'Operator self-checks. Flag a part to raise a nonconformance.':'Autoinspecciones del operador. Marca una parte para abrir una no conformidad.',
+    'New self-check':'Nueva autoinspección','Part':'Parte','Job / PO':'Trabajo / OC','Qty':'Cant.','Result':'Resultado','By':'Por',
+    'Pass':'Aprobado','Flagged':'Marcado','No self-checks yet. Press':'Aún no hay autoinspecciones. Pulsa','to log one.':'para registrar una.',
+    // self-check form
+    'Self-check':'Autoinspección','Snap a photo, confirm your work, then mark Pass or Flag.':'Toma una foto, confirma tu trabajo y marca Aprobado o Marcar.',
+    'Link to an order':'Vincular a una orden','— Not linked / free entry —':'— Sin vincular / entrada libre —',
+    'Pick the order to auto-fill part / customer / job, or leave unlinked and type below.':'Elige la orden para autocompletar parte / cliente / trabajo, o déjala sin vincular y escribe abajo.',
+    'Part #':'N.º de parte','Customer':'Cliente','Job #':'N.º de trabajo','PO #':'N.º de OC','Qty inspected':'Cant. inspeccionada','Rev':'Rev',
+    'Part photo(s)':'Foto(s) de la parte','Add photo':'Agregar foto',
+    'AI photo check (compare to a known-good reference + flag obvious mistakes) is coming next. For now this saves the photo; you still verify toleranced features with a gauge.':'La verificación con IA (comparar con una referencia buena y detectar errores obvios) viene pronto. Por ahora esto guarda la foto; aún debes verificar las medidas con calibrador.',
+    'Flag (raise NCR)':'Marcar (abrir no conformidad)','What\u2019s wrong? (starts a nonconformance)':'¿Qué está mal? (abre una no conformidad)',
+    'Notes':'Notas','Save self-check':'Guardar autoinspección','Cancel':'Cancelar',
+    'Enter at least a part # or customer.':'Ingresa al menos un N.º de parte o cliente.','Mark the result as Pass or Flag.':'Marca el resultado como Aprobado o Marcar.',
+    // first articles
+    'Formal first-article reports. Marvin / managers approve.':'Reportes formales de primer artículo. Marvin / gerentes aprueban.',
+    'New first article':'Nuevo primer artículo','Type':'Tipo','Chars':'Caract.','Status':'Estado','No first articles yet.':'Aún no hay primeros artículos.',
+    'Simple FAR':'FAR simple','AS9102':'AS9102','Full AS9102':'AS9102 completo','Report type':'Tipo de reporte',
+    'Fill the header, list characteristics, then submit for review.':'Completa el encabezado, lista las características y envía a revisión.',
+    'Material':'Material','Date':'Fecha','Inspected by':'Inspeccionado por','Restricted / ITAR':'Restringido / ITAR',
+    'Drawing':'Plano','Upload drawing':'Subir plano',
+    'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
+    'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
+    'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
+    'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
+    // ncr
+    'Open → Dispositioned → Closed. Operators raise; managers disposition and close.':'Abierta → Con disposición → Cerrada. Operadores las abren; gerentes deciden y cierran.',
+    'New NCR':'Nueva no conformidad','Issue':'Problema','Raised by':'Abierta por',
+    'No nonconformances. Flagging a self-check creates one here automatically.':'Sin no conformidades. Marcar una autoinspección crea una aquí automáticamente.',
+    'New nonconformance':'Nueva no conformidad','Nonconformance':'No conformidad','Record a flagged part.':'Registra una parte marcada.',
+    'raised by':'abierta por','Qty affected':'Cant. afectada','Description of nonconformance':'Descripción de la no conformidad',
+    'Disposition':'Disposición','(manager)':'(gerente)','Corrective action':'Acción correctiva',
+    'Rework':'Retrabajo','Scrap':'Desecho','Use as is':'Usar como está','Return to vendor':'Devolver al proveedor','Accept':'Aceptar',
+    'Raise NCR':'Abrir no conformidad','Mark dispositioned':'Marcar con disposición','Close NCR':'Cerrar no conformidad','Back':'Atrás',
+    'Open':'Abierta','Dispositioned':'Con disposición','Closed':'Cerrada',
+    // certs
+    'Mill & material certifications, linkable to the orders that used them.':'Certificados de molino y material, vinculables a las órdenes que los usaron.',
+    'Add cert':'Agregar certificado','Heat / Lot':'Colada / lote','Supplier':'Proveedor','Cert #':'N.º de cert.','Linked orders':'Órdenes vinculadas',
+    'No certs yet. Press':'Aún no hay certificados. Pulsa','and attach a mill certificate.':'y adjunta un certificado de molino.',
+    'Add material cert':'Agregar certificado de material','Capture the cert details and link it to the orders it covers.':'Captura los datos del certificado y vincúlalo a las órdenes que cubre.',
+    'Material / grade':'Material / grado','Specification':'Especificación','Heat / lot #':'N.º de colada / lote','Cert date':'Fecha de cert.',
+    'Size / thickness':'Tamaño / espesor','Cert file':'Archivo del certificado','Upload cert':'Subir certificado','Link to orders':'Vincular a órdenes','Save cert':'Guardar certificado',
+    'Next phase: AI reads the cert and fills heat/lot, material, spec, supplier and date for you.':'Siguiente fase: la IA lee el certificado y completa colada/lote, material, especificación, proveedor y fecha por ti.',
+    'No orders found.':'No se encontraron órdenes.','Enter a material or attach a cert file.':'Ingresa un material o adjunta un archivo de certificado.',
+    'Open cert':'Abrir certificado','Delete':'Eliminar','Delete this cert record?':'¿Eliminar este registro de certificado?'
+  }
+};
+let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
+function t(s){ const d=I18N[LANG]; if(d && Object.prototype.hasOwnProperty.call(d,s)) return d[s]; return s; }
+window.t=t;
+function applyStatic(){
+  document.querySelectorAll('[data-t]').forEach(el=>{ el.textContent=t(el.getAttribute('data-t')); });
+  document.querySelectorAll('[data-tph]').forEach(el=>{ el.placeholder=t(el.getAttribute('data-tph')); });
+  const so=document.getElementById('qc-signout'); if(so) so.title=t('Sign out');
+  if(QC_USER){ const rt=document.getElementById('qc-role-txt'); if(rt) rt.textContent=t(QC_ROLE==='operator'?'Operator':'Manager'); }
+  document.querySelectorAll('#qc-lang button,#qc-lang-login button').forEach(b=>b.classList.toggle('on', b.dataset.lang===LANG));
+  document.documentElement.lang=LANG;
+}
+window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catch(e){} applyStatic(); render(); };
+
+/* ---------- state ---------- */
+window.QC_USER=null; window.QC_ROLE='manager';
+let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={};
+let page='inspections';
+let editId=null;
+let _pendingFiles={};
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const vals=o=>Object.values(o||{}).filter(Boolean);
+const newId=p=>(p||'r')+'_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtDate(s){ if(!s) return '—'; const d=new Date(s); if(isNaN(d)) return esc(s); return d.toLocaleDateString(LANG==='es'?'es-MX':'en-US',{month:'short',day:'numeric',year:'2-digit'}); }
+function fmtWhen(ms){ if(!ms) return '—'; return new Date(ms).toLocaleString(LANG==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function gv(id){const el=$(id);return el?el.value.trim():'';}
+function gc(id){const el=$(id);return el?el.checked:false;}
+const isMgr=()=>QC_ROLE!=='operator';
+
+/* ---------- data in from Firebase module ---------- */
+window.qcOnData=(name,val)=>{
+  if(name==='inspections') INSPECTIONS=val||{};
+  else if(name==='ncr') NCRS=val||{};
+  else if(name==='certs') CERTS=val||{};
+  else if(name==='orders') ORDERS=val||{};
+  else if(name==='quotes') QUOTES=val||{};
+  render();
+};
+window.qcOnAuth=(user,role)=>{
+  QC_USER=user; QC_ROLE=role||'manager';
+  document.body.classList.toggle('role-operator', role==='operator');
+  const chip=$('qc-role-chip'), rt=$('qc-role-txt');
+  if(chip){ chip.style.display='inline-flex'; rt.textContent=t(role==='operator'?'Operator':'Manager'); chip.querySelector('i').className=role==='operator'?'ti ti-user-cog':'ti ti-shield-check'; }
+  if(!user){ $('qc-app').style.display='none'; $('qc-dock').style.display='none'; return; }
+  $('qc-app').style.display='block'; $('qc-dock').style.display='flex';
+  if(page==='inspections' && role==='operator') page='selfcheck';
+  applyStatic(); render();
+};
+async function dbSet(path,val){ if(window.qcSet) return window.qcSet(path,val); }
+async function dbRemove(path){ if(window.qcRemove) return window.qcRemove(path); }
+async function upload(file,prefix){ if(window.qcUpload) return window.qcUpload(file,prefix); return ''; }
+
+window._qcPin=(e)=>{ e&&e.stopPropagation(); document.body.classList.toggle('sb-pinned'); };
+
+/* ---------- routing ---------- */
+const META={
+  inspections:['Inspections','Operator self-checks and first articles'],
+  selfcheck:['Self-Check','Confirm your work before sign-off'],
+  fairs:['First Articles','Formal first-article reports'],
+  fair:['First Article','First-article report'],
+  ncr:['Nonconformances','Flagged parts and corrective action'],
+  certs:['Material Certs','Mill & material certifications']
+};
+window.showPage=(p)=>{
+  if(QC_ROLE==='operator' && p==='certs') p='inspections';
+  page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
+  render();
+};
+function setActive(){
+  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs'};
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
+  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr'};
+  document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
+  if(dockMap[page]&&$(dockMap[page])) $(dockMap[page]).classList.add('active');
+  const m=META[page]||['Inspections','Quality control'];
+  $('tb-title').textContent=t(m[0]); $('tb-sub').textContent=t(m[1]);
+}
+function render(){
+  if(!QC_USER && !window.__qcDemo) return;
+  setActive();
+  const c=$('content'); if(!c) return;
+  if(page==='inspections') c.innerHTML=viewInspections();
+  else if(page==='selfcheck') c.innerHTML=viewSelfCheck();
+  else if(page==='fairs') c.innerHTML=viewFairs();
+  else if(page==='fair') c.innerHTML=viewFair();
+  else if(page==='ncr') c.innerHTML=viewNcr();
+  else if(page==='certs') c.innerHTML=viewCerts();
+}
+
+/* ---------- order linking ---------- */
+function orderOptions(sel){
+  const list=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||''));
+  return `<option value="">${t('— Not linked / free entry —')}</option>`+list.map(o=>{
+    const lbl=[o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ');
+    return `<option value="${esc(o.id)}" ${sel===o.id?'selected':''}>${esc(lbl||o.id)}</option>`;
+  }).join('');
+}
+window.qcFillFromOrder=(prefix,oid)=>{
+  const o=ORDERS[oid]; if(!o) return;
+  const set=(suf,v)=>{const el=$(prefix+suf); if(el&&v!=null) el.value=v;};
+  set('-customer',o.customer||''); set('-part',o.part||o.partNum||''); set('-po',o.po||''); set('-job',o.job||'');
+};
+
+/* ---------- file inputs ---------- */
+window.qcPickFiles=(key,inputEl)=>{
+  _pendingFiles[key]=_pendingFiles[key]||[];
+  [...inputEl.files].forEach(f=>_pendingFiles[key].push(f));
+  const strip=$('files-'+key);
+  if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map(f=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`).join(' ');
+  inputEl.value='';
+};
+async function uploadPending(key,prefix){
+  const files=_pendingFiles[key]||[]; const urls=[];
+  for(const f of files){ try{ const u=await upload(f,prefix); if(u) urls.push({name:f.name,url:u,type:f.type}); }catch(e){ console.warn('upload failed',e); } }
+  _pendingFiles[key]=[];
+  return urls;
+}
+
+/* =================== INSPECTIONS LIST =================== */
+function resultBadge(r){
+  if(r==='Pass') return `<span class="badge ok"><i class="ti ti-check"></i> ${t('Pass')}</span>`;
+  if(r==='Flag') return `<span class="badge flag"><i class="ti ti-flag"></i> ${t('Flagged')}</span>`;
+  return '<span class="badge neutral">—</span>';
+}
+function fairStatusBadge(s){
+  const map={Draft:'neutral',Measuring:'warn',Submitted:'warn',Approved:'ok',Rejected:'flag'};
+  return `<span class="badge ${map[s]||'neutral'}">${t(s||'Draft')}</span>`;
+}
+function viewInspections(){
+  const list=vals(INSPECTIONS).filter(i=>i.type==='self').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const rows=list.map(i=>`<tr class="click" onclick="window.qcOpenSelf('${i.id}')">
+    <td><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')}</div></td>
+    <td>${esc(i.job||'—')}${i.po?` <span class="muted">· ${t('PO #')} ${esc(i.po)}</span>`:''}</td>
+    <td>${esc(i.qty||'')}</td>
+    <td>${resultBadge(i.result)}</td>
+    <td>${esc((i.createdBy||'').split('@')[0])}<div class="muted" style="font-size:12px">${fmtWhen(i.createdAt)}</div></td>
+  </tr>`).join('');
+  return `<div class="page-head"><h2>${t('Inspections')}</h2><p>${t('Operator self-checks. Flag a part to raise a nonconformance.')}</p></div>
+    <div class="toolbar"><button class="btn primary" onclick="showPage('selfcheck')"><i class="ti ti-camera-check"></i> ${t('New self-check')}</button></div>
+    <div class="card" style="padding:0">
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Part')}</th><th>${t('Job / PO')}</th><th>${t('Qty')}</th><th>${t('Result')}</th><th>${t('By')}</th></tr></thead><tbody>${rows}</tbody></table>`
+        :`<div class="empty">${t('No self-checks yet. Press')} <b>${t('New self-check')}</b> ${t('to log one.')}</div>`}
+    </div>`;
+}
+window.qcOpenSelf=(id)=>{ editId=id; page='selfcheck'; render(); };
+
+/* =================== SELF-CHECK FORM =================== */
+function viewSelfCheck(){
+  const r=editId?INSPECTIONS[editId]:null;
+  const v=(f,d)=>r&&r[f]!=null?r[f]:(d||'');
+  const result=v('result','');
+  return `<div class="page-head"><h2>${r?t('Self-check'):t('New self-check')}</h2><p>${t('Snap a photo, confirm your work, then mark Pass or Flag.')}</p></div>
+  <div class="card">
+    <div class="field"><label class="fl">${t('Link to an order')}</label>
+      <select class="in" id="sc-order" onchange="qcFillFromOrder('sc',this.value)">${orderOptions(v('orderId',''))}</select>
+      <div class="hint">${t('Pick the order to auto-fill part / customer / job, or leave unlinked and type below.')}</div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="sc-part" value="${esc(v('partNum'))}"></div>
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="sc-customer" value="${esc(v('customer'))}"></div>
+      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="sc-job" value="${esc(v('job'))}"></div>
+      <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="sc-po" value="${esc(v('po'))}"></div>
+      <div class="field"><label class="fl">${t('Qty inspected')}</label><input class="in" id="sc-qty" type="number" min="0" value="${esc(v('qty'))}"></div>
+      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="sc-rev" value="${esc(v('rev'))}"></div>
+    </div>
+    <div class="field"><label class="fl">${t('Part photo(s)')}</label>
+      <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('sc',this)"></label>
+      <div class="thumbs" id="files-sc"></div>
+      ${(r&&r.photos&&r.photos.length)?`<div class="thumbs">${r.photos.map(p=>`<img class="thumb" src="${esc(p.url)}">`).join('')}</div>`:''}
+      <div class="aiwip"><i class="ti ti-sparkles"></i> ${t('AI photo check (compare to a known-good reference + flag obvious mistakes) is coming next. For now this saves the photo; you still verify toleranced features with a gauge.')}</div>
+    </div>
+    <div class="field"><label class="fl">${t('Result')}</label>
+      <div class="res-pick">
+        <div class="opt pass ${result==='Pass'?'on':''}" id="sc-pass" onclick="qcPickResult('Pass')"><i class="ti ti-check"></i> ${t('Pass')}</div>
+        <div class="opt flag ${result==='Flag'?'on':''}" id="sc-flag" onclick="qcPickResult('Flag')"><i class="ti ti-flag"></i> ${t('Flag (raise NCR)')}</div>
+      </div>
+      <input type="hidden" id="sc-result" value="${esc(result)}">
+    </div>
+    <div class="field" id="sc-flag-note" style="display:${result==='Flag'?'block':'none'}"><label class="fl">${t('What\u2019s wrong? (starts a nonconformance)')}</label><textarea class="in" id="sc-issue">${esc(v('issue'))}</textarea></div>
+    <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="sc-notes">${esc(v('notes'))}</textarea></div>
+    <div class="toolbar" style="margin:4px 0 0">
+      <button class="btn primary" onclick="window.qcSaveSelf()"><i class="ti ti-device-floppy"></i> ${t('Save self-check')}</button>
+      <button class="btn" onclick="showPage('inspections')">${t('Cancel')}</button>
+    </div>
+  </div>`;
+}
+window.qcPickResult=(r)=>{ $('sc-result').value=r; $('sc-pass').classList.toggle('on',r==='Pass'); $('sc-flag').classList.toggle('on',r==='Flag'); $('sc-flag-note').style.display=r==='Flag'?'block':'none'; };
+window.qcSaveSelf=async ()=>{
+  const part=gv('sc-part'), cust=gv('sc-customer');
+  if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
+  const result=gv('sc-result');
+  if(!result){ alert(t('Mark the result as Pass or Flag.')); return; }
+  const id=editId||newId('insp');
+  const prev=editId?INSPECTIONS[editId]:null;
+  const photos=(prev&&prev.photos)?prev.photos.slice():[];
+  const fresh=await uploadPending('sc','inspections');
+  fresh.forEach(f=>photos.push(f));
+  const rec={
+    id, type:'self', createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'',
+    updatedAt:Date.now(), orderId:gv('sc-order'),
+    partNum:part, customer:cust, rev:gv('sc-rev'), po:gv('sc-po'), job:gv('sc-job'), qty:gv('sc-qty'),
+    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos
+  };
+  await dbSet('qc/inspections/'+id, rec);
+  if(result==='Flag' && !(prev&&prev.ncrId)){
+    const ncrId=newId('ncr');
+    const ncr={ id:ncrId, createdAt:Date.now(), raisedBy:(QC_USER&&QC_USER.email)||'', status:'open',
+      inspectionId:id, orderId:rec.orderId, partNum:part, customer:cust, job:rec.job, qtyAffected:rec.qty,
+      description:rec.issue||'Flagged during operator self-check.', disposition:'', correctiveAction:'' };
+    await dbSet('qc/ncr/'+ncrId, ncr);
+    rec.ncrId=ncrId; await dbSet('qc/inspections/'+id, rec);
+  }
+  editId=null; page='inspections'; render();
+};
+
+/* =================== FIRST ARTICLES =================== */
+function viewFairs(){
+  const list=vals(INSPECTIONS).filter(i=>i.type==='fair').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const rows=list.map(i=>`<tr class="click" onclick="window.qcOpenFair('${i.id}')">
+    <td><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')} ${i.rev?('· Rev '+esc(i.rev)):''}</div></td>
+    <td>${i.mode==='as9102'?t('AS9102'):t('Simple FAR')}</td>
+    <td>${(i.characteristics||[]).length}</td>
+    <td>${fairStatusBadge(i.fairStatus)}</td>
+    <td>${esc((i.createdBy||'').split('@')[0])}<div class="muted" style="font-size:12px">${fmtWhen(i.createdAt)}</div></td>
+  </tr>`).join('');
+  return `<div class="page-head"><h2>${t('First Articles')}</h2><p>${t('Formal first-article reports. Marvin / managers approve.')}</p></div>
+    <div class="toolbar"><button class="btn primary" onclick="window.qcNewFair()"><i class="ti ti-plus"></i> ${t('New first article')}</button></div>
+    <div class="card" style="padding:0">
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Part')}</th><th>${t('Type')}</th><th>${t('Chars')}</th><th>${t('Status')}</th><th>${t('By')}</th></tr></thead><tbody>${rows}</tbody></table>`
+        :`<div class="empty">${t('No first articles yet.')}</div>`}
+    </div>`;
+}
+window.qcNewFair=()=>{ editId=null; _chars=[]; page='fair'; render(); };
+window.qcOpenFair=(id)=>{ editId=id; page='fair'; render(); };
+
+function charRow(i,c){
+  c=c||{}; const oot=c.oot?'oot':'';
+  return `<tr class="${oot}" data-row="${i}">
+    <td class="cno">${c.no||(i+1)}</td>
+    <td><textarea data-f="requirement" oninput="qcCharEdit(${i})">${esc(c.requirement||'')}</textarea></td>
+    <td><input data-f="result" oninput="qcCharEdit(${i})" value="${esc(c.result||'')}"></td>
+    <td><input data-f="tol" value="${esc(c.tol||'')}" style="width:80px"></td>
+    <td><input data-f="notes" value="${esc(c.notes||'')}"></td>
+    <td class="rm" onclick="qcCharDel(${i})"><i class="ti ti-x"></i></td>
+  </tr>`;
+}
+let _chars=[];
+function viewFair(){
+  const r=editId?INSPECTIONS[editId]:null;
+  if(r) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
+  else if(!_chars.length) _chars=[{no:1},{no:2},{no:3}];
+  const v=(f,d)=>r&&r[f]!=null?r[f]:(d||'');
+  const mode=v('mode','simple');
+  const st=v('fairStatus','Draft');
+  const canApprove=isMgr() && (st==='Submitted'||st==='Measuring');
+  return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
+  <div class="card">
+    <div class="field"><label class="fl">${t('Report type')}</label>
+      <div class="seg" id="fair-mode">
+        <button class="${mode==='simple'?'on':''}" onclick="qcFairMode('simple')">${t('Simple FAR')}</button>
+        <button class="${mode==='as9102'?'on':''}" onclick="qcFairMode('as9102')">${t('Full AS9102')}</button>
+      </div>
+      <input type="hidden" id="fair-modev" value="${esc(mode)}">
+    </div>
+    <div class="field"><label class="fl">${t('Link to an order')}</label>
+      <select class="in" id="fr-order" onchange="qcFillFromOrder('fr',this.value)">${orderOptions(v('orderId',''))}</select></div>
+    <div class="grid3">
+      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="fr-part" value="${esc(v('partNum'))}"></div>
+      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="fr-rev" value="${esc(v('rev'))}"></div>
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="fr-customer" value="${esc(v('customer'))}"></div>
+      <div class="field"><label class="fl">${t('Material')}</label><input class="in" id="fr-material" value="${esc(v('material'))}"></div>
+      <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="fr-po" value="${esc(v('po'))}"></div>
+      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="fr-job" value="${esc(v('job'))}"></div>
+      <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="fr-date" type="date" value="${esc(v('date',todayISO()))}"></div>
+      <div class="field"><label class="fl">${t('Inspected by')}</label><input class="in" id="fr-by" value="${esc(v('inspectedBy', (QC_USER&&QC_USER.email||'').split('@')[0]))}"></div>
+      <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
+    </div>
+    <div class="field"><label class="fl">${t('Drawing')}</label>
+      <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
+      <div class="thumbs" id="files-frdraw"></div>
+      ${(r&&r.drawing&&r.drawing.url)?`<div style="margin-top:6px"><a class="badge neutral" href="${esc(r.drawing.url)}" target="_blank"><i class="ti ti-file"></i> ${esc(r.drawing.name||'drawing')}</a></div>`:''}
+      <div class="aiwip"><i class="ti ti-sparkles"></i> ${t('Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.')}</div>
+    </div>
+
+    <div class="card-title" style="margin-top:6px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
+    <table class="char-tbl"><thead><tr><th style="width:48px">#</th><th>${t('Requirement')}</th><th>${t('Result')}</th><th>+/-</th><th>${t('Notes')}</th><th style="width:32px"></th></tr></thead>
+      <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table>
+    <div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>
+
+    <div class="toolbar" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+      <button class="btn primary" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
+      <button class="btn" onclick="window.qcSaveFair('Submitted')">${t('Submit for review')}</button>
+      ${canApprove?`<button class="btn green mgr-only" onclick="window.qcSaveFair('Approved')"><i class="ti ti-check"></i> ${t('Approve')}</button>
+        <button class="btn danger mgr-only" onclick="window.qcSaveFair('Rejected')">${t('Reject')}</button>`:''}
+      <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
+    </div>
+    ${(r&&r.reviewedBy)?`<div class="hint">${t('Last decision:')} ${t(r.fairStatus)} · ${esc((r.reviewedBy||'').split('@')[0])} · ${fmtWhen(r.reviewedAt)}</div>`:''}
+  </div>`;
+}
+window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); event.target.classList.add('on'); };
+function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=>{ _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); _chars[i].no=_chars[i].no||(i+1); }); }
+window.qcCharEdit=(i)=>{ const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr)return; _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); };
+window.qcCharAdd=()=>{ syncChars(); _chars.push({no:_chars.length+1}); $('char-body').insertAdjacentHTML('beforeend',charRow(_chars.length-1,_chars[_chars.length-1])); };
+window.qcCharDel=(i)=>{ syncChars(); _chars.splice(i,1); _chars.forEach((c,n)=>c.no=n+1); $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); };
+window.qcSaveFair=async (action)=>{
+  syncChars();
+  const part=gv('fr-part'), cust=gv('fr-customer');
+  if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
+  const id=editId||newId('fair');
+  const prev=editId?INSPECTIONS[editId]:null;
+  let drawing=(prev&&prev.drawing)||null;
+  const fresh=await uploadPending('frdraw','fair-drawings');
+  if(fresh.length) drawing=fresh[0];
+  let status=(prev&&prev.fairStatus)||'Draft';
+  if(action==='Submitted') status='Submitted';
+  else if(action==='Approved'||action==='Rejected') status=action;
+  else if(status==='Draft' && _chars.some(c=>c.result)) status='Measuring';
+  const rec={
+    id, type:'fair', mode:gv('fair-modev')||'simple',
+    createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
+    orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
+    po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
+    drawing, characteristics:_chars, fairStatus:status
+  };
+  if(action==='Approved'||action==='Rejected'){ rec.reviewedBy=(QC_USER&&QC_USER.email)||''; rec.reviewedAt=Date.now(); }
+  await dbSet('qc/inspections/'+id, rec);
+  editId=null; _chars=[]; page='fairs'; render();
+};
+
+/* =================== NONCONFORMANCES =================== */
+function ncrBadge(s){ const map={open:'flag',dispositioned:'warn',closed:'ok'}; const lbl={open:'Open',dispositioned:'Dispositioned',closed:'Closed'}; return `<span class="badge ${map[s]||'neutral'}">${t(lbl[s]||s)}</span>`; }
+function viewNcr(){
+  const list=vals(NCRS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(editId&&NCRS[editId]) return ncrDetail(NCRS[editId]);
+  const rows=list.map(n=>`<tr class="click" onclick="window.qcOpenNcr('${n.id}')">
+    <td><b>${esc(n.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(n.customer||'')} ${n.job?('· '+t('Job #')+' '+esc(n.job)):''}</div></td>
+    <td style="max-width:280px">${esc((n.description||'').slice(0,90))}</td>
+    <td>${esc(n.qtyAffected||'')}</td>
+    <td>${ncrBadge(n.status)}</td>
+    <td>${esc((n.raisedBy||'').split('@')[0])}<div class="muted" style="font-size:12px">${fmtWhen(n.createdAt)}</div></td>
+  </tr>`).join('');
+  return `<div class="page-head"><h2>${t('Nonconformances')}</h2><p>${t('Open → Dispositioned → Closed. Operators raise; managers disposition and close.')}</p></div>
+    <div class="toolbar"><button class="btn primary" onclick="window.qcNewNcr()"><i class="ti ti-plus"></i> ${t('New NCR')}</button></div>
+    <div class="card" style="padding:0">
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Part')}</th><th>${t('Issue')}</th><th>${t('Qty')}</th><th>${t('Status')}</th><th>${t('Raised by')}</th></tr></thead><tbody>${rows}</tbody></table>`
+        :`<div class="empty">${t('No nonconformances. Flagging a self-check creates one here automatically.')}</div>`}
+    </div>`;
+}
+window.qcNewNcr=()=>{ editId='__new_ncr__'; render(); };
+window.qcOpenNcr=(id)=>{ editId=id; render(); };
+const DISPOSITIONS=['','Rework','Scrap','Use as is','Return to vendor','Accept'];
+function ncrDetail(n){
+  const isNew=editId==='__new_ncr__';
+  if(isNew) n={};
+  const v=(f,d)=>n&&n[f]!=null?n[f]:(d||'');
+  const st=v('status','open');
+  const mgr=isMgr();
+  return `<div class="page-head"><h2>${isNew?t('New nonconformance'):t('Nonconformance')}</h2><p>${isNew?t('Record a flagged part.'):ncrBadge(st)+' · '+t('raised by')+' '+esc((n.raisedBy||'').split('@')[0])+' · '+fmtWhen(n.createdAt)}</p></div>
+  <div class="card">
+    ${isNew?`<div class="field"><label class="fl">${t('Link to an order')}</label><select class="in" id="nc-order" onchange="qcFillFromOrder('nc',this.value)">${orderOptions('')}</select></div>`:''}
+    <div class="grid2">
+      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="nc-part" value="${esc(v('partNum'))}" ${!isNew&&!mgr?'readonly':''}></div>
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="nc-customer" value="${esc(v('customer'))}" ${!isNew&&!mgr?'readonly':''}></div>
+      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="nc-job" value="${esc(v('job'))}" ${!isNew&&!mgr?'readonly':''}></div>
+      <div class="field"><label class="fl">${t('Qty affected')}</label><input class="in" id="nc-qty" value="${esc(v('qtyAffected'))}" ${!isNew&&!mgr?'readonly':''}></div>
+    </div>
+    <div class="field"><label class="fl">${t('Description of nonconformance')}</label><textarea class="in" id="nc-desc" ${!isNew&&!mgr&&st!=='open'?'readonly':''}>${esc(v('description'))}</textarea></div>
+    ${isNew?'':`
+    <div class="field"><label class="fl">${t('Disposition')} ${mgr?'':t('(manager)')}</label>
+      <select class="in" id="nc-disp" ${mgr?'':'disabled'}>${DISPOSITIONS.map(d=>`<option value="${esc(d)}" ${v('disposition')===d?'selected':''}>${d===''?'':t(d)}</option>`).join('')}</select></div>
+    <div class="field"><label class="fl">${t('Corrective action')}</label><textarea class="in" id="nc-corr" ${mgr?'':'readonly'}>${esc(v('correctiveAction'))}</textarea></div>
+    `}
+    <div class="toolbar" style="margin-top:6px">
+      ${isNew?`<button class="btn primary" onclick="window.qcSaveNcr('create')"><i class="ti ti-device-floppy"></i> ${t('Raise NCR')}</button>`
+        :`<button class="btn" onclick="window.qcSaveNcr('save')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
+          ${mgr&&st==='open'?`<button class="btn primary mgr-only" onclick="window.qcSaveNcr('disposition')">${t('Mark dispositioned')}</button>`:''}
+          ${mgr&&st!=='closed'?`<button class="btn green mgr-only" onclick="window.qcSaveNcr('close')"><i class="ti ti-check"></i> ${t('Close NCR')}</button>`:''}`}
+      <button class="btn" onclick="editId=null;render()">${t('Back')}</button>
+    </div>
+  </div>`;
+}
+window.qcSaveNcr=async (action)=>{
+  const isNew=editId==='__new_ncr__';
+  const prev=isNew?null:NCRS[editId];
+  const id=isNew?newId('ncr'):editId;
+  const rec=Object.assign({}, prev||{}, {
+    id, createdAt:(prev&&prev.createdAt)||Date.now(), raisedBy:(prev&&prev.raisedBy)||(QC_USER&&QC_USER.email)||'',
+    partNum:gv('nc-part'), customer:gv('nc-customer'), job:gv('nc-job'), qtyAffected:gv('nc-qty'), description:gv('nc-desc')
+  });
+  if(isNew){ rec.status='open'; rec.orderId=gv('nc-order'); rec.disposition=''; rec.correctiveAction=''; }
+  else {
+    if(isMgr()){ rec.disposition=gv('nc-disp'); rec.correctiveAction=gv('nc-corr'); }
+    if(action==='disposition'){ rec.status='dispositioned'; rec.dispositionedBy=(QC_USER&&QC_USER.email)||''; rec.dispositionedAt=Date.now(); }
+    if(action==='close'){ rec.status='closed'; rec.closedBy=(QC_USER&&QC_USER.email)||''; rec.closedAt=Date.now(); }
+  }
+  await dbSet('qc/ncr/'+id, rec);
+  editId=null; render();
+};
+
+/* =================== MATERIAL CERTS =================== */
+function viewCerts(){
+  const list=vals(CERTS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  if(editId==='__new_cert__') return certForm();
+  const rows=list.map(c=>{
+    const linked=(c.linkedOrders||[]).map(oid=>ORDERS[oid]?(ORDERS[oid].job||ORDERS[oid].po||oid):oid);
+    return `<tr>
+    <td><b>${esc(c.material||'—')}</b><div class="muted" style="font-size:12px">${esc(c.spec||'')}</div></td>
+    <td>${esc(c.heatLot||'—')}</td>
+    <td>${esc(c.supplier||'—')}</td>
+    <td>${esc(c.certNo||'—')}<div class="muted" style="font-size:12px">${fmtDate(c.certDate)}</div></td>
+    <td>${linked.length?linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' '):'<span class="muted">—</span>'}</td>
+    <td>${c.file&&c.file.url?`<a class="icon-btn" href="${esc(c.file.url)}" target="_blank" title="${t('Open cert')}"><i class="ti ti-file"></i></a>`:''}
+        <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
+  </tr>`;}).join('');
+  return `<div class="page-head"><h2>${t('Material Certs')}</h2><p>${t('Mill & material certifications, linkable to the orders that used them.')}</p></div>
+    <div class="toolbar"><button class="btn primary" onclick="window.qcNewCert()"><i class="ti ti-plus"></i> ${t('Add cert')}</button></div>
+    <div class="card" style="padding:0">
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Material')}</th><th>${t('Heat / Lot')}</th><th>${t('Supplier')}</th><th>${t('Cert #')}</th><th>${t('Linked orders')}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+        :`<div class="empty">${t('No certs yet. Press')} <b>${t('Add cert')}</b> ${t('and attach a mill certificate.')}</div>`}
+    </div>`;
+}
+window.qcNewCert=()=>{ editId='__new_cert__'; render(); };
+window.qcDelCert=async (id)=>{ if(!confirm(t('Delete this cert record?')))return; delete CERTS[id]; await dbRemove('qc/certs/'+id); render(); };
+function certForm(){
+  const orderChecks=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||'')).slice(0,40).map(o=>{
+    const lbl=[o.customer,o.part||o.partNum,o.job?('Job '+o.job):''].filter(Boolean).join(' · ');
+    return `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;margin:3px 0"><input type="checkbox" class="cert-link" value="${esc(o.id)}" style="width:auto;min-height:0"> ${esc(lbl||o.id)}</label>`;
+  }).join('');
+  return `<div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
+  <div class="card">
+    <div class="grid2">
+      <div class="field"><label class="fl">${t('Material / grade')}</label><input class="in" id="ct-material" placeholder="304/304L SS"></div>
+      <div class="field"><label class="fl">${t('Specification')}</label><input class="in" id="ct-spec" placeholder="ASTM A240"></div>
+      <div class="field"><label class="fl">${t('Heat / lot #')}</label><input class="in" id="ct-heat"></div>
+      <div class="field"><label class="fl">${t('Supplier')}</label><input class="in" id="ct-supplier"></div>
+      <div class="field"><label class="fl">${t('Cert #')}</label><input class="in" id="ct-certno"></div>
+      <div class="field"><label class="fl">${t('Cert date')}</label><input class="in" id="ct-date" type="date"></div>
+      <div class="field"><label class="fl">${t('Size / thickness')}</label><input class="in" id="ct-size" placeholder='18ga 48&quot;x120&quot;'></div>
+      <div class="field"><label class="fl">${t('Qty')}</label><input class="in" id="ct-qty"></div>
+      <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="ct-po"></div>
+    </div>
+    <div class="field"><label class="fl">${t('Cert file')}</label>
+      <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload cert')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('cert',this)"></label>
+      <div class="thumbs" id="files-cert"></div>
+      <div class="aiwip"><i class="ti ti-sparkles"></i> ${t('Next phase: AI reads the cert and fills heat/lot, material, spec, supplier and date for you.')}</div>
+    </div>
+    <div class="field"><label class="fl">${t('Link to orders')}</label>
+      <div style="max-height:200px;overflow:auto;border:1px solid var(--border);padding:8px 10px">${orderChecks||('<span class="muted">'+t('No orders found.')+'</span>')}</div></div>
+    <div class="toolbar" style="margin-top:6px">
+      <button class="btn primary" onclick="window.qcSaveCert()"><i class="ti ti-device-floppy"></i> ${t('Save cert')}</button>
+      <button class="btn" onclick="editId=null;render()">${t('Cancel')}</button>
+    </div>
+  </div>`;
+}
+window.qcSaveCert=async ()=>{
+  const material=gv('ct-material');
+  if(!material && !(_pendingFiles['cert']||[]).length){ alert(t('Enter a material or attach a cert file.')); return; }
+  const id=newId('cert');
+  const files=await uploadPending('cert','certs');
+  const linked=[...document.querySelectorAll('.cert-link:checked')].map(c=>c.value);
+  const rec={ id, createdAt:Date.now(), addedBy:(QC_USER&&QC_USER.email)||'',
+    material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), certNo:gv('ct-certno'),
+    certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'),
+    file:files[0]||null, linkedOrders:linked };
+  await dbSet('qc/certs/'+id, rec);
+  editId=null; render();
+};
+
+// initial static translation (login screen + chrome) before sign-in
+applyStatic();
+</script>
+
+<!-- ================= Firebase (auth + db + storage) ================= -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+const T=(s)=> (window.t? window.t(s): s);
+const firebaseConfig = {
+  apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
+  authDomain: "bsmp-orders.firebaseapp.com",
+  databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com",
+  projectId: "bsmp-orders",
+  storageBucket: "bsmp-orders.firebasestorage.app",
+  messagingSenderId: "924947028289",
+  appId: "1:924947028289:web:c58c74e37ee51aa1b9e9c0"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+const OPERATOR_EMAILS = ['operator@bertsmp.com'];
+function isOperatorEmail(email){
+  email=(email||'').toLowerCase();
+  if(OPERATOR_EMAILS.includes(email)) return true;
+  const local=email.split('@')[0]||'';
+  return local.startsWith('operator');
+}
+
+window.qcSet = (path,val)=> set(ref(db,path), val);
+window.qcUpdate = (path,val)=> update(ref(db,path), val);
+window.qcRemove = (path)=> remove(ref(db,path));
+window.qcUpload = async (file, prefix)=>{
+  const safe=(file.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
+  const path='qc/'+(prefix||'misc')+'/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
+  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type});
+  await task;
+  return await getDownloadURL(task.snapshot.ref);
+};
+
+function startListeners(){
+  onValue(ref(db,'qc/inspections'), s=> window.qcOnData('inspections', s.val()||{}));
+  onValue(ref(db,'qc/ncr'),         s=> window.qcOnData('ncr', s.val()||{}));
+  onValue(ref(db,'qc/certs'),       s=> window.qcOnData('certs', s.val()||{}));
+  onValue(ref(db,'orders'),         s=> window.qcOnData('orders', s.val()||{}));
+  onValue(ref(db,'quotes'),         s=> window.qcOnData('quotes', s.val()||{}));
+}
+let _started=false;
+onAuthStateChanged(auth, (user)=>{
+  const ov=document.getElementById('qc-login');
+  const fd=document.getElementById('qc-foot-dot'), ft=document.getElementById('qc-foot-txt');
+  if(user){
+    if(ov) ov.style.display='none';
+    if(fd) fd.style.background='#1f7d57'; if(ft){ ft.removeAttribute('data-t'); ft.textContent=(user.email||'').split('@')[0]||'Signed in'; }
+    if(!_started){ startListeners(); _started=true; }
+    window.qcOnAuth(user, isOperatorEmail(user.email)?'operator':'manager');
+  } else {
+    if(ov) ov.style.display='flex';
+    if(fd) fd.style.background='#8a93a0'; if(ft){ ft.setAttribute('data-t','Signed out'); ft.textContent=T('Signed out'); }
+    window.qcOnAuth(null, 'manager');
+  }
+});
+window._qcLogin = async ()=>{
+  const email=(document.getElementById('qc-email').value||'').trim();
+  const pass=document.getElementById('qc-pass').value;
+  const err=document.getElementById('qc-login-err'), btn=document.getElementById('qc-login-btn');
+  err.textContent=''; btn.disabled=true; btn.textContent=T('Signing in…');
+  try{ await signInWithEmailAndPassword(auth, email, pass); }
+  catch(e){ err.textContent=(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found')?T('Incorrect email or password.'):(T('Sign-in error: ')+e.message); }
+  finally{ btn.disabled=false; btn.textContent=T('Sign in'); }
+};
+window._qcLogout = ()=> signOut(auth);
+document.addEventListener('keydown', e=>{
+  const ov=document.getElementById('qc-login');
+  if(e.key==='Enter' && ov && ov.style.display!=='none' && document.activeElement && (document.activeElement.id==='qc-email'||document.activeElement.id==='qc-pass')) window._qcLogin();
+});
+</script>
+</body>
+</html>
