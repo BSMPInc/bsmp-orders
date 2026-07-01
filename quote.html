@@ -533,6 +533,49 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .ins-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ins-chip { font-size: 11px; font-weight: 600; color: var(--text2); background: var(--surface2); padding: 2px 8px; }
 .li-stat { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 1px; }
+
+/* ── Sticky zoomable drawing viewer (New Quote) ── */
+.dv { position: sticky; top: 0; z-index: 30; margin-bottom: 16px; background: var(--surface);
+  border: 1px solid var(--border2); box-shadow: 0 2px 12px rgba(16,24,40,.12); display: none; }
+.dv.show { display: block; }
+.dv-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface2);
+  border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 500; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--text2); }
+.dv-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.dv-title .ti { color: var(--accent); font-size: 16px; }
+.dv-fname { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--text3);
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dv-tools { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.dv-btn { height: 28px; min-width: 28px; padding: 0 8px; border: 1px solid var(--border2); background: #fff;
+  color: var(--text2); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; }
+.dv-btn:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.dv-btn .ti { font-size: 16px; }
+.dv-zoom-label { min-width: 46px; text-align: center; font-variant-numeric: tabular-nums;
+  color: var(--text2); font-weight: 600; }
+.dv-body { position: relative; }
+.dv-viewport { position: relative; overflow: hidden; height: 360px; background: var(--surface2);
+  cursor: grab; touch-action: none; }
+.dv-viewport.grabbing { cursor: grabbing; }
+.dv-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+.dv-canvas img { display: block; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+.dv-hint { position: absolute; left: 10px; bottom: 8px; font-size: 10.5px; color: var(--text3);
+  background: rgba(255,255,255,.82); padding: 2px 7px; pointer-events: none; letter-spacing: .02em; }
+.dv-resize { height: 11px; cursor: ns-resize; background: var(--surface2); border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; }
+.dv-resize::before { content: ''; width: 40px; height: 3px; background: var(--border2); }
+.dv.collapsed .dv-body { display: none; }
+.dv .dv-expand { display: none; }
+.dv.collapsed .dv-collapse { display: none; }
+.dv.collapsed .dv-expand { display: inline-flex; }
+@media (max-width: 1100px){ .dv { position: static; } }
+
+/* ── Collapsible cards (AI extract) ── */
+.card.collapsible .card-title { cursor: pointer; user-select: none; }
+.card-collapse-ico { margin-left: auto; color: var(--text3); font-size: 16px; transition: transform .15s; }
+.card.collapsed .card-collapse-ico { transform: rotate(-90deg); }
+.card.collapsed .card-title { margin-bottom: -16px; border-bottom: none; }
+.card.collapsed > *:not(.card-title) { display: none; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -603,16 +646,42 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 <div class="panel active" id="panel-quote">
   <div class="quote-grid">
   <div class="quote-main">
+
+  <!-- Sticky zoomable drawing viewer -->
+  <div class="dv" id="drawing-viewer">
+    <div class="dv-head">
+      <span class="dv-title"><i class="ti ti-photo"></i> Drawing <span class="dv-fname" id="dv-fname"></span></span>
+      <span class="dv-tools">
+        <button class="dv-btn" onclick="dvZoomOut()" title="Zoom out"><i class="ti ti-minus"></i></button>
+        <span class="dv-zoom-label" id="dv-zoom-label">100%</span>
+        <button class="dv-btn" onclick="dvZoomIn()" title="Zoom in"><i class="ti ti-plus"></i></button>
+        <button class="dv-btn" onclick="dvFit()" title="Fit to view"><i class="ti ti-arrows-minimize"></i></button>
+        <button class="dv-btn" onclick="dvActual()" title="Actual size (100%)">1:1</button>
+        <button class="dv-btn" onclick="dvFull()" title="Full screen"><i class="ti ti-maximize"></i></button>
+        <button class="dv-btn dv-collapse" onclick="dvToggleCollapse()" title="Minimize"><i class="ti ti-chevron-up"></i></button>
+        <button class="dv-btn dv-expand" onclick="dvToggleCollapse()" title="Expand"><i class="ti ti-chevron-down"></i></button>
+      </span>
+    </div>
+    <div class="dv-body">
+      <div class="dv-viewport" id="dv-viewport">
+        <div class="dv-canvas" id="dv-canvas"><img id="dv-img" alt="Imported drawing"></div>
+        <div class="dv-hint">Scroll to zoom · drag to pan · double-click to zoom in</div>
+      </div>
+      <div class="dv-resize" id="dv-resize" title="Drag to resize"></div>
+    </div>
+  </div>
+
   <div class="page-header">
     <h2>New Quote</h2>
     <p>Upload a drawing or enter part details manually</p>
   </div>
 
   <!-- Drawing Upload -->
-  <div class="card">
-    <div class="card-title">
+  <div class="card collapsible" id="upload-card">
+    <div class="card-title" onclick="toggleCardCollapse(this)" title="Click to minimize / expand">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
-      Drawing Upload
+      Drawing Upload &amp; AI Extract
+      <i class="ti ti-chevron-down card-collapse-ico"></i>
     </div>
     <div class="drop-zone" id="dropzone">
       <input type="file" id="file-input" accept=".pdf,.png,.jpg,.jpeg,.dxf" onchange="handleFile(this.files[0])">
@@ -3998,6 +4067,7 @@ async function handleFile(file){
     reader.onload=e=>{
       document.getElementById('preview-img').src=e.target.result;
       document.getElementById('part-preview').style.display='block';
+      setDrawingViewer(e.target.result, file.name);
     };
     reader.readAsDataURL(file);
   } else if(ext==='pdf'){
@@ -4007,12 +4077,14 @@ async function handleFile(file){
         const buf = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({data: buf.slice(0)}).promise;
         const page = await pdf.getPage(1);
-        const viewport = page.getViewport({scale: 1.5});
+        const viewport = page.getViewport({scale: 2.4});
         const c = document.createElement('canvas');
         c.width = viewport.width; c.height = viewport.height;
         await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
-        document.getElementById('preview-img').src = c.toDataURL('image/png');
+        const durl = c.toDataURL('image/png');
+        document.getElementById('preview-img').src = durl;
         document.getElementById('part-preview').style.display='block';
+        setDrawingViewer(durl, file.name);
       }
     } catch(e){ console.error('PDF preview render failed', e); }
   }
@@ -4394,6 +4466,102 @@ function showFullDrawing(dataUrl){
   img.style.cssText = 'max-width:95%;max-height:95%;object-fit:contain;background:#fff;border-radius:8px;box-shadow:0 10px 40px rgba(0,0,0,0.4)';
   overlay.appendChild(img);
   document.body.appendChild(overlay);
+}
+
+// ===================== STICKY ZOOMABLE DRAWING VIEWER =====================
+const dv = { scale:1, x:0, y:0, natW:0, natH:0, min:0.05, max:16, drag:null };
+function dvEls(){ return {
+  root: document.getElementById('drawing-viewer'),
+  vp:   document.getElementById('dv-viewport'),
+  canvas: document.getElementById('dv-canvas'),
+  img:  document.getElementById('dv-img'),
+  label:document.getElementById('dv-zoom-label'),
+  fname:document.getElementById('dv-fname')
+}; }
+function dvApply(){ const {canvas,label}=dvEls(); if(!canvas) return;
+  canvas.style.transform = `translate(${dv.x}px,${dv.y}px) scale(${dv.scale})`;
+  if(label) label.textContent = Math.round(dv.scale*100)+'%';
+}
+function dvFit(){ const {vp}=dvEls(); if(!vp||!dv.natW) return;
+  const w=vp.clientWidth, h=vp.clientHeight;
+  const s=Math.min(w/dv.natW, h/dv.natH);
+  dv.scale = s>0 ? s : 1;
+  dv.x = (w - dv.natW*dv.scale)/2;
+  dv.y = (h - dv.natH*dv.scale)/2;
+  dvApply();
+}
+function dvZoomAt(factor, cx, cy){
+  const ns = Math.max(dv.min, Math.min(dv.max, dv.scale*factor));
+  const k = ns/dv.scale;
+  dv.x = cx - (cx - dv.x)*k;
+  dv.y = cy - (cy - dv.y)*k;
+  dv.scale = ns; dvApply();
+}
+function dvZoomCenter(factor){ const {vp}=dvEls(); if(!vp) return; dvZoomAt(factor, vp.clientWidth/2, vp.clientHeight/2); }
+window.dvZoomIn  = () => dvZoomCenter(1.25);
+window.dvZoomOut = () => dvZoomCenter(0.8);
+window.dvFit     = dvFit;
+window.dvActual  = () => dvZoomCenter(1/dv.scale);
+window.dvFull    = () => { const {img}=dvEls(); if(img&&img.getAttribute('src')) showFullDrawing(img.src); };
+window.dvToggleCollapse = () => { const {root}=dvEls(); if(root) root.classList.toggle('collapsed'); };
+function setDrawingViewer(dataUrl, fname){
+  const {root,img,fname:fn}=dvEls();
+  if(!root||!img||!dataUrl) return;
+  if(fn) fn.textContent = fname || '';
+  root.classList.add('show'); root.classList.remove('collapsed');
+  img.onload = () => { dv.natW = img.naturalWidth||img.width; dv.natH = img.naturalHeight||img.height; dvFit(); };
+  img.src = dataUrl;
+  dvInit();
+}
+function dvClear(){ const {root,img,fname}=dvEls(); if(!root) return;
+  root.classList.remove('show','collapsed');
+  if(img) img.removeAttribute('src');
+  if(fname) fname.textContent='';
+  dv.natW=dv.natH=0; dv.scale=1; dv.x=dv.y=0;
+}
+window.setDrawingViewer = setDrawingViewer;
+window.dvClear = dvClear;
+window.toggleCardCollapse = (titleEl) => { const c = titleEl.closest('.card'); if(c) c.classList.toggle('collapsed'); };
+
+function dvInit(){
+  const {vp}=dvEls(); if(!vp || vp._dvInit) return; vp._dvInit = true;
+  const dist=(a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
+  const ptrs=new Map(); let pinch=null;
+  vp.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const r=vp.getBoundingClientRect();
+    dvZoomAt(e.deltaY<0?1.12:0.892, e.clientX-r.left, e.clientY-r.top);
+  }, {passive:false});
+  vp.addEventListener('pointerdown', e=>{
+    vp.setPointerCapture(e.pointerId);
+    ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(ptrs.size===1){ dv.drag={sx:e.clientX, sy:e.clientY, ox:dv.x, oy:dv.y}; vp.classList.add('grabbing'); }
+    else if(ptrs.size===2){ dv.drag=null; const p=[...ptrs.values()]; pinch={d:dist(p[0],p[1]), s:dv.scale}; }
+  });
+  vp.addEventListener('pointermove', e=>{
+    if(!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    const r=vp.getBoundingClientRect();
+    if(ptrs.size>=2 && pinch){
+      const p=[...ptrs.values()]; const nd=dist(p[0],p[1]); if(!nd) return;
+      const mid={x:(p[0].x+p[1].x)/2 - r.left, y:(p[0].y+p[1].y)/2 - r.top};
+      dvZoomAt((pinch.s*(nd/pinch.d))/dv.scale, mid.x, mid.y);
+      return;
+    }
+    if(dv.drag){ dv.x=dv.drag.ox+(e.clientX-dv.drag.sx); dv.y=dv.drag.oy+(e.clientY-dv.drag.sy); dvApply(); }
+  });
+  const end=e=>{ ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null; if(ptrs.size===0){ dv.drag=null; vp.classList.remove('grabbing'); } };
+  vp.addEventListener('pointerup', end);
+  vp.addEventListener('pointercancel', end);
+  vp.addEventListener('dblclick', e=>{ const r=vp.getBoundingClientRect(); dvZoomAt(1.6, e.clientX-r.left, e.clientY-r.top); });
+  const rz=document.getElementById('dv-resize');
+  if(rz){ let ry=null;
+    rz.addEventListener('pointerdown', e=>{ ry={y:e.clientY, h:vp.clientHeight}; rz.setPointerCapture(e.pointerId); e.preventDefault(); });
+    rz.addEventListener('pointermove', e=>{ if(!ry) return; vp.style.height = Math.max(150, Math.min(window.innerHeight*0.82, ry.h+(e.clientY-ry.y)))+'px'; });
+    const rend=()=>{ ry=null; };
+    rz.addEventListener('pointerup', rend);
+    rz.addEventListener('pointercancel', rend);
+  }
 }
 
 
@@ -4828,6 +4996,7 @@ function resetForm(){
   document.getElementById('ai-tags').innerHTML='';
   document.getElementById('part-preview').style.display='none';
   document.getElementById('part-header').style.display='none';
+  dvClear();
   document.getElementById('file-input').value='';
   document.getElementById('ops-container').innerHTML='';
   document.getElementById('hw-container').innerHTML='';
@@ -5144,6 +5313,7 @@ function reloadQuote(id){
     document.getElementById('part-header').style.display='flex';
     document.getElementById('ph-name').textContent=q.partNum;
     document.getElementById('ph-mat').textContent=q.material;
+    setDrawingViewer(q.img, q.partNum||'');
   }
 
   // ---- Operations / hardware / outsource ----
