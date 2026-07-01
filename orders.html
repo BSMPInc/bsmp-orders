@@ -607,7 +607,7 @@ tr:hover .del-btn{opacity:1}
 .disp-pname{font-size:15px;font-weight:800;color:var(--text)}
 .disp-psub{font-size:11.5px;color:var(--text2);margin-top:1px}
 .disp-rows{display:flex;flex-direction:column}
-.disp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid #f1f3f7}
+.disp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
 .disp-seq{font-size:11px;font-weight:800;color:var(--text3);min-width:17px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
 .disp-move{display:inline-flex;flex-direction:column;gap:2px;flex-shrink:0;margin-left:2px}
 .dm-btn{border:1px solid var(--border);background:#fff;border-radius:6px;width:28px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);padding:0}
@@ -3632,7 +3632,7 @@ function renderOfficeQueue(officeOrders, name){
       const overdue = r.due && new Date(r.due+'T00:00:00') < today;
       const lbl = [r.po&&('PO '+r.po), r.job&&('Job '+r.job), r.part].filter(Boolean).join(' · ') || '(no detail)';
       const openCell = op ? '<td></td>' : `<td style="text-align:center"><button class="q-open-btn" title="Open in Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button></td>`;
-      return `<tr class="q-row"${op?'':` onclick="window._openInOrders('${r.id}',event)"`}>
+      return `<tr class="q-row" data-qjob="${r.id}"${op?'':` onclick="window._openInOrders('${r.id}',event)"`}>
         <td><b>${esc2(r.customer||'—')}</b></td>
         <td>${esc2(lbl)}</td>
         <td style="text-align:center;color:var(--text2)">${r.qty||''}</td>
@@ -3785,7 +3785,7 @@ function renderQueues(){
     const openCell = op ? '' : `<td style="text-align:center"><button class="q-open-btn" title="Open in Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button></td>`;
     // in the Purchasing queue, show which PO step each row is
     const stepChip = isPurchasingQueue ? `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:${PROCESS_COLORS[sName]||'#888'};margin-right:6px">${procIcon(sName,13)}${shortProc(sName)}</span>` : '';
-    return `<tr class="q-row${done?' q-done':''}">
+    return `<tr class="q-row${done?' q-done':''}" data-qjob="${r.id}">
       <td>${statusBadge(status)}</td>
       <td>${prioCell}</td>
       <td><b>${r.job||'—'}</b></td>
@@ -3945,8 +3945,8 @@ function dispatchRow(it, idx, total){
   const qtyCtl = ext ? '' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
   const op = userRole==='operator';
   const assignCtl = (op || !team.length) ? '' : `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>`;
-  const openBtn = op ? '' : `<button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
-  return `<div class="disp-row">
+  const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
+  return `<div class="disp-row" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
@@ -3968,9 +3968,9 @@ function officeDispatchRow(it, idx, total){
   const due = r.due?fmtDate(r.due):'—';
   const dueOver = r.due && new Date(r.due+'T00:00:00') < new Date(new Date().toDateString());
   const op = userRole==='operator';
-  const openBtn = op ? '' : `<button class="q-open-btn" title="Open job" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
+  const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
   const statusChip = `<span class="status-badge ${STATUS_CLASS[r.status]||''}" style="font-size:10px">${esc2(r.status)}</span>`;
-  return `<div class="disp-row">
+  return `<div class="disp-row" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
     <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
@@ -5385,6 +5385,33 @@ window._openInOrders = (id, e) => {
     if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('row-flash'); setTimeout(()=>el.classList.remove('row-flash'),1600); }
   },80);
 };
+// Which Work Queue tab a job belongs in right now (based on its current actionable step).
+function queueForOrder(r){
+  if(!r) return null;
+  if(OFFICE_STATUSES.includes(r.status)) return OFFICE_QUEUE_KEY;   // Need PO / Ready to Invoice → office queue
+  const ord = enabledOrdered(ensureSchedule(r));
+  const mapQ = name => {
+    if(!name) return null;
+    if(name==='Purchasing' || name.startsWith('Purchasing-')) return 'Purchasing';  // all PO steps live in the Purchasing queue
+    return INTERNAL_PROCESSES.includes(name) ? name : null;                          // outsource steps have no queue
+  };
+  const cur = ord.find(s=>!s.done);
+  let q = cur ? mapQ(cur.name) : null;
+  if(!q){ for(const s of ord){ if(!s.done){ const m=mapQ(s.name); if(m){ q=m; break; } } } }  // fall back to next queue-backed step
+  return q;
+}
+// Jump from the Today board to this job's row in Work Queues, and flash it.
+window._openInQueue = (id, e) => {
+  if(e) e.stopPropagation();
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const q = queueForOrder(r);
+  showPage('queues');
+  if(q) selectQueue(q);   // sets the active tab and re-renders the queue
+  setTimeout(()=>{
+    const el = document.querySelector(`.q-row[data-qjob='${id}']`);
+    if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('row-flash'); setTimeout(()=>el.classList.remove('row-flash'),1600); }
+  }, 130);
+};
 let _drawZoom = 1;
 window._openDrawing = (id, e) => {
   if(e) e.stopPropagation();
@@ -5755,6 +5782,7 @@ function applyRoleUI(){
   }
   const pill = document.getElementById('topbar-op-pill');
   if(pill) pill.style.display = op ? 'inline-flex' : 'none';
+  if(window._refreshSidebarForRole) window._refreshSidebarForRole();   // operators auto-hide the sidebar
   if(op){ showPage('queues'); } else { showPage('dashboard'); }
 }
 
@@ -5820,7 +5848,15 @@ window.openHelp = () => { document.getElementById('help-modal').style.display='f
   window._toggleSidebarPin = (e) => {
     if(e) e.stopPropagation();
     pinned = !pinned;
-    try{ localStorage.setItem('bsmp_sidebar_pinned', pinned?'1':'0'); }catch{}
+    // Operators work off the bottom dock; keep their sidebar auto-hiding and don't let
+    // a pin choice leak between the operator and manager roles on a shared device.
+    if(userRole!=='operator'){ try{ localStorage.setItem('bsmp_sidebar_pinned', pinned?'1':'0'); }catch{} }
+    apply();
+  };
+  // Called on login / role change: operators always auto-hide; managers keep their saved choice.
+  window._refreshSidebarForRole = () => {
+    if(userRole==='operator'){ pinned = false; }
+    else { try{ pinned = localStorage.getItem('bsmp_sidebar_pinned')==='1'; }catch{ pinned = false; } }
     apply();
   };
   // tapping the collapsed sliver opens it (touch has no hover to reveal it)
