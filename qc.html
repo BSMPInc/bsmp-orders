@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 :root{
   --bg:#f5f2ea; --card:#ffffff; --surface:#ffffff;
@@ -164,6 +165,11 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .dz i{font-size:26px}
 @keyframes qcspin{to{transform:rotate(360deg)}}
 .ti.spin{display:inline-block;animation:qcspin .8s linear infinite}
+.rv-results{border:1px solid var(--border);border-top:none;max-height:170px;overflow:auto}
+.rv-results:empty{display:none}
+.rv-opt{padding:7px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
+.rv-opt:last-child{border-bottom:none}
+.rv-opt:hover{background:var(--accent-soft)}
 body.role-operator .mgr-only{display:none!important}
 </style>
 </head>
@@ -306,9 +312,13 @@ const I18N = {
     'AI could not read the cert. Fill the fields by hand.':'La IA no pudo leer el certificado. Complétalos a mano.',
     'No AI connection set — open the Quote app Settings to add a proxy URL, then retry.':'Sin conexión de IA — abre Ajustes en la app de Cotizaciones para agregar el proxy y reintenta.',
     'Search certs (heat, material, supplier, PO)…':'Buscar certificados (colada, material, proveedor, OC)…','Search orders…':'Buscar órdenes…',
+    'Search jobs by customer, part, job or PO…':'Buscar trabajos por cliente, parte, trabajo u OC…',
     'Vendor invoice':'Factura del proveedor','Drop invoice here or click to add — AI reads invoice #, date and amount.':'Suelta la factura o haz clic — la IA lee N.º, fecha e importe.',
     'Reading invoice with AI…':'Leyendo factura con IA…','Invoice #':'N.º de factura','Invoice date':'Fecha de factura','Amount':'Importe','Vendor':'Proveedor',
-    'Invoice':'Factura','Duplicate heat/lot':'Colada/lote duplicado','Files':'Archivos'
+    'Invoice':'Factura','Duplicate heat/lot':'Colada/lote duplicado','Files':'Archivos',
+    'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
+    'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
+    'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -331,6 +341,8 @@ let page='inspections';
 let editId=null;
 let _pendingFiles={};
 let CERT_FILTER='';
+let _certPacket=null;
+let _certLinks=[];
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -487,36 +499,117 @@ function qcIngestCert(files){
   _pendingFiles['cert']=_pendingFiles['cert']||[];
   files.forEach(f=>_pendingFiles['cert'].push(f));
   qcRenderStrip('cert');
-  analyzeCert(files[0]);
+  analyzeCertPacket();
 }
-async function analyzeCert(file){
+const CERT_PROMPT='You are reading a received material package for a sheet metal shop. It may contain ONE or SEVERAL distinct material certifications / mill test reports (different heats or lots). Respond with ONLY valid JSON, no markdown or extra text:\n{"certs":[{"material":null,"spec":null,"heat_lot":null,"supplier":null,"mill":null,"cert_no":null,"cert_date":null,"size_thickness":null,"qty":null,"po_number":null,"country_of_origin":null,"itar":false,"doc":1,"pages":null}]}\nCreate one array element per DISTINCT certificate (distinct heat/lot, or distinct material plus cert number). If the package is a single certificate, return exactly one element. doc=the 1-based Document number (as labeled below) this certificate appears in. pages=for a multi-page PDF document, the 1-based page numbers within that document that make up THIS certificate (e.g. [1,2]); use null when the document is a single page or a single image. Field rules: material=alloy/grade/temper e.g. "6061-T6","304/304L SS","A36". spec=governing specification(s) e.g. "AMS 4027","ASTM B209","ASTM A240". heat_lot=heat and/or lot exactly as printed. supplier=distributor/vendor who shipped it. mill=producing mill if different. cert_no=certificate/document number. cert_date=YYYY-MM-DD. size_thickness=size/gauge/thickness. qty=quantity or weight. po_number=purchase order referenced. country_of_origin=melt/manufacture country if stated. itar=true only if explicitly export-controlled.';
+async function callAICerts(files){
+  const content=[];
+  for(let i=0;i<files.length;i++){
+    const f=files[i];
+    content.push({type:'text',text:'=== Document '+(i+1)+': '+(f.name||('file'+(i+1)))+' ==='});
+    content.push(aiContentBlock(await toBase64(f), extFromFile(f)));
+  }
+  content.push({type:'text',text:CERT_PROMPT});
+  const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:2000, messages:[{role:'user',content}] });
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message||'AI error');
+  const raw=(data.content||[]).map(c=>c.text||'').join('');
+  let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+  const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
+  if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
+  clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
+  const parsed=JSON.parse(clean);
+  let certs=Array.isArray(parsed)?parsed:(parsed.certs||(parsed.material!==undefined?[parsed]:[]));
+  return Array.isArray(certs)?certs:[];
+}
+function fillCertForm(d){
+  const setV=(id,v)=>{ const el=$(id); if(el && v!=null && v!=='') el.value=String(v); };
+  setV('ct-material', d.material); setV('ct-spec', d.spec); setV('ct-heat', d.heat_lot);
+  setV('ct-supplier', d.supplier); setV('ct-mill', d.mill); setV('ct-certno', d.cert_no);
+  setV('ct-size', d.size_thickness); setV('ct-qty', d.qty); setV('ct-po', d.po_number);
+  setV('ct-country', d.country_of_origin);
+  if(d.cert_date){ const el=$('ct-date'); if(el){ const m=String(d.cert_date).match(/\d{4}-\d{2}-\d{2}/); if(m) el.value=m[0]; } }
+  const itarEl=$('ct-itar'); if(itarEl && d.itar===true) itarEl.checked=true;
+  if(d.po_number) qcAutoLinkByPO(String(d.po_number));
+}
+function normalizeDetected(c){
+  const norm=s=>String(s||'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+  const linked=[];
+  if(c.po_number){ const tp=norm(c.po_number); if(tp) vals(ORDERS).forEach(o=>{ if(norm(o.po)===tp) linked.push(o.id); }); }
+  return { material:c.material||'', spec:c.spec||'', heat_lot:c.heat_lot||'', supplier:c.supplier||'', mill:c.mill||'',
+    cert_no:c.cert_no||'', cert_date:(String(c.cert_date||'').match(/\d{4}-\d{2}-\d{2}/)||[''])[0], size_thickness:c.size_thickness||'',
+    qty:c.qty!=null?String(c.qty):'', po_number:c.po_number||'', country_of_origin:c.country_of_origin||'', itar:c.itar===true,
+    doc:Number(c.doc)||1, pages:Array.isArray(c.pages)?c.pages.map(n=>+n).filter(n=>Number.isFinite(n)&&n>0):null, _linked:linked };
+}
+async function analyzeCertPacket(){
   if(!hasAIConnection()){ setAIStatus('cert-ai','error',t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.')); return; }
+  const files=[...(_pendingFiles['cert']||[])];
+  if(!files.length) return;
   setAIStatus('cert-ai','loading',t('Reading cert with AI…'));
-  const prompt='You are reading a material test report / mill certification for a sheet metal shop receiving a material package. Extract the header data. Respond with ONLY a valid JSON object, no markdown or extra text. Use null for anything not present.\n{"material":null,"spec":null,"heat_lot":null,"supplier":null,"mill":null,"cert_no":null,"cert_date":null,"size_thickness":null,"qty":null,"po_number":null,"country_of_origin":null,"itar":false}\nRules: material=alloy/grade/temper e.g. "6061-T6", "304/304L SS", "A36". spec=governing specification(s) e.g. "AMS 4027", "ASTM B209", "ASTM A240". heat_lot=heat number and/or lot number exactly as printed. supplier=the distributor/vendor who shipped it. mill=the producing mill if different from supplier. cert_no=certificate or document number. cert_date=YYYY-MM-DD if determinable. size_thickness=material size/gauge/thickness e.g. ".060 48x120". qty=quantity or weight as printed. po_number=the purchase order number referenced. country_of_origin=melt/manufacture country if stated. itar=true only if the document is explicitly marked ITAR/EAR/export-controlled.';
   try{
-    const d=await callAIJson(file, prompt);
-    const setV=(id,v)=>{ const el=$(id); if(el && v!=null && v!=='') el.value=String(v); };
-    setV('ct-material', d.material); setV('ct-spec', d.spec); setV('ct-heat', d.heat_lot);
-    setV('ct-supplier', d.supplier); setV('ct-mill', d.mill); setV('ct-certno', d.cert_no);
-    setV('ct-size', d.size_thickness); setV('ct-qty', d.qty); setV('ct-po', d.po_number);
-    setV('ct-country', d.country_of_origin);
-    if(d.cert_date){ const el=$('ct-date'); if(el){ const m=String(d.cert_date).match(/\d{4}-\d{2}-\d{2}/); if(m) el.value=m[0]; } }
-    const itarEl=$('ct-itar'); if(itarEl && d.itar===true) itarEl.checked=true;
-    let filled=['material','spec','heat_lot','supplier','cert_no'].filter(k=>d[k]!=null&&d[k]!=='').length;
-    if(d.po_number){ qcAutoLinkByPO(String(d.po_number)); }
-    setAIStatus('cert-ai','ok', filled?t('AI filled the fields below — check them before saving.'):t('AI could not read the cert. Fill the fields by hand.'));
+    const certs=await callAICerts(files);
+    if(certs.length<=1){
+      const d=certs[0]||{};
+      fillCertForm(d);
+      const filled=['material','spec','heat_lot','supplier','cert_no'].filter(k=>d[k]!=null&&d[k]!=='').length;
+      setAIStatus('cert-ai','ok', filled?t('AI filled the fields below — check them before saving.'):t('AI could not read the cert. Fill the fields by hand.'));
+      return;
+    }
+    _certPacket={ files, detected: certs.map(normalizeDetected) };
+    editId='__cert_review__';
+    render();
   }catch(e){
     setAIStatus('cert-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')));
   }
 }
-// pre-check any order whose PO matches, and surface it in the picker search
+// split a PDF into a new File containing only the given 1-based pages
+async function splitPdfPages(file, pages){
+  if(typeof PDFLib==='undefined') return file;
+  try{
+    const src=await PDFLib.PDFDocument.load(await file.arrayBuffer());
+    const total=src.getPageCount();
+    const idx=pages.map(p=>p-1).filter(i=>i>=0&&i<total);
+    if(!idx.length) return file;
+    const out=await PDFLib.PDFDocument.create();
+    (await out.copyPages(src, idx)).forEach(p=>out.addPage(p));
+    const bytes=await out.save();
+    const base=(file.name||'cert').replace(/\.pdf$/i,'');
+    return new File([bytes], base+'_p'+pages.join('-')+'.pdf', {type:'application/pdf'});
+  }catch(e){ console.warn('pdf split failed',e); return file; }
+}
+function isPdf(f){ return f && ((f.type||'').indexOf('pdf')>=0 || /\.pdf$/i.test(f.name||'')); }
+async function buildCertFile(cert, files){
+  let src=files[(cert.doc||1)-1]||files[0]||null;
+  if(cert.pages && cert.pages.length){
+    if(!isPdf(src)){ const pdfs=files.filter(isPdf); if(pdfs.length===1) src=pdfs[0]; }
+    if(isPdf(src)) return await splitPdfPages(src, cert.pages);
+  }
+  return src;
+}
+// pre-link any order whose PO matches
 function qcAutoLinkByPO(po){
   const norm=s=>String(s||'').replace(/[^a-z0-9]/gi,'').toLowerCase();
   const target=norm(po); if(!target) return;
   let matched=0;
-  document.querySelectorAll('.cert-link').forEach(cb=>{ if(norm(cb.dataset.po)===target){ cb.checked=true; matched++; } });
-  if(matched){ const s=$('cert-order-search'); if(s){ s.value=po; qcCertOrderFilter(po); } }
+  vals(ORDERS).forEach(o=>{ if(norm(o.po)===target && !_certLinks.includes(o.id)){ _certLinks.push(o.id); matched++; } });
+  if(matched){ const el=$('cert-chips'); if(el) el.innerHTML=certLinkChips(); }
 }
+function certLinkChips(){
+  return _certLinks.map(oid=>{ const o=ORDERS[oid]; const lbl=o?rvOrderLabel(o):oid;
+    return `<span class="badge neutral" style="gap:6px">${esc(lbl)} <i class="ti ti-x" style="cursor:pointer" onclick="qcCertUnlink('${esc(oid)}')"></i></span>`;
+  }).join(' ')||('<span class="muted">—</span>');
+}
+window.qcCertUnlink=(oid)=>{ _certLinks=_certLinks.filter(x=>x!==oid); const el=$('cert-chips'); if(el) el.innerHTML=certLinkChips(); };
+window.qcCertLink=(oid)=>{ if(!_certLinks.includes(oid)) _certLinks.push(oid); const el=$('cert-chips'); if(el) el.innerHTML=certLinkChips(); const b=$('cert-order-results'); if(b) b.innerHTML=''; const s=$('cert-order-search'); if(s) s.value=''; };
+window.qcCertSearch=(q)=>{
+  const box=$('cert-order-results'); if(!box) return;
+  const s=String(q||'').trim().toLowerCase();
+  if(!s){ box.innerHTML=''; return; }
+  const linked=new Set(_certLinks);
+  const matches=vals(ORDERS).map(o=>({o,lbl:rvOrderLabel(o)}))
+    .filter(x=>!linked.has(x.o.id) && (x.lbl+' '+(x.o.po||'')).toLowerCase().indexOf(s)>=0).slice(0,10);
+  box.innerHTML=matches.length?matches.map(x=>`<div class="rv-opt" onclick="qcCertLink('${esc(x.o.id)}')">${esc(x.lbl||x.o.id)}</div>`).join(''):`<div class="rv-opt muted">${t('No orders found.')}</div>`;
+};
 
 /* ---------- vendor invoice drop + AI ---------- */
 window.qcInvDrop=(e)=>{ e.preventDefault(); e.currentTarget.classList.remove('drag'); qcIngestInvoice([...(e.dataTransfer&&e.dataTransfer.files||[])]); };
@@ -545,7 +638,6 @@ async function analyzeInvoice(file){
 }
 
 /* ---------- searchable pickers / filters ---------- */
-window.qcCertOrderFilter=(q)=>{ const s=String(q||'').toLowerCase(); document.querySelectorAll('#cert-order-list label').forEach(l=>{ l.style.display=(!s||l.dataset.s.indexOf(s)>=0)?'flex':'none'; }); };
 window.qcCertListFilter=(q)=>{ CERT_FILTER=String(q||''); const s=CERT_FILTER.toLowerCase(); document.querySelectorAll('#cert-rows tr').forEach(tr=>{ tr.style.display=(!s||(tr.dataset.s||'').indexOf(s)>=0)?'':'none'; }); };
 
 /* =================== INSPECTIONS LIST =================== */
@@ -833,6 +925,7 @@ window.qcSaveNcr=async (action)=>{
 function viewCerts(){
   const list=vals(CERTS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(editId==='__new_cert__') return certForm();
+  if(editId==='__cert_review__') return certReviewForm();
   const heatCount={};
   list.forEach(c=>{ const h=(c.heatLot||'').trim().toLowerCase(); if(h) heatCount[h]=(heatCount[h]||0)+1; });
   const rows=list.map(c=>{
@@ -867,14 +960,9 @@ function viewCerts(){
         :`<div class="empty">${t('No certs yet. Press')} <b>${t('Add cert')}</b> ${t('and attach a mill certificate.')}</div>`}
     </div>`;
 }
-window.qcNewCert=()=>{ editId='__new_cert__'; render(); };
+window.qcNewCert=()=>{ _certLinks=[]; editId='__new_cert__'; render(); };
 window.qcDelCert=async (id)=>{ if(!confirm(t('Delete this cert record?')))return; delete CERTS[id]; await dbRemove('qc/certs/'+id); render(); };
 function certForm(){
-  const orderChecks=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||'')).map(o=>{
-    const lbl=[o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ');
-    const sstr=(lbl+' '+(o.po||'')).toLowerCase();
-    return `<label data-s="${esc(sstr)}" style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;margin:3px 0"><input type="checkbox" class="cert-link" value="${esc(o.id)}" data-po="${esc(o.po||'')}" style="width:auto;min-height:0"> ${esc(lbl||o.id)}</label>`;
-  }).join('');
   return `<div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
   <div class="card">
     <div class="field"><label class="fl">${t('Cert package')}</label>
@@ -901,8 +989,9 @@ function certForm(){
     </div>
     <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ct-itar" style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
     <div class="field"><label class="fl">${t('Link to orders')}</label>
-      <input class="in" id="cert-order-search" style="margin-bottom:6px" placeholder="${t('Search orders…')}" oninput="qcCertOrderFilter(this.value)">
-      <div id="cert-order-list" style="max-height:200px;overflow:auto;border:1px solid var(--border);padding:8px 10px">${orderChecks||('<span class="muted">'+t('No orders found.')+'</span>')}</div></div>
+      <div id="cert-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${certLinkChips()}</div>
+      <input class="in" id="cert-order-search" placeholder="${t('Search jobs by customer, part, job or PO…')}" oninput="qcCertSearch(this.value)">
+      <div id="cert-order-results" class="rv-results"></div></div>
     <div class="field"><label class="fl">${t('Vendor invoice')}</label>
       <div class="dz" ondragover="qcDragOver(event)" ondragleave="qcDragLeave(event)" ondrop="qcInvDrop(event)" onclick="this.querySelector('input').click()">
         <i class="ti ti-file-dollar"></i>
@@ -930,7 +1019,7 @@ window.qcSaveCert=async ()=>{
   const id=newId('cert');
   const files=await uploadPending('cert','certs');
   const invFiles=await uploadPending('invoice','invoices');
-  const linked=[...document.querySelectorAll('.cert-link:checked')].map(c=>c.value);
+  const linked=_certLinks.slice();
   const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
   const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
   const rec={ id, createdAt:Date.now(), addedBy:(QC_USER&&QC_USER.email)||'',
@@ -938,6 +1027,101 @@ window.qcSaveCert=async ()=>{
     certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'), country:gv('ct-country'), itar:gc('ct-itar'),
     files, file:files[0]||null, linkedOrders:linked, invoice: hasInv?invoice:null };
   await dbSet('qc/certs/'+id, rec);
+  editId=null; render();
+};
+
+/* ---------- multi-cert review step ---------- */
+function rvOrderLabel(o){ return [o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · '); }
+function rvChipsHtml(i){
+  const c=_certPacket&&_certPacket.detected[i]; if(!c) return '';
+  return (c._linked||[]).map(oid=>{ const o=ORDERS[oid]; const lbl=o?rvOrderLabel(o):oid;
+    return `<span class="badge neutral" style="gap:6px">${esc(lbl)} <i class="ti ti-x" style="cursor:pointer" onclick="qcRvUnlink(${i},'${esc(oid)}')"></i></span>`;
+  }).join(' ')||('<span class="muted">—</span>');
+}
+window.qcRvEdit=(i,k,v)=>{ if(_certPacket&&_certPacket.detected[i]) _certPacket.detected[i][k]=v; };
+window.qcRvDrop=(i)=>{ if(!_certPacket) return; _certPacket.detected.splice(i,1); if(!_certPacket.detected.length){ qcCancelReview(); return; } render(); };
+window.qcCancelReview=()=>{ _certPacket=null; _pendingFiles['cert']=[]; _pendingFiles['invoice']=[]; editId=null; render(); };
+window.qcRvUnlink=(i,oid)=>{ const c=_certPacket&&_certPacket.detected[i]; if(!c) return; c._linked=(c._linked||[]).filter(x=>x!==oid); const el=$('rv-chips-'+i); if(el) el.innerHTML=rvChipsHtml(i); };
+window.qcRvLink=(i,oid)=>{ const c=_certPacket&&_certPacket.detected[i]; if(!c) return; c._linked=c._linked||[]; if(!c._linked.includes(oid)) c._linked.push(oid); const el=$('rv-chips-'+i); if(el) el.innerHTML=rvChipsHtml(i); const box=$('rv-results-'+i); if(box) box.innerHTML=''; };
+window.qcRvSearch=(i,q)=>{
+  const box=$('rv-results-'+i); if(!box) return;
+  const s=String(q||'').trim().toLowerCase();
+  if(!s){ box.innerHTML=''; return; }
+  const c=_certPacket.detected[i]; const linked=new Set(c._linked||[]);
+  const matches=vals(ORDERS).map(o=>({o,lbl:rvOrderLabel(o)}))
+    .filter(x=>!linked.has(x.o.id) && (x.lbl+' '+(x.o.po||'')).toLowerCase().indexOf(s)>=0).slice(0,10);
+  box.innerHTML=matches.length?matches.map(x=>`<div class="rv-opt" onclick="qcRvLink(${i},'${esc(x.o.id)}')">${esc(x.lbl||x.o.id)}</div>`).join(''):`<div class="rv-opt muted">${t('No orders found.')}</div>`;
+};
+function certReviewForm(){
+  const P=_certPacket; if(!P||!P.detected||!P.detected.length){ editId=null; return certForm(); }
+  const F=(i,k,label,type)=>`<div class="field"><label class="fl">${label}</label><input class="in"${type?(' type="'+type+'"'):''} value="${esc(P.detected[i][k]||'')}" oninput="qcRvEdit(${i},'${k}',this.value)"></div>`;
+  const cards=P.detected.map((c,i)=>{
+    const src=(c.pages&&c.pages.length)?(t('Document')+' '+(c.doc||1)+' · '+t('pages')+' '+c.pages.join(', ')):(t('Document')+' '+(c.doc||1));
+    return `<div class="card" style="border-left:3px solid var(--spark)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <b>${t('Cert')} ${i+1} <span class="muted" style="font-weight:600">· ${esc(src)}</span></b>
+        <span class="icon-btn" title="${t('Remove')}" onclick="qcRvDrop(${i})"><i class="ti ti-trash"></i></span>
+      </div>
+      <div class="grid2">
+        ${F(i,'material',t('Material / grade'))}${F(i,'spec',t('Specification'))}
+        ${F(i,'heat_lot',t('Heat / lot #'))}${F(i,'supplier',t('Supplier'))}
+        ${F(i,'mill',t('Mill'))}${F(i,'cert_no',t('Cert #'))}
+        ${F(i,'cert_date',t('Cert date'),'date')}${F(i,'size_thickness',t('Size / thickness'))}
+        ${F(i,'qty',t('Qty'))}${F(i,'po_number',t('PO #'))}
+        ${F(i,'country_of_origin',t('Country of origin'))}
+      </div>
+      <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" ${c.itar?'checked':''} onchange="qcRvEdit(${i},'itar',this.checked)" style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
+      <div class="field"><label class="fl">${t('Linked orders')}</label>
+        <div id="rv-chips-${i}" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${rvChipsHtml(i)}</div>
+        <input class="in" placeholder="${t('Search orders…')}" oninput="qcRvSearch(${i},this.value)">
+        <div id="rv-results-${i}" class="rv-results"></div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="page-head"><h2>${t('Review detected certs')}</h2><p>${t('AI found multiple certs in this packet. Check each one, then save.')}</p></div>
+  <div class="toolbar">
+    <button class="btn primary" onclick="window.qcSaveReviewedCerts()"><i class="ti ti-device-floppy"></i> ${t('Save all')} (${P.detected.length})</button>
+    <button class="btn" onclick="qcCancelReview()">${t('Cancel')}</button>
+    <span class="muted" id="rv-status" style="font-size:12px"></span>
+  </div>
+  ${cards}
+  <div class="card"><div class="field"><label class="fl">${t('Vendor invoice')} — ${t('applies to all certs in this packet')}</label>
+    <div class="dz" ondragover="qcDragOver(event)" ondragleave="qcDragLeave(event)" ondrop="qcInvDrop(event)" onclick="this.querySelector('input').click()">
+      <i class="ti ti-file-dollar"></i><div>${t('Drop invoice here or click to add — AI reads invoice #, date and amount.')}</div>
+      <input type="file" accept=".pdf,image/*" style="display:none" onchange="qcInvPick(this)">
+    </div>
+    <div class="thumbs" id="files-invoice"></div>
+    <div class="aiwip" id="inv-ai" style="display:none"></div>
+    <div class="grid2" style="margin-top:8px">
+      <div class="field"><label class="fl">${t('Invoice #')}</label><input class="in" id="inv-no"></div>
+      <div class="field"><label class="fl">${t('Invoice date')}</label><input class="in" id="inv-date" type="date"></div>
+      <div class="field"><label class="fl">${t('Amount')}</label><input class="in" id="inv-amount"></div>
+      <div class="field"><label class="fl">${t('Vendor')}</label><input class="in" id="inv-vendor"></div>
+    </div>
+  </div></div>`;
+}
+window.qcSaveReviewedCerts=async ()=>{
+  const P=_certPacket; if(!P||!P.detected.length) return;
+  const st=$('rv-status'); const setSt=m=>{ if(st) st.textContent=m; };
+  setSt(t('Saving…'));
+  const invFiles=await uploadPending('invoice','invoices');
+  const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
+  const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
+  let n=0;
+  for(const c of P.detected){
+    try{
+      const f=await buildCertFile(c, P.files);
+      let fileObj=null;
+      if(f){ const url=await upload(f,'certs'); if(url) fileObj={name:f.name,url,type:f.type||'application/octet-stream'}; }
+      const id=newId('cert');
+      await dbSet('qc/certs/'+id, { id, createdAt:Date.now()+n, addedBy:(QC_USER&&QC_USER.email)||'',
+        material:c.material||'', spec:c.spec||'', heatLot:c.heat_lot||'', supplier:c.supplier||'', mill:c.mill||'', certNo:c.cert_no||'',
+        certDate:c.cert_date||'', size:c.size_thickness||'', qty:c.qty||'', po:c.po_number||'', country:c.country_of_origin||'', itar:!!c.itar,
+        files:fileObj?[fileObj]:[], file:fileObj, linkedOrders:c._linked||[], invoice: hasInv?invoice:null });
+      n++; setSt(t('Saved')+' '+n+'/'+P.detected.length);
+    }catch(e){ console.warn('save cert failed',e); }
+  }
+  _certPacket=null; _pendingFiles['cert']=[]; _pendingFiles['invoice']=[];
   editId=null; render();
 };
 
