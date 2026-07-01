@@ -2942,6 +2942,8 @@ function exportArchiveCSV(){
 }
 let opCount=0, hwCount=0, outCount=0;
 let currentPartImg = null;
+let currentDrawingUpload = null;  // { dataUrl, ext } full-res drawing to upload to Storage on save
+let currentDrawingUrl = null;     // existing Storage URL when a saved quote is reloaded
 
 function getApiKey(){ return localStorage.getItem('bsmp_apikey')||''; }
 function getProxyUrl(){ return (localStorage.getItem('bsmp_proxy_url')||'').trim(); }
@@ -3057,6 +3059,7 @@ function showPanel(name){
   document.getElementById('panel-'+name).classList.add('active');
   const navEl = document.getElementById('nav-'+name); if(navEl) navEl.classList.add('active');
   if(name==='history') renderHistory();
+  if(name==='quote') requestAnimationFrame(()=>{ if(window._dvRefit) window._dvRefit(); });
   if(typeof updateChrome==='function') updateChrome(name);
 }
 
@@ -4068,6 +4071,8 @@ async function handleFile(file){
       document.getElementById('preview-img').src=e.target.result;
       document.getElementById('part-preview').style.display='block';
       setDrawingViewer(e.target.result, file.name);
+      currentDrawingUpload = { dataUrl: e.target.result, ext: ((file.name.split('.').pop()||'png').toLowerCase().replace(/[^a-z0-9]/g,'')) || 'png' };
+      currentDrawingUrl = null;
     };
     reader.readAsDataURL(file);
   } else if(ext==='pdf'){
@@ -4085,6 +4090,8 @@ async function handleFile(file){
         document.getElementById('preview-img').src = durl;
         document.getElementById('part-preview').style.display='block';
         setDrawingViewer(durl, file.name);
+        currentDrawingUpload = { dataUrl: c.toDataURL('image/jpeg', 0.9), ext: 'jpg' };  // compact full-res copy for Storage
+        currentDrawingUrl = null;
       }
     } catch(e){ console.error('PDF preview render failed', e); }
   }
@@ -4482,8 +4489,11 @@ function dvApply(){ const {canvas,label}=dvEls(); if(!canvas) return;
   canvas.style.transform = `translate(${dv.x}px,${dv.y}px) scale(${dv.scale})`;
   if(label) label.textContent = Math.round(dv.scale*100)+'%';
 }
-function dvFit(){ const {vp}=dvEls(); if(!vp||!dv.natW) return;
+function dvFit(){ const {vp,img}=dvEls(); if(!vp) return;
+  if((!dv.natW||!dv.natH) && img){ dv.natW = img.naturalWidth||dv.natW; dv.natH = img.naturalHeight||dv.natH; }
+  if(!dv.natW||!dv.natH) return;
   const w=vp.clientWidth, h=vp.clientHeight;
+  if(w<2||h<2) return;   // viewport not laid out yet (panel hidden) — a later show/resize re-fits
   const s=Math.min(w/dv.natW, h/dv.natH);
   dv.scale = s>0 ? s : 1;
   dv.x = (w - dv.natW*dv.scale)/2;
@@ -4509,10 +4519,21 @@ function setDrawingViewer(dataUrl, fname){
   if(!root||!img||!dataUrl) return;
   if(fn) fn.textContent = fname || '';
   root.classList.add('show'); root.classList.remove('collapsed');
-  img.onload = () => { dv.natW = img.naturalWidth||img.width; dv.natH = img.naturalHeight||img.height; dvFit(); };
+  dv.natW = 0; dv.natH = 0;
+  const settle = () => {
+    dv.natW = img.naturalWidth||img.width||0;
+    dv.natH = img.naturalHeight||img.height||0;
+    requestAnimationFrame(dvFit);          // let the panel/viewport finish laying out first
+    requestAnimationFrame(()=>requestAnimationFrame(dvFit));  // and once more, for a just-shown panel
+  };
+  img.onload = settle;
+  img.onerror = ()=>{};
   img.src = dataUrl;
+  if(img.complete && img.naturalWidth) settle();   // cached / identical src: onload may not fire
   dvInit();
 }
+// Re-fit the current drawing (used when the Quote panel becomes visible or the window resizes).
+window._dvRefit = ()=>{ try{ if(dv.natW && dv.natH) dvFit(); }catch(e){} };
 function dvClear(){ const {root,img,fname}=dvEls(); if(!root) return;
   root.classList.remove('show','collapsed');
   if(img) img.removeAttribute('src');
@@ -4525,6 +4546,7 @@ window.toggleCardCollapse = (titleEl) => { const c = titleEl.closest('.card'); i
 
 function dvInit(){
   const {vp}=dvEls(); if(!vp || vp._dvInit) return; vp._dvInit = true;
+  window.addEventListener('resize', ()=>{ if(dv.natW && dv.natH) dvFit(); });
   const dist=(a,b)=>Math.hypot(a.x-b.x, a.y-b.y);
   const ptrs=new Map(); let pinch=null;
   vp.addEventListener('wheel', e=>{
@@ -4887,6 +4909,7 @@ function saveQuote(){
     laborLines, hwLines, outLines,
     notes: document.getElementById('notes').value,
     img: currentPartImg||null,
+    drawingUrl: currentDrawingUrl||'',
 
     // ---- Full snapshot for accurate reload ----
     matMode: matMode,
@@ -4934,6 +4957,19 @@ function saveQuote(){
   HISTORY.unshift(quote);
   if(HISTORY.length>500) HISTORY.pop();
   try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(quote); }catch(e){}
+  // Upload the full-res drawing to Firebase Storage, then attach its URL to the quote
+  // (localStorage keeps only the small thumbnail; the database keeps only the URL).
+  if(currentDrawingUpload && window._qUploadDrawing && window._qDrawingSignedIn && window._qDrawingSignedIn()){
+    const up = currentDrawingUpload;
+    window._qUploadDrawing(quote.id, up.dataUrl, up.ext)
+      .then(url => {
+        quote.drawingUrl = url;                 // same object reference lives in HISTORY
+        currentDrawingUrl = url; currentDrawingUpload = null;
+        try{ persistHistory(); }catch(e){}
+        try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(quote); }catch(e){}
+      })
+      .catch(e => { console.warn('drawing upload failed', e); });
+  }
   const persistResult = persistHistory();
 
   // Confirmation: toast + brief button state change.
@@ -4997,6 +5033,8 @@ function resetForm(){
   document.getElementById('part-preview').style.display='none';
   document.getElementById('part-header').style.display='none';
   dvClear();
+  currentDrawingUpload = null;
+  currentDrawingUrl = null;
   document.getElementById('file-input').value='';
   document.getElementById('ops-container').innerHTML='';
   document.getElementById('hw-container').innerHTML='';
@@ -5304,16 +5342,18 @@ function reloadQuote(id){
   updateFormComplexityVisibility();
 
   // ---- Part image / header ----
-  if(q.img){
-    currentPartImg=q.img;
+  currentDrawingUrl = q.drawingUrl || null;   // preserve the Storage URL if this quote is re-saved
+  currentDrawingUpload = null;
+  if(q.img || q.drawingUrl){
+    currentPartImg = q.img || null;
     const box=document.getElementById('part-img-box');
     const imgEl=document.createElement('img');
-    imgEl.src=q.img; imgEl.style.cssText='max-width:100%;max-height:100%;object-fit:contain';
+    imgEl.src = q.img || q.drawingUrl; imgEl.style.cssText='max-width:100%;max-height:100%;object-fit:contain';
     box.innerHTML=''; box.appendChild(imgEl);
     document.getElementById('part-header').style.display='flex';
     document.getElementById('ph-name').textContent=q.partNum;
     document.getElementById('ph-mat').textContent=q.material;
-    setDrawingViewer(q.img, q.partNum||'');
+    setDrawingViewer(q.drawingUrl || q.img, q.partNum||'');   // full-res Storage image when available
   }
 
   // ---- Operations / hardware / outsource ----
@@ -8490,6 +8530,7 @@ window.syncOptCards=function(){
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, ref, set, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getStorage, ref as sref, uploadString, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 const firebaseConfig = {
   apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
   authDomain: "bsmp-orders.firebaseapp.com",
@@ -8502,6 +8543,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
+// Upload a full-res drawing to Firebase Storage and return its download URL.
+// Keeps the big image out of the Realtime Database / localStorage (only a URL is stored).
+window._qDrawingSignedIn = () => !!_qUser;
+window._qUploadDrawing = async (id, dataUrl, ext) => {
+  if(!_qUser) throw new Error('not signed in');
+  if(!dataUrl) throw new Error('no drawing');
+  const r = sref(storage, 'quote-drawings/' + id + '.' + (ext || 'png'));
+  await uploadString(r, dataUrl, 'data_url');
+  return await getDownloadURL(r);
+};
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 let _qUser = null;
 let _qSynced = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_quote_synced')||'[]')); }catch(e){ return new Set(); } })();
@@ -8545,6 +8597,7 @@ function quotePayload(q){
     outLines:   (q.outLines||[]).map(o=>({ desc:String(o.desc||''), q:String(o.q!=null?o.q:''), c:String(o.c!=null?o.c:'') })),
     hwLines:    (q.hwLines||[]).map(h=>({ desc:String(h.desc||''), q:String(h.q!=null?h.q:''), c:String(h.c!=null?h.c:'') })),
     notes: q.notes || '',
+    drawingUrl: q.drawingUrl || '',
     syncedAt: Date.now()
   };
 }
