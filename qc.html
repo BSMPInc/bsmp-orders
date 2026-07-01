@@ -84,7 +84,8 @@ body.sb-pinned .topbar{padding-left:22px}
 .content{flex:1;padding:22px 22px calc(26px + var(--dock-h));max-width:1100px;width:100%}
 
 /* ===== Dock ===== */
-.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;padding-left:8px;z-index:46;transition:left .18s ease}
+.dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;padding-left:8px;z-index:46;transition:left .18s ease;overflow-x:auto;scrollbar-width:none}
+.dock::-webkit-scrollbar{display:none}
 body.sb-pinned .dock{left:var(--sb)}
 .dock-tab{flex:none;width:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--text2);font-size:10.5px;font-weight:700;background:none;border:none;border-top:2.25px solid transparent;font-family:inherit;text-align:center}
 .dock-tab i{font-size:19px}
@@ -229,6 +230,7 @@ body.role-operator .mgr-only{display:none!important}
   <button class="dock-tab" id="dock-inspections" onclick="showPage('inspections')"><i class="ti ti-checklist"></i><span data-t="dock:inspections">Inspections</span></button>
   <button class="dock-tab" id="dock-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span data-t="dock:firstarticles">First Articles</span></button>
   <button class="dock-tab" id="dock-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span data-t="dock:ncr">NCRs</span></button>
+  <button class="dock-tab mgr-only" id="dock-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span data-t="dock:materialcerts">Certs</span></button>
   <div class="dock-switch">
     <span class="lbl" data-t="Switch app">Switch app</span>
     <div class="dock-chips">
@@ -245,7 +247,7 @@ body.role-operator .mgr-only{display:none!important}
 /* ---------- i18n ---------- */
 const I18N = {
   en: {
-    'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs',
+    'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs', 'dock:materialcerts':'Certs',
     'nav:materialcerts':'Material Certs'
   },
   es: {
@@ -255,7 +257,7 @@ const I18N = {
     'Quality':'Calidad','Records':'Registros','New Self-Check':'Autoinspección','Inspections':'Inspecciones',
     'First Articles':'Primeros artículos','Nonconformances':'No conformidades','Material Certs':'Certificados de material',
     'Connecting…':'Conectando…','Signed out':'Sesión cerrada','Switch app':'Cambiar app','Manager':'Gerente','Operator':'Operador','Sign out':'Cerrar sesión',
-    'dock:selfcheck':'Autoinsp.','dock:inspections':'Inspecc.','dock:firstarticles':'1.er Art.','dock:ncr':'No conf.','nav:materialcerts':'Certificados',
+    'dock:selfcheck':'Autoinsp.','dock:inspections':'Inspecc.','dock:firstarticles':'1.er Art.','dock:ncr':'No conf.','dock:materialcerts':'Certs','nav:materialcerts':'Certificados',
     // page subs
     'Quality control':'Control de calidad','Operator self-checks and first articles':'Autoinspecciones y primeros artículos',
     'Confirm your work before sign-off':'Confirma tu trabajo antes de aprobarlo','Formal first-article reports':'Reportes formales de primer artículo',
@@ -398,7 +400,7 @@ function setActive(){
   const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
-  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr'};
+  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs'};
   document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
   if(dockMap[page]&&$(dockMap[page])) $(dockMap[page]).classList.add('active');
   const m=META[page]||['Inspections','Quality control'];
