@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>BSMP Inspection / QC</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAACqElEQVR4nO2X3UsUURiHn3OcpXVXcNfNO/tQM4gyP0oRi+q2v6CIDItu6iIikAjppu4Kuugi6AuqmzKiD0KsQLJE6S8QK7C0LnLXwo9mXLeZc7pYd9nUmd1WWSH6wTDDzMv7e/ac9513VpCh1n37NQXQYF+PSF3LQpsv9JKFNl8IIVbDPFMye8h/gGUklyJrjOH2oKpyA8fbD5MqEKVU1mRaa0zT4vPYF968HeDbeBQhBFq7l5krQCRSxt49u7KauunYkUOc7uhk+P1HzzhXAMd2UEqhtUYpxejYVxzHWfIXCZFc6nA4RPnaCIlEgpKSIO1tBznbeSE/AARImSwR07Q4eaoD07I8kwWDQc6fO8Pu1ha01qyrqEBK6bl9ORehYRhIKZBSzp//PHw+H6Zp0vu6P70iyVhvC/cVyJBGMxuPo5QGli4opX4hpaBpRz1aa4QQTE5NYdv28gC01gQDAa5cuojjOJ6xodJSNlVXopQmNjHBjdt3kVLMg+cJAMnlb6irzSU0rWg0xvT0jKd5TgBCCObmEnQ9ekoikfCMCwSKaWneSeXG9WzbuoVrVy/TdvQE49FY/gAA8bk412/dySWUBw8fc//eTfz+NQQDAZqbGnne/dI1PqcuEAjKwiEMw8Dn82EYxqIjdX/i+w8mJ6eQUqK1JhwKeebOuQtmfppZKxqgoa6W8vIISimEEFizs/kDpAoo3QW2A4LFnTg/c4r9fjbXVFNUZADJVhwaGs4PQAqZnmZSGjTWb/dMtFiCJ8+6GRr+kB+AZVmMfBpNv/e11p5TLSXbthmPxugfeMeLV71Zp+Gqf5J51kDXiPcozVUHqmpcn7m24UqZZ8vlCuBF/bfyyuW5BSsJ4aZ/+6s4J4DMP4qF1mBfj5Cpi9Uwh4wtKCREptdv0U8DIx/XgyoAAAAASUVORK5CYII=">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
@@ -156,6 +158,12 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .res-pick .opt.flag.on{background:var(--red-soft);border-color:var(--red);color:var(--red)}
 .hint{font-size:12px;color:var(--text3);margin-top:4px}
 .aiwip{font-size:11.5px;color:var(--text3);border:1px dashed var(--border2);padding:9px 11px;margin-top:8px;display:flex;align-items:center;gap:8px}
+.dz{border:1.5px dashed var(--border2);background:var(--bg);padding:18px;text-align:center;color:var(--text2);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;transition:border-color .15s,background .15s}
+.dz:hover{border-color:var(--accent);color:var(--accent)}
+.dz.drag{border-color:var(--accent);background:var(--accent-soft)}
+.dz i{font-size:26px}
+@keyframes qcspin{to{transform:rotate(360deg)}}
+.ti.spin{display:inline-block;animation:qcspin .8s linear infinite}
 body.role-operator .mgr-only{display:none!important}
 </style>
 </head>
@@ -291,7 +299,16 @@ const I18N = {
     'Size / thickness':'Tamaño / espesor','Cert file':'Archivo del certificado','Upload cert':'Subir certificado','Link to orders':'Vincular a órdenes','Save cert':'Guardar certificado',
     'Next phase: AI reads the cert and fills heat/lot, material, spec, supplier and date for you.':'Siguiente fase: la IA lee el certificado y completa colada/lote, material, especificación, proveedor y fecha por ti.',
     'No orders found.':'No se encontraron órdenes.','Enter a material or attach a cert file.':'Ingresa un material o adjunta un archivo de certificado.',
-    'Open cert':'Abrir certificado','Delete':'Eliminar','Delete this cert record?':'¿Eliminar este registro de certificado?'
+    'Open cert':'Abrir certificado','Delete':'Eliminar','Delete this cert record?':'¿Eliminar este registro de certificado?',
+    'Cert package':'Paquete del certificado','Mill':'Molino','Country of origin':'País de origen',
+    'Drag & drop or click to add the cert package (PDF or photos). AI reads it and fills the fields below.':'Arrastra o haz clic para agregar el paquete del certificado (PDF o fotos). La IA lo lee y completa los campos.',
+    'Reading cert with AI…':'Leyendo certificado con IA…','AI filled the fields below — check them before saving.':'La IA completó los campos — revísalos antes de guardar.',
+    'AI could not read the cert. Fill the fields by hand.':'La IA no pudo leer el certificado. Complétalos a mano.',
+    'No AI connection set — open the Quote app Settings to add a proxy URL, then retry.':'Sin conexión de IA — abre Ajustes en la app de Cotizaciones para agregar el proxy y reintenta.',
+    'Search certs (heat, material, supplier, PO)…':'Buscar certificados (colada, material, proveedor, OC)…','Search orders…':'Buscar órdenes…',
+    'Vendor invoice':'Factura del proveedor','Drop invoice here or click to add — AI reads invoice #, date and amount.':'Suelta la factura o haz clic — la IA lee N.º, fecha e importe.',
+    'Reading invoice with AI…':'Leyendo factura con IA…','Invoice #':'N.º de factura','Invoice date':'Fecha de factura','Amount':'Importe','Vendor':'Proveedor',
+    'Invoice':'Factura','Duplicate heat/lot':'Colada/lote duplicado','Files':'Archivos'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -313,6 +330,7 @@ let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={};
 let page='inspections';
 let editId=null;
 let _pendingFiles={};
+let CERT_FILTER='';
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -414,6 +432,121 @@ async function uploadPending(key,prefix){
   _pendingFiles[key]=[];
   return urls;
 }
+function qcRenderStrip(key){
+  const strip=$('files-'+key);
+  if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="qcDropFile('${key}',${i})"></i></span>`).join(' ');
+}
+window.qcDropFile=(key,i)=>{ (_pendingFiles[key]||[]).splice(i,1); qcRenderStrip(key); };
+
+/* ---------- AI extraction (shares the Quote app proxy/key on this origin) ---------- */
+function getProxyUrl(){ try{ return (localStorage.getItem('bsmp_proxy_url')||'').trim(); }catch(e){ return ''; } }
+function getApiKey(){ try{ return localStorage.getItem('bsmp_apikey')||''; }catch(e){ return ''; } }
+function hasAIConnection(){ return !!(getProxyUrl()||getApiKey()); }
+async function callAnthropic(payload){
+  const proxy=getProxyUrl();
+  if(proxy) return fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const key=getApiKey();
+  if(!key) throw new Error('no-connection');
+  return fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(payload)});
+}
+function toBase64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
+function aiContentBlock(b64, ext){
+  const e=(ext||'').toLowerCase();
+  if(e==='pdf') return {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}};
+  const mt = (e==='jpg'||e==='jpeg')?'image/jpeg':(e==='png'?'image/png':(e==='webp'?'image/webp':'image/'+e));
+  return {type:'image',source:{type:'base64',media_type:mt,data:b64}};
+}
+function extFromFile(file){ const n=(file.name||'').toLowerCase(); const m=n.match(/\.([a-z0-9]+)$/); if(m) return m[1]; const tp=(file.type||''); if(tp.indexOf('pdf')>=0) return 'pdf'; if(tp.indexOf('png')>=0) return 'png'; if(tp.indexOf('jpeg')>=0||tp.indexOf('jpg')>=0) return 'jpg'; return 'png'; }
+async function callAIJson(file, promptText){
+  const b64=await toBase64(file);
+  const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:1200, messages:[{role:'user',content:[aiContentBlock(b64, extFromFile(file)), {type:'text',text:promptText}]}] });
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message||'AI error');
+  const raw=(data.content||[]).map(c=>c.text||'').join('');
+  let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+  const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
+  if(fb>=0 && lb>fb) clean=clean.slice(fb,lb+1);
+  clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
+  return JSON.parse(clean);
+}
+function setAIStatus(elId, state, msg){
+  const el=$(elId); if(!el) return;
+  el.style.display='flex';
+  const ic = state==='loading'?'ti-loader-2 spin':(state==='ok'?'ti-sparkles':(state==='error'?'ti-alert-triangle':'ti-sparkles'));
+  const col = state==='error'?'var(--red)':(state==='ok'?'var(--green)':'var(--text3)');
+  el.style.color=col; el.innerHTML=`<i class="ti ${ic}"></i> ${esc(msg)}`;
+}
+
+/* ---------- cert package drop + AI ---------- */
+window.qcDragOver=(e)=>{ e.preventDefault(); e.currentTarget.classList.add('drag'); };
+window.qcDragLeave=(e)=>{ e.currentTarget.classList.remove('drag'); };
+window.qcCertDrop=(e)=>{ e.preventDefault(); e.currentTarget.classList.remove('drag'); qcIngestCert([...(e.dataTransfer&&e.dataTransfer.files||[])]); };
+window.qcCertPick=(inp)=>{ const f=[...inp.files]; inp.value=''; qcIngestCert(f); };
+function qcIngestCert(files){
+  if(!files.length) return;
+  _pendingFiles['cert']=_pendingFiles['cert']||[];
+  files.forEach(f=>_pendingFiles['cert'].push(f));
+  qcRenderStrip('cert');
+  analyzeCert(files[0]);
+}
+async function analyzeCert(file){
+  if(!hasAIConnection()){ setAIStatus('cert-ai','error',t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.')); return; }
+  setAIStatus('cert-ai','loading',t('Reading cert with AI…'));
+  const prompt='You are reading a material test report / mill certification for a sheet metal shop receiving a material package. Extract the header data. Respond with ONLY a valid JSON object, no markdown or extra text. Use null for anything not present.\n{"material":null,"spec":null,"heat_lot":null,"supplier":null,"mill":null,"cert_no":null,"cert_date":null,"size_thickness":null,"qty":null,"po_number":null,"country_of_origin":null,"itar":false}\nRules: material=alloy/grade/temper e.g. "6061-T6", "304/304L SS", "A36". spec=governing specification(s) e.g. "AMS 4027", "ASTM B209", "ASTM A240". heat_lot=heat number and/or lot number exactly as printed. supplier=the distributor/vendor who shipped it. mill=the producing mill if different from supplier. cert_no=certificate or document number. cert_date=YYYY-MM-DD if determinable. size_thickness=material size/gauge/thickness e.g. ".060 48x120". qty=quantity or weight as printed. po_number=the purchase order number referenced. country_of_origin=melt/manufacture country if stated. itar=true only if the document is explicitly marked ITAR/EAR/export-controlled.';
+  try{
+    const d=await callAIJson(file, prompt);
+    const setV=(id,v)=>{ const el=$(id); if(el && v!=null && v!=='') el.value=String(v); };
+    setV('ct-material', d.material); setV('ct-spec', d.spec); setV('ct-heat', d.heat_lot);
+    setV('ct-supplier', d.supplier); setV('ct-mill', d.mill); setV('ct-certno', d.cert_no);
+    setV('ct-size', d.size_thickness); setV('ct-qty', d.qty); setV('ct-po', d.po_number);
+    setV('ct-country', d.country_of_origin);
+    if(d.cert_date){ const el=$('ct-date'); if(el){ const m=String(d.cert_date).match(/\d{4}-\d{2}-\d{2}/); if(m) el.value=m[0]; } }
+    const itarEl=$('ct-itar'); if(itarEl && d.itar===true) itarEl.checked=true;
+    let filled=['material','spec','heat_lot','supplier','cert_no'].filter(k=>d[k]!=null&&d[k]!=='').length;
+    if(d.po_number){ qcAutoLinkByPO(String(d.po_number)); }
+    setAIStatus('cert-ai','ok', filled?t('AI filled the fields below — check them before saving.'):t('AI could not read the cert. Fill the fields by hand.'));
+  }catch(e){
+    setAIStatus('cert-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')));
+  }
+}
+// pre-check any order whose PO matches, and surface it in the picker search
+function qcAutoLinkByPO(po){
+  const norm=s=>String(s||'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+  const target=norm(po); if(!target) return;
+  let matched=0;
+  document.querySelectorAll('.cert-link').forEach(cb=>{ if(norm(cb.dataset.po)===target){ cb.checked=true; matched++; } });
+  if(matched){ const s=$('cert-order-search'); if(s){ s.value=po; qcCertOrderFilter(po); } }
+}
+
+/* ---------- vendor invoice drop + AI ---------- */
+window.qcInvDrop=(e)=>{ e.preventDefault(); e.currentTarget.classList.remove('drag'); qcIngestInvoice([...(e.dataTransfer&&e.dataTransfer.files||[])]); };
+window.qcInvPick=(inp)=>{ const f=[...inp.files]; inp.value=''; qcIngestInvoice(f); };
+function qcIngestInvoice(files){
+  if(!files.length) return;
+  _pendingFiles['invoice']=_pendingFiles['invoice']||[];
+  files.forEach(f=>_pendingFiles['invoice'].push(f));
+  qcRenderStrip('invoice');
+  analyzeInvoice(files[0]);
+}
+async function analyzeInvoice(file){
+  if(!hasAIConnection()){ setAIStatus('inv-ai','error',t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.')); return; }
+  setAIStatus('inv-ai','loading',t('Reading invoice with AI…'));
+  const prompt='You are reading a vendor invoice for a material purchase. Respond with ONLY a valid JSON object, no markdown or extra text. Use null when absent.\n{"invoice_no":null,"invoice_date":null,"amount":null,"vendor":null,"po_number":null}\nRules: amount=invoice grand total as a plain number, no currency symbol. invoice_date=YYYY-MM-DD. vendor=the company that issued the invoice. po_number=purchase order referenced.';
+  try{
+    const d=await callAIJson(file, prompt);
+    const setV=(id,v)=>{ const el=$(id); if(el && v!=null && v!=='') el.value=String(v); };
+    setV('inv-no', d.invoice_no); setV('inv-amount', d.amount); setV('inv-vendor', d.vendor);
+    if(d.invoice_date){ const el=$('inv-date'); if(el){ const m=String(d.invoice_date).match(/\d{4}-\d{2}-\d{2}/); if(m) el.value=m[0]; } }
+    if(d.po_number && !gv('ct-po')){ const el=$('ct-po'); if(el) el.value=String(d.po_number); }
+    setAIStatus('inv-ai','ok', t('AI filled the fields below — check them before saving.'));
+  }catch(e){
+    setAIStatus('inv-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')));
+  }
+}
+
+/* ---------- searchable pickers / filters ---------- */
+window.qcCertOrderFilter=(q)=>{ const s=String(q||'').toLowerCase(); document.querySelectorAll('#cert-order-list label').forEach(l=>{ l.style.display=(!s||l.dataset.s.indexOf(s)>=0)?'flex':'none'; }); };
+window.qcCertListFilter=(q)=>{ CERT_FILTER=String(q||''); const s=CERT_FILTER.toLowerCase(); document.querySelectorAll('#cert-rows tr').forEach(tr=>{ tr.style.display=(!s||(tr.dataset.s||'').indexOf(s)>=0)?'':'none'; }); };
 
 /* =================== INSPECTIONS LIST =================== */
 function resultBadge(r){
@@ -700,51 +833,91 @@ window.qcSaveNcr=async (action)=>{
 function viewCerts(){
   const list=vals(CERTS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(editId==='__new_cert__') return certForm();
+  const heatCount={};
+  list.forEach(c=>{ const h=(c.heatLot||'').trim().toLowerCase(); if(h) heatCount[h]=(heatCount[h]||0)+1; });
   const rows=list.map(c=>{
     const linked=(c.linkedOrders||[]).map(oid=>ORDERS[oid]?(ORDERS[oid].job||ORDERS[oid].po||oid):oid);
-    return `<tr>
+    const h=(c.heatLot||'').trim().toLowerCase();
+    const dup=h && heatCount[h]>1;
+    const flist=c.files?vals(c.files):(c.file?[c.file]:[]);
+    const nFiles=flist.length;
+    const firstUrl=(flist[0]&&flist[0].url)||'';
+    const inv=c.invoice||{};
+    const invCell=(inv.no||inv.amount||(inv.file&&inv.file.url))
+      ? `${inv.no?('<b>'+esc(inv.no)+'</b>'):''}${inv.amount?('<div class="muted" style="font-size:12px">$'+esc(inv.amount)+'</div>'):''}${inv.file&&inv.file.url?` <a class="icon-btn" href="${esc(inv.file.url)}" target="_blank" title="${t('Invoice')}"><i class="ti ti-file-dollar"></i></a>`:''}`
+      : '<span class="muted">—</span>';
+    const sstr=[c.material,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
+    return `<tr data-s="${esc(sstr)}">
     <td><b>${esc(c.material||'—')}</b><div class="muted" style="font-size:12px">${esc(c.spec||'')}</div></td>
-    <td>${esc(c.heatLot||'—')}</td>
-    <td>${esc(c.supplier||'—')}</td>
+    <td>${esc(c.heatLot||'—')}${dup?` <span class="badge warn" title="${t('Duplicate heat/lot')}"><i class="ti ti-alert-triangle"></i></span>`:''}${c.itar?` <span class="badge flag" title="ITAR">ITAR</span>`:''}</td>
+    <td>${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div class="muted" style="font-size:12px">${esc(c.mill)}</div>`:''}</td>
     <td>${esc(c.certNo||'—')}<div class="muted" style="font-size:12px">${fmtDate(c.certDate)}</div></td>
     <td>${linked.length?linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' '):'<span class="muted">—</span>'}</td>
-    <td>${c.file&&c.file.url?`<a class="icon-btn" href="${esc(c.file.url)}" target="_blank" title="${t('Open cert')}"><i class="ti ti-file"></i></a>`:''}
+    <td>${invCell}</td>
+    <td>${nFiles?`<a class="icon-btn" href="${esc(firstUrl||'#')}" target="_blank" title="${t('Open cert')}"><i class="ti ti-file"></i></a>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:''}
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
   </tr>`;}).join('');
   return `<div class="page-head"><h2>${t('Material Certs')}</h2><p>${t('Mill & material certifications, linkable to the orders that used them.')}</p></div>
-    <div class="toolbar"><button class="btn primary" onclick="window.qcNewCert()"><i class="ti ti-plus"></i> ${t('Add cert')}</button></div>
+    <div class="toolbar">
+      <button class="btn primary" onclick="window.qcNewCert()"><i class="ti ti-plus"></i> ${t('Add cert')}</button>
+      ${list.length?`<input class="in" id="cert-search" style="max-width:340px" placeholder="${t('Search certs (heat, material, supplier, PO)…')}" value="${esc(CERT_FILTER)}" oninput="qcCertListFilter(this.value)">`:''}
+    </div>
     <div class="card" style="padding:0">
-      ${list.length?`<table class="tbl"><thead><tr><th>${t('Material')}</th><th>${t('Heat / Lot')}</th><th>${t('Supplier')}</th><th>${t('Cert #')}</th><th>${t('Linked orders')}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Material')}</th><th>${t('Heat / Lot')}</th><th>${t('Supplier')}</th><th>${t('Cert #')}</th><th>${t('Linked orders')}</th><th>${t('Invoice')}</th><th></th></tr></thead><tbody id="cert-rows">${rows}</tbody></table>`
         :`<div class="empty">${t('No certs yet. Press')} <b>${t('Add cert')}</b> ${t('and attach a mill certificate.')}</div>`}
     </div>`;
 }
 window.qcNewCert=()=>{ editId='__new_cert__'; render(); };
 window.qcDelCert=async (id)=>{ if(!confirm(t('Delete this cert record?')))return; delete CERTS[id]; await dbRemove('qc/certs/'+id); render(); };
 function certForm(){
-  const orderChecks=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||'')).slice(0,40).map(o=>{
-    const lbl=[o.customer,o.part||o.partNum,o.job?('Job '+o.job):''].filter(Boolean).join(' · ');
-    return `<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;margin:3px 0"><input type="checkbox" class="cert-link" value="${esc(o.id)}" style="width:auto;min-height:0"> ${esc(lbl||o.id)}</label>`;
+  const orderChecks=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||'')).map(o=>{
+    const lbl=[o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ');
+    const sstr=(lbl+' '+(o.po||'')).toLowerCase();
+    return `<label data-s="${esc(sstr)}" style="display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;margin:3px 0"><input type="checkbox" class="cert-link" value="${esc(o.id)}" data-po="${esc(o.po||'')}" style="width:auto;min-height:0"> ${esc(lbl||o.id)}</label>`;
   }).join('');
   return `<div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
   <div class="card">
+    <div class="field"><label class="fl">${t('Cert package')}</label>
+      <div class="dz" ondragover="qcDragOver(event)" ondragleave="qcDragLeave(event)" ondrop="qcCertDrop(event)" onclick="this.querySelector('input').click()">
+        <i class="ti ti-cloud-upload"></i>
+        <div>${t('Drag & drop or click to add the cert package (PDF or photos). AI reads it and fills the fields below.')}</div>
+        <input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="qcCertPick(this)">
+      </div>
+      <div class="thumbs" id="files-cert"></div>
+      <div class="aiwip" id="cert-ai"><i class="ti ti-sparkles"></i> ${t('Next phase: AI reads the cert and fills heat/lot, material, spec, supplier and date for you.')}</div>
+    </div>
     <div class="grid2">
       <div class="field"><label class="fl">${t('Material / grade')}</label><input class="in" id="ct-material" placeholder="304/304L SS"></div>
       <div class="field"><label class="fl">${t('Specification')}</label><input class="in" id="ct-spec" placeholder="ASTM A240"></div>
       <div class="field"><label class="fl">${t('Heat / lot #')}</label><input class="in" id="ct-heat"></div>
       <div class="field"><label class="fl">${t('Supplier')}</label><input class="in" id="ct-supplier"></div>
+      <div class="field"><label class="fl">${t('Mill')}</label><input class="in" id="ct-mill"></div>
       <div class="field"><label class="fl">${t('Cert #')}</label><input class="in" id="ct-certno"></div>
       <div class="field"><label class="fl">${t('Cert date')}</label><input class="in" id="ct-date" type="date"></div>
       <div class="field"><label class="fl">${t('Size / thickness')}</label><input class="in" id="ct-size" placeholder='18ga 48&quot;x120&quot;'></div>
       <div class="field"><label class="fl">${t('Qty')}</label><input class="in" id="ct-qty"></div>
       <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="ct-po"></div>
+      <div class="field"><label class="fl">${t('Country of origin')}</label><input class="in" id="ct-country"></div>
     </div>
-    <div class="field"><label class="fl">${t('Cert file')}</label>
-      <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload cert')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('cert',this)"></label>
-      <div class="thumbs" id="files-cert"></div>
-      <div class="aiwip"><i class="ti ti-sparkles"></i> ${t('Next phase: AI reads the cert and fills heat/lot, material, spec, supplier and date for you.')}</div>
-    </div>
+    <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ct-itar" style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
     <div class="field"><label class="fl">${t('Link to orders')}</label>
-      <div style="max-height:200px;overflow:auto;border:1px solid var(--border);padding:8px 10px">${orderChecks||('<span class="muted">'+t('No orders found.')+'</span>')}</div></div>
+      <input class="in" id="cert-order-search" style="margin-bottom:6px" placeholder="${t('Search orders…')}" oninput="qcCertOrderFilter(this.value)">
+      <div id="cert-order-list" style="max-height:200px;overflow:auto;border:1px solid var(--border);padding:8px 10px">${orderChecks||('<span class="muted">'+t('No orders found.')+'</span>')}</div></div>
+    <div class="field"><label class="fl">${t('Vendor invoice')}</label>
+      <div class="dz" ondragover="qcDragOver(event)" ondragleave="qcDragLeave(event)" ondrop="qcInvDrop(event)" onclick="this.querySelector('input').click()">
+        <i class="ti ti-file-dollar"></i>
+        <div>${t('Drop invoice here or click to add — AI reads invoice #, date and amount.')}</div>
+        <input type="file" accept=".pdf,image/*" style="display:none" onchange="qcInvPick(this)">
+      </div>
+      <div class="thumbs" id="files-invoice"></div>
+      <div class="aiwip" id="inv-ai" style="display:none"></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field"><label class="fl">${t('Invoice #')}</label><input class="in" id="inv-no"></div>
+        <div class="field"><label class="fl">${t('Invoice date')}</label><input class="in" id="inv-date" type="date"></div>
+        <div class="field"><label class="fl">${t('Amount')}</label><input class="in" id="inv-amount"></div>
+        <div class="field"><label class="fl">${t('Vendor')}</label><input class="in" id="inv-vendor"></div>
+      </div>
+    </div>
     <div class="toolbar" style="margin-top:6px">
       <button class="btn primary" onclick="window.qcSaveCert()"><i class="ti ti-device-floppy"></i> ${t('Save cert')}</button>
       <button class="btn" onclick="editId=null;render()">${t('Cancel')}</button>
@@ -753,14 +926,17 @@ function certForm(){
 }
 window.qcSaveCert=async ()=>{
   const material=gv('ct-material');
-  if(!material && !(_pendingFiles['cert']||[]).length){ alert(t('Enter a material or attach a cert file.')); return; }
+  if(!material && !(_pendingFiles['cert']||[]).length && !gv('ct-heat')){ alert(t('Enter a material or attach a cert file.')); return; }
   const id=newId('cert');
   const files=await uploadPending('cert','certs');
+  const invFiles=await uploadPending('invoice','invoices');
   const linked=[...document.querySelectorAll('.cert-link:checked')].map(c=>c.value);
+  const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
+  const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
   const rec={ id, createdAt:Date.now(), addedBy:(QC_USER&&QC_USER.email)||'',
-    material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), certNo:gv('ct-certno'),
-    certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'),
-    file:files[0]||null, linkedOrders:linked };
+    material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), mill:gv('ct-mill'), certNo:gv('ct-certno'),
+    certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'), country:gv('ct-country'), itar:gc('ct-itar'),
+    files, file:files[0]||null, linkedOrders:linked, invoice: hasInv?invoice:null };
   await dbSet('qc/certs/'+id, rec);
   editId=null; render();
 };
