@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- build 2026-07-02b · apar receivables invoice# sort -->
+<!-- build 2026-07-02c · apar invoice# sort + reverse-order toggle -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1475,7 +1475,7 @@ function updateBadges(entries){
   set('nb-trash',trashedEntries().length);
 }
 // list view state (per side): search text, group-by-vendor, selected ids
-const listState={ar:{q:'',group:false,sort:'due',sel:new Set(),focus:'all',compact:false},ap:{q:'',group:false,sort:'due',sel:new Set(),focus:'all',compact:false}};
+const listState={ar:{q:'',group:false,sort:'due',dir:1,sel:new Set(),focus:'all',compact:false},ap:{q:'',group:false,sort:'due',dir:1,sel:new Set(),focus:'all',compact:false}};
 let _curSide='ap';
 function entryRow(e,opts){
   opts=opts||{};
@@ -1719,6 +1719,7 @@ function renderList(entries,side){
   const S=listState[side];
   const isAR=side==='ar';
   const all=sortListBy(entries,S.sort);
+  if(S.dir===-1) all.reverse();
   // prune selections that no longer exist
   const ids=new Set(all.map(e=>e.id));
   S.sel.forEach(id=>{ if(!ids.has(id)) S.sel.delete(id); });
@@ -1849,6 +1850,7 @@ function renderList(entries,side){
       <label class="sort-ctl"><i class="ti ti-arrows-sort"></i><select id="list-sort" onchange="setListSort(this.value)">
         ${LIST_SORTS.map(s=>`<option value="${s.k}" ${S.sort===s.k?'selected':''}>${s.label}</option>`).join('')}
       </select></label>
+      <button class="btn${S.dir===-1?' primary':''}" onclick="toggleListDir()" title="Reverse sort order" aria-label="Reverse sort order"><i class="ti ti-arrow-${S.dir===-1?'up':'down'}"></i></button>
       <div class="focus-chips">
         <button class="fchip${focus==='overdue'?' on':''}" onclick="setListFocus('overdue')"><i class="ti ti-alert-triangle"></i> Overdue</button>
         <button class="fchip${focus==='week'?' on':''}" onclick="setListFocus('week')"><i class="ti ti-clock"></i> Due ≤ 7 days</button>
@@ -1870,6 +1872,7 @@ function renderList(entries,side){
 }
 window.toggleGroupMode=()=>{ listState[_curSide].group=!listState[_curSide].group; rerenderList(); };
 window.setListSort=(key)=>{ listState[_curSide].sort=key; rerenderList(); };
+window.toggleListDir=()=>{ const S=listState[_curSide]; S.dir=(S.dir===-1?1:-1); rerenderList(); };
 window.toggleCompact=()=>{ listState[_curSide].compact=!listState[_curSide].compact; rerenderList(); };
 window.setListFocus=(f)=>{ const S=listState[_curSide]; S.focus=(S.focus===f)?'all':f; rerenderList(); };
 window.clearListFocus=()=>{ listState[_curSide].focus='all'; rerenderList(); };
