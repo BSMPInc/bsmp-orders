@@ -337,6 +337,7 @@ const I18N = {
     'Reading invoice with AI…':'Leyendo factura con IA…','Invoice #':'N.º de factura','Invoice date':'Fecha de factura','Amount':'Importe','Vendor':'Proveedor',
     'Invoice':'Factura','Duplicate heat/lot':'Colada/lote duplicado','Files':'Archivos',
     'View cert':'Ver certificado','View invoice':'Ver factura','Open in new tab':'Abrir en pestaña nueva','Print':'Imprimir','Material cert':'Certificado de material','No file is attached to this cert yet.':'Este certificado aún no tiene archivo adjunto.',
+    'Saved certs':'Certificados guardados','saved cert':'certificado guardado','saved certs':'certificados guardados','No saved certs yet.':'Aún no hay certificados guardados.','Press':'Pulsa','to add your first one — it will appear here after you save.':'para agregar el primero — aparecerá aquí después de guardar.',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
     'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
     'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
@@ -977,10 +978,11 @@ function viewCerts(){
     <div class="toolbar">
       <button class="btn primary" onclick="window.qcNewCert()"><i class="ti ti-plus"></i> ${t('Add cert')}</button>
       ${list.length?`<input class="in" id="cert-search" style="max-width:340px" placeholder="${t('Search certs (heat, material, supplier, PO)…')}" value="${esc(CERT_FILTER)}" oninput="qcCertListFilter(this.value)">`:''}
+      <div style="margin-left:auto;font-weight:800;color:var(--text2)">${list.length} ${list.length===1?t('saved cert'):t('saved certs')}</div>
     </div>
     <div class="card" style="padding:0">
       ${list.length?`<table class="tbl"><thead><tr><th>${t('Material')}</th><th>${t('Heat / Lot')}</th><th>${t('Supplier')}</th><th>${t('Cert #')}</th><th>${t('Linked orders')}</th><th>${t('Invoice')}</th><th></th></tr></thead><tbody id="cert-rows">${rows}</tbody></table>`
-        :`<div class="empty">${t('No certs yet. Press')} <b>${t('Add cert')}</b> ${t('and attach a mill certificate.')}</div>`}
+        :`<div class="empty"><i class="ti ti-license" style="font-size:30px;opacity:.5;display:block;margin-bottom:8px"></i>${t('No saved certs yet.')}<br><span class="muted">${t('Press')} <b>${t('Add cert')}</b> ${t('to add your first one — it will appear here after you save.')}</span></div>`}
     </div>`;
 }
 window.qcNewCert=()=>{ _certLinks=[]; editId='__new_cert__'; render(); };
@@ -1036,7 +1038,8 @@ function qcvRender(){
   else body.innerHTML=`<div class="qcv-imgwrap"><img src="${esc(f.url)}" alt="${esc(f.name)}"></div>`;
 }
 function certForm(){
-  return `<div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
+  return `<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>
+  <div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
   <div class="card">
     <div class="field"><label class="fl">${t('Cert package')}</label>
       <div class="dz" ondragover="qcDragOver(event)" ondragleave="qcDragLeave(event)" ondrop="qcCertDrop(event)" onclick="this.querySelector('input').click()">
