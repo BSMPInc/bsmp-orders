@@ -2259,7 +2259,7 @@ function poItemsHtml(g){
     return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}${r.buildOnly?' build-only':''}" onclick="window._tl('${r.id}',event)">
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
-        <span class="ci-desc-main" title="${(r.desc||r.part||'').replace(/"/g,'&quot;')}">${missBadge}${clip}${r.desc||r.part||'<span style="color:var(--text3)">(no description)</span>'}</span>
+        <span class="ci-desc-main" title="${((r.part?('Part '+r.part):'')+(r.part&&r.desc?' · ':'')+(r.desc||'')).replace(/"/g,'&quot;')}">${missBadge}${clip}${r.part||r.desc||'<span style="color:var(--text3)">(no part #)</span>'}</span>
         ${r.invoice?`<span class="inv-chip" title="Invoice number">Inv ${r.invoice}</span>`:''}
         ${osLine}
       </div>
