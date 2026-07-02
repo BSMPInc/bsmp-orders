@@ -171,6 +171,24 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .rv-opt{padding:7px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
 .rv-opt:last-child{border-bottom:none}
 .rv-opt:hover{background:var(--accent-soft)}
+.qcv-ov{position:fixed;inset:0;background:rgba(16,20,26,.55);z-index:9500;display:none;align-items:center;justify-content:center;padding:24px}
+.qcv{background:var(--card);width:min(980px,96vw);height:min(90vh,940px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
+.qcv-head{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.qcv-title{flex:1;min-width:0}
+.qcv-h1{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px}
+.qcv-h2{font-size:12px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qcv-actions{display:flex;gap:6px;flex-wrap:wrap}
+.qcv-x{border:none;background:none;cursor:pointer;color:var(--text2);font-size:22px;padding:2px 4px;line-height:1}
+.qcv-x:hover{color:var(--text)}
+.qcv-tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);overflow-x:auto;flex-wrap:wrap}
+.qcv-tab{border:1px solid var(--border);background:var(--bg);padding:5px 10px;font-size:12px;font-weight:600;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-family:inherit}
+.qcv-tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.qcv-body{flex:1;min-height:0;background:#525659;display:flex}
+.qcv-frame{width:100%;height:100%;border:none;background:#525659}
+.qcv-imgwrap{flex:1;overflow:auto;display:flex;align-items:center;justify-content:center;padding:12px}
+.qcv-imgwrap img{max-width:100%;max-height:100%;object-fit:contain;background:#fff}
+.cert-open{cursor:pointer}
+.cert-open:hover{text-decoration:underline}
 body.role-operator .mgr-only{display:none!important}
 </style>
 </head>
@@ -318,6 +336,7 @@ const I18N = {
     'Vendor invoice':'Factura del proveedor','Drop invoice here or click to add — AI reads invoice #, date and amount.':'Suelta la factura o haz clic — la IA lee N.º, fecha e importe.',
     'Reading invoice with AI…':'Leyendo factura con IA…','Invoice #':'N.º de factura','Invoice date':'Fecha de factura','Amount':'Importe','Vendor':'Proveedor',
     'Invoice':'Factura','Duplicate heat/lot':'Colada/lote duplicado','Files':'Archivos',
+    'View cert':'Ver certificado','View invoice':'Ver factura','Open in new tab':'Abrir en pestaña nueva','Print':'Imprimir','Material cert':'Certificado de material','No file is attached to this cert yet.':'Este certificado aún no tiene archivo adjunto.',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
     'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
     'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
@@ -939,17 +958,19 @@ function viewCerts(){
     const firstUrl=(flist[0]&&flist[0].url)||'';
     const inv=c.invoice||{};
     const invCell=(inv.no||inv.amount||(inv.file&&inv.file.url))
-      ? `${inv.no?('<b>'+esc(inv.no)+'</b>'):''}${inv.amount?('<div class="muted" style="font-size:12px">$'+esc(inv.amount)+'</div>'):''}${inv.file&&inv.file.url?` <a class="icon-btn" href="${esc(inv.file.url)}" target="_blank" title="${t('Invoice')}"><i class="ti ti-file-dollar"></i></a>`:''}`
+      ? `${inv.no?('<b>'+esc(inv.no)+'</b>'):''}${inv.amount?('<div class="muted" style="font-size:12px">$'+esc(inv.amount)+'</div>'):''}${inv.file&&inv.file.url?` <button class="icon-btn" onclick="qcViewCert('${c.id}',${nFiles})" title="${t('View invoice')}"><i class="ti ti-file-dollar"></i></button>`:''}`
       : '<span class="muted">—</span>';
     const sstr=[c.material,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
+    const hasFile=nFiles>0||!!(inv.file&&inv.file.url);
+    const matCell=hasFile?`<b class="cert-open" onclick="qcViewCert('${c.id}')" title="${t('View cert')}">${esc(c.material||'—')}</b>`:`<b>${esc(c.material||'—')}</b>`;
     return `<tr data-s="${esc(sstr)}">
-    <td><b>${esc(c.material||'—')}</b><div class="muted" style="font-size:12px">${esc(c.spec||'')}</div></td>
+    <td>${matCell}<div class="muted" style="font-size:12px">${esc(c.spec||'')}</div></td>
     <td>${esc(c.heatLot||'—')}${dup?` <span class="badge warn" title="${t('Duplicate heat/lot')}"><i class="ti ti-alert-triangle"></i></span>`:''}${c.itar?` <span class="badge flag" title="ITAR">ITAR</span>`:''}</td>
     <td>${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div class="muted" style="font-size:12px">${esc(c.mill)}</div>`:''}</td>
     <td>${esc(c.certNo||'—')}<div class="muted" style="font-size:12px">${fmtDate(c.certDate)}</div></td>
     <td>${linked.length?linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' '):'<span class="muted">—</span>'}</td>
     <td>${invCell}</td>
-    <td>${nFiles?`<a class="icon-btn" href="${esc(firstUrl||'#')}" target="_blank" title="${t('Open cert')}"><i class="ti ti-file"></i></a>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:''}
+    <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:''}
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
   </tr>`;}).join('');
   return `<div class="page-head"><h2>${t('Material Certs')}</h2><p>${t('Mill & material certifications, linkable to the orders that used them.')}</p></div>
@@ -964,6 +985,56 @@ function viewCerts(){
 }
 window.qcNewCert=()=>{ _certLinks=[]; editId='__new_cert__'; render(); };
 window.qcDelCert=async (id)=>{ if(!confirm(t('Delete this cert record?')))return; delete CERTS[id]; await dbRemove('qc/certs/'+id); render(); };
+
+/* =================== CERT VIEWER (view + print the actual PDF) =================== */
+function qcFileKind(f){ const s=((f&&f.url)||'')+' '+((f&&f.name)||'')+' '+((f&&f.type)||''); return /pdf/i.test(s)?'pdf':'img'; }
+function qcPrintFile(url,kind){
+  const isPdf=(kind==='pdf')|| /pdf/i.test(kind||'') || /\.pdf($|\?)/i.test(url||'');
+  if(isPdf){
+    const w=window.open(url,'_blank');
+    if(w){ const p=()=>{ try{ w.focus(); w.print(); }catch(e){} }; try{ w.addEventListener('load',p); }catch(e){} setTimeout(p,1400); }
+  } else {
+    const w=window.open('','_blank','width=900,height=760');
+    if(w){ w.document.write('<!doctype html><title>'+t('Print')+'</title><body style="margin:0;display:flex;align-items:center;justify-content:center"><img src="'+url+'" style="max-width:100%;max-height:100vh" onload="setTimeout(function(){window.focus();window.print();},200)"></body>'); w.document.close(); }
+  }
+}
+let _certView=null;
+window.qcViewCert=(id,startIdx)=>{
+  const c=CERTS[id]; if(!c) return;
+  const files=[];
+  const cf=c.files?vals(c.files):(c.file?[c.file]:[]);
+  cf.forEach((f,i)=>{ if(f&&f.url) files.push({url:f.url,name:f.name||(t('Cert')+' '+(i+1)),kind:qcFileKind(f),tag:'cert'}); });
+  const inv=c.invoice||{};
+  if(inv.file&&inv.file.url) files.push({url:inv.file.url,name:inv.file.name||t('Invoice'),kind:qcFileKind(inv.file),tag:'invoice'});
+  if(!files.length){ alert(t('No file is attached to this cert yet.')); return; }
+  _certView={ id, c, files, idx: Math.min(startIdx||0, files.length-1) };
+  qcvMount(); qcvRender();
+};
+function qcvMount(){
+  let ov=$('qcv-ov');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='qcv-ov'; ov.className='qcv-ov';
+    ov.innerHTML='<div class="qcv" role="dialog" aria-modal="true"><div class="qcv-head"><div class="qcv-title" id="qcv-title"></div><div class="qcv-actions" id="qcv-actions"></div><button class="qcv-x" onclick="qcvClose()" aria-label="Close"><i class="ti ti-x"></i></button></div><div class="qcv-tabs" id="qcv-tabs"></div><div class="qcv-body" id="qcv-body"></div></div>';
+    ov.addEventListener('click',e=>{ if(e.target===ov) qcvClose(); });
+    document.body.appendChild(ov);
+    document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const o=$('qcv-ov'); if(o&&o.style.display!=='none') qcvClose(); } });
+  }
+  ov.style.display='flex';
+}
+window.qcvClose=()=>{ const ov=$('qcv-ov'); if(ov){ ov.style.display='none'; const b=$('qcv-body'); if(b) b.innerHTML=''; } _certView=null; };
+window.qcvGo=(i)=>{ if(_certView){ _certView.idx=i; qcvRender(); } };
+window.qcvPrint=()=>{ if(_certView){ const f=_certView.files[_certView.idx]; if(f) qcPrintFile(f.url,f.kind); } };
+window.qcvOpen=()=>{ if(_certView){ const f=_certView.files[_certView.idx]; if(f) window.open(f.url,'_blank'); } };
+function qcvRender(){
+  const V=_certView; if(!V) return; const c=V.c, f=V.files[V.idx];
+  $('qcv-title').innerHTML=`<div class="qcv-h1">${esc(c.material||t('Material cert'))}${c.itar?' <span class="badge flag">ITAR</span>':''}</div>`+
+    `<div class="qcv-h2">${[c.heatLot?(t('Heat / Lot')+' '+esc(c.heatLot)):'',c.certNo?(t('Cert #')+' '+esc(c.certNo)):'',esc(c.supplier||'')].filter(Boolean).join(' · ')}</div>`;
+  $('qcv-actions').innerHTML=`<button class="btn sm primary" onclick="qcvPrint()"><i class="ti ti-printer"></i> ${t('Print')}</button><button class="btn sm" onclick="qcvOpen()"><i class="ti ti-external-link"></i> ${t('Open in new tab')}</button>`;
+  $('qcv-tabs').innerHTML=V.files.length>1?V.files.map((x,i)=>`<button class="qcv-tab${i===V.idx?' on':''}" onclick="qcvGo(${i})"><i class="ti ti-${x.tag==='invoice'?'file-dollar':'file'}"></i> ${esc(x.name)}</button>`).join(''):'';
+  const body=$('qcv-body');
+  if(f.kind==='pdf') body.innerHTML=`<iframe class="qcv-frame" src="${esc(f.url)}#toolbar=1" title="${esc(f.name)}"></iframe>`;
+  else body.innerHTML=`<div class="qcv-imgwrap"><img src="${esc(f.url)}" alt="${esc(f.name)}"></div>`;
+}
 function certForm(){
   return `<div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
   <div class="card">
