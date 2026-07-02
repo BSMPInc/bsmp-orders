@@ -189,6 +189,10 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .qcv-imgwrap img{max-width:100%;max-height:100%;object-fit:contain;background:#fff}
 .cert-open{cursor:pointer}
 .cert-open:hover{text-decoration:underline}
+.qc-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
+.qc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.qc-toast.err{background:var(--spark)}
+.qc-toast.ok{background:#2f7d55}
 body.role-operator .mgr-only{display:none!important}
 </style>
 </head>
@@ -338,6 +342,7 @@ const I18N = {
     'Invoice':'Factura','Duplicate heat/lot':'Colada/lote duplicado','Files':'Archivos',
     'View cert':'Ver certificado','View invoice':'Ver factura','Open in new tab':'Abrir en pestaña nueva','Print':'Imprimir','Material cert':'Certificado de material','No file is attached to this cert yet.':'Este certificado aún no tiene archivo adjunto.',
     'Saved certs':'Certificados guardados','saved cert':'certificado guardado','saved certs':'certificados guardados','No saved certs yet.':'Aún no hay certificados guardados.','Press':'Pulsa','to add your first one — it will appear here after you save.':'para agregar el primero — aparecerá aquí después de guardar.',
+    'Cert saved.':'Certificado guardado.','Save failed:':'Error al guardar:','certs saved':'certificados guardados',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
     'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
     'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
@@ -375,6 +380,14 @@ function fmtDate(s){ if(!s) return '—'; const d=new Date(s); if(isNaN(d)) retu
 function fmtWhen(ms){ if(!ms) return '—'; return new Date(ms).toLocaleString(LANG==='es'?'es-MX':'en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
 function gv(id){const el=$(id);return el?el.value.trim():'';}
 function gc(id){const el=$(id);return el?el.checked:false;}
+function qcToast(msg,kind){
+  let el=$('qc-toast');
+  if(!el){ el=document.createElement('div'); el.id='qc-toast'; el.className='qc-toast'; document.body.appendChild(el); }
+  el.className='qc-toast '+(kind||'')+' show';
+  el.innerHTML='<i class="ti ti-'+(kind==='err'?'alert-triangle':'circle-check')+'"></i> '+esc(msg);
+  clearTimeout(el._t); el._t=setTimeout(()=>{ el.className='qc-toast '+(kind||''); }, 3400);
+}
+window.qcToast=qcToast;
 const isMgr=()=>QC_ROLE!=='operator';
 
 /* ---------- data in from Firebase module ---------- */
@@ -396,7 +409,7 @@ window.qcOnAuth=(user,role)=>{
   if(page==='inspections' && role==='operator') page='selfcheck';
   applyStatic(); render();
 };
-async function dbSet(path,val){ if(window.qcSet) return window.qcSet(path,val); }
+async function dbSet(path,val){ if(window.qcSet) return window.qcSet(path, val===undefined?null:JSON.parse(JSON.stringify(val))); }
 async function dbRemove(path){ if(window.qcRemove) return window.qcRemove(path); }
 async function upload(file,prefix){ if(window.qcUpload) return window.qcUpload(file,prefix); return ''; }
 
@@ -1092,18 +1105,27 @@ function certForm(){
 window.qcSaveCert=async ()=>{
   const material=gv('ct-material');
   if(!material && !(_pendingFiles['cert']||[]).length && !gv('ct-heat')){ alert(t('Enter a material or attach a cert file.')); return; }
-  const id=newId('cert');
-  const files=await uploadPending('cert','certs');
-  const invFiles=await uploadPending('invoice','invoices');
-  const linked=_certLinks.slice();
-  const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
-  const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
-  const rec={ id, createdAt:Date.now(), addedBy:(QC_USER&&QC_USER.email)||'',
-    material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), mill:gv('ct-mill'), certNo:gv('ct-certno'),
-    certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'), country:gv('ct-country'), itar:gc('ct-itar'),
-    files, file:files[0]||null, linkedOrders:linked, invoice: hasInv?invoice:null };
-  await dbSet('qc/certs/'+id, rec);
-  editId=null; render();
+  const btn=document.querySelector('button[onclick="window.qcSaveCert()"]');
+  if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
+  try{
+    const id=newId('cert');
+    const files=await uploadPending('cert','certs');
+    const invFiles=await uploadPending('invoice','invoices');
+    const linked=_certLinks.slice();
+    const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
+    const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
+    const rec={ id, createdAt:Date.now(), addedBy:(QC_USER&&QC_USER.email)||'',
+      material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), mill:gv('ct-mill'), certNo:gv('ct-certno'),
+      certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'), country:gv('ct-country'), itar:gc('ct-itar'),
+      files, file:files[0]||null, linkedOrders:linked, invoice: hasInv?invoice:null };
+    await dbSet('qc/certs/'+id, rec);
+    _certLinks=[]; editId=null; render();
+    qcToast(t('Cert saved.'),'ok');
+  }catch(e){
+    console.error('cert save failed', e);
+    if(btn){ btn.disabled=false; btn.style.opacity=''; }
+    qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err');
+  }
 };
 
 /* ---------- multi-cert review step ---------- */
@@ -1183,7 +1205,7 @@ window.qcSaveReviewedCerts=async ()=>{
   const invFiles=await uploadPending('invoice','invoices');
   const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
   const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
-  let n=0;
+  let n=0, firstErr=null;
   for(const c of P.detected){
     try{
       const f=await buildCertFile(c, P.files);
@@ -1195,10 +1217,14 @@ window.qcSaveReviewedCerts=async ()=>{
         certDate:c.cert_date||'', size:c.size_thickness||'', qty:c.qty||'', po:c.po_number||'', country:c.country_of_origin||'', itar:!!c.itar,
         files:fileObj?[fileObj]:[], file:fileObj, linkedOrders:c._linked||[], invoice: hasInv?invoice:null });
       n++; setSt(t('Saved')+' '+n+'/'+P.detected.length);
-    }catch(e){ console.warn('save cert failed',e); }
+    }catch(e){ console.error('save cert failed',e); if(!firstErr) firstErr=e; }
   }
+  const total=P.detected.length;
   _certPacket=null; _pendingFiles['cert']=[]; _pendingFiles['invoice']=[];
   editId=null; render();
+  if(n===total){ qcToast(n+' '+t('certs saved'),'ok'); }
+  else if(n>0){ qcToast(n+'/'+total+' '+t('certs saved')+' · '+t('Save failed:')+' '+((firstErr&&firstErr.message)||firstErr),'err'); }
+  else { qcToast(t('Save failed:')+' '+((firstErr&&firstErr.message)||firstErr),'err'); }
 };
 
 // initial static translation (login screen + chrome) before sign-in
