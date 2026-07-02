@@ -1682,7 +1682,8 @@ const LIST_SORTS=[
   {k:'due',label:'Due date'},
   {k:'issue',label:'Date (issued)'},
   {k:'until',label:'Days until due'},
-  {k:'amount',label:'Amount'}
+  {k:'amount',label:'Amount'},
+  {k:'invoice',label:'Invoice #'}
 ];
 function sortListBy(arr,key){
   const a2=[...arr];
@@ -1695,6 +1696,14 @@ function sortListBy(arr,key){
   } else if(key==='amount'){
     const bal=e=>Math.max(0,(e.amount||0)-(e.paid||0));
     a2.sort((a,b)=>bal(b)-bal(a)); // largest balance first
+  } else if(key==='invoice'){
+    // by invoice number, numeric-aware ("INV-2" before "INV-10"); blanks last
+    const ref=e=>(e.ref||'').trim();
+    a2.sort((a,b)=>{
+      const ra=ref(a), rb=ref(b);
+      if(!ra&&!rb)return 0; if(!ra)return 1; if(!rb)return -1;
+      return ra.localeCompare(rb,undefined,{numeric:true,sensitivity:'base'});
+    });
   } else { // 'due' (default): overdue first, then by due date ascending
     a2.sort((a,b)=>{
       const sa=statusOf(a)==='over'?0:1, sb=statusOf(b)==='over'?0:1;
