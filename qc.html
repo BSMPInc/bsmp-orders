@@ -10,6 +10,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>try{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}</script>
 <style>
 :root{
   --bg:#f5f2ea; --card:#ffffff; --surface:#ffffff;
@@ -344,6 +346,7 @@ const I18N = {
     'Saved certs':'Certificados guardados','saved cert':'certificado guardado','saved certs':'certificados guardados','No saved certs yet.':'Aún no hay certificados guardados.','Press':'Pulsa','to add your first one — it will appear here after you save.':'para agregar el primero — aparecerá aquí después de guardar.',
     'Cert saved.':'Certificado guardado.','Save failed:':'Error al guardar:','certs saved':'certificados guardados',
     'Order details':'Detalles de la orden','Orders using this material':'Órdenes que usan este material','Printed':'Impreso','No linked orders on this cert.':'Este certificado no tiene órdenes vinculadas.','Please allow pop-ups to open the printable order sheet.':'Permite ventanas emergentes para abrir la hoja imprimible.','View / print full order details':'Ver / imprimir detalles de la orden','Unit price':'Precio unitario','Order date':'Fecha de orden','Due date':'Fecha de entrega','Part #':'N.º de parte','Job #':'N.º de trabajo','Order':'Orden',
+    'Material Certificate':'Certificado de material','Traceability sheet':'Hoja de trazabilidad','Certificate':'Certificado','Certificate document':'Documento del certificado','Loading cert document…':'Cargando documento del certificado…','No cert file attached.':'Sin archivo de certificado adjunto.','No cert details.':'Sin detalles del certificado.','Restricted':'Restringido','Could not embed this cert for printing. Open it from the cert viewer to print separately.':'No se pudo incrustar el certificado para imprimir. Ábrelo en el visor para imprimirlo por separado.',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
     'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
     'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
@@ -1056,61 +1059,106 @@ function qcvRender(){
   else body.innerHTML=`<div class="qcv-imgwrap"><img src="${esc(f.url)}" alt="${esc(f.name)}"></div>`;
 }
 
-/* open a printable window with the FULL details of the orders linked to a cert */
-window.qcOrderSheet=(certId)=>{
+/* open a printable window: logo + cert info + linked order details + the cert document itself */
+window.qcOrderSheet=async (certId)=>{
   const c=CERTS[certId]; if(!c) return;
   const orders=(c.linkedOrders||[]).map(id=>ORDERS[id]).filter(Boolean);
-  const w=window.open('','_blank','width=920,height=820');
+  const w=window.open('','_blank','width=980,height=900');
   if(!w){ alert(t('Please allow pop-ups to open the printable order sheet.')); return; }
+  const logo=(document.querySelector('.logo-flag img')||{}).src||'';
   const money=v=>(v!=null&&v!==''&&!isNaN(+v))?('$'+(+v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})):esc(String(v||''));
   const rowsFor=o=>{
     const F=[
-      [t('Customer'), o.customer],
-      [t('Part #'), o.part||o.partNum],
-      [t('Rev'), o.rev],
-      [t('Description'), o.desc||o.description],
-      [t('Job #'), o.job],
-      [t('PO #'), o.po],
-      [t('Qty'), o.qty],
-      [t('Unit price'), (o.price!=null&&o.price!=='')?money(o.price):''],
-      [t('Order date'), fmtDate(o.ordered||o.orderDate||o.created)],
-      [t('Due date'), fmtDate(o.due||o.dueDate)],
-      [t('Status'), o.status||o.stage],
-      [t('Notes'), o.notes]
+      [t('Customer'), o.customer],[t('Part #'), o.part||o.partNum],[t('Rev'), o.rev],
+      [t('Description'), o.desc||o.description],[t('Job #'), o.job],[t('PO #'), o.po],
+      [t('Qty'), o.qty],[t('Unit price'), (o.price!=null&&o.price!=='')?money(o.price):''],
+      [t('Order date'), fmtDate(o.ordered||o.orderDate||o.created)],[t('Due date'), fmtDate(o.due||o.dueDate)],
+      [t('Status'), o.status||o.stage],[t('Notes'), o.notes]
     ].filter(r=>r[1]!=null && String(r[1]).trim()!=='' && r[1]!=='—');
     return F.map(r=>`<tr><th>${esc(r[0])}</th><td>${esc(String(r[1]))}</td></tr>`).join('');
   };
   const blocks=orders.length
     ? orders.map(o=>`<div class="ord"><h2>${esc([o.customer,o.part||o.partNum].filter(Boolean).join(' — ')||t('Order'))}</h2><table>${rowsFor(o)}</table></div>`).join('')
     : `<p class="none">${t('No linked orders on this cert.')}</p>`;
-  const hdr=[c.material,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):'',c.supplier].filter(Boolean).map(esc).join(' &middot; ');
-  const doc=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t('Order details')+' — '+(c.material||'cert'))}</title><style>
-    *{box-sizing:border-box} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;color:#1b2430;background:#f5f3ee}
-    .wrap{max-width:820px;margin:0 auto;padding:28px}
-    .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1b2430;padding-bottom:12px;margin-bottom:16px}
-    .brand{font-weight:800;font-size:19px;letter-spacing:.02em;line-height:1}
-    .brand small{display:block;font-weight:600;font-size:10.5px;color:#5b6470;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
-    .cert{font-size:12px;color:#3a4049;margin-top:8px}
-    h1{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;color:#5b6470}
+  const cf=[
+    [t('Material / grade'), c.material],[t('Specification'), c.spec],[t('Heat / Lot'), c.heatLot],
+    [t('Cert #'), c.certNo],[t('Supplier'), c.supplier],[t('Mill'), c.mill],
+    [t('Cert date'), fmtDate(c.certDate)],[t('Size / thickness'), c.size],[t('Country of origin'), c.country]
+  ].filter(r=>r[1]!=null && String(r[1]).trim()!=='' && r[1]!=='—');
+  const certInfo=cf.map(r=>`<div class="ci"><span class="cl">${esc(r[0])}</span><span class="cv">${esc(String(r[1]))}</span></div>`).join('')
+    +(c.itar?`<div class="ci"><span class="cl">${t('Restricted')}</span><span class="cv itar">ITAR</span></div>`:'');
+  const doc=`<!doctype html><html><head><meta charset="utf-8"><title>${esc((c.material||'Cert')+' — '+t('Material Certificate'))}</title><style>
+    *{box-sizing:border-box} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;color:#1b2430;background:#f1efe9}
+    .wrap{max-width:840px;margin:0 auto;padding:0 0 32px}
+    .hdr{display:flex;align-items:center;gap:16px;background:#3a4049;padding:16px 24px;border-bottom:3px solid #d42b2b;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .hdr .logo{height:46px;width:auto}
+    .htitle{color:#fff;font-weight:800;font-size:17px;line-height:1.1;letter-spacing:.02em}
+    .htitle span{display:block;font-weight:600;font-size:11px;color:#c7ccd2;text-transform:uppercase;letter-spacing:.09em;margin-top:3px}
+    .hmeta{margin-left:auto;color:#c7ccd2;font-size:11px;text-align:right}
+    .body{padding:22px 24px 0}
+    h1{font-size:12.5px;margin:22px 0 10px;text-transform:uppercase;letter-spacing:.08em;color:#8a6d3b;border-bottom:1px solid #e2ddd3;padding-bottom:5px}
+    h1:first-child{margin-top:6px}
+    .certbox{background:#fff;border:1.5px solid #cdd2d8;border-left:4px solid #3a4049;border-radius:6px;padding:16px 18px;display:grid;grid-template-columns:1fr 1fr;gap:9px 26px}
+    .ci{display:flex;flex-direction:column;gap:1px;min-width:0}
+    .cl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#7a828c;font-weight:700}
+    .cv{font-size:15px;font-weight:800;color:#161d26;line-height:1.2}
+    .cv.itar{color:#b3261e}
     .ord{background:#fff;border:1px solid #d9d5cc;border-radius:6px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid}
     .ord h2{font-size:14px;margin:0 0 8px;color:#3a4049}
     table{width:100%;border-collapse:collapse;font-size:12.5px}
     th{text-align:left;width:150px;color:#5b6470;font-weight:600;padding:5px 10px 5px 0;vertical-align:top;white-space:nowrap}
-    td{padding:5px 0;vertical-align:top}
+    td{padding:5px 0;vertical-align:top;font-weight:600}
     tr+tr th,tr+tr td{border-top:1px solid #eef0f2}
     .none{color:#8a919b}
-    .meta{text-align:right;font-size:11px;color:#5b6470}
-    .actions{margin:20px 0;text-align:center}
-    button{font:inherit;font-weight:700;background:#3a4049;color:#fff;border:none;border-radius:6px;padding:9px 22px;cursor:pointer}
-    @media print{ body{background:#fff} .actions{display:none} .ord{border-color:#bbb} .wrap{padding:0} }
+    .pages{display:flex;flex-direction:column;gap:12px}
+    .certpage{width:100%;height:auto;border:1px solid #cdd2d8;border-radius:4px;page-break-inside:avoid;background:#fff}
+    .loading,.pagenote{color:#8a919b;font-size:12px;padding:10px 0}
+    .actions{position:sticky;bottom:0;margin:22px 24px 0;text-align:center}
+    button{font:inherit;font-weight:700;background:#3a4049;color:#fff;border:none;border-radius:6px;padding:10px 26px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+    @media print{ body{background:#fff} .actions{display:none} .ord,.certbox{border-color:#bbb} }
   </style></head><body><div class="wrap">
-    <div class="top"><div><div class="brand">BERT&rsquo;S<small>Sheet Metal Products</small></div><div class="cert">${hdr}</div></div><div class="meta">${esc(t('Printed'))} ${esc(fmtDate(todayISO()))}</div></div>
-    <h1>${esc(t('Orders using this material'))}</h1>
-    ${blocks}
+    <div class="hdr">${logo?`<img class="logo" src="${logo}">`:''}<div class="htitle">${esc(t('Material Certificate'))}<span>${esc(t('Traceability sheet'))}</span></div><div class="hmeta">${esc(t('Printed'))} ${esc(fmtDate(todayISO()))}</div></div>
+    <div class="body">
+      <h1>${esc(t('Certificate'))}</h1>
+      <div class="certbox">${certInfo||('<span class="none">'+esc(t('No cert details.'))+'</span>')}</div>
+      <h1>${esc(t('Orders using this material'))}</h1>
+      ${blocks}
+      <h1>${esc(t('Certificate document'))}</h1>
+      <div id="cert-pages" class="pages"><div class="loading">${esc(t('Loading cert document…'))}</div></div>
+    </div>
     <div class="actions"><button onclick="window.print()">${esc(t('Print'))}</button></div>
   </div></body></html>`;
   w.document.write(doc); w.document.close(); w.focus();
+  qcRenderCertPages(c, w);
 };
+// render each cert file (PDF pages rasterized, images embedded) into the print window
+async function qcRenderCertPages(c, w){
+  const container=w.document.getElementById('cert-pages'); if(!container) return;
+  const files=c.files?vals(c.files):(c.file?[c.file]:[]);
+  if(!files.length){ container.innerHTML='<div class="pagenote">'+esc(t('No cert file attached.'))+'</div>'; return; }
+  let html='';
+  for(const f of files){
+    if(!f||!f.url) continue;
+    const isPdf=/pdf/i.test((f.type||'')+' '+(f.name||'')+' '+f.url);
+    if(!isPdf){ html+='<img class="certpage" src="'+f.url+'">'; continue; }
+    try{
+      if(typeof pdfjsLib==='undefined') throw new Error('no pdfjs');
+      const pdf=await pdfjsLib.getDocument({url:f.url}).promise;
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const vp=page.getViewport({scale:2});
+        const canvas=document.createElement('canvas');
+        canvas.width=vp.width; canvas.height=vp.height;
+        await page.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise;
+        html+='<img class="certpage" src="'+canvas.toDataURL('image/jpeg',0.86)+'">';
+      }
+    }catch(e){
+      console.warn('cert render failed', e);
+      html+='<div class="pagenote">'+esc(t('Could not embed this cert for printing. Open it from the cert viewer to print separately.'))+'</div>';
+    }
+  }
+  container.innerHTML=html||('<div class="pagenote">'+esc(t('No cert file attached.'))+'</div>');
+}
 function certForm(){
   return `<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>
   <div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
