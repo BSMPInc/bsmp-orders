@@ -83,7 +83,8 @@ body.sb-pinned .topbar{padding-left:22px}
 #qc-lang button.on{background:var(--accent);color:#fff}
 .icon-btn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer}
 .icon-btn:hover{border-color:var(--accent);color:var(--accent)}
-.content{flex:1;padding:22px 22px calc(26px + var(--dock-h));max-width:1100px;width:100%}
+.content{flex:1;padding:22px 22px calc(26px + var(--dock-h));max-width:1500px;width:100%}
+.content.wide{max-width:none}
 
 /* ===== Dock ===== */
 .dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:flex;align-items:stretch;padding-left:8px;z-index:46;transition:left .18s ease;overflow-x:auto;scrollbar-width:none}
@@ -487,6 +488,7 @@ function render(){
   if(!QC_USER && !window.__qcDemo) return;
   setActive();
   const c=$('content'); if(!c) return;
+  c.classList.toggle('wide', page==='fair');
   if(page==='inspections') c.innerHTML=viewInspections();
   else if(page==='selfcheck') c.innerHTML=viewSelfCheck();
   else if(page==='fairs') c.innerHTML=viewFairs();
