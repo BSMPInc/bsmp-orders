@@ -153,9 +153,9 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .char-tbl .rm{color:var(--text3);cursor:pointer;text-align:center}
 .char-tbl .rm:hover{color:var(--red)}
 .char-tbl tr.oot td{background:var(--red-soft)}
-.fair-top{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr);gap:16px;align-items:start}
-.fair-draw{position:sticky;top:10px}
-.fdv{position:relative;height:min(62vh,540px);background:#3a4049;border:1px solid var(--border);overflow:hidden;border-radius:4px}
+.fair-top{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;position:sticky;top:84px;z-index:20;background:var(--card);padding:8px 0 12px;box-shadow:0 9px 10px -8px rgba(16,24,40,.18)}
+.fair-info{max-height:min(58vh,540px);overflow:auto;padding-right:6px}
+.fdv{position:relative;height:min(58vh,540px);background:#3a4049;border:1px solid var(--border);overflow:hidden;border-radius:4px}
 .fdv-canvas{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
 .fdv-canvas.grabbing{cursor:grabbing}
 .fdv-img{position:absolute;top:0;left:0;transform-origin:0 0;max-width:none;user-select:none;-webkit-user-drag:none;background:#fff}
@@ -165,7 +165,7 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .fdv-pct{font-size:11px;color:var(--text2);min-width:40px;text-align:center;font-weight:700}
 .fdv-empty{height:min(52vh,440px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text3);background:var(--bg);border:1px dashed var(--border2);border-radius:4px;text-align:center;padding:16px}
 .fdv-empty i{font-size:34px;opacity:.5}
-@media (max-width:900px){ .fair-top{grid-template-columns:1fr} .fair-draw{position:static} .fdv{height:min(52vh,460px)} }
+@media (max-width:900px){ .fair-top{grid-template-columns:1fr;position:static;box-shadow:none} .fair-info{max-height:none;overflow:visible} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
