@@ -235,6 +235,12 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .bubble-stage img{display:block;max-width:100%;height:auto;user-select:none;-webkit-user-drag:none}
 .balloon{position:absolute;transform:translate(-50%,-50%);min-width:10px;height:10px;padding:0 2px;border-radius:999px;border:1px solid #ff0000;background:#fff;color:#ff0000;font:700 5pt Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 0 0 1px #fff;line-height:1;touch-action:none}
 .balloon:active{cursor:grabbing}
+.fair-fs{position:fixed;inset:0;z-index:9400;background:var(--bg);display:none;flex-direction:column;padding:10px 12px 12px}
+.fair-fs-bar{display:flex;align-items:center;gap:10px;padding:2px 2px 8px;font-size:15px}
+.fair-fs-body{flex:1;min-height:0;overflow:auto}
+.fair-fs .bubble-ws{max-height:none;height:auto;border:1px solid var(--border)}
+.fair-fs .bubble-stage{display:block;width:100%}
+.fair-fs .bubble-stage img{width:100%;height:auto}
 .balloon.filled{background:#ffecec;box-shadow:0 0 0 1.5px #fff,0 0 0 3px rgba(255,0,0,.12)}
 .qc-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .qc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -370,6 +376,7 @@ const I18N = {
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
+    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
     // ncr
@@ -891,7 +898,7 @@ window.qcCharCompute=(i)=>{
 };
 function catToType(cat){ return cat==='cutout_dia'?'Diameter':((cat==='material'||cat==='finish'||cat==='thickness')?'Note':'Linear'); }
 let _chars=[];
-let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false;
+let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false, _fairFull=false;
 function viewFair(){
   const r=editId?INSPECTIONS[editId]:null;
   if(r && !_fairBubbles.length) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
@@ -937,7 +944,7 @@ function viewFair(){
       </div>
     </div>
 
-    <div id="fair-bubble-ws">${_fairImg?fairBubbleWorkspace():''}</div>
+    <div id="fair-bubble-ws">${(_fairImg && !_fairFull)?fairBubbleWorkspace():''}</div>
 
     <div class="card-title" style="margin-top:14px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
     <div style="overflow-x:auto"><table class="char-tbl"><thead><tr><th style="width:38px">#</th><th style="min-width:120px">${t('Requirement')}</th><th style="min-width:96px">${t('Tolerance Range')}</th><th style="min-width:104px">${t('Type')}</th><th style="min-width:100px">${t('Result')}</th><th style="min-width:88px">${t('Deviation')}</th><th style="min-width:120px">${t('Notes')}</th><th style="width:30px"></th></tr></thead>
@@ -1137,7 +1144,7 @@ window.qcBubblesLineUp=()=>{
   if(!_fairBubbles.length) return;
   const n=_fairBubbles.length, top=0.04, bot=0.96, x=0.955;
   _fairBubbles.forEach((b,i)=>{ b.bx=x; b.by=n>1?(top+(bot-top)*i/(n-1)):0.5; });
-  const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML=fairBubbleWorkspace();
+  qcWsRender();
 };
 function loadImg(src, cross){ return new Promise((res,rej)=>{ const im=new Image(); if(cross) im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=rej; im.src=src; }); }
 async function pdfFirstPageImage(src){
@@ -1171,7 +1178,7 @@ async function qcFairDrawingImage(){
 window.qcFairAutoBubble=async ()=>{
   if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
   const btn=$('fair-bubble-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
-  const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML='<div class="muted" style="padding:12px 0"><i class="ti ti-loader-2 spin"></i> '+esc(t('AI reading the drawing…'))+'</div>';
+  const ws=qcWsHost(); if(ws) ws.innerHTML='<div class="muted" style="padding:12px 0"><i class="ti ti-loader-2 spin"></i> '+esc(t('AI reading the drawing…'))+'</div>';
   try{
     const img=await qcFairDrawingImage();
     if(!img) throw new Error(t('Upload the drawing first (re-upload a saved one to auto-bubble it).'));
@@ -1187,7 +1194,7 @@ window.qcFairAutoBubble=async ()=>{
     _fairImg=img; _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null;
     _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
     if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
-    if(ws) ws.innerHTML=fairBubbleWorkspace();
+    qcWsRender();
     qcToast(_fairBubbles.length+' '+t('characteristics ballooned — review and drag to fine-tune'),'ok');
   }catch(e){
     console.error('auto-bubble failed', e);
@@ -1215,14 +1222,14 @@ function qcSyncCharsFromBubbles(){
 }
 window.qcFairPlaceMode=async ()=>{
   const btn=$('fair-place-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
-  const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML='<div class="muted" style="padding:12px 0"><i class="ti ti-loader-2 spin"></i> '+esc(t('Loading drawing…'))+'</div>';
+  const ws=qcWsHost(); if(ws) ws.innerHTML='<div class="muted" style="padding:12px 0"><i class="ti ti-loader-2 spin"></i> '+esc(t('Loading drawing…'))+'</div>';
   try{
     const img=await qcFairDrawingImage();
     if(!img) throw new Error(t('Upload the drawing first (re-upload a saved one).'));
     _fairImg=img; _fairBalloonedUrl=null;
     const rr=editId?INSPECTIONS[editId]:null;
     if(!_fairBubbles.length && rr && rr.bubbles && rr.bubbles.length) _fairBubbles=rr.bubbles.map(b=>({...b}));
-    if(ws) ws.innerHTML=fairBubbleWorkspace();
+    qcWsRender();
     qcToast(t('Click the drawing next to each dimension to drop a balloon, then Read dimensions.'),'ok');
   }catch(e){ console.error(e); if(ws) ws.innerHTML=''; qcToast(t('Could not load drawing:')+' '+((e&&e.message)||e),'err'); }
   finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
@@ -1243,7 +1250,7 @@ window.qcFairReadBubbles=async ()=>{
     let filled=0;
     _fairBubbles.forEach(b=>{ const it=byNo[b.no]; if(it){ b.value=it.value||''; b.tol=it.tol||''; b.category=it.category||b.category; if(b.value) filled++; } });
     qcSyncCharsFromBubbles();
-    const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML=fairBubbleWorkspace();
+    qcWsRender();
     qcToast(filled+' / '+_fairBubbles.length+' '+t('dimensions read'), filled?'ok':'err');
   }catch(e){ console.error('read failed', e); qcToast(t('Read failed:')+' '+((e&&e.message)||e),'err'); }
   finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
@@ -1252,7 +1259,7 @@ window.qcBubblesSort=()=>{
   if(!_fairBubbles.length) return;
   _fairBubbles=qcSortByHierarchy(_fairBubbles);
   qcSyncCharsFromBubbles();
-  const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML=fairBubbleWorkspace();
+  qcWsRender();
 };
 // recover the extraction from an already-saved ballooned image (numbered balloons baked in)
 window.qcFairReadBallooned=async ()=>{
@@ -1293,8 +1300,23 @@ window.qcBubStageClick=(e)=>{
   st.insertAdjacentHTML('beforeend', balloonHtml(_fairBubbles[_fairBubbles.length-1], _fairBubbles.length-1));
   const bar=$('fair-read-btn'); if(bar) bar.disabled=false;
 };
-window.qcBubRemove=(i)=>{ _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1); const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML=fairBubbleWorkspace(); if(_chars.length) qcSyncCharsFromBubbles(); };
-window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; _fairBubbles=[]; const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML=fairBubbleWorkspace(); };
+window.qcBubRemove=(i)=>{ _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); };
+window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; _fairBubbles=[]; qcWsRender(); };
+function qcWsHost(){ return _fairFull ? ($('fair-fs-body')||$('fair-bubble-ws')) : $('fair-bubble-ws'); }
+function qcWsRender(){ const h=qcWsHost(); if(h) h.innerHTML=fairBubbleWorkspace(); }
+window.qcFairFull=(on)=>{
+  _fairFull=!!on;
+  let ov=$('fair-fs');
+  if(_fairFull && !ov){
+    ov=document.createElement('div'); ov.id='fair-fs'; ov.className='fair-fs';
+    ov.innerHTML='<div class="fair-fs-bar"><b>'+esc(t('Place bubbles'))+'</b><span style="flex:1"></span><button class="btn sm" onclick="qcFairFull(false)"><i class="ti ti-arrows-minimize"></i> '+esc(t('Exit full screen'))+'</button></div><div class="fair-fs-body" id="fair-fs-body"></div>';
+    document.body.appendChild(ov);
+  }
+  if(ov) ov.style.display=_fairFull?'flex':'none';
+  const inline=$('fair-bubble-ws');
+  if(_fairFull){ if(inline) inline.innerHTML='<div class="muted" style="padding:10px 0"><i class="ti ti-arrows-maximize"></i> '+esc(t('Editing in full screen…'))+'</div>'; }
+  qcWsRender();
+};
 function fairBubbleWorkspace(){
   if(!_fairImg) return '';
   const balloons=_fairBubbles.map((b,i)=>balloonHtml(b,i)).join('');
@@ -1306,6 +1328,7 @@ function fairBubbleWorkspace(){
       <button class="btn sm" onclick="qcBubblesLineUp()"><i class="ti ti-layout-align-right"></i> ${t('Line up in margin')}</button>
       <button class="btn sm" onclick="qcFairSaveBallooned()"><i class="ti ti-device-floppy"></i> ${t('Save ballooned drawing')}</button>
       <button class="btn sm" onclick="qcBubbleClear()"><i class="ti ti-trash"></i> ${t('Clear')}</button>
+      ${_fairFull?'':`<button class="btn sm" onclick="qcFairFull(true)"><i class="ti ti-arrows-maximize"></i> ${t('Full screen')}</button>`}
     </div>
     <div class="bubble-ws"><div class="bubble-stage" id="bubble-stage" onclick="qcBubStageClick(event)"><img src="${_fairImg.dataUrl}" alt="drawing" draggable="false">${balloons}</div></div>`;
 }
