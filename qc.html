@@ -191,6 +191,12 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .qcv-imgwrap img{max-width:100%;max-height:100%;object-fit:contain;background:#fff}
 .cert-open{cursor:pointer}
 .cert-open:hover{text-decoration:underline}
+.bubble-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.bubble-ws{margin-top:10px;border:1px solid var(--border);background:#fff;overflow:auto;max-height:600px}
+.bubble-stage{position:relative;display:inline-block;min-width:100%;line-height:0}
+.bubble-stage img{display:block;max-width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+.balloon{position:absolute;transform:translate(-50%,-50%);min-width:20px;height:20px;padding:0 3px;border-radius:999px;border:1.6px solid #ff0000;background:#fff;color:#ff0000;font:700 10pt Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 0 0 1.5px #fff;line-height:1;touch-action:none}
+.balloon:active{cursor:grabbing}
 .qc-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .qc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .qc-toast.err{background:var(--spark)}
@@ -310,6 +316,11 @@ const I18N = {
     'Drawing':'Plano','Upload drawing':'Subir plano',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
     'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
+    'Auto-bubble with AI':'Auto-globos con IA','AI reads the drawing, numbers the characteristics and fills the table. Drag balloons to fine-tune.':'La IA lee el plano, numera las características y llena la tabla. Arrastra los globos para ajustar.',
+    'Ballooned drawing':'Plano con globos','AI reading the drawing…':'La IA está leyendo el plano…','No AI connection set — set the proxy in the Quote app Settings.':'Sin conexión de IA — configura el proxy en Ajustes de la app de Cotizaciones.',
+    'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
+    'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
+    'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
     // ncr
@@ -797,8 +808,8 @@ function viewFairs(){
         :`<div class="empty">${t('No first articles yet.')}</div>`}
     </div>`;
 }
-window.qcNewFair=()=>{ editId=null; _chars=[]; page='fair'; render(); };
-window.qcOpenFair=(id)=>{ editId=id; page='fair'; render(); };
+window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
+window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
 
 function charRow(i,c){
   c=c||{}; const oot=c.oot?'oot':'';
@@ -812,10 +823,11 @@ function charRow(i,c){
   </tr>`;
 }
 let _chars=[];
+let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null;
 function viewFair(){
   const r=editId?INSPECTIONS[editId]:null;
-  if(r) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
-  else if(!_chars.length) _chars=[{no:1},{no:2},{no:3}];
+  if(r && !_fairBubbles.length) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
+  else if(!r && !_fairBubbles.length && !_chars.length) _chars=[{no:1},{no:2},{no:3}];
   const v=(f,d)=>r&&r[f]!=null?r[f]:(d||'');
   const mode=v('mode','simple');
   const st=v('fairStatus','Draft');
@@ -846,7 +858,10 @@ function viewFair(){
       <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
       <div class="thumbs" id="files-frdraw"></div>
       ${(r&&r.drawing&&r.drawing.url)?`<div style="margin-top:6px"><a class="badge neutral" href="${esc(r.drawing.url)}" target="_blank"><i class="ti ti-file"></i> ${esc(r.drawing.name||'drawing')}</a></div>`:''}
-      <div class="aiwip"><i class="ti ti-sparkles"></i> ${t('Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.')}</div>
+      <div class="bubble-bar"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
+        <span class="muted" style="font-size:11.5px">${t('AI reads the drawing, numbers the characteristics and fills the table. Drag balloons to fine-tune.')}</span></div>
+      ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px"><a class="badge neutral" href="${esc(r.ballooned.url)}" target="_blank"><i class="ti ti-circle-number-1"></i> ${t('Ballooned drawing')}</a></div>`:''}
+      <div id="fair-bubble-ws">${(_fairImg&&_fairBubbles.length)?fairBubbleWorkspace():''}</div>
     </div>
 
     <div class="card-title" style="margin-top:6px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
@@ -887,11 +902,115 @@ window.qcSaveFair=async (action)=>{
     createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
-    drawing, characteristics:_chars, fairStatus:status
+    drawing, characteristics:_chars, fairStatus:status,
+    ballooned:_fairBalloonedUrl||(prev&&prev.ballooned)||null
   };
   if(action==='Approved'||action==='Rejected'){ rec.reviewedBy=(QC_USER&&QC_USER.email)||''; rec.reviewedAt=Date.now(); }
   await dbSet('qc/inspections/'+id, rec);
   editId=null; _chars=[]; page='fairs'; render();
+};
+
+/* =================== FIRST ARTICLE AUTO-BUBBLE (AI) =================== */
+const FAIR_BUBBLE_PROMPT='You are an AS9102 First Article Inspection engineer ballooning a sheet-metal fabrication drawing. Identify EVERY inspectable characteristic: material and grade note, material thickness/gauge, finish/plating/deburr/coating notes, overall/border/profile dimensions, bend dimensions and angles/flanges, and every hole/cutout (its diameter and the linear dimensions that locate or size it). Respond with ONLY valid JSON, no markdown:\n{"characteristics":[{"value":"","tol":"","category":"","x":0.5,"y":0.5,"side":"top","group":null}]}\nRules per item: value=the requirement exactly as printed (e.g. "304/304L SS", ".060", "\\u00d8.250", "2.500", "R.125", "90\\u00b0", "deburr all edges"); keep the \\u00d8 diameter symbol for holes. tol=the tolerance if shown (e.g. "\\u00b1.005","+.002/-.000") else "". category=EXACTLY one of: material, thickness, finish, major, bend, cutout_dia, cutout_linear. x,y=normalized 0..1 position (from top-left) of the CENTER of that dimension text. side="top" or "bottom" — whichever side of the callout has clearer empty space for a balloon. group=for hole/cutout dimensions, a short id shared by all dimensions of the SAME hole/cutout (e.g. "h1","h2"); use null for non-cutout items. Do not number them; numbering is handled separately.';
+function qcSortBubbles(chars){
+  const order={material:0,thickness:1,finish:2,major:3,bend:4};
+  const head=chars.filter(c=>order[c.category]!=null).sort((a,b)=>order[a.category]-order[b.category]);
+  const cut=chars.filter(c=>order[c.category]==null);
+  const groups=[], gmap={};
+  cut.forEach(c=>{ const g=(c.group||('_'+(c.value||Math.random()))); if(!gmap[g]){ gmap[g]={dia:[],lin:[]}; groups.push(g); } (c.category==='cutout_dia'?gmap[g].dia:gmap[g].lin).push(c); });
+  const cutSorted=[]; groups.forEach(g=>{ gmap[g].dia.forEach(c=>cutSorted.push(c)); gmap[g].lin.forEach(c=>cutSorted.push(c)); });
+  const all=head.concat(cutSorted);
+  all.forEach((c,i)=>{ c.no=i+1; const x=Math.max(0,Math.min(1,+c.x||0.5)), y=Math.max(0,Math.min(1,+c.y||0.5));
+    c.bx=x; c.by=Math.max(0.02,Math.min(0.98, y+(c.side==='bottom'?0.05:-0.05))); });
+  return all;
+}
+function loadImg(src, cross){ return new Promise((res,rej)=>{ const im=new Image(); if(cross) im.crossOrigin='anonymous'; im.onload=()=>res(im); im.onerror=rej; im.src=src; }); }
+async function pdfFirstPageImage(src){
+  if(typeof pdfjsLib==='undefined') throw new Error('pdf.js not loaded');
+  const pdf=await pdfjsLib.getDocument(src).promise;
+  const page=await pdf.getPage(1);
+  const vp=page.getViewport({scale:2});
+  const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+  await page.render({canvasContext:cv.getContext('2d'), viewport:vp}).promise;
+  return {dataUrl:cv.toDataURL('image/png'), w:cv.width, h:cv.height};
+}
+async function imgFromFile(file){
+  if(extFromFile(file)==='pdf') return await pdfFirstPageImage({data:await file.arrayBuffer()});
+  const url=URL.createObjectURL(file);
+  try{ const im=await loadImg(url); const cv=document.createElement('canvas'); cv.width=im.naturalWidth; cv.height=im.naturalHeight; cv.getContext('2d').drawImage(im,0,0); return {dataUrl:cv.toDataURL('image/png'), w:cv.width, h:cv.height}; }
+  finally{ URL.revokeObjectURL(url); }
+}
+async function imgFromUrl(url, meta){
+  if(/pdf/i.test((meta&&meta.type||'')+' '+(meta&&meta.name||'')+' '+url)) return await pdfFirstPageImage({url});
+  const im=await loadImg(url, true);
+  const cv=document.createElement('canvas'); cv.width=im.naturalWidth; cv.height=im.naturalHeight; cv.getContext('2d').drawImage(im,0,0);
+  return {dataUrl:cv.toDataURL('image/png'), w:cv.width, h:cv.height};
+}
+async function qcFairDrawingImage(){
+  const pend=(_pendingFiles['frdraw']||[])[0];
+  if(pend) return await imgFromFile(pend);
+  const r=editId?INSPECTIONS[editId]:null;
+  if(r&&r.drawing&&r.drawing.url) return await imgFromUrl(r.drawing.url, r.drawing);
+  return null;
+}
+window.qcFairAutoBubble=async ()=>{
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  const btn=$('fair-bubble-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
+  const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML='<div class="muted" style="padding:12px 0"><i class="ti ti-loader-2 spin"></i> '+esc(t('AI reading the drawing…'))+'</div>';
+  try{
+    const img=await qcFairDrawingImage();
+    if(!img) throw new Error(t('Upload the drawing first (re-upload a saved one to auto-bubble it).'));
+    const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:3200, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/png',data:img.dataUrl.split(',')[1]}},{type:'text',text:FAIR_BUBBLE_PROMPT}]}] });
+    const data=await resp.json();
+    if(data.error) throw new Error(data.error.message||'AI error');
+    let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
+    const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
+    clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
+    const parsed=JSON.parse(clean);
+    let chars=Array.isArray(parsed)?parsed:(parsed.characteristics||[]);
+    if(!chars.length) throw new Error(t('No characteristics found on the drawing.'));
+    _fairImg=img; _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null;
+    _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||'')+(b.tol?(' '+b.tol):''), tol:b.tol||'', result:'', notes:''}));
+    if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
+    if(ws) ws.innerHTML=fairBubbleWorkspace();
+    qcToast(_fairBubbles.length+' '+t('characteristics ballooned — review and drag to fine-tune'),'ok');
+  }catch(e){
+    console.error('auto-bubble failed', e);
+    if(ws) ws.innerHTML='';
+    qcToast(t('Auto-bubble failed:')+' '+((e&&e.message)||e),'err');
+  }finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
+};
+function fairBubbleWorkspace(){
+  if(!_fairImg || !_fairBubbles.length) return '';
+  const balloons=_fairBubbles.map((b,i)=>`<div class="balloon" data-i="${i}" style="left:${(b.bx*100).toFixed(2)}%;top:${(b.by*100).toFixed(2)}%" onmousedown="qcBubDown(event,${i})" ontouchstart="qcBubDown(event,${i})" title="${esc((b.value||'')+(b.tol?(' '+b.tol):''))}">${b.no}</div>`).join('');
+  return `<div class="bubble-bar"><span class="muted">${_fairBubbles.length} ${t('balloons — drag any to reposition')}</span>
+      <button class="btn sm" onclick="qcFairSaveBallooned()"><i class="ti ti-device-floppy"></i> ${t('Save ballooned drawing')}</button></div>
+    <div class="bubble-ws"><div class="bubble-stage" id="bubble-stage"><img src="${_fairImg.dataUrl}" alt="drawing" draggable="false">${balloons}</div></div>`;
+}
+function _bubPoint(e){ return (e.touches&&e.touches[0])?e.touches[0]:e; }
+window.qcBubDown=(e,i)=>{ e.preventDefault(); _bubDrag=i; document.addEventListener('mousemove',qcBubMove); document.addEventListener('mouseup',qcBubUp); document.addEventListener('touchmove',qcBubMove,{passive:false}); document.addEventListener('touchend',qcBubUp); };
+function qcBubMove(e){ if(_bubDrag==null) return; if(e.cancelable) e.preventDefault(); const st=$('bubble-stage'); if(!st) return; const r=st.getBoundingClientRect(); const p=_bubPoint(e); let bx=(p.clientX-r.left)/r.width, by=(p.clientY-r.top)/r.height; bx=Math.max(0,Math.min(1,bx)); by=Math.max(0,Math.min(1,by)); const b=_fairBubbles[_bubDrag]; if(!b) return; b.bx=bx; b.by=by; const el=st.querySelector('.balloon[data-i="'+_bubDrag+'"]'); if(el){ el.style.left=(bx*100)+'%'; el.style.top=(by*100)+'%'; } }
+function qcBubUp(){ _bubDrag=null; document.removeEventListener('mousemove',qcBubMove); document.removeEventListener('mouseup',qcBubUp); document.removeEventListener('touchmove',qcBubMove); document.removeEventListener('touchend',qcBubUp); }
+window.qcFairSaveBallooned=async ()=>{
+  if(!_fairImg||!_fairBubbles.length){ qcToast(t('Run Auto-bubble first.'),'err'); return; }
+  try{
+    const im=await loadImg(_fairImg.dataUrl);
+    const w=im.naturalWidth||_fairImg.w, h=im.naturalHeight||_fairImg.h;
+    const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+    const ctx=cv.getContext('2d'); ctx.drawImage(im,0,0,w,h);
+    const R=Math.max(11, Math.round(Math.min(w,h)*0.016));
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.round(R*1.2)+'px Arial, sans-serif';
+    _fairBubbles.forEach(b=>{ const cx=b.bx*w, cy=b.by*h;
+      ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle='#ffffff'; ctx.fill();
+      ctx.lineWidth=Math.max(1.6,R*0.16); ctx.strokeStyle='#ff0000'; ctx.stroke();
+      ctx.fillStyle='#ff0000'; ctx.fillText(String(b.no),cx,cy+R*0.04); });
+    const dataUrl=cv.toDataURL('image/jpeg',0.9);
+    const blob=await (await fetch(dataUrl)).blob();
+    const file=new File([blob], 'ballooned-'+Date.now()+'.jpg', {type:'image/jpeg'});
+    const url=await upload(file,'fair-drawings');
+    if(url){ _fairBalloonedUrl={name:file.name,url,type:'image/jpeg'}; qcToast(t('Ballooned drawing saved — Save the report to keep it.'),'ok'); }
+    else qcToast(t('Save failed:')+' upload','err');
+  }catch(e){ console.error('ballooned save failed', e); qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err'); }
 };
 
 /* =================== NONCONFORMANCES =================== */
