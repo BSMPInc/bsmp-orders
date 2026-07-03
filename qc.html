@@ -144,6 +144,9 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .char-tbl th{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);font-weight:700;padding:6px 6px;border-bottom:1px solid var(--border);text-align:left}
 .char-tbl td{padding:4px 5px;border-bottom:1px solid var(--border);vertical-align:top}
 .char-tbl input,.char-tbl textarea{width:100%;border:1px solid var(--border);background:#fff;padding:6px 7px;outline:none;min-height:32px}
+.char-tbl select{width:100%;border:1px solid var(--border);background:#fff;padding:6px 5px;outline:none;min-height:32px;font:inherit;color:inherit}
+.char-tbl .devcell{background:var(--bg);color:var(--text2);font-weight:700;text-align:center}
+.char-tbl tr.oot .devcell{color:var(--red);background:var(--red-soft)}
 .char-tbl input:focus,.char-tbl textarea:focus{border-color:var(--accent)}
 .char-tbl .cno{width:48px;text-align:center;font-weight:700;color:var(--text2)}
 .char-tbl .rm{color:var(--text3);cursor:pointer;text-align:center}
@@ -317,6 +320,7 @@ const I18N = {
     'Drawing':'Plano','Upload drawing':'Subir plano',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
     'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
+    'Tolerance Range':'Rango de tolerancia','Type':'Tipo','Deviation':'Desviación','Linear':'Lineal','Diameter':'Diámetro','Radius':'Radio','Angular':'Angular','Note':'Nota',
     'Auto-bubble with AI':'Auto-globos con IA','AI reads the drawing, numbers the characteristics and fills the table. Drag balloons to fine-tune.':'La IA lee el plano, numera las características y llena la tabla. Arrastra los globos para ajustar.',
     'Place bubbles myself':'Colocar globos yo','Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.':'Auto-globos: la IA encuentra y coloca todo. Colocar globos yo: tú haces clic en cada dimensión y la IA lee lo que marcaste — colocación más precisa.',
     'Read dimensions with AI':'Leer dimensiones con IA','Sort by hierarchy':'Ordenar por jerarquía','Clear':'Limpiar','Remove all balloons?':'¿Quitar todos los globos?',
@@ -820,15 +824,36 @@ window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _fairImg=null; _fairBalloo
 
 function charRow(i,c){
   c=c||{}; const oot=c.oot?'oot':'';
+  const types=['Linear','Diameter','Radius','Angular','Note'];
+  const typeOpts=types.map(tp=>`<option value="${tp}" ${((c.type||'Linear')===tp)?'selected':''}>${t(tp)}</option>`).join('');
   return `<tr class="${oot}" data-row="${i}">
     <td class="cno">${c.no||(i+1)}</td>
-    <td><textarea data-f="requirement" oninput="qcCharEdit(${i})">${esc(c.requirement||'')}</textarea></td>
-    <td><input data-f="result" oninput="qcCharEdit(${i})" value="${esc(c.result||'')}"></td>
-    <td><input data-f="tol" value="${esc(c.tol||'')}" style="width:80px"></td>
+    <td><textarea data-f="requirement" oninput="qcCharCompute(${i})">${esc(c.requirement||'')}</textarea></td>
+    <td><input data-f="tol" value="${esc(c.tol||'')}" oninput="qcCharCompute(${i})" placeholder="±.005"></td>
+    <td><select data-f="type">${typeOpts}</select></td>
+    <td><input data-f="result" oninput="qcCharCompute(${i})" value="${esc(c.result||'')}"></td>
+    <td><input data-f="dev" value="${esc(c.dev||'')}" readonly class="devcell" tabindex="-1"></td>
     <td><input data-f="notes" value="${esc(c.notes||'')}"></td>
     <td class="rm" onclick="qcCharDel(${i})"><i class="ti ti-x"></i></td>
   </tr>`;
 }
+// compute deviation (actual − nominal) and flag out-of-tolerance
+window.qcCharCompute=(i)=>{
+  const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr) return;
+  const g=f=>{ const el=tr.querySelector(`[data-f="${f}"]`); return el?el.value:''; };
+  const num=s=>{ const m=String(s||'').replace(/[^0-9.+\-]/g,' ').match(/-?\d*\.?\d+/); return m?parseFloat(m[0]):NaN; };
+  const nom=num(g('requirement')), act=num(g('result')), devEl=tr.querySelector('[data-f="dev"]');
+  let dev=NaN;
+  if(isFinite(nom)&&isFinite(act)){ dev=act-nom; if(devEl) devEl.value=(dev>=0?'+':'')+dev.toFixed(3); }
+  else if(devEl) devEl.value='';
+  const tol=g('tol'); let pl=NaN, mi=NaN, m;
+  if((m=tol.match(/[±\u00b1]\s*(\d*\.?\d+)/))){ pl=parseFloat(m[1]); mi=parseFloat(m[1]); }
+  else { const p=tol.match(/\+\s*(\d*\.?\d+)/), n=tol.match(/-\s*(\d*\.?\d+)/); if(p) pl=parseFloat(p[1]); if(n) mi=parseFloat(n[1]); }
+  let oot=false;
+  if(isFinite(dev)&&(isFinite(pl)||isFinite(mi))){ if(isFinite(pl)&&dev>pl+1e-9) oot=true; if(isFinite(mi)&&dev<-mi-1e-9) oot=true; }
+  tr.classList.toggle('oot', oot);
+};
+function catToType(cat){ return cat==='cutout_dia'?'Diameter':((cat==='material'||cat==='finish'||cat==='thickness')?'Note':'Linear'); }
 let _chars=[];
 let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false;
 function viewFair(){
@@ -873,8 +898,8 @@ function viewFair(){
     </div>
 
     <div class="card-title" style="margin-top:6px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
-    <table class="char-tbl"><thead><tr><th style="width:48px">#</th><th>${t('Requirement')}</th><th>${t('Result')}</th><th>+/-</th><th>${t('Notes')}</th><th style="width:32px"></th></tr></thead>
-      <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table>
+    <div style="overflow-x:auto"><table class="char-tbl"><thead><tr><th style="width:38px">#</th><th style="min-width:120px">${t('Requirement')}</th><th style="min-width:96px">${t('Tolerance Range')}</th><th style="min-width:104px">${t('Type')}</th><th style="min-width:100px">${t('Result')}</th><th style="min-width:88px">${t('Deviation')}</th><th style="min-width:120px">${t('Notes')}</th><th style="width:30px"></th></tr></thead>
+      <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table></div>
     <div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>
 
     <div class="toolbar" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
@@ -888,7 +913,7 @@ function viewFair(){
   </div>`;
 }
 window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); event.target.classList.add('on'); };
-function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=>{ _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); _chars[i].no=_chars[i].no||(i+1); }); }
+function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=>{ _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); _chars[i].no=_chars[i].no||(i+1); _chars[i].oot=tr.classList.contains('oot'); }); }
 window.qcCharEdit=(i)=>{ const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr)return; _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); };
 window.qcCharAdd=()=>{ syncChars(); _chars.push({no:_chars.length+1}); $('char-body').insertAdjacentHTML('beforeend',charRow(_chars.length-1,_chars[_chars.length-1])); };
 window.qcCharDel=(i)=>{ syncChars(); _chars.splice(i,1); _chars.forEach((c,n)=>c.no=n+1); $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); };
@@ -1005,7 +1030,7 @@ window.qcFairAutoBubble=async ()=>{
     let chars=Array.isArray(parsed)?parsed:(parsed.characteristics||[]);
     if(!chars.length) throw new Error(t('No characteristics found on the drawing.'));
     _fairImg=img; _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null;
-    _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||'')+(b.tol?(' '+b.tol):''), tol:b.tol||'', result:'', notes:''}));
+    _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
     if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
     if(ws) ws.innerHTML=fairBubbleWorkspace();
     qcToast(_fairBubbles.length+' '+t('characteristics ballooned — review and drag to fine-tune'),'ok');
@@ -1030,7 +1055,7 @@ async function qcCompositeBalloonsDataUrl(){
   return {dataUrl:cv.toDataURL('image/jpeg',0.9), w, h};
 }
 function qcSyncCharsFromBubbles(){
-  _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||'')+(b.tol?(' '+b.tol):''), tol:b.tol||'', result:'', notes:''}));
+  _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
   if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
 }
 window.qcFairPlaceMode=async ()=>{
@@ -1093,7 +1118,7 @@ window.qcFairReadBallooned=async ()=>{
     const parsed=JSON.parse(clean); let items=Array.isArray(parsed)?parsed:(parsed.items||parsed.characteristics||[]);
     items=items.filter(it=>it&&it.no!=null).sort((a,b)=>(+a.no)-(+b.no));
     if(!items.length) throw new Error(t('No numbered balloons found in the image.'));
-    _chars=items.map(it=>({no:+it.no, requirement:(it.value||'')+(it.tol?(' '+it.tol):''), tol:it.tol||'', result:'', notes:''}));
+    _chars=items.map(it=>({no:+it.no, requirement:(it.value||''), tol:it.tol||'', type:catToType(it.category), result:'', dev:'', notes:''}));
     if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
     qcToast(items.length+' '+t('dimensions read — Save the report to keep them'),'ok');
   }catch(e){ console.error('read ballooned failed', e); qcToast(t('Read failed:')+' '+((e&&e.message)||e),'err'); }
