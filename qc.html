@@ -165,6 +165,27 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .fdv-pct{font-size:11px;color:var(--text2);min-width:40px;text-align:center;font-weight:700}
 .fdv-empty{height:min(52vh,440px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text3);background:var(--bg);border:1px dashed var(--border2);border-radius:4px;text-align:center;padding:16px}
 .fdv-empty i{font-size:34px;opacity:.5}
+.fdv-markers{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.fmark{position:absolute;transform:translate(-50%,-50%);min-width:26px;height:26px;padding:0 4px;border-radius:999px;border:2px solid #ff0000;background:#fff;color:#ff0000;font:700 12px Arial,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.35);line-height:1;transition:transform .1s}
+.fmark.ok{border-color:#2f7d55;color:#fff;background:#2f7d55}
+.fmark.oot{border-color:#c0261c;color:#fff;background:#c0261c}
+.fmark:hover{transform:translate(-50%,-50%) scale(1.15);z-index:2}
+.fdv-hint{position:absolute;left:8px;bottom:8px;background:rgba(58,64,73,.92);color:#fff;font-size:11px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none}
+.meas-ov{position:fixed;inset:0;background:rgba(16,20,26,.5);z-index:9550;display:none;align-items:center;justify-content:center;padding:20px}
+.meas{background:var(--card);width:min(430px,94vw);border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,.4);overflow:hidden}
+.meas-h{background:#3a4049;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:11px}
+.meas-h .n{width:36px;height:36px;border-radius:999px;background:#fff;color:#3a4049;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+.meas-x{border:none;background:none;color:#fff;cursor:pointer;font-size:20px;padding:2px 4px;line-height:1}
+.meas-b{padding:16px}
+.meas-spec{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:16px}
+.meas-spec .k{font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:700;letter-spacing:.05em}
+.meas-spec .val{font-size:18px;font-weight:800;margin-top:2px}
+.meas .big{width:100%;font-size:24px;font-weight:800;text-align:center;padding:13px;border:2px solid var(--border);border-radius:8px;outline:none;background:#fff;color:var(--text)}
+.meas .big:focus{border-color:var(--accent)}
+.meas-dev{text-align:center;margin:11px 0 4px;font-weight:800;font-size:15px;min-height:22px}
+.meas-dev.ok{color:#2f7d55} .meas-dev.oot{color:var(--red)}
+.meas-btns{display:flex;gap:8px;margin-top:10px}
+.meas-btns .btn{flex:1;justify-content:center}
 @media (max-width:900px){ .fair-top{grid-template-columns:1fr;position:static;box-shadow:none} .fair-info{max-height:none;overflow:visible} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -333,6 +354,8 @@ const I18N = {
     'Material':'Material','Date':'Fecha','Inspected by':'Inspeccionado por','Restricted / ITAR':'Restringido / ITAR',
     'Drawing':'Plano','Upload drawing':'Subir plano',
     'Zoom in':'Acercar','Zoom out':'Alejar','Fit':'Ajustar','No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.':'Aún no hay plano — sube uno a la derecha y luego usa Auto-globos o Colocar globos.',
+    'Tap a balloon to enter its measurement':'Toca un globo para ingresar su medición','Characteristic':'Característica','Tolerance':'Tolerancia','Measured result':'Resultado medido','Confirm & next':'Confirmar y siguiente','Confirm':'Confirmar','In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia','All balloons measured.':'Todos los globos medidos.',
+    'msr:req':'Requisito','msr:tol':'Tolerancia','msr:measured':'Resultado medido','msr:next':'Confirmar y siguiente','msr:confirm':'Confirmar',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
     'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
     'Tolerance Range':'Rango de tolerancia','Type':'Tipo','Deviation':'Desviación','Linear':'Lineal','Diameter':'Diámetro','Radius':'Radio','Angular':'Angular','Note':'Nota',
@@ -853,21 +876,18 @@ function charRow(i,c){
     <td class="rm" onclick="qcCharDel(${i})"><i class="ti ti-x"></i></td>
   </tr>`;
 }
+// shared measurement math
+function parseNum(s){ const m=String(s==null?'':s).replace(/[^0-9.+\-]/g,' ').match(/-?\d*\.?\d+/); return m?parseFloat(m[0]):NaN; }
+function parseTol(tol){ let pl=NaN,mi=NaN,m; const s=String(tol||''); if((m=s.match(/[±\u00b1]\s*(\d*\.?\d+)/))){ pl=parseFloat(m[1]); mi=parseFloat(m[1]); } else { const p=s.match(/\+\s*(\d*\.?\d+)/), n=s.match(/-\s*(\d*\.?\d+)/); if(p) pl=parseFloat(p[1]); if(n) mi=parseFloat(n[1]); } return {pl,mi}; }
+function qcDev(req,tol,result){ const nom=parseNum(req), act=parseNum(result); let dev=NaN, oot=false, devStr=''; const hasResult=isFinite(act); if(isFinite(nom)&&hasResult){ dev=act-nom; devStr=(dev>=0?'+':'')+dev.toFixed(3); const {pl,mi}=parseTol(tol); if(isFinite(pl)&&dev>pl+1e-9) oot=true; if(isFinite(mi)&&dev<-mi-1e-9) oot=true; } return {dev,oot,devStr,hasResult}; }
+function charStatus(c){ if(!c||String(c.result||'').trim()==='') return 'none'; return qcDev(c.requirement,c.tol,c.result).oot?'oot':'ok'; }
 // compute deviation (actual − nominal) and flag out-of-tolerance
 window.qcCharCompute=(i)=>{
   const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr) return;
   const g=f=>{ const el=tr.querySelector(`[data-f="${f}"]`); return el?el.value:''; };
-  const num=s=>{ const m=String(s||'').replace(/[^0-9.+\-]/g,' ').match(/-?\d*\.?\d+/); return m?parseFloat(m[0]):NaN; };
-  const nom=num(g('requirement')), act=num(g('result')), devEl=tr.querySelector('[data-f="dev"]');
-  let dev=NaN;
-  if(isFinite(nom)&&isFinite(act)){ dev=act-nom; if(devEl) devEl.value=(dev>=0?'+':'')+dev.toFixed(3); }
-  else if(devEl) devEl.value='';
-  const tol=g('tol'); let pl=NaN, mi=NaN, m;
-  if((m=tol.match(/[±\u00b1]\s*(\d*\.?\d+)/))){ pl=parseFloat(m[1]); mi=parseFloat(m[1]); }
-  else { const p=tol.match(/\+\s*(\d*\.?\d+)/), n=tol.match(/-\s*(\d*\.?\d+)/); if(p) pl=parseFloat(p[1]); if(n) mi=parseFloat(n[1]); }
-  let oot=false;
-  if(isFinite(dev)&&(isFinite(pl)||isFinite(mi))){ if(isFinite(pl)&&dev>pl+1e-9) oot=true; if(isFinite(mi)&&dev<-mi-1e-9) oot=true; }
-  tr.classList.toggle('oot', oot);
+  const d=qcDev(g('requirement'), g('tol'), g('result'));
+  const devEl=tr.querySelector('[data-f="dev"]'); if(devEl) devEl.value=d.devStr;
+  tr.classList.toggle('oot', d.oot);
 };
 function catToType(cat){ return cat==='cutout_dia'?'Diameter':((cat==='material'||cat==='finish'||cat==='thickness')?'Note':'Linear'); }
 let _chars=[];
@@ -880,6 +900,7 @@ function viewFair(){
   const mode=v('mode','simple');
   const st=v('fairStatus','Draft');
   const canApprove=isMgr() && (st==='Submitted'||st==='Measuring');
+  _fdvBubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
   <div class="card">
     <div class="fair-top">
@@ -936,7 +957,8 @@ function viewFair(){
 function farViewer(r){
   const url=(r&&r.ballooned&&r.ballooned.url)||(r&&r.drawing&&r.drawing.url)||'';
   if(!url) return `<div class="fdv-empty"><i class="ti ti-photo"></i><div>${t('No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.')}</div></div>`;
-  return `<div class="fdv"><div class="fdv-canvas" id="fdv-canvas"><img class="fdv-img" id="fdv-img" src="${esc(url)}" draggable="false" alt="drawing" onload="fdvInit()"></div>
+  return `<div class="fdv"><div class="fdv-canvas" id="fdv-canvas"><img class="fdv-img" id="fdv-img" src="${esc(url)}" draggable="false" alt="drawing" onload="fdvInit()"><div class="fdv-markers" id="fdv-markers"></div></div>
+    ${_fdvBubbles.length?`<div class="fdv-hint">${t('Tap a balloon to enter its measurement')}</div>`:''}
     <div class="fdv-ctrls">
       <button onclick="fdvZoom(-1)" title="${t('Zoom out')}"><i class="ti ti-minus"></i></button>
       <button onclick="fdvFit()" title="${t('Fit')}"><i class="ti ti-arrows-minimize"></i></button>
@@ -946,9 +968,26 @@ function farViewer(r){
     </div></div>`;
 }
 /* ---- drawing viewer: zoom + pan (desktop wheel/drag, iPad pinch/drag) ---- */
-let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false;
+let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false, _fdvBubbles=[];
 function fdvEls(){ return {c:$('fdv-canvas'), i:$('fdv-img')}; }
-function fdvApply(){ const {i}=fdvEls(); if(!i) return; i.style.transform='translate('+fdv.x+'px,'+fdv.y+'px) scale('+fdv.s+')'; const p=$('fdv-pct'); if(p) p.textContent=Math.round(fdv.s*100)+'%'; }
+function fdvApply(){ const {i}=fdvEls(); if(!i) return; i.style.transform='translate('+fdv.x+'px,'+fdv.y+'px) scale('+fdv.s+')'; const p=$('fdv-pct'); if(p) p.textContent=Math.round(fdv.s*100)+'%'; fdvPositionMarkers(); }
+function fdvRenderMarkers(){
+  const layer=$('fdv-markers'); if(!layer) return;
+  if(!_fdvBubbles.length){ layer.innerHTML=''; return; }
+  layer.innerHTML=_fdvBubbles.map(b=>{ const c=_chars.find(x=>x.no===b.no); const st=charStatus(c);
+    return `<div class="fmark ${st}" data-no="${b.no}" onclick="qcMeas(${b.no})" title="#${b.no}">${b.no}</div>`; }).join('');
+  fdvPositionMarkers();
+}
+function fdvPositionMarkers(){
+  const {c,i}=fdvEls(); if(!c||!i||!i.naturalWidth) return;
+  const w=i.naturalWidth, h=i.naturalHeight, cw=c.clientWidth, ch=c.clientHeight;
+  _fdvBubbles.forEach(b=>{ const el=c.querySelector('.fmark[data-no="'+b.no+'"]'); if(!el) return;
+    const x=fdv.x+b.bx*w*fdv.s, y=fdv.y+b.by*h*fdv.s;
+    el.style.left=x+'px'; el.style.top=y+'px';
+    el.style.display=(x<-14||y<-14||x>cw+14||y>ch+14)?'none':'flex';
+  });
+}
+window.fdvRefreshMarkers=()=>{ fdvRenderMarkers(); };
 window.fdvFit=()=>{ const {c,i}=fdvEls(); if(!c||!i||!i.naturalWidth) return; const cw=c.clientWidth,ch=c.clientHeight; const s=Math.min(cw/i.naturalWidth, ch/i.naturalHeight)||1; fdv.s=s; fdv.fit=s; fdv.x=(cw-i.naturalWidth*s)/2; fdv.y=(ch-i.naturalHeight*s)/2; fdvApply(); };
 window.fdvReset=()=>{ const {c,i}=fdvEls(); if(!c||!i) return; fdv.s=1; fdv.x=(c.clientWidth-i.naturalWidth)/2; fdv.y=(c.clientHeight-i.naturalHeight)/2; fdvApply(); };
 function fdvZoomAt(f,cx,cy){ const {c}=fdvEls(); if(!c) return; if(cx==null){ cx=c.clientWidth/2; cy=c.clientHeight/2; } const ns=Math.max((fdv.fit||0.05)*0.5, Math.min(fdv.s*f, 16)); fdv.x=cx-(cx-fdv.x)*(ns/fdv.s); fdv.y=cy-(cy-fdv.y)*(ns/fdv.s); fdv.s=ns; fdvApply(); }
@@ -957,7 +996,7 @@ function _tdist(e){ const a=e.touches[0],b=e.touches[1]; return Math.hypot(a.cli
 function _tmid(e){ const a=e.touches[0],b=e.touches[1]; return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}; }
 window.fdvInit=()=>{
   const {c}=fdvEls(); if(!c) return;
-  fdvFit();
+  fdvFit(); fdvRenderMarkers();
   c.onwheel=(e)=>{ e.preventDefault(); const r=c.getBoundingClientRect(); fdvZoom(e.deltaY<0?1:-1, e.clientX-r.left, e.clientY-r.top); };
   c.onmousedown=(e)=>{ _fdvDrag=true; _fdvLX=e.clientX; _fdvLY=e.clientY; c.classList.add('grabbing'); };
   c.ontouchstart=(e)=>{ if(e.touches.length===2){ _fdvPinch={d:_tdist(e),s:fdv.s}; } else if(e.touches.length===1){ _fdvDrag=true; _fdvLX=e.touches[0].clientX; _fdvLY=e.touches[0].clientY; } };
@@ -969,6 +1008,64 @@ window.fdvInit=()=>{
     document.addEventListener('mousemove',(e)=>{ if(!_fdvDrag) return; const {c}=fdvEls(); if(!c) return; fdv.x+=e.clientX-_fdvLX; fdv.y+=e.clientY-_fdvLY; _fdvLX=e.clientX; _fdvLY=e.clientY; fdvApply(); });
     document.addEventListener('mouseup',()=>{ _fdvDrag=false; const {c}=fdvEls(); if(c) c.classList.remove('grabbing'); });
   }
+};
+/* ---- tap a balloon → enter its measurement ---- */
+let _measNo=null;
+function qcMeasMount(){
+  let ov=$('meas-ov');
+  if(!ov){
+    ov=document.createElement('div'); ov.id='meas-ov'; ov.className='meas-ov';
+    ov.innerHTML='<div class="meas" role="dialog" aria-modal="true"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div><span style="flex:1"></span><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div><div class="k" data-t="msr:tol">Tolerance</div><div class="val" id="meas-tol"></div></div></div><label class="k" style="display:block;margin-bottom:5px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div></div>';
+    ov.addEventListener('click',e=>{ if(e.target===ov) qcMeasClose(); });
+    document.body.appendChild(ov);
+    const inp=ov.querySelector('#meas-input');
+    inp.addEventListener('input', qcMeasPreview);
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); qcMeasConfirm(true); } else if(e.key==='Escape'){ qcMeasClose(); } });
+  }
+  ov.style.display='flex';
+}
+window.qcMeas=(no)=>{
+  syncChars();
+  const c=_chars.find(x=>x.no===no); if(!c) return;
+  _measNo=no; qcMeasMount();
+  $('meas-n').textContent=no;
+  $('meas-title').textContent=t('Characteristic')+' '+no;
+  $('meas-type').textContent=c.type?t(c.type):'';
+  $('meas-req').textContent=c.requirement||'—';
+  $('meas-tol').textContent=c.tol||'—';
+  const inp=$('meas-input'); inp.value=c.result||''; 
+  qcMeasPreview();
+  setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+};
+window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; };
+function qcMeasPreview(){
+  const c=_chars.find(x=>x.no===_measNo); if(!c) return;
+  const val=$('meas-input').value;
+  const d=qcDev(c.requirement, c.tol, val);
+  const el=$('meas-dev');
+  if(!String(val).trim()||!d.hasResult){ el.textContent=''; el.className='meas-dev'; return; }
+  if(isFinite(d.dev)){ el.textContent=(d.oot?('⚠ '+t('Out of tolerance')):('✓ '+t('In tolerance')))+'  ·  Δ '+d.devStr; el.className='meas-dev '+(d.oot?'oot':'ok'); }
+  else { el.textContent=''; el.className='meas-dev'; }
+}
+window.qcMeasConfirm=(advance)=>{
+  const idx=_chars.findIndex(x=>x.no===_measNo); if(idx<0){ qcMeasClose(); return; }
+  const val=$('meas-input').value;
+  _chars[idx].result=val;
+  const d=qcDev(_chars[idx].requirement, _chars[idx].tol, val);
+  _chars[idx].dev=d.devStr; _chars[idx].oot=d.oot;
+  // reflect into the table row if present
+  const tr=document.querySelector(`#char-body tr[data-row="${idx}"]`);
+  if(tr){ const rEl=tr.querySelector('[data-f="result"]'); if(rEl) rEl.value=val; qcCharCompute(idx); }
+  fdvRenderMarkers();
+  if(advance){
+    const order=_fdvBubbles.map(b=>b.no);
+    const start=order.indexOf(_measNo);
+    let nextNo=null;
+    for(let k=1;k<=order.length;k++){ const nn=order[(start+k)%order.length]; const cc=_chars.find(x=>x.no===nn); if(cc && String(cc.result||'').trim()===''){ nextNo=nn; break; } }
+    if(nextNo!=null && nextNo!==_measNo){ qcMeas(nextNo); return; }
+    qcToast(t('All balloons measured.'),'ok');
+  }
+  qcMeasClose();
 };
 window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); event.target.classList.add('on'); };
 function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=>{ _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); _chars[i].no=_chars[i].no||(i+1); _chars[i].oot=tr.classList.contains('oot'); }); }
