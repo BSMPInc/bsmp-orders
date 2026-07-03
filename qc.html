@@ -323,6 +323,7 @@ const I18N = {
     'Click the drawing next to each dimension to drop a balloon.':'Haz clic en el plano junto a cada dimensión para colocar un globo.','Click the drawing next to each dimension to drop a balloon, then Read dimensions.':'Haz clic junto a cada dimensión para colocar un globo y luego Leer dimensiones.',
     'balloons — click drawing to add · drag to move · double-click to remove':'globos — clic para agregar · arrastra para mover · doble clic para quitar','Loading drawing…':'Cargando plano…','Could not load drawing:':'No se pudo cargar el plano:','Upload the drawing first (re-upload a saved one).':'Sube el plano primero (vuelve a subir uno guardado).',
     'Place at least one balloon first.':'Coloca al menos un globo primero.','dimensions read':'dimensiones leídas','Read failed:':'Lectura falló:',
+    'Read dimensions from ballooned drawing':'Leer dimensiones del plano con globos','No ballooned drawing on this report.':'Este reporte no tiene plano con globos.','No numbered balloons found in the image.':'No se encontraron globos numerados en la imagen.','dimensions read — Save the report to keep them':'dimensiones leídas — guarda el reporte para conservarlas',
     'Ballooned drawing':'Plano con globos','AI reading the drawing…':'La IA está leyendo el plano…','No AI connection set — set the proxy in the Quote app Settings.':'Sin conexión de IA — configura el proxy en Ajustes de la app de Cotizaciones.',
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
@@ -867,7 +868,7 @@ function viewFair(){
       <div class="bubble-bar"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
         <button class="btn sm" id="fair-place-btn" onclick="qcFairPlaceMode()"><i class="ti ti-circle-plus"></i> ${t('Place bubbles myself')}</button></div>
       <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')}</div>
-      ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px"><a class="badge neutral" href="${esc(r.ballooned.url)}" target="_blank"><i class="ti ti-circle-number-1"></i> ${t('Ballooned drawing')}</a></div>`:''}
+      ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><a class="badge neutral" href="${esc(r.ballooned.url)}" target="_blank"><i class="ti ti-circle-number-1"></i> ${t('Ballooned drawing')}</a><button class="btn sm" id="fair-readb-btn" onclick="qcFairReadBallooned()"><i class="ti ti-sparkles"></i> ${t('Read dimensions from ballooned drawing')}</button></div>`:''}
       <div id="fair-bubble-ws">${_fairImg?fairBubbleWorkspace():''}</div>
     </div>
 
@@ -910,7 +911,8 @@ window.qcSaveFair=async (action)=>{
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
     drawing, characteristics:_chars, fairStatus:status,
-    ballooned:_fairBalloonedUrl||(prev&&prev.ballooned)||null
+    ballooned:_fairBalloonedUrl||(prev&&prev.ballooned)||null,
+    bubbles: _fairBubbles.length ? _fairBubbles.map(b=>({no:b.no,bx:b.bx,by:b.by,value:b.value||'',tol:b.tol||'',category:b.category||'',group:b.group||null})) : ((prev&&prev.bubbles)||null)
   };
   if(action==='Approved'||action==='Rejected'){ rec.reviewedBy=(QC_USER&&QC_USER.email)||''; rec.reviewedAt=Date.now(); }
   await dbSet('qc/inspections/'+id, rec);
@@ -1038,6 +1040,8 @@ window.qcFairPlaceMode=async ()=>{
     const img=await qcFairDrawingImage();
     if(!img) throw new Error(t('Upload the drawing first (re-upload a saved one).'));
     _fairImg=img; _fairBalloonedUrl=null;
+    const rr=editId?INSPECTIONS[editId]:null;
+    if(!_fairBubbles.length && rr && rr.bubbles && rr.bubbles.length) _fairBubbles=rr.bubbles.map(b=>({...b}));
     if(ws) ws.innerHTML=fairBubbleWorkspace();
     qcToast(t('Click the drawing next to each dimension to drop a balloon, then Read dimensions.'),'ok');
   }catch(e){ console.error(e); if(ws) ws.innerHTML=''; qcToast(t('Could not load drawing:')+' '+((e&&e.message)||e),'err'); }
@@ -1069,6 +1073,31 @@ window.qcBubblesSort=()=>{
   _fairBubbles=qcSortByHierarchy(_fairBubbles);
   qcSyncCharsFromBubbles();
   const ws=$('fair-bubble-ws'); if(ws) ws.innerHTML=fairBubbleWorkspace();
+};
+// recover the extraction from an already-saved ballooned image (numbered balloons baked in)
+window.qcFairReadBallooned=async ()=>{
+  const r=editId?INSPECTIONS[editId]:null;
+  const url=(r&&r.ballooned&&r.ballooned.url)||null;
+  if(!url){ qcToast(t('No ballooned drawing on this report.'),'err'); return; }
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  const btn=$('fair-readb-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
+  try{
+    const im=await loadImg(url, true);
+    const cv=document.createElement('canvas'); cv.width=im.naturalWidth; cv.height=im.naturalHeight; cv.getContext('2d').drawImage(im,0,0);
+    const b64=cv.toDataURL('image/jpeg',0.9).split(',')[1];
+    const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:3000, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:FAIR_READ_PROMPT}]}] });
+    const data=await resp.json(); if(data.error) throw new Error(data.error.message||'AI error');
+    let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
+    const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
+    clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
+    const parsed=JSON.parse(clean); let items=Array.isArray(parsed)?parsed:(parsed.items||parsed.characteristics||[]);
+    items=items.filter(it=>it&&it.no!=null).sort((a,b)=>(+a.no)-(+b.no));
+    if(!items.length) throw new Error(t('No numbered balloons found in the image.'));
+    _chars=items.map(it=>({no:+it.no, requirement:(it.value||'')+(it.tol?(' '+it.tol):''), tol:it.tol||'', result:'', notes:''}));
+    if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
+    qcToast(items.length+' '+t('dimensions read — Save the report to keep them'),'ok');
+  }catch(e){ console.error('read ballooned failed', e); qcToast(t('Read failed:')+' '+((e&&e.message)||e),'err'); }
+  finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
 };
 const _catLabel={material:'material',thickness:'thickness',finish:'finish',major:'major dim',bend:'bend',cutout_dia:'cutout \u00d8',cutout_linear:'cutout dim'};
 function balloonHtml(b,i){
