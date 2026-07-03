@@ -152,6 +152,19 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .char-tbl .rm{color:var(--text3);cursor:pointer;text-align:center}
 .char-tbl .rm:hover{color:var(--red)}
 .char-tbl tr.oot td{background:var(--red-soft)}
+.fair-top{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr);gap:16px;align-items:start}
+.fair-draw{position:sticky;top:10px}
+.fdv{position:relative;height:min(62vh,540px);background:#3a4049;border:1px solid var(--border);overflow:hidden;border-radius:4px}
+.fdv-canvas{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
+.fdv-canvas.grabbing{cursor:grabbing}
+.fdv-img{position:absolute;top:0;left:0;transform-origin:0 0;max-width:none;user-select:none;-webkit-user-drag:none;background:#fff}
+.fdv-ctrls{position:absolute;right:8px;bottom:8px;display:flex;gap:2px;align-items:center;background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:8px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.fdv-ctrls button{border:none;background:none;cursor:pointer;padding:6px 8px;color:var(--text);font:inherit;font-weight:700;border-radius:5px;line-height:1;min-height:36px}
+.fdv-ctrls button:hover{background:var(--bg)}
+.fdv-pct{font-size:11px;color:var(--text2);min-width:40px;text-align:center;font-weight:700}
+.fdv-empty{height:min(52vh,440px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text3);background:var(--bg);border:1px dashed var(--border2);border-radius:4px;text-align:center;padding:16px}
+.fdv-empty i{font-size:34px;opacity:.5}
+@media (max-width:900px){ .fair-top{grid-template-columns:1fr} .fair-draw{position:static} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
@@ -318,6 +331,7 @@ const I18N = {
     'Fill the header, list characteristics, then submit for review.':'Completa el encabezado, lista las características y envía a revisión.',
     'Material':'Material','Date':'Fecha','Inspected by':'Inspeccionado por','Restricted / ITAR':'Restringido / ITAR',
     'Drawing':'Plano','Upload drawing':'Subir plano',
+    'Zoom in':'Acercar','Zoom out':'Alejar','Fit':'Ajustar','No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.':'Aún no hay plano — sube uno a la derecha y luego usa Auto-globos o Colocar globos.',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
     'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
     'Tolerance Range':'Rango de tolerancia','Type':'Tipo','Deviation':'Desviación','Linear':'Lineal','Diameter':'Diámetro','Radius':'Radio','Angular':'Angular','Note':'Nota',
@@ -866,38 +880,43 @@ function viewFair(){
   const canApprove=isMgr() && (st==='Submitted'||st==='Measuring');
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
   <div class="card">
-    <div class="field"><label class="fl">${t('Report type')}</label>
-      <div class="seg" id="fair-mode">
-        <button class="${mode==='simple'?'on':''}" onclick="qcFairMode('simple')">${t('Simple FAR')}</button>
-        <button class="${mode==='as9102'?'on':''}" onclick="qcFairMode('as9102')">${t('Full AS9102')}</button>
+    <div class="fair-top">
+      <div class="fair-draw">${farViewer(r)}</div>
+      <div class="fair-info">
+        <div class="field"><label class="fl">${t('Report type')}</label>
+          <div class="seg" id="fair-mode">
+            <button class="${mode==='simple'?'on':''}" onclick="qcFairMode('simple')">${t('Simple FAR')}</button>
+            <button class="${mode==='as9102'?'on':''}" onclick="qcFairMode('as9102')">${t('Full AS9102')}</button>
+          </div>
+          <input type="hidden" id="fair-modev" value="${esc(mode)}">
+        </div>
+        <div class="field"><label class="fl">${t('Link to an order')}</label>
+          <select class="in" id="fr-order" onchange="qcFillFromOrder('fr',this.value)">${orderOptions(v('orderId',''))}</select></div>
+        <div class="grid2">
+          <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="fr-part" value="${esc(v('partNum'))}"></div>
+          <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="fr-rev" value="${esc(v('rev'))}"></div>
+          <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="fr-customer" value="${esc(v('customer'))}"></div>
+          <div class="field"><label class="fl">${t('Material')}</label><input class="in" id="fr-material" value="${esc(v('material'))}"></div>
+          <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="fr-po" value="${esc(v('po'))}"></div>
+          <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="fr-job" value="${esc(v('job'))}"></div>
+          <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="fr-date" type="date" value="${esc(v('date',todayISO()))}"></div>
+          <div class="field"><label class="fl">${t('Inspected by')}</label><input class="in" id="fr-by" value="${esc(v('inspectedBy', (QC_USER&&QC_USER.email||'').split('@')[0]))}"></div>
+        </div>
+        <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
+        <div class="field"><label class="fl">${t('Drawing')}</label>
+          <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
+          <div class="thumbs" id="files-frdraw"></div>
+          <div class="bubble-bar" style="margin-top:8px"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
+            <button class="btn sm" id="fair-place-btn" onclick="qcFairPlaceMode()"><i class="ti ti-circle-plus"></i> ${t('Place bubbles myself')}</button></div>
+          ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px"><button class="btn sm" id="fair-readb-btn" onclick="qcFairReadBallooned()"><i class="ti ti-sparkles"></i> ${t('Read dimensions from ballooned drawing')}</button></div>`:''}
+          <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')}</div>
+        </div>
       </div>
-      <input type="hidden" id="fair-modev" value="${esc(mode)}">
-    </div>
-    <div class="field"><label class="fl">${t('Link to an order')}</label>
-      <select class="in" id="fr-order" onchange="qcFillFromOrder('fr',this.value)">${orderOptions(v('orderId',''))}</select></div>
-    <div class="grid3">
-      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="fr-part" value="${esc(v('partNum'))}"></div>
-      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="fr-rev" value="${esc(v('rev'))}"></div>
-      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="fr-customer" value="${esc(v('customer'))}"></div>
-      <div class="field"><label class="fl">${t('Material')}</label><input class="in" id="fr-material" value="${esc(v('material'))}"></div>
-      <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="fr-po" value="${esc(v('po'))}"></div>
-      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="fr-job" value="${esc(v('job'))}"></div>
-      <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="fr-date" type="date" value="${esc(v('date',todayISO()))}"></div>
-      <div class="field"><label class="fl">${t('Inspected by')}</label><input class="in" id="fr-by" value="${esc(v('inspectedBy', (QC_USER&&QC_USER.email||'').split('@')[0]))}"></div>
-      <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
-    </div>
-    <div class="field"><label class="fl">${t('Drawing')}</label>
-      <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
-      <div class="thumbs" id="files-frdraw"></div>
-      ${(r&&r.drawing&&r.drawing.url)?`<div style="margin-top:6px"><a class="badge neutral" href="${esc(r.drawing.url)}" target="_blank"><i class="ti ti-file"></i> ${esc(r.drawing.name||'drawing')}</a></div>`:''}
-      <div class="bubble-bar"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
-        <button class="btn sm" id="fair-place-btn" onclick="qcFairPlaceMode()"><i class="ti ti-circle-plus"></i> ${t('Place bubbles myself')}</button></div>
-      <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')}</div>
-      ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><a class="badge neutral" href="${esc(r.ballooned.url)}" target="_blank"><i class="ti ti-circle-number-1"></i> ${t('Ballooned drawing')}</a><button class="btn sm" id="fair-readb-btn" onclick="qcFairReadBallooned()"><i class="ti ti-sparkles"></i> ${t('Read dimensions from ballooned drawing')}</button></div>`:''}
-      <div id="fair-bubble-ws">${_fairImg?fairBubbleWorkspace():''}</div>
     </div>
 
-    <div class="card-title" style="margin-top:6px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
+    <div id="fair-bubble-ws">${_fairImg?fairBubbleWorkspace():''}</div>
+
+    <div class="card-title" style="margin-top:14px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
     <div style="overflow-x:auto"><table class="char-tbl"><thead><tr><th style="width:38px">#</th><th style="min-width:120px">${t('Requirement')}</th><th style="min-width:96px">${t('Tolerance Range')}</th><th style="min-width:104px">${t('Type')}</th><th style="min-width:100px">${t('Result')}</th><th style="min-width:88px">${t('Deviation')}</th><th style="min-width:120px">${t('Notes')}</th><th style="width:30px"></th></tr></thead>
       <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table></div>
     <div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>
@@ -912,6 +931,43 @@ function viewFair(){
     ${(r&&r.reviewedBy)?`<div class="hint">${t('Last decision:')} ${t(r.fairStatus)} · ${esc((r.reviewedBy||'').split('@')[0])} · ${fmtWhen(r.reviewedAt)}</div>`:''}
   </div>`;
 }
+function farViewer(r){
+  const url=(r&&r.ballooned&&r.ballooned.url)||(r&&r.drawing&&r.drawing.url)||'';
+  if(!url) return `<div class="fdv-empty"><i class="ti ti-photo"></i><div>${t('No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.')}</div></div>`;
+  return `<div class="fdv"><div class="fdv-canvas" id="fdv-canvas"><img class="fdv-img" id="fdv-img" src="${esc(url)}" draggable="false" alt="drawing" onload="fdvInit()"></div>
+    <div class="fdv-ctrls">
+      <button onclick="fdvZoom(-1)" title="${t('Zoom out')}"><i class="ti ti-minus"></i></button>
+      <button onclick="fdvFit()" title="${t('Fit')}"><i class="ti ti-arrows-minimize"></i></button>
+      <span class="fdv-pct" id="fdv-pct">100%</span>
+      <button onclick="fdvZoom(1)" title="${t('Zoom in')}"><i class="ti ti-plus"></i></button>
+      <button onclick="fdvReset()" title="1:1">1:1</button>
+    </div></div>`;
+}
+/* ---- drawing viewer: zoom + pan (desktop wheel/drag, iPad pinch/drag) ---- */
+let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false;
+function fdvEls(){ return {c:$('fdv-canvas'), i:$('fdv-img')}; }
+function fdvApply(){ const {i}=fdvEls(); if(!i) return; i.style.transform='translate('+fdv.x+'px,'+fdv.y+'px) scale('+fdv.s+')'; const p=$('fdv-pct'); if(p) p.textContent=Math.round(fdv.s*100)+'%'; }
+window.fdvFit=()=>{ const {c,i}=fdvEls(); if(!c||!i||!i.naturalWidth) return; const cw=c.clientWidth,ch=c.clientHeight; const s=Math.min(cw/i.naturalWidth, ch/i.naturalHeight)||1; fdv.s=s; fdv.fit=s; fdv.x=(cw-i.naturalWidth*s)/2; fdv.y=(ch-i.naturalHeight*s)/2; fdvApply(); };
+window.fdvReset=()=>{ const {c,i}=fdvEls(); if(!c||!i) return; fdv.s=1; fdv.x=(c.clientWidth-i.naturalWidth)/2; fdv.y=(c.clientHeight-i.naturalHeight)/2; fdvApply(); };
+function fdvZoomAt(f,cx,cy){ const {c}=fdvEls(); if(!c) return; if(cx==null){ cx=c.clientWidth/2; cy=c.clientHeight/2; } const ns=Math.max((fdv.fit||0.05)*0.5, Math.min(fdv.s*f, 16)); fdv.x=cx-(cx-fdv.x)*(ns/fdv.s); fdv.y=cy-(cy-fdv.y)*(ns/fdv.s); fdv.s=ns; fdvApply(); }
+window.fdvZoom=(dir,cx,cy)=>fdvZoomAt(dir>0?1.25:1/1.25, cx, cy);
+function _tdist(e){ const a=e.touches[0],b=e.touches[1]; return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); }
+function _tmid(e){ const a=e.touches[0],b=e.touches[1]; return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}; }
+window.fdvInit=()=>{
+  const {c}=fdvEls(); if(!c) return;
+  fdvFit();
+  c.onwheel=(e)=>{ e.preventDefault(); const r=c.getBoundingClientRect(); fdvZoom(e.deltaY<0?1:-1, e.clientX-r.left, e.clientY-r.top); };
+  c.onmousedown=(e)=>{ _fdvDrag=true; _fdvLX=e.clientX; _fdvLY=e.clientY; c.classList.add('grabbing'); };
+  c.ontouchstart=(e)=>{ if(e.touches.length===2){ _fdvPinch={d:_tdist(e),s:fdv.s}; } else if(e.touches.length===1){ _fdvDrag=true; _fdvLX=e.touches[0].clientX; _fdvLY=e.touches[0].clientY; } };
+  c.ontouchmove=(e)=>{ e.preventDefault(); const r=c.getBoundingClientRect();
+    if(e.touches.length===2&&_fdvPinch){ const nd=_tdist(e); const m=_tmid(e); const f=(nd/_fdvPinch.d); const ns=Math.max((fdv.fit||0.05)*0.5,Math.min(_fdvPinch.s*f,16)); const cx=m.x-r.left, cy=m.y-r.top; fdv.x=cx-(cx-fdv.x)*(ns/fdv.s); fdv.y=cy-(cy-fdv.y)*(ns/fdv.s); fdv.s=ns; fdvApply(); }
+    else if(e.touches.length===1&&_fdvDrag){ const p=e.touches[0]; fdv.x+=p.clientX-_fdvLX; fdv.y+=p.clientY-_fdvLY; _fdvLX=p.clientX; _fdvLY=p.clientY; fdvApply(); } };
+  c.ontouchend=(e)=>{ if(e.touches.length<2) _fdvPinch=null; if(e.touches.length===0) _fdvDrag=false; };
+  if(!_fdvBound){ _fdvBound=true;
+    document.addEventListener('mousemove',(e)=>{ if(!_fdvDrag) return; const {c}=fdvEls(); if(!c) return; fdv.x+=e.clientX-_fdvLX; fdv.y+=e.clientY-_fdvLY; _fdvLX=e.clientX; _fdvLY=e.clientY; fdvApply(); });
+    document.addEventListener('mouseup',()=>{ _fdvDrag=false; const {c}=fdvEls(); if(c) c.classList.remove('grabbing'); });
+  }
+};
 window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); event.target.classList.add('on'); };
 function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=>{ _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); _chars[i].no=_chars[i].no||(i+1); _chars[i].oot=tr.classList.contains('oot'); }); }
 window.qcCharEdit=(i)=>{ const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr)return; _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); };
