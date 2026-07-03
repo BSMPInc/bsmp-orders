@@ -343,6 +343,7 @@ const I18N = {
     'View cert':'Ver certificado','View invoice':'Ver factura','Open in new tab':'Abrir en pestaña nueva','Print':'Imprimir','Material cert':'Certificado de material','No file is attached to this cert yet.':'Este certificado aún no tiene archivo adjunto.',
     'Saved certs':'Certificados guardados','saved cert':'certificado guardado','saved certs':'certificados guardados','No saved certs yet.':'Aún no hay certificados guardados.','Press':'Pulsa','to add your first one — it will appear here after you save.':'para agregar el primero — aparecerá aquí después de guardar.',
     'Cert saved.':'Certificado guardado.','Save failed:':'Error al guardar:','certs saved':'certificados guardados',
+    'Order details':'Detalles de la orden','Orders using this material':'Órdenes que usan este material','Printed':'Impreso','No linked orders on this cert.':'Este certificado no tiene órdenes vinculadas.','Please allow pop-ups to open the printable order sheet.':'Permite ventanas emergentes para abrir la hoja imprimible.','View / print full order details':'Ver / imprimir detalles de la orden','Unit price':'Precio unitario','Order date':'Fecha de orden','Due date':'Fecha de entrega','Part #':'N.º de parte','Job #':'N.º de trabajo','Order':'Orden',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
     'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
     'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
@@ -409,7 +410,11 @@ window.qcOnAuth=(user,role)=>{
   if(page==='inspections' && role==='operator') page='selfcheck';
   applyStatic(); render();
 };
-async function dbSet(path,val){ if(window.qcSet) return window.qcSet(path, val===undefined?null:JSON.parse(JSON.stringify(val))); }
+async function dbSet(path,val){
+  if(!window.qcSet) return;
+  try{ return await window.qcSet(path, val===undefined?null:JSON.parse(JSON.stringify(val))); }
+  catch(e){ console.error('save failed:', path, e); qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err'); throw e; }
+}
 async function dbRemove(path){ if(window.qcRemove) return window.qcRemove(path); }
 async function upload(file,prefix){ if(window.qcUpload) return window.qcUpload(file,prefix); return ''; }
 
@@ -982,7 +987,7 @@ function viewCerts(){
     <td>${esc(c.heatLot||'—')}${dup?` <span class="badge warn" title="${t('Duplicate heat/lot')}"><i class="ti ti-alert-triangle"></i></span>`:''}${c.itar?` <span class="badge flag" title="ITAR">ITAR</span>`:''}</td>
     <td>${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div class="muted" style="font-size:12px">${esc(c.mill)}</div>`:''}</td>
     <td>${esc(c.certNo||'—')}<div class="muted" style="font-size:12px">${fmtDate(c.certDate)}</div></td>
-    <td>${linked.length?linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' '):'<span class="muted">—</span>'}</td>
+    <td>${linked.length?`<span class="cert-open" onclick="qcOrderSheet('${c.id}')" title="${t('View / print full order details')}">${linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' ')} <i class="ti ti-printer" style="opacity:.55"></i></span>`:'<span class="muted">—</span>'}</td>
     <td>${invCell}</td>
     <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:''}
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
@@ -1044,12 +1049,68 @@ function qcvRender(){
   const V=_certView; if(!V) return; const c=V.c, f=V.files[V.idx];
   $('qcv-title').innerHTML=`<div class="qcv-h1">${esc(c.material||t('Material cert'))}${c.itar?' <span class="badge flag">ITAR</span>':''}</div>`+
     `<div class="qcv-h2">${[c.heatLot?(t('Heat / Lot')+' '+esc(c.heatLot)):'',c.certNo?(t('Cert #')+' '+esc(c.certNo)):'',esc(c.supplier||'')].filter(Boolean).join(' · ')}</div>`;
-  $('qcv-actions').innerHTML=`<button class="btn sm primary" onclick="qcvPrint()"><i class="ti ti-printer"></i> ${t('Print')}</button><button class="btn sm" onclick="qcvOpen()"><i class="ti ti-external-link"></i> ${t('Open in new tab')}</button>`;
+  $('qcv-actions').innerHTML=`${(c.linkedOrders&&c.linkedOrders.length)?`<button class="btn sm" onclick="qcOrderSheet('${c.id}')"><i class="ti ti-clipboard-list"></i> ${t('Order details')}</button>`:''}<button class="btn sm primary" onclick="qcvPrint()"><i class="ti ti-printer"></i> ${t('Print')}</button><button class="btn sm" onclick="qcvOpen()"><i class="ti ti-external-link"></i> ${t('Open in new tab')}</button>`;
   $('qcv-tabs').innerHTML=V.files.length>1?V.files.map((x,i)=>`<button class="qcv-tab${i===V.idx?' on':''}" onclick="qcvGo(${i})"><i class="ti ti-${x.tag==='invoice'?'file-dollar':'file'}"></i> ${esc(x.name)}</button>`).join(''):'';
   const body=$('qcv-body');
   if(f.kind==='pdf') body.innerHTML=`<iframe class="qcv-frame" src="${esc(f.url)}#toolbar=1" title="${esc(f.name)}"></iframe>`;
   else body.innerHTML=`<div class="qcv-imgwrap"><img src="${esc(f.url)}" alt="${esc(f.name)}"></div>`;
 }
+
+/* open a printable window with the FULL details of the orders linked to a cert */
+window.qcOrderSheet=(certId)=>{
+  const c=CERTS[certId]; if(!c) return;
+  const orders=(c.linkedOrders||[]).map(id=>ORDERS[id]).filter(Boolean);
+  const w=window.open('','_blank','width=920,height=820');
+  if(!w){ alert(t('Please allow pop-ups to open the printable order sheet.')); return; }
+  const money=v=>(v!=null&&v!==''&&!isNaN(+v))?('$'+(+v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})):esc(String(v||''));
+  const rowsFor=o=>{
+    const F=[
+      [t('Customer'), o.customer],
+      [t('Part #'), o.part||o.partNum],
+      [t('Rev'), o.rev],
+      [t('Description'), o.desc||o.description],
+      [t('Job #'), o.job],
+      [t('PO #'), o.po],
+      [t('Qty'), o.qty],
+      [t('Unit price'), (o.price!=null&&o.price!=='')?money(o.price):''],
+      [t('Order date'), fmtDate(o.ordered||o.orderDate||o.created)],
+      [t('Due date'), fmtDate(o.due||o.dueDate)],
+      [t('Status'), o.status||o.stage],
+      [t('Notes'), o.notes]
+    ].filter(r=>r[1]!=null && String(r[1]).trim()!=='' && r[1]!=='—');
+    return F.map(r=>`<tr><th>${esc(r[0])}</th><td>${esc(String(r[1]))}</td></tr>`).join('');
+  };
+  const blocks=orders.length
+    ? orders.map(o=>`<div class="ord"><h2>${esc([o.customer,o.part||o.partNum].filter(Boolean).join(' — ')||t('Order'))}</h2><table>${rowsFor(o)}</table></div>`).join('')
+    : `<p class="none">${t('No linked orders on this cert.')}</p>`;
+  const hdr=[c.material,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):'',c.supplier].filter(Boolean).map(esc).join(' &middot; ');
+  const doc=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t('Order details')+' — '+(c.material||'cert'))}</title><style>
+    *{box-sizing:border-box} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;margin:0;color:#1b2430;background:#f5f3ee}
+    .wrap{max-width:820px;margin:0 auto;padding:28px}
+    .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1b2430;padding-bottom:12px;margin-bottom:16px}
+    .brand{font-weight:800;font-size:19px;letter-spacing:.02em;line-height:1}
+    .brand small{display:block;font-weight:600;font-size:10.5px;color:#5b6470;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+    .cert{font-size:12px;color:#3a4049;margin-top:8px}
+    h1{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;color:#5b6470}
+    .ord{background:#fff;border:1px solid #d9d5cc;border-radius:6px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid}
+    .ord h2{font-size:14px;margin:0 0 8px;color:#3a4049}
+    table{width:100%;border-collapse:collapse;font-size:12.5px}
+    th{text-align:left;width:150px;color:#5b6470;font-weight:600;padding:5px 10px 5px 0;vertical-align:top;white-space:nowrap}
+    td{padding:5px 0;vertical-align:top}
+    tr+tr th,tr+tr td{border-top:1px solid #eef0f2}
+    .none{color:#8a919b}
+    .meta{text-align:right;font-size:11px;color:#5b6470}
+    .actions{margin:20px 0;text-align:center}
+    button{font:inherit;font-weight:700;background:#3a4049;color:#fff;border:none;border-radius:6px;padding:9px 22px;cursor:pointer}
+    @media print{ body{background:#fff} .actions{display:none} .ord{border-color:#bbb} .wrap{padding:0} }
+  </style></head><body><div class="wrap">
+    <div class="top"><div><div class="brand">BERT&rsquo;S<small>Sheet Metal Products</small></div><div class="cert">${hdr}</div></div><div class="meta">${esc(t('Printed'))} ${esc(fmtDate(todayISO()))}</div></div>
+    <h1>${esc(t('Orders using this material'))}</h1>
+    ${blocks}
+    <div class="actions"><button onclick="window.print()">${esc(t('Print'))}</button></div>
+  </div></body></html>`;
+  w.document.write(doc); w.document.close(); w.focus();
+};
 function certForm(){
   return `<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>
   <div class="page-head"><h2>${t('Add material cert')}</h2><p>${t('Capture the cert details and link it to the orders it covers.')}</p></div>
