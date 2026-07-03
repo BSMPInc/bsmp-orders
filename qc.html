@@ -166,10 +166,13 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .fdv-empty{height:min(52vh,440px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text3);background:var(--bg);border:1px dashed var(--border2);border-radius:4px;text-align:center;padding:16px}
 .fdv-empty i{font-size:34px;opacity:.5}
 .fdv-markers{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.fmark{position:absolute;transform:translate(-50%,-50%);min-width:26px;height:26px;padding:0 4px;border-radius:999px;border:2px solid #ff0000;background:#fff;color:#ff0000;font:700 12px Arial,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;box-shadow:0 0 0 2px #fff,0 1px 4px rgba(0,0,0,.35);line-height:1;transition:transform .1s}
-.fmark.ok{border-color:#2f7d55;color:#fff;background:#2f7d55}
-.fmark.oot{border-color:#c0261c;color:#fff;background:#c0261c}
-.fmark:hover{transform:translate(-50%,-50%) scale(1.15);z-index:2}
+.fmark{position:absolute;transform:translate(-50%,-50%);min-width:14px;height:14px;padding:0 2px;border-radius:999px;border:1.4px solid rgba(224,0,0,.92);background:rgba(255,255,255,.32);color:#d40000;font:700 7px Arial,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;line-height:1;transition:transform .1s,background .1s}
+.fmark::after{content:'';position:absolute;inset:-7px}
+.fmark.ok{border-color:rgba(30,120,70,.95);color:#0b4a2c;background:rgba(47,125,85,.3)}
+.fmark.oot{border-color:rgba(180,30,25,.95);color:#7a0f0a;background:rgba(192,38,28,.32)}
+.fmark:hover{transform:translate(-50%,-50%) scale(1.5);background:rgba(255,255,255,.72);z-index:2}
+.fmark.ok:hover{background:rgba(47,125,85,.85);color:#fff}
+.fmark.oot:hover{background:rgba(192,38,28,.85);color:#fff}
 .fdv-hint{position:absolute;left:8px;bottom:8px;background:rgba(58,64,73,.92);color:#fff;font-size:11px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none}
 .meas-ov{position:fixed;inset:0;background:rgba(16,20,26,.5);z-index:9550;display:none;align-items:center;justify-content:center;padding:20px}
 .meas{background:var(--card);width:min(430px,94vw);border-radius:8px;box-shadow:0 24px 64px rgba(0,0,0,.4);overflow:hidden}
@@ -961,8 +964,10 @@ function viewFair(){
     ${(r&&r.reviewedBy)?`<div class="hint">${t('Last decision:')} ${t(r.fairStatus)} · ${esc((r.reviewedBy||'').split('@')[0])} · ${fmtWhen(r.reviewedAt)}</div>`:''}
   </div>`;
 }
+function fdvIsImg(f){ return f && (/(png|jpe?g|webp|gif)/i.test(f.type||'') || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(f.url||'')); }
 function farViewer(r){
-  const url=(r&&r.ballooned&&r.ballooned.url)||(r&&r.drawing&&r.drawing.url)||'';
+  _curDraw=(r&&r.drawing)||null;
+  const url=(_fairImg&&_fairImg.dataUrl) || (fdvIsImg(_curDraw)?_curDraw.url:'') || (r&&r.ballooned&&r.ballooned.url) || (_curDraw&&_curDraw.url) || '';
   if(!url) return `<div class="fdv-empty"><i class="ti ti-photo"></i><div>${t('No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.')}</div></div>`;
   return `<div class="fdv"><div class="fdv-canvas" id="fdv-canvas"><img class="fdv-img" id="fdv-img" src="${esc(url)}" draggable="false" alt="drawing" onload="fdvInit()"><div class="fdv-markers" id="fdv-markers"></div></div>
     ${_fdvBubbles.length?`<div class="fdv-hint">${t('Tap a balloon to enter its measurement')}</div>`:''}
@@ -975,7 +980,7 @@ function farViewer(r){
     </div></div>`;
 }
 /* ---- drawing viewer: zoom + pan (desktop wheel/drag, iPad pinch/drag) ---- */
-let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false, _fdvBubbles=[];
+let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false, _fdvBubbles=[], _curDraw=null;
 function fdvEls(){ return {c:$('fdv-canvas'), i:$('fdv-img')}; }
 function fdvApply(){ const {i}=fdvEls(); if(!i) return; i.style.transform='translate('+fdv.x+'px,'+fdv.y+'px) scale('+fdv.s+')'; const p=$('fdv-pct'); if(p) p.textContent=Math.round(fdv.s*100)+'%'; fdvPositionMarkers(); }
 function fdvRenderMarkers(){
@@ -1004,6 +1009,9 @@ function _tmid(e){ const a=e.touches[0],b=e.touches[1]; return {x:(a.clientX+b.c
 window.fdvInit=()=>{
   const {c}=fdvEls(); if(!c) return;
   fdvFit(); fdvRenderMarkers();
+  if(!_fairImg && _curDraw && !fdvIsImg(_curDraw)){
+    imgFromUrl(_curDraw.url, _curDraw).then(im=>{ if(im){ _fairImg=im; const el=$('fdv-img'); if(el) el.src=im.dataUrl; } }).catch(()=>{});
+  }
   c.onwheel=(e)=>{ e.preventDefault(); const r=c.getBoundingClientRect(); fdvZoom(e.deltaY<0?1:-1, e.clientX-r.left, e.clientY-r.top); };
   c.onmousedown=(e)=>{ _fdvDrag=true; _fdvLX=e.clientX; _fdvLY=e.clientY; c.classList.add('grabbing'); };
   c.ontouchstart=(e)=>{ if(e.touches.length===2){ _fdvPinch={d:_tdist(e),s:fdv.s}; } else if(e.touches.length===1){ _fdvDrag=true; _fdvLX=e.touches[0].clientX; _fdvLY=e.touches[0].clientY; } };
@@ -1208,12 +1216,12 @@ async function qcCompositeBalloonsDataUrl(){
   const w=im.naturalWidth||_fairImg.w, h=im.naturalHeight||_fairImg.h;
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const ctx=cv.getContext('2d'); ctx.drawImage(im,0,0,w,h);
-  const R=Math.max(6, Math.round(Math.min(w,h)*0.008));
-  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.round(R*1.2)+'px Arial, sans-serif';
+  const R=Math.max(9, Math.round(Math.min(w,h)*0.012));
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.round(R*1.1)+'px Arial, sans-serif';
   _fairBubbles.forEach(b=>{ const cx=b.bx*w, cy=b.by*h;
-    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle='#ffffff'; ctx.fill();
-    ctx.lineWidth=Math.max(1.6,R*0.16); ctx.strokeStyle='#ff0000'; ctx.stroke();
-    ctx.fillStyle='#ff0000'; ctx.fillText(String(b.no),cx,cy+R*0.04); });
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fill();
+    ctx.lineWidth=Math.max(1.4,R*0.14); ctx.strokeStyle='#ff0000'; ctx.stroke();
+    ctx.fillStyle='#d40000'; ctx.fillText(String(b.no),cx,cy+R*0.04); });
   return {dataUrl:cv.toDataURL('image/jpeg',0.9), w, h};
 }
 function qcSyncCharsFromBubbles(){
