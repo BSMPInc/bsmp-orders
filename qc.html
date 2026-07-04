@@ -886,17 +886,19 @@ window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _fairImg=null; _fairBalloo
 
 function charRow(i,c){
   c=c||{}; const oot=c.oot?'oot':'';
+  // Operators may only record the measured result — the definition columns are locked.
+  const opRO=!isMgr(), ro=opRO?'readonly':'', dis=opRO?'disabled':'';
   const types=['Linear','Diameter','Radius','Angular','Note'];
   const typeOpts=types.map(tp=>`<option value="${tp}" ${((c.type||'Linear')===tp)?'selected':''}>${t(tp)}</option>`).join('');
   return `<tr class="${oot}" data-row="${i}">
     <td class="cno">${c.no||(i+1)}</td>
-    <td><textarea data-f="requirement" oninput="qcCharCompute(${i})">${esc(c.requirement||'')}</textarea></td>
-    <td><input data-f="tol" value="${esc(c.tol||'')}" oninput="qcCharCompute(${i})" placeholder="±.005"></td>
-    <td><select data-f="type">${typeOpts}</select></td>
+    <td><textarea data-f="requirement" oninput="qcCharCompute(${i})" ${ro}>${esc(c.requirement||'')}</textarea></td>
+    <td><input data-f="tol" value="${esc(c.tol||'')}" oninput="qcCharCompute(${i})" placeholder="±.005" ${ro}></td>
+    <td><select data-f="type" ${dis}>${typeOpts}</select></td>
     <td><input data-f="result" oninput="qcCharCompute(${i})" value="${esc(c.result||'')}"></td>
     <td><input data-f="dev" value="${esc(c.dev||'')}" readonly class="devcell" tabindex="-1"></td>
-    <td><input data-f="notes" value="${esc(c.notes||'')}"></td>
-    <td class="rm" onclick="qcCharDel(${i})"><i class="ti ti-x"></i></td>
+    <td><input data-f="notes" value="${esc(c.notes||'')}" ${ro}></td>
+    ${opRO?'<td></td>':`<td class="rm" onclick="qcCharDel(${i})"><i class="ti ti-x"></i></td>`}
   </tr>`;
 }
 // shared measurement math
@@ -923,52 +925,60 @@ function viewFair(){
   const mode=v('mode','simple');
   const st=v('fairStatus','Draft');
   const canApprove=isMgr() && (st==='Submitted'||st==='Measuring');
+  // Operators can view everything and record measurements on the ballooned drawing,
+  // but cannot change the header, re-balloon, or edit the characteristic definitions.
+  const opRO=!isMgr(), dis=opRO?'disabled':'', ro=opRO?'readonly':'';
   _fdvBubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
+  <div class="toolbar" style="margin-bottom:12px">
+    <button class="btn primary" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
+    <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
+  </div>
   <div class="card">
     <div class="fair-top${_fairDrawMin?' draw-min':''}">
       <div class="fair-draw">${farViewer(r)}</div>
       <div class="fair-info">
         <div class="field"><label class="fl">${t('Report type')}</label>
           <div class="seg" id="fair-mode">
-            <button class="${mode==='simple'?'on':''}" onclick="qcFairMode('simple')">${t('Simple FAR')}</button>
-            <button class="${mode==='as9102'?'on':''}" onclick="qcFairMode('as9102')">${t('Full AS9102')}</button>
+            <button class="${mode==='simple'?'on':''}" onclick="qcFairMode('simple')" ${dis}>${t('Simple FAR')}</button>
+            <button class="${mode==='as9102'?'on':''}" onclick="qcFairMode('as9102')" ${dis}>${t('Full AS9102')}</button>
           </div>
           <input type="hidden" id="fair-modev" value="${esc(mode)}">
         </div>
         <div class="field"><label class="fl">${t('Link to an order')}</label>
-          <select class="in" id="fr-order" onchange="qcFillFromOrder('fr',this.value)">${orderOptions(v('orderId',''))}</select></div>
+          <select class="in" id="fr-order" onchange="qcFillFromOrder('fr',this.value)" ${dis}>${orderOptions(v('orderId',''))}</select></div>
         <div class="grid2">
-          <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="fr-part" value="${esc(v('partNum'))}"></div>
-          <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="fr-rev" value="${esc(v('rev'))}"></div>
-          <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="fr-customer" value="${esc(v('customer'))}"></div>
-          <div class="field"><label class="fl">${t('Material')}</label><input class="in" id="fr-material" value="${esc(v('material'))}"></div>
-          <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="fr-po" value="${esc(v('po'))}"></div>
-          <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="fr-job" value="${esc(v('job'))}"></div>
-          <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="fr-date" type="date" value="${esc(v('date',todayISO()))}"></div>
-          <div class="field"><label class="fl">${t('Inspected by')}</label><input class="in" id="fr-by" value="${esc(v('inspectedBy', (QC_USER&&QC_USER.email||'').split('@')[0]))}"></div>
+          <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="fr-part" value="${esc(v('partNum'))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="fr-rev" value="${esc(v('rev'))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="fr-customer" value="${esc(v('customer'))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('Material')}</label><input class="in" id="fr-material" value="${esc(v('material'))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('PO #')}</label><input class="in" id="fr-po" value="${esc(v('po'))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="fr-job" value="${esc(v('job'))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="fr-date" type="date" value="${esc(v('date',todayISO()))}" ${ro}></div>
+          <div class="field"><label class="fl">${t('Inspected by')}</label><input class="in" id="fr-by" value="${esc(v('inspectedBy', (QC_USER&&QC_USER.email||'').split('@')[0]))}" ${ro}></div>
         </div>
-        <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
+        <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} ${dis} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
         <div class="field"><label class="fl">${t('Drawing')}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
+            ${isMgr()?`<label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>`:''}
             <button class="btn sm" id="draw-min-btn" onclick="qcToggleDrawPreview()"><i class="ti ti-${_fairDrawMin?'eye':'eye-off'}"></i> ${_fairDrawMin?t('Show drawing'):t('Hide drawing')}</button>
           </div>
           <div class="thumbs" id="files-frdraw"></div>
-          <div class="bubble-bar" style="margin-top:8px"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
+          ${isMgr()?`<div class="bubble-bar" style="margin-top:8px"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
             <button class="btn sm" id="fair-place-btn" onclick="qcFairPlaceMode()"><i class="ti ti-circle-plus"></i> ${t('Place bubbles myself')}</button></div>
           ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px"><button class="btn sm" id="fair-readb-btn" onclick="qcFairReadBallooned()"><i class="ti ti-sparkles"></i> ${t('Read dimensions from ballooned drawing')}</button></div>`:''}
-          <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')}</div>
+          <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')}</div>`
+          :`<div class="muted" style="font-size:11.5px;margin-top:8px">${t('Tap a balloon to enter its measurement')}</div>`}
         </div>
       </div>
     </div>
 
-    <div id="fair-bubble-ws">${(_fairImg && !_fairFull)?fairBubbleWorkspace():''}</div>
+    <div id="fair-bubble-ws">${(isMgr() && _fairImg && !_fairFull)?fairBubbleWorkspace():''}</div>
 
     <div class="card-title" style="margin-top:14px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
     <div style="overflow-x:auto"><table class="char-tbl"><thead><tr><th style="width:38px">#</th><th style="min-width:120px">${t('Requirement')}</th><th style="min-width:96px">${t('Tolerance Range')}</th><th style="min-width:104px">${t('Type')}</th><th style="min-width:100px">${t('Result')}</th><th style="min-width:88px">${t('Deviation')}</th><th style="min-width:120px">${t('Notes')}</th><th style="width:30px"></th></tr></thead>
       <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table></div>
-    <div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>
+    ${isMgr()?`<div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>`:''}
 
     <div class="toolbar" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
       <button class="btn primary" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
