@@ -153,8 +153,10 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .char-tbl .rm{color:var(--text3);cursor:pointer;text-align:center}
 .char-tbl .rm:hover{color:var(--red)}
 .char-tbl tr.oot td{background:var(--red-soft)}
-.fair-top{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;position:sticky;top:84px;z-index:20;background:var(--card);padding:8px 0 12px;box-shadow:0 9px 10px -8px rgba(16,24,40,.18)}
-.fair-info{max-height:min(58vh,540px);overflow:auto;padding-right:6px}
+.fair-top{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;background:var(--card);padding:8px 0 12px}
+.fair-top.draw-min{grid-template-columns:1fr}
+.fair-top.draw-min .fair-draw{display:none}
+.fair-info{padding-right:6px}
 .fdv{position:relative;height:min(58vh,540px);background:#3a4049;border:1px solid var(--border);overflow:hidden;border-radius:4px}
 .fdv-canvas{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none}
 .fdv-canvas.grabbing{cursor:grabbing}
@@ -189,7 +191,7 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas-dev.ok{color:#2f7d55} .meas-dev.oot{color:var(--red)}
 .meas-btns{display:flex;gap:8px;margin-top:10px}
 .meas-btns .btn{flex:1;justify-content:center}
-@media (max-width:900px){ .fair-top{grid-template-columns:1fr;position:static;box-shadow:none} .fair-info{max-height:none;overflow:visible} .fdv{height:min(52vh,460px)} }
+@media (max-width:900px){ .fair-top{grid-template-columns:1fr} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
@@ -233,23 +235,27 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .cert-open{cursor:pointer}
 .cert-open:hover{text-decoration:underline}
 .bubble-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px}
-.bubble-ws{margin-top:10px;border:1px solid var(--border);background:#fff;overflow:auto;max-height:600px}
-.bubble-stage{position:relative;display:inline-block;min-width:100%;line-height:0}
-.bubble-stage img{display:block;max-width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+.bubble-ws{margin-top:10px;border:1px solid var(--border);background:#3a4049;overflow:hidden;height:580px;position:relative}
+.bubble-canvas{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none;width:100%;height:100%}
+.bubble-canvas.grabbing{cursor:grabbing}
+.bubble-canvas.boxmode{cursor:crosshair}
+.bubble-stage{position:absolute;top:0;left:0;transform-origin:0 0;line-height:0;user-select:none}
+.bubble-stage img{display:block;user-select:none;-webkit-user-drag:none}
 .balloon{position:absolute;transform:translate(-50%,-50%);min-width:10px;height:10px;padding:0 2px;border-radius:999px;border:1px solid #ff0000;background:#fff;color:#ff0000;font:700 5pt Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 0 0 1px #fff;line-height:1;touch-action:none}
 .balloon:active{cursor:grabbing}
 .balloon.reading{background:#fff8d6;border-color:#c99a00;color:#8a6d00}
-.bubble-stage.boxmode{cursor:crosshair}
 .ws-box{position:absolute;border:1.5px dashed #ff2d2d;background:rgba(255,45,45,.12);pointer-events:none;z-index:5}
 .ws-modeseg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:none}
 .ws-modeseg button{border:none;background:var(--card);padding:6px 12px;font:inherit;font-weight:700;font-size:12px;cursor:pointer;color:var(--text2);display:inline-flex;align-items:center;gap:5px}
 .ws-modeseg button.on{background:var(--accent);color:#fff}
+.bws-ctrls{position:absolute;right:8px;bottom:8px;display:flex;gap:2px;align-items:center;background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:8px;padding:3px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:10}
+.bws-ctrls button{border:none;background:none;cursor:pointer;padding:6px 8px;color:var(--text);font:inherit;font-weight:700;border-radius:5px;line-height:1;min-height:36px}
+.bws-ctrls button:hover{background:var(--bg)}
+.bws-pct{font-size:11px;color:var(--text2);min-width:40px;text-align:center;font-weight:700}
 .fair-fs{position:fixed;inset:0;z-index:9400;background:var(--bg);display:none;flex-direction:column;padding:10px 12px 12px}
 .fair-fs-bar{display:flex;align-items:center;gap:10px;padding:2px 2px 8px;font-size:15px}
 .fair-fs-body{flex:1;min-height:0;overflow:auto}
-.fair-fs .bubble-ws{max-height:none;height:auto;border:1px solid var(--border)}
-.fair-fs .bubble-stage{display:block;width:100%}
-.fair-fs .bubble-stage img{width:100%;height:auto}
+.fair-fs .bubble-ws{height:calc(100vh - 140px)}
 .balloon.filled{background:#ffecec;box-shadow:0 0 0 1.5px #fff,0 0 0 3px rgba(255,0,0,.12)}
 .qc-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .qc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -367,7 +373,7 @@ const I18N = {
     'Simple FAR':'FAR simple','AS9102':'AS9102','Full AS9102':'AS9102 completo','Report type':'Tipo de reporte',
     'Fill the header, list characteristics, then submit for review.':'Completa el encabezado, lista las características y envía a revisión.',
     'Material':'Material','Date':'Fecha','Inspected by':'Inspeccionado por','Restricted / ITAR':'Restringido / ITAR',
-    'Drawing':'Plano','Upload drawing':'Subir plano',
+    'Drawing':'Plano','Upload drawing':'Subir plano','Hide drawing':'Ocultar plano','Show drawing':'Mostrar plano',
     'Zoom in':'Acercar','Zoom out':'Alejar','Fit':'Ajustar','No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.':'Aún no hay plano — sube uno a la derecha y luego usa Auto-globos o Colocar globos.',
     'Tap a balloon to enter its measurement':'Toca un globo para ingresar su medición','Characteristic':'Característica','Tolerance':'Tolerancia','Measured result':'Resultado medido','Confirm & next':'Confirmar y siguiente','Confirm':'Confirmar','In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia','All balloons measured.':'Todos los globos medidos.',
     'msr:req':'Requisito','msr:tol':'Tolerancia','msr:measured':'Resultado medido','msr:next':'Confirmar y siguiente','msr:confirm':'Confirmar',
@@ -908,7 +914,7 @@ window.qcCharCompute=(i)=>{
 };
 function catToType(cat){ return cat==='cutout_dia'?'Diameter':((cat==='material'||cat==='finish'||cat==='thickness')?'Note':'Linear'); }
 let _chars=[];
-let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false, _fairFull=false, _wsMode='place', _wsBox=null;
+let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false, _fairFull=false, _wsMode='place', _wsBox=null, _fairDrawMin=false;
 function viewFair(){
   const r=editId?INSPECTIONS[editId]:null;
   if(r && !_fairBubbles.length) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
@@ -920,7 +926,7 @@ function viewFair(){
   _fdvBubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
   <div class="card">
-    <div class="fair-top">
+    <div class="fair-top${_fairDrawMin?' draw-min':''}">
       <div class="fair-draw">${farViewer(r)}</div>
       <div class="fair-info">
         <div class="field"><label class="fl">${t('Report type')}</label>
@@ -944,7 +950,10 @@ function viewFair(){
         </div>
         <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
         <div class="field"><label class="fl">${t('Drawing')}</label>
-          <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
+            <button class="btn sm" id="draw-min-btn" onclick="qcToggleDrawPreview()"><i class="ti ti-${_fairDrawMin?'eye':'eye-off'}"></i> ${_fairDrawMin?t('Show drawing'):t('Hide drawing')}</button>
+          </div>
           <div class="thumbs" id="files-frdraw"></div>
           <div class="bubble-bar" style="margin-top:8px"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
             <button class="btn sm" id="fair-place-btn" onclick="qcFairPlaceMode()"><i class="ti ti-circle-plus"></i> ${t('Place bubbles myself')}</button></div>
@@ -1090,6 +1099,11 @@ window.qcMeasConfirm=(advance)=>{
   qcMeasClose();
 };
 window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); event.target.classList.add('on'); };
+window.qcToggleDrawPreview=()=>{
+  _fairDrawMin=!_fairDrawMin;
+  const ft=document.querySelector('.fair-top'); if(ft) ft.classList.toggle('draw-min', _fairDrawMin);
+  const btn=$('draw-min-btn'); if(btn) btn.innerHTML='<i class="ti ti-'+(_fairDrawMin?'eye':'eye-off')+'"></i> '+esc(_fairDrawMin?t('Show drawing'):t('Hide drawing'));
+};
 function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=>{ _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); _chars[i].no=_chars[i].no||(i+1); _chars[i].oot=tr.classList.contains('oot'); }); }
 window.qcCharEdit=(i)=>{ const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr)return; _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); };
 window.qcCharAdd=()=>{ syncChars(); _chars.push({no:_chars.length+1}); $('char-body').insertAdjacentHTML('beforeend',charRow(_chars.length-1,_chars[_chars.length-1])); };
@@ -1206,7 +1220,7 @@ window.qcFairAutoBubble=async ()=>{
     const parsed=JSON.parse(clean);
     let chars=Array.isArray(parsed)?parsed:(parsed.characteristics||[]);
     if(!chars.length) throw new Error(t('No characteristics found on the drawing.'));
-    _fairImg=img; _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null;
+    _fairImg=img; _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null; _bws={s:1,x:0,y:0,fit:1}; _bwsBound=false;
     _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
     if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
     qcWsRender();
@@ -1241,7 +1255,7 @@ window.qcFairPlaceMode=async ()=>{
   try{
     const img=await qcFairDrawingImage();
     if(!img) throw new Error(t('Upload the drawing first (re-upload a saved one).'));
-    _fairImg=img; _fairBalloonedUrl=null;
+    _fairImg=img; _fairBalloonedUrl=null; _bws={s:1,x:0,y:0,fit:1}; _bwsBound=false;
     const rr=editId?INSPECTIONS[editId]:null;
     if(!_fairBubbles.length && rr && rr.bubbles && rr.bubbles.length) _fairBubbles=rr.bubbles.map(b=>({...b}));
     qcWsRender();
@@ -1311,8 +1325,11 @@ window.qcBubStageClick=(e)=>{
   if(_wsMode!=='place') return;
   if(_bubDidDrag){ _bubDidDrag=false; return; }
   const tgt=e.target; if(tgt&&tgt.classList&&tgt.classList.contains('balloon')) return;
-  const st=$('bubble-stage'); if(!st) return; const r=st.getBoundingClientRect();
-  const bx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)), by=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+  const st=$('bubble-stage'); const im=st&&st.querySelector('img'); if(!st||!im) return;
+  // coords relative to the image in image-pixel space, then normalize
+  const r=im.getBoundingClientRect();
+  const bx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+  const by=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
   _fairBubbles.push({no:_fairBubbles.length+1, bx, by});
   st.insertAdjacentHTML('beforeend', balloonHtml(_fairBubbles[_fairBubbles.length-1], _fairBubbles.length-1));
   const bar=$('fair-read-btn'); if(bar) bar.disabled=false;
@@ -1321,20 +1338,23 @@ window.qcBubStageClick=(e)=>{
 window.qcStageDown=(e)=>{
   if(_wsMode!=='box') return;
   const tgt=e.target; if(tgt&&tgt.classList&&tgt.classList.contains('balloon')) return;
-  const st=$('bubble-stage'); if(!st) return;
-  const p=(e.touches&&e.touches[0])||e; const r=st.getBoundingClientRect();
-  const x=p.clientX-r.left, y=p.clientY-r.top;
+  const st=$('bubble-stage'); const im=st&&st.querySelector('img'); if(!st||!im) return;
+  const p=(e.touches&&e.touches[0])||e;
+  // box visually drawn on the stage element; coords relative to stage origin
+  const rs=st.getBoundingClientRect();
+  const x=(p.clientX-rs.left)/_bws.s, y=(p.clientY-rs.top)/_bws.s;
   const el=document.createElement('div'); el.className='ws-box'; el.style.cssText='left:'+x+'px;top:'+y+'px;width:0;height:0';
   st.appendChild(el);
-  _wsBox={x0:x,y0:y,el,st,cur:null};
+  _wsBox={x0:x,y0:y,el,st,im,cur:null};
   if(e.cancelable) e.preventDefault();
   document.addEventListener('mousemove',qcStageMove); document.addEventListener('mouseup',qcStageUp);
   document.addEventListener('touchmove',qcStageMove,{passive:false}); document.addEventListener('touchend',qcStageUp);
 };
 function qcStageMove(e){
   if(!_wsBox) return; if(e.cancelable) e.preventDefault();
-  const p=(e.touches&&e.touches[0])||e; const r=_wsBox.st.getBoundingClientRect();
-  const x=p.clientX-r.left, y=p.clientY-r.top;
+  const p=(e.touches&&e.touches[0])||e; const rs=_wsBox.st.getBoundingClientRect();
+  // divide by scale to stay in stage-local (unscaled) space so the box CSS matches
+  const x=(p.clientX-rs.left)/_bws.s, y=(p.clientY-rs.top)/_bws.s;
   const L=Math.min(x,_wsBox.x0), T=Math.min(y,_wsBox.y0), W=Math.abs(x-_wsBox.x0), H=Math.abs(y-_wsBox.y0);
   _wsBox.el.style.cssText='left:'+L+'px;top:'+T+'px;width:'+W+'px;height:'+H+'px';
   _wsBox.cur={L,T,W,H};
@@ -1345,8 +1365,10 @@ function qcStageUp(){
   const box=_wsBox; _wsBox=null; if(!box) return;
   const c=box.cur; if(box.el&&box.el.parentNode) box.el.parentNode.removeChild(box.el);
   if(!c || c.W<8 || c.H<6) return;
-  const r=box.st.getBoundingClientRect();
-  const nb={ x:c.L/r.width, y:c.T/r.height, w:c.W/r.width, h:c.H/r.height };
+  // normalize against the image's natural size (c.L/T/W/H are in stage-local unscaled px)
+  const im=box.im||box.st.querySelector('img');
+  const iw=im?im.naturalWidth:box.st.offsetWidth, ih=im?im.naturalHeight:box.st.offsetHeight;
+  const nb={ x:c.L/iw, y:c.T/ih, w:c.W/iw, h:c.H/ih };
   const b={ no:_fairBubbles.length+1, bx:nb.x+nb.w/2, by:nb.y+nb.h/2, box:nb, reading:true };
   _fairBubbles.push(b); qcWsRender(); qcReadBox(b);
 }
@@ -1380,7 +1402,7 @@ async function qcReadBox(b){
 window.qcBubRemove=(i)=>{ _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); };
 window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; _fairBubbles=[]; qcWsRender(); };
 function qcWsHost(){ return _fairFull ? ($('fair-fs-body')||$('fair-bubble-ws')) : $('fair-bubble-ws'); }
-function qcWsRender(){ const h=qcWsHost(); if(h) h.innerHTML=fairBubbleWorkspace(); }
+function qcWsRender(){ _bwsBound=false; const h=qcWsHost(); if(h) h.innerHTML=fairBubbleWorkspace(); }
 window.qcFairFull=(on)=>{
   _fairFull=!!on;
   let ov=$('fair-fs');
@@ -1408,18 +1430,101 @@ function fairBubbleWorkspace(){
       <button class="btn sm primary" id="fair-read-btn" onclick="qcFairReadBubbles()" ${n?'':'disabled'}><i class="ti ti-sparkles"></i> ${t('Read dimensions with AI')}</button>
       <button class="btn sm" onclick="qcBubblesSort()"><i class="ti ti-sort-ascending-numbers"></i> ${t('Sort by hierarchy')}</button>
       <button class="btn sm" onclick="qcBubblesLineUp()"><i class="ti ti-layout-align-right"></i> ${t('Line up in margin')}</button>
-      <button class="btn sm" onclick="qcFairSaveBallooned()"><i class="ti ti-device-floppy"></i> ${t('Save ballooned drawing')}</button>
+      <button class="btn sm" id="bws-save-btn" onclick="qcFairSaveBallooned()"><i class="ti ti-device-floppy"></i> ${t('Save ballooned drawing')}</button>
       <button class="btn sm" onclick="qcBubbleClear()"><i class="ti ti-trash"></i> ${t('Clear')}</button>
       ${_fairFull?'':`<button class="btn sm" onclick="qcFairFull(true)"><i class="ti ti-arrows-maximize"></i> ${t('Full screen')}</button>`}
     </div>
-    <div class="bubble-ws"><div class="bubble-stage${_wsMode==='box'?' boxmode':''}" id="bubble-stage" onclick="qcBubStageClick(event)" onmousedown="qcStageDown(event)" ontouchstart="qcStageDown(event)"><img src="${_fairImg.dataUrl}" alt="drawing" draggable="false">${balloons}</div></div>`;
+    <div class="bubble-ws" id="bubble-ws">
+      <div class="bubble-canvas${_wsMode==='box'?' boxmode':''}" id="bubble-canvas">
+        <div class="bubble-stage" id="bubble-stage" onclick="qcBubStageClick(event)" onmousedown="qcStageDown(event)" ontouchstart="qcStageDown(event)">
+          <img src="${_fairImg.dataUrl}" alt="drawing" draggable="false" onload="bwsInit()">${balloons}
+        </div>
+      </div>
+      <div class="bws-ctrls">
+        <button onclick="bwsZoom(-1)" title="${t('Zoom out')}"><i class="ti ti-minus"></i></button>
+        <button onclick="bwsFit()" title="${t('Fit')}"><i class="ti ti-arrows-minimize"></i></button>
+        <span class="bws-pct" id="bws-pct">100%</span>
+        <button onclick="bwsZoom(1)" title="${t('Zoom in')}"><i class="ti ti-plus"></i></button>
+        <button onclick="bwsReset()" title="1:1">1:1</button>
+      </div>
+    </div>`;
 }
 function _bubPoint(e){ return (e.touches&&e.touches[0])?e.touches[0]:e; }
 window.qcBubDown=(e,i)=>{ e.preventDefault(); _bubDrag=i; _bubDidDrag=false; document.addEventListener('mousemove',qcBubMove); document.addEventListener('mouseup',qcBubUp); document.addEventListener('touchmove',qcBubMove,{passive:false}); document.addEventListener('touchend',qcBubUp); };
-function qcBubMove(e){ if(_bubDrag==null) return; if(e.cancelable) e.preventDefault(); _bubDidDrag=true; const st=$('bubble-stage'); if(!st) return; const r=st.getBoundingClientRect(); const p=_bubPoint(e); let bx=(p.clientX-r.left)/r.width, by=(p.clientY-r.top)/r.height; bx=Math.max(0,Math.min(1,bx)); by=Math.max(0,Math.min(1,by)); const b=_fairBubbles[_bubDrag]; if(!b) return; b.bx=bx; b.by=by; const el=st.querySelector('.balloon[data-i="'+_bubDrag+'"]'); if(el){ el.style.left=(bx*100)+'%'; el.style.top=(by*100)+'%'; } }
+function qcBubMove(e){ if(_bubDrag==null) return; if(e.cancelable) e.preventDefault(); _bubDidDrag=true; const st=$('bubble-stage'); if(!st) return; const im=st.querySelector('img'); if(!im) return; const r=im.getBoundingClientRect(); const p=_bubPoint(e); let bx=(p.clientX-r.left)/r.width, by=(p.clientY-r.top)/r.height; bx=Math.max(0,Math.min(1,bx)); by=Math.max(0,Math.min(1,by)); const b=_fairBubbles[_bubDrag]; if(!b) return; b.bx=bx; b.by=by; const el=st.querySelector('.balloon[data-i="'+_bubDrag+'"]'); if(el){ el.style.left=(bx*100)+'%'; el.style.top=(by*100)+'%'; } }
 function qcBubUp(){ _bubDrag=null; document.removeEventListener('mousemove',qcBubMove); document.removeEventListener('mouseup',qcBubUp); document.removeEventListener('touchmove',qcBubMove); document.removeEventListener('touchend',qcBubUp); }
+
+/* ---- bubble workspace pan + zoom ---- */
+let _bws={s:1,x:0,y:0,fit:1}, _bwsPan=false, _bwsLX=0, _bwsLY=0, _bwsPinch=null, _bwsBound=false, _bwsDocBound=false;
+function bwsApply(){
+  const st=$('bubble-stage'); if(!st) return;
+  st.style.transform='translate('+_bws.x+'px,'+_bws.y+'px) scale('+_bws.s+')';
+  const p=$('bws-pct'); if(p) p.textContent=Math.round(_bws.s*100)+'%';
+}
+window.bwsFit=()=>{
+  const cv=$('bubble-canvas'), st=$('bubble-stage'), im=st&&st.querySelector('img');
+  if(!cv||!im||!im.naturalWidth) return;
+  const cw=cv.clientWidth, ch=cv.clientHeight;
+  const s=Math.min(cw/im.naturalWidth, ch/im.naturalHeight)||1;
+  _bws.s=s; _bws.fit=s;
+  _bws.x=(cw-im.naturalWidth*s)/2; _bws.y=(ch-im.naturalHeight*s)/2;
+  bwsApply();
+};
+window.bwsReset=()=>{
+  const cv=$('bubble-canvas'), st=$('bubble-stage'), im=st&&st.querySelector('img');
+  if(!cv||!im) return;
+  _bws.s=1; _bws.x=(cv.clientWidth-im.naturalWidth)/2; _bws.y=(cv.clientHeight-im.naturalHeight)/2;
+  bwsApply();
+};
+function bwsZoomAt(f,cx,cy){
+  const cv=$('bubble-canvas'); if(!cv) return;
+  if(cx==null){ cx=cv.clientWidth/2; cy=cv.clientHeight/2; }
+  const ns=Math.max((_bws.fit||0.05)*0.4, Math.min(_bws.s*f, 20));
+  _bws.x=cx-(cx-_bws.x)*(ns/_bws.s); _bws.y=cy-(cy-_bws.y)*(ns/_bws.s); _bws.s=ns;
+  bwsApply();
+}
+window.bwsZoom=(dir,cx,cy)=>bwsZoomAt(dir>0?1.3:1/1.3, cx, cy);
+window.bwsInit=()=>{
+  const cv=$('bubble-canvas'); if(!cv) return;
+  // if we already have a zoom state (e.g. re-render after placing balloon), restore it; otherwise fit
+  if(_bws.fit && _bws.s !== 1) bwsApply();
+  else bwsFit();
+  if(_bwsBound) return; _bwsBound=true;
+  cv.addEventListener('wheel',(e)=>{ e.preventDefault(); const r=cv.getBoundingClientRect(); bwsZoom(e.deltaY<0?1:-1, e.clientX-r.left, e.clientY-r.top); },{passive:false});
+  // pan: only when not dragging a balloon and not in boxmode
+  cv.addEventListener('mousedown',(e)=>{
+    if(e.target.classList.contains('balloon')) return;
+    if(cv.classList.contains('boxmode')) return;
+    _bwsPan=true; _bwsLX=e.clientX; _bwsLY=e.clientY; cv.classList.add('grabbing');
+  });
+  cv.addEventListener('touchstart',(e)=>{
+    if(e.touches.length===2){ _bwsPinch={d:Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY),s:_bws.s}; }
+    else if(e.touches.length===1 && !e.target.classList.contains('balloon') && !cv.classList.contains('boxmode')){ _bwsPan=true; _bwsLX=e.touches[0].clientX; _bwsLY=e.touches[0].clientY; }
+  },{passive:true});
+  cv.addEventListener('touchmove',(e)=>{
+    if(e.touches.length===2&&_bwsPinch){
+      e.preventDefault();
+      const nd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      const mx=(e.touches[0].clientX+e.touches[1].clientX)/2, my=(e.touches[0].clientY+e.touches[1].clientY)/2;
+      const r=cv.getBoundingClientRect(), cx=mx-r.left, cy=my-r.top;
+      const ns=Math.max((_bws.fit||0.05)*0.4,Math.min(_bwsPinch.s*(nd/_bwsPinch.d),20));
+      _bws.x=cx-(cx-_bws.x)*(ns/_bws.s); _bws.y=cy-(cy-_bws.y)*(ns/_bws.s); _bws.s=ns; bwsApply();
+    } else if(e.touches.length===1&&_bwsPan){
+      e.preventDefault();
+      _bws.x+=e.touches[0].clientX-_bwsLX; _bws.y+=e.touches[0].clientY-_bwsLY;
+      _bwsLX=e.touches[0].clientX; _bwsLY=e.touches[0].clientY; bwsApply();
+    }
+  },{passive:false});
+  cv.addEventListener('touchend',(e)=>{ if(e.touches.length<2) _bwsPinch=null; if(e.touches.length===0) _bwsPan=false; });
+  if(!_bwsDocBound){ _bwsDocBound=true;
+    document.addEventListener('mousemove',(e)=>{ if(!_bwsPan) return; const cv2=$('bubble-canvas'); if(!cv2) return; _bws.x+=e.clientX-_bwsLX; _bws.y+=e.clientY-_bwsLY; _bwsLX=e.clientX; _bwsLY=e.clientY; bwsApply(); });
+    document.addEventListener('mouseup',()=>{ _bwsPan=false; const cv2=$('bubble-canvas'); if(cv2) cv2.classList.remove('grabbing'); });
+  }
+};
 window.qcFairSaveBallooned=async ()=>{
   if(!_fairImg||!_fairBubbles.length){ qcToast(t('Place at least one balloon first.'),'err'); return; }
+  const btn=$('bws-save-btn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin"></i> '+esc(t('Saving…')); }
   try{
     const comp=await qcCompositeBalloonsDataUrl();
     const blob=await (await fetch(comp.dataUrl)).blob();
@@ -1428,6 +1533,9 @@ window.qcFairSaveBallooned=async ()=>{
     if(url){ _fairBalloonedUrl={name:file.name,url,type:'image/jpeg'}; qcToast(t('Ballooned drawing saved — Save the report to keep it.'),'ok'); }
     else qcToast(t('Save failed:')+' upload','err');
   }catch(e){ console.error('ballooned save failed', e); qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err'); }
+  finally{
+    if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-device-floppy"></i> '+esc(t('Save ballooned drawing')); }
+  }
 };
 
 /* =================== NONCONFORMANCES =================== */
