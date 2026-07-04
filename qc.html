@@ -374,7 +374,7 @@ const I18N = {
     'Fill the header, list characteristics, then submit for review.':'Completa el encabezado, lista las características y envía a revisión.',
     'Material':'Material','Date':'Fecha','Inspected by':'Inspeccionado por','Restricted / ITAR':'Restringido / ITAR',
     'Drawing':'Plano','Upload drawing':'Subir plano','Hide drawing':'Ocultar plano','Show drawing':'Mostrar plano',
-    'Zoom in':'Acercar','Zoom out':'Alejar','Fit':'Ajustar','No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.':'Aún no hay plano — sube uno a la derecha y luego usa Auto-globos o Colocar globos.',
+    'Zoom in':'Acercar','Zoom out (−)':'Alejar (−)','Fit':'Ajustar','No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.':'Aún no hay plano — sube uno a la derecha y luego usa Auto-globos o Colocar globos.',
     'Tap a balloon to enter its measurement':'Toca un globo para ingresar su medición','Characteristic':'Característica','Tolerance':'Tolerancia','Measured result':'Resultado medido','Confirm & next':'Confirmar y siguiente','Confirm':'Confirmar','In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia','All balloons measured.':'Todos los globos medidos.',
     'msr:req':'Requisito','msr:tol':'Tolerancia','msr:measured':'Resultado medido','msr:next':'Confirmar y siguiente','msr:confirm':'Confirmar',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
@@ -988,7 +988,7 @@ function farViewer(r){
   return `<div class="fdv"><div class="fdv-canvas" id="fdv-canvas"><img class="fdv-img" id="fdv-img" src="${esc(url)}" draggable="false" alt="drawing" onload="fdvInit()"><div class="fdv-markers" id="fdv-markers"></div></div>
     ${_fdvBubbles.length?`<div class="fdv-hint">${t('Tap a balloon to enter its measurement')}</div>`:''}
     <div class="fdv-ctrls">
-      <button onclick="fdvZoom(-1)" title="${t('Zoom out')}"><i class="ti ti-minus"></i></button>
+      <button onclick="fdvZoom(-1)" title="${t('Zoom out (−)')}"><i class="ti ti-minus"></i></button>
       <button onclick="fdvFit()" title="${t('Fit')}"><i class="ti ti-arrows-minimize"></i></button>
       <span class="fdv-pct" id="fdv-pct">100%</span>
       <button onclick="fdvZoom(1)" title="${t('Zoom in')}"><i class="ti ti-plus"></i></button>
@@ -1441,7 +1441,7 @@ function fairBubbleWorkspace(){
         </div>
       </div>
       <div class="bws-ctrls">
-        <button onclick="bwsZoom(-1)" title="${t('Zoom out')}"><i class="ti ti-minus"></i></button>
+        <button onclick="bwsZoom(-1)" title="${t('Zoom out (−)')}"><i class="ti ti-minus"></i></button>
         <button onclick="bwsFit()" title="${t('Fit')}"><i class="ti ti-arrows-minimize"></i></button>
         <span class="bws-pct" id="bws-pct">100%</span>
         <button onclick="bwsZoom(1)" title="${t('Zoom in')}"><i class="ti ti-plus"></i></button>
