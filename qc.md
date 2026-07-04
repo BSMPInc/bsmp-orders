@@ -9,13 +9,21 @@ Quality control: operator self-checks, First Article Inspection reports (Simple 
 
 ## Data & storage
 
-- **Owns RTDB:** `qc/inspections`, `qc/ncr`, `qc/certs`.
+- **Owns RTDB:** `qc/inspections`, `qc/ncr`, `qc/certs`, `qc/audit`.
+- **`qc/audit` = append-only change history.** Each entry is written under its own `qc/audit/<id>` and never edited (immutable trail, an AS9100 building block). FAR result changes (`{charNo, from, to, wasOot, nowOot, user, ts, action}`) and NCR raise/correct events are logged here on every `qcSaveFair`. Loaded into the `AUDIT` state mirror; `farHistoryCard()` renders it on the First Article form. **Needs its own security rule** (see warning below) or the writes are swallowed — the code intentionally wraps `qcLogAudit` in try/catch so a missing rule can't block the main save.
+- **Out-of-tolerance → NCR:** when a saved FAR has any characteristic whose result busts its tolerance (`charIsOot`), `qcSaveFair` auto-raises a linked NCR (`source:'fair'`, `farId`/`inspectionId`, `rec.ncrId`), mirroring the self-check Flag path. When every dimension is corrected it stamps `correctedAt`/`correctedBy` on that NCR and leaves the final close to a manager. The FAR list shows an "Open NCR" badge until it's closed.
 - **Reads:** `orders` and `quotes` (to link a self-check / FAR / cert to an order).
 - **Storage:** uploads under `qc/` prefix (`qcUpload` → `qc/<subfolder>/...`). Cert packages, part photos, and ballooned drawings all live here.
 - **localStorage:** `bsmp_qc_lang` (EN/ES), plus it *reads* `bsmp_proxy_url` / `bsmp_apikey` set by quote.html for AI.
 - **CDN deps unique to this app:** `pdf-lib` (splitting cert PDFs) and `pdf.js` (rendering drawing/cert pages).
 
 > ⚠️ **The classic silent-save bug lives here.** RTDB + Storage security rules must include the `qc/` path (and a matching Storage rule) or saves to certs/inspections fail silently. Rules are server-side (Firebase console), not in this repo, and take effect immediately with no redeploy. If a QC save does nothing, check rules first.
+>
+> ⚠️ **`qc/audit` needs its own rule.** Add it under the `qc` node in the Firebase console. Recommended append-only/immutable form (create-once, no overwrite/delete):
+> ```json
+> "audit": { ".read": "auth != null", "$e": { ".write": "auth != null && !data.exists()" } }
+> ```
+> Without it, change-history entries silently don't persist (the FAR still saves fine).
 
 ## Structure
 

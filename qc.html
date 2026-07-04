@@ -153,6 +153,12 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .char-tbl .rm{color:var(--text3);cursor:pointer;text-align:center}
 .char-tbl .rm:hover{color:var(--red)}
 .char-tbl tr.oot td{background:var(--red-soft)}
+.hist-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.hist-row{font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px 8px;background:var(--bg);border:1px solid var(--border)}
+.hist-row code{background:rgba(0,0,0,.05);padding:1px 5px;font-weight:700}
+.hist-badge{font-size:11px;font-weight:800;padding:1px 7px;white-space:nowrap}
+.hist-badge.oot,.hist-badge.ncr{background:var(--red-soft);color:var(--red)}
+.hist-badge.ok{color:#2f7d55;background:rgba(47,125,85,.12)}
 .fair-top{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;background:var(--card);padding:8px 0 12px}
 .fair-top.draw-min{grid-template-columns:1fr}
 .fair-top.draw-min .fair-draw{display:none}
@@ -392,7 +398,7 @@ const I18N = {
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
-    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…',
+    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta',
     'Tap to place':'Tocar para colocar','Box a dimension':'Encuadrar una cota','Drag a box around one dimension — AI reads only what you boxed (most accurate).':'Dibuja un recuadro alrededor de una cota — la IA lee solo lo que encuadraste (lo más preciso).','reading…':'leyendo…','Could not read that box — try boxing a bit tighter.':'No se pudo leer ese recuadro — intenta encuadrar más ajustado.',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
@@ -451,7 +457,7 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 
 /* ---------- state ---------- */
 window.QC_USER=null; window.QC_ROLE='manager';
-let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={};
+let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={};
 let page='inspections';
 let editId=null;
 let _pendingFiles={};
@@ -485,6 +491,7 @@ window.qcOnData=(name,val)=>{
   else if(name==='certs') CERTS=val||{};
   else if(name==='orders') ORDERS=val||{};
   else if(name==='quotes') QUOTES=val||{};
+  else if(name==='audit') AUDIT=val||{};
   render();
 };
 window.qcOnAuth=(user,role)=>{
@@ -874,7 +881,7 @@ function viewFairs(){
     <td><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')} ${i.rev?('· Rev '+esc(i.rev)):''}</div></td>
     <td>${i.mode==='as9102'?t('AS9102'):t('Simple FAR')}</td>
     <td>${(i.characteristics||[]).length}</td>
-    <td>${fairStatusBadge(i.fairStatus)}</td>
+    <td>${fairStatusBadge(i.fairStatus)}${(i.ncrId&&NCRS[i.ncrId]&&NCRS[i.ncrId].status!=='closed')?` <span class="hist-badge ncr">${t('Open NCR')}</span>`:''}</td>
     <td>${esc((i.createdBy||'').split('@')[0])}<div class="muted" style="font-size:12px">${fmtWhen(i.createdAt)}</div></td>
   </tr>`).join('');
   return `<div class="page-head"><h2>${t('First Articles')}</h2><p>${t('Formal first-article reports. Marvin / managers approve.')}</p></div>
@@ -991,7 +998,8 @@ function viewFair(){
       <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
     </div>
     ${(r&&r.reviewedBy)?`<div class="hint">${t('Last decision:')} ${t(r.fairStatus)} · ${esc((r.reviewedBy||'').split('@')[0])} · ${fmtWhen(r.reviewedAt)}</div>`:''}
-  </div>`;
+  </div>
+  ${r?farHistoryCard(editId):''}`;
 }
 function fdvIsImg(f){ return f && (/(png|jpe?g|webp|gif)/i.test(f.type||'') || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(f.url||'')); }
 function farViewer(r){
@@ -1141,6 +1149,35 @@ function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=
 window.qcCharEdit=(i)=>{ const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr)return; _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); };
 window.qcCharAdd=()=>{ syncChars(); _chars.push({no:_chars.length+1}); $('char-body').insertAdjacentHTML('beforeend',charRow(_chars.length-1,_chars[_chars.length-1])); };
 window.qcCharDel=(i)=>{ syncChars(); _chars.splice(i,1); _chars.forEach((c,n)=>c.no=n+1); $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); };
+// a characteristic is out of tolerance once it has a result that busts the band
+function charIsOot(c){ return !!(c && String(c.result||'').trim()!=='' && qcDev(c.requirement,c.tol,c.result).oot); }
+// append-only audit trail — each entry is written under its own qc/audit/<id> and never edited
+async function qcLogAudit(entries){
+  for(let i=0;i<entries.length;i++){
+    const aid=newId('aud')+'_'+i;
+    await dbSet('qc/audit/'+aid, Object.assign({ id:aid, ts:Date.now(), user:(QC_USER&&QC_USER.email)||'' }, entries[i]));
+  }
+}
+function farActionLabel(a){
+  if(a.action==='ncr-raised') return t('NCR raised');
+  if(a.action==='ncr-corrected') return t('NCR corrected');
+  return a.action==='measure'?t('measured'):t('corrected');
+}
+function farHistoryCard(id){
+  const list=Object.keys(AUDIT).map(k=>AUDIT[k]).filter(a=>a&&a.inspectionId===id).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const insp=id&&INSPECTIONS[id]; const ncr=(insp&&insp.ncrId)?NCRS[insp.ncrId]:null;
+  const banner=(ncr&&ncr.status!=='closed')?`<div class="hint" style="color:var(--red)"><i class="ti ti-alert-triangle"></i> ${t('Open NCR')} · ${esc((ncr.description||'').slice(0,140))}</div>`:'';
+  const rows=list.map(a=>{
+    if(a.field==='ncr') return `<div class="hist-row"><span class="hist-badge ncr"><i class="ti ti-clipboard-x"></i> ${farActionLabel(a)}</span><span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
+    const badge=a.nowOot?`<span class="hist-badge oot">${t('Out of tolerance')}</span>`:`<span class="hist-badge ok">${t('In tolerance')}</span>`;
+    return `<div class="hist-row"><b>#${esc(a.charNo)}</b> <code>${esc(a.from||'—')}</code> → <code>${esc(a.to||'—')}</code> ${badge}<span class="muted">${farActionLabel(a)} · ${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
+  }).join('');
+  return `<div class="card" style="margin-top:14px">
+    <div class="card-title"><i class="ti ti-history"></i> ${t('Change history')}</div>
+    ${banner}
+    ${list.length?`<div class="hist-list">${rows}</div>`:`<div class="muted" style="padding:6px 0">${t('No changes logged yet.')}</div>`}
+  </div>`;
+}
 window.qcSaveFair=async (action)=>{
   syncChars();
   const part=gv('fr-part'), cust=gv('fr-customer');
@@ -1164,7 +1201,47 @@ window.qcSaveFair=async (action)=>{
     bubbles: _fairBubbles.length ? _fairBubbles.map(b=>({no:b.no,bx:b.bx,by:b.by,value:b.value||'',tol:b.tol||'',category:b.category||'',group:b.group||null,box:b.box||null})) : ((prev&&prev.bubbles)||null)
   };
   if(action==='Approved'||action==='Rejected'){ rec.reviewedBy=(QC_USER&&QC_USER.email)||''; rec.reviewedAt=Date.now(); }
+
+  // ---- change history: diff each characteristic result against the last saved value ----
+  const prevByNo={}; ((prev&&prev.characteristics)||[]).forEach(c=>{ if(c&&c.no!=null) prevByNo[c.no]=c; });
+  const audits=[];
+  _chars.forEach(c=>{
+    const pc=prevByNo[c.no];
+    const oldV=(pc&&pc.result!=null)?String(pc.result):'';
+    const newV=(c.result!=null)?String(c.result):'';
+    if(oldV!==newV) audits.push({ inspectionId:id, partNum:part, charNo:c.no, requirement:c.requirement||'', tol:c.tol||'',
+      field:'result', from:oldV, to:newV, wasOot:(pc?charIsOot(pc):false), nowOot:charIsOot(c),
+      action:oldV===''?'measure':'correct' });
+  });
+
+  // ---- auto-raise / resolve the linked NCR based on out-of-tolerance dimensions ----
+  const ootNow=_chars.filter(charIsOot);
+  const ootLabel=ootNow.map(c=>'#'+c.no+' '+(c.requirement||'')+'='+(c.result||'')).join(', ');
+  let ncrId=(prev&&prev.ncrId)||null;
+  const existingNcr=ncrId?NCRS[ncrId]:null;
+  if(ootNow.length){
+    if(!existingNcr || existingNcr.status==='closed'){
+      ncrId=newId('ncr');
+      await dbSet('qc/ncr/'+ncrId, { id:ncrId, createdAt:Date.now(), raisedBy:(QC_USER&&QC_USER.email)||'', status:'open',
+        source:'fair', inspectionId:id, farId:id, orderId:rec.orderId, partNum:part, customer:cust, job:rec.job,
+        qtyAffected:'', description:t('First-article dimensions out of tolerance:')+' '+ootLabel, ootList:ootLabel, disposition:'', correctiveAction:'' });
+      audits.push({ inspectionId:id, partNum:part, field:'ncr', action:'ncr-raised', ncrId, note:ootLabel });
+    } else {
+      // keep the current out-of-tolerance list on a dedicated field so we never clobber a manager-edited description
+      await dbSet('qc/ncr/'+ncrId+'/ootList', ootLabel);
+    }
+    rec.ncrId=ncrId;
+  } else if(existingNcr && existingNcr.status!=='closed' && !existingNcr.correctedAt){
+    // every dimension is back in tolerance → mark corrected, leave the final close to a manager
+    await dbSet('qc/ncr/'+ncrId+'/correctedAt', Date.now());
+    await dbSet('qc/ncr/'+ncrId+'/correctedBy', (QC_USER&&QC_USER.email)||'');
+    audits.push({ inspectionId:id, partNum:part, field:'ncr', action:'ncr-corrected', ncrId });
+    rec.ncrId=ncrId;
+  } else if(ncrId){ rec.ncrId=ncrId; }
+
   await dbSet('qc/inspections/'+id, rec);
+  // never let an audit-trail write block the main save (e.g. if the qc/audit rule is missing)
+  if(audits.length){ try{ await qcLogAudit(audits); }catch(e){ console.error('audit log failed', e); } }
   editId=null; _chars=[]; page='fairs'; render();
 };
 
@@ -2064,6 +2141,7 @@ function startListeners(){
   onValue(ref(db,'qc/inspections'), s=> window.qcOnData('inspections', s.val()||{}));
   onValue(ref(db,'qc/ncr'),         s=> window.qcOnData('ncr', s.val()||{}));
   onValue(ref(db,'qc/certs'),       s=> window.qcOnData('certs', s.val()||{}));
+  onValue(ref(db,'qc/audit'),       s=> window.qcOnData('audit', s.val()||{}));
   onValue(ref(db,'orders'),         s=> window.qcOnData('orders', s.val()||{}));
   onValue(ref(db,'quotes'),         s=> window.qcOnData('quotes', s.val()||{}));
 }

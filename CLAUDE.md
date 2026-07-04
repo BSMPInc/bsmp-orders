@@ -66,7 +66,7 @@ Each app owns a top-level namespace, and some apps read across namespaces:
 - **quote.html** → owns `quotes/`
 - **orders.html** → owns `orders/`, plus `team`, `customers`, `durations`, `jobCounter`, `trash/`, `backups/`, `backupIndex`; also reads `quotes`
 - **apar.html** → owns `apar/*` (`apar/entries`, `apar/accounts`, `apar/vendorAccounts`, `apar/vendorAliases`, `apar/recurring`, `apar/audit`, `apar/depositLog`, `apar/apSplit`, etc.); also reads `orders`
-- **qc.html** → owns `qc/*` (`qc/inspections`, `qc/ncr`, `qc/certs`); also reads `orders` and `quotes`
+- **qc.html** → owns `qc/*` (`qc/inspections`, `qc/ncr`, `qc/certs`, `qc/audit` — append-only change history); also reads `orders` and `quotes`
 
 **When adding a new data path, keep it under the app's own namespace** (e.g. new QC data goes under `qc/…`, new AP/AR data under `apar/…`). Cross-app reads are fine; cross-app writes should be rare and intentional.
 
