@@ -159,6 +159,13 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .hist-badge{font-size:11px;font-weight:800;padding:1px 7px;white-space:nowrap}
 .hist-badge.oot,.hist-badge.ncr{background:var(--red-soft);color:var(--red)}
 .hist-badge.ok{color:#2f7d55;background:rgba(47,125,85,.12)}
+.tol-defs{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.tol-defs label{font-size:11.5px;color:var(--text2);display:flex;flex-direction:column;gap:4px}
+.tol-defs .pm{display:flex;align-items:center;gap:3px;font-weight:800;color:var(--text)}
+.tol-defs input{width:74px;border:1px solid var(--border);background:#fff;padding:5px 6px;font:inherit;font-weight:700}
+.meas-tolin{width:100%;border:1px solid var(--border);background:#fff;padding:5px 7px;font:inherit;font-weight:700;color:inherit}
+.meas-tolin:read-only{background:var(--bg);color:var(--text2)}
+.meas-tolhint{font-size:11px;color:var(--accent);margin-top:3px;min-height:13px}
 .fair-top{display:grid;grid-template-columns:2fr 1fr;gap:16px;align-items:start;background:var(--card);padding:8px 0 12px}
 .fair-top.draw-min{grid-template-columns:1fr}
 .fair-top.draw-min .fair-draw{display:none}
@@ -398,7 +405,7 @@ const I18N = {
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
-    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta',
+    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta','Default tolerances (title block)':'Tolerancias por defecto (cuadro de rótulo)','1 decimal (.X)':'1 decimal (.X)','2 decimals (.XX)':'2 decimales (.XX)','3 decimals (.XXX)':'3 decimales (.XXX)','Angles':'Ángulos','Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.':'Se aplica cuando una característica no tiene su propio ± — se marcan con un * en la columna de tolerancia.','from callout':'del plano','title block':'cuadro de rótulo','No tolerance set — reading will not be checked':'Sin tolerancia — la lectura no se verificará',
     'Tap to place':'Tocar para colocar','Box a dimension':'Encuadrar una cota','Drag a box around one dimension — AI reads only what you boxed (most accurate).':'Dibuja un recuadro alrededor de una cota — la IA lee solo lo que encuadraste (lo más preciso).','reading…':'leyendo…','Could not read that box — try boxing a bit tighter.':'No se pudo leer ese recuadro — intenta encuadrar más ajustado.',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
@@ -895,18 +902,26 @@ window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _fairImg=null; _
 window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
 
 function charRow(i,c){
-  c=c||{}; const oot=c.oot?'oot':'';
+  c=c||{};
   // Operators may only record the measured result — the definition columns are locked.
   const opRO=!isMgr(), ro=opRO?'readonly':'', dis=opRO?'disabled':'';
   const types=['Linear','Diameter','Radius','Angular','Note'];
   const typeOpts=types.map(tp=>`<option value="${tp}" ${((c.type||'Linear')===tp)?'selected':''}>${t(tp)}</option>`).join('');
+  // compute status live so the row reflects the current explicit/callout/title-block tolerance
+  const _hasRes=String(c.result||'').trim()!=='';
+  const _d=_hasRes?qcDev(c.requirement,c.tol,c.result):null;
+  const oot=(_d&&_d.oot)?'oot':'';
+  const devVal=_d?_d.devStr:(c.dev||'');
+  // show the tolerance that will actually be applied (callout/title-block) as the placeholder when the field is blank
+  const eff=resolveTol(c.requirement||'', c.tol||'');
+  const tph=eff.src==='none'?'±.005':(eff.str+(eff.src==='title'?' *':''));
   return `<tr class="${oot}" data-row="${i}">
     <td class="cno">${c.no||(i+1)}</td>
     <td><textarea data-f="requirement" oninput="qcCharCompute(${i})" ${ro}>${esc(c.requirement||'')}</textarea></td>
-    <td><input data-f="tol" value="${esc(c.tol||'')}" oninput="qcCharCompute(${i})" placeholder="±.005" ${ro}></td>
+    <td><input data-f="tol" value="${esc(c.tol||'')}" oninput="qcCharCompute(${i})" placeholder="${esc(tph)}" ${ro}></td>
     <td><select data-f="type" ${dis}>${typeOpts}</select></td>
     <td><input data-f="result" oninput="qcCharCompute(${i})" value="${esc(c.result||'')}"></td>
-    <td><input data-f="dev" value="${esc(c.dev||'')}" readonly class="devcell" tabindex="-1"></td>
+    <td><input data-f="dev" value="${esc(devVal)}" readonly class="devcell" tabindex="-1"></td>
     <td><input data-f="notes" value="${esc(c.notes||'')}" ${ro}></td>
     ${opRO?'<td></td>':`<td class="rm" onclick="qcCharDel(${i})"><i class="ti ti-x"></i></td>`}
   </tr>`;
@@ -914,7 +929,32 @@ function charRow(i,c){
 // shared measurement math
 function parseNum(s){ const m=String(s==null?'':s).replace(/[^0-9.+\-]/g,' ').match(/-?\d*\.?\d+/); return m?parseFloat(m[0]):NaN; }
 function parseTol(tol){ let pl=NaN,mi=NaN,m; const s=String(tol||''); if((m=s.match(/[±\u00b1]\s*(\d*\.?\d+)/))){ pl=parseFloat(m[1]); mi=parseFloat(m[1]); } else { const p=s.match(/\+\s*(\d*\.?\d+)/), n=s.match(/-\s*(\d*\.?\d+)/); if(p) pl=parseFloat(p[1]); if(n) mi=parseFloat(n[1]); } return {pl,mi}; }
-function qcDev(req,tol,result){ const nom=parseNum(req), act=parseNum(result); let dev=NaN, oot=false, devStr=''; const hasResult=isFinite(act); if(isFinite(nom)&&hasResult){ dev=act-nom; devStr=(dev>=0?'+':'')+dev.toFixed(3); const {pl,mi}=parseTol(tol); if(isFinite(pl)&&dev>pl+1e-9) oot=true; if(isFinite(mi)&&dev<-mi-1e-9) oot=true; } return {dev,oot,devStr,hasResult}; }
+// ---- tolerance resolution: explicit field → ± embedded in the callout → title-block default ----
+const DEFAULT_TOL_DEFAULTS={p1:0.03,p2:0.01,p3:0.005,ang:1};
+let _fairTolDefaults=Object.assign({},DEFAULT_TOL_DEFAULTS);
+function fmtTolNum(n){ return isFinite(n)?String(+n.toFixed(4)).replace(/^(-?)0\./,'$1.'):''; }
+function tolStr(pl,mi,ang){ const u=ang?'°':''; return (isFinite(pl)&&isFinite(mi)&&Math.abs(pl-mi)<1e-9)?('±'+fmtTolNum(pl)+u):('+'+fmtTolNum(pl)+u+'/-'+fmtTolNum(mi)+u); }
+function isAngleReq(req){ return /°|deg/i.test(String(req||'')); }
+function decimalPlacesOf(req){ const m=String(req==null?'':req).match(/\d*\.(\d+)/); return m?m[1].length:0; }
+// strict: only read a ± (or a matched +x / -x pair) out of the requirement — never a lone minus (avoids misreading fractions like 1-1/2)
+function parseEmbeddedTol(req){ const s=String(req||''); let m;
+  if((m=s.match(/[±]\s*(\d*\.?\d+)/))) return {pl:parseFloat(m[1]),mi:parseFloat(m[1])};
+  const p=s.match(/\+\s*(\d*\.?\d+)/), n=s.match(/(?:^|[^0-9])-\s*(\d*\.?\d+)/);
+  if(p&&n) return {pl:parseFloat(p[1]),mi:parseFloat(n[1])};
+  return null; }
+function defaultTolBand(req){ const d=_fairTolDefaults||DEFAULT_TOL_DEFAULTS;
+  if(isAngleReq(req)){ const a=parseFloat(d.ang); return (isFinite(a)&&a>0)?{pl:a,mi:a,ang:true}:null; }
+  const dp=decimalPlacesOf(req); let v=NaN;
+  if(dp>=3) v=parseFloat(d.p3); else if(dp===2) v=parseFloat(d.p2); else if(dp===1) v=parseFloat(d.p1);
+  return (isFinite(v)&&v>0)?{pl:v,mi:v}:null; }
+// returns {pl,mi,str,src}; src ∈ explicit | callout | title | none
+function resolveTol(req,tol){
+  const b0=parseTol(tol); if(isFinite(b0.pl)||isFinite(b0.mi)) return {pl:b0.pl,mi:b0.mi,str:String(tol||'').trim(),src:'explicit'};
+  let b=parseEmbeddedTol(req); if(b) return {pl:b.pl,mi:b.mi,str:tolStr(b.pl,b.mi,false),src:'callout'};
+  b=defaultTolBand(req); if(b) return {pl:b.pl,mi:b.mi,str:tolStr(b.pl,b.mi,b.ang),src:'title'};
+  return {pl:NaN,mi:NaN,str:'',src:'none'}; }
+function tolSrcLabel(src){ return src==='callout'?t('from callout'):src==='title'?t('title block'):''; }
+function qcDev(req,tol,result){ const nom=parseNum(req), act=parseNum(result); let dev=NaN, oot=false, devStr=''; const hasResult=isFinite(act); const band=resolveTol(req,tol); if(isFinite(nom)&&hasResult){ dev=act-nom; devStr=(dev>=0?'+':'')+dev.toFixed(3); if(isFinite(band.pl)&&dev>band.pl+1e-9) oot=true; if(isFinite(band.mi)&&dev<-band.mi-1e-9) oot=true; } return {dev,oot,devStr,hasResult,band}; }
 function charStatus(c){ if(!c||String(c.result||'').trim()==='') return 'none'; return qcDev(c.requirement,c.tol,c.result).oot?'oot':'ok'; }
 // compute deviation (actual − nominal) and flag out-of-tolerance
 window.qcCharCompute=(i)=>{
@@ -938,6 +978,8 @@ function viewFair(){
   // Operators can view everything and record measurements on the ballooned drawing,
   // but cannot change the header, re-balloon, or edit the characteristic definitions.
   const opRO=!isMgr(), dis=opRO?'disabled':'', ro=opRO?'readonly':'';
+  // title-block default tolerances for this report (used when a characteristic has no ± of its own)
+  _fairTolDefaults=Object.assign({}, DEFAULT_TOL_DEFAULTS, (r&&r.tolDefaults)||{});
   _fdvBubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
   <div class="toolbar" style="margin-bottom:12px">
@@ -985,6 +1027,14 @@ function viewFair(){
 
     <div id="fair-bubble-ws">${(isMgr() && _fairImg && !_fairFull)?fairBubbleWorkspace():''}</div>
 
+    ${isMgr()?`<div class="card-title" style="margin-top:14px"><i class="ti ti-adjustments-alt"></i> ${t('Default tolerances (title block)')}</div>
+    <div class="tol-defs">
+      <label>${t('1 decimal (.X)')}<div class="pm">±<input id="tol-p1" value="${esc(_fairTolDefaults.p1)}" oninput="qcSetTolDefault('p1',this.value)"></div></label>
+      <label>${t('2 decimals (.XX)')}<div class="pm">±<input id="tol-p2" value="${esc(_fairTolDefaults.p2)}" oninput="qcSetTolDefault('p2',this.value)"></div></label>
+      <label>${t('3 decimals (.XXX)')}<div class="pm">±<input id="tol-p3" value="${esc(_fairTolDefaults.p3)}" oninput="qcSetTolDefault('p3',this.value)"></div></label>
+      <label>${t('Angles')}<div class="pm">±<input id="tol-ang" value="${esc(_fairTolDefaults.ang)}" oninput="qcSetTolDefault('ang',this.value)">°</div></label>
+    </div>
+    <div class="muted" style="font-size:11.5px;margin-top:4px">${t('Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.')}</div>`:''}
     <div class="card-title" style="margin-top:14px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
     <div style="overflow-x:auto"><table class="char-tbl"><thead><tr><th style="width:38px">#</th><th style="min-width:120px">${t('Requirement')}</th><th style="min-width:96px">${t('Tolerance Range')}</th><th style="min-width:104px">${t('Type')}</th><th style="min-width:100px">${t('Result')}</th><th style="min-width:88px">${t('Deviation')}</th><th style="min-width:120px">${t('Notes')}</th><th style="width:30px"></th></tr></thead>
       <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table></div>
@@ -1085,7 +1135,7 @@ function qcMeasMount(){
   let ov=$('meas-ov');
   if(!ov){
     ov=document.createElement('div'); ov.id='meas-ov'; ov.className='meas-ov';
-    ov.innerHTML='<div class="meas" role="dialog" aria-modal="true"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div><span style="flex:1"></span><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div><div class="k" data-t="msr:tol">Tolerance</div><div class="val" id="meas-tol"></div></div></div><label class="k" style="display:block;margin-bottom:5px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div></div>';
+    ov.innerHTML='<div class="meas" role="dialog" aria-modal="true"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div><span style="flex:1"></span><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div></div><label class="k" style="display:block;margin-bottom:5px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div></div>';
     ov.addEventListener('click',e=>{ if(e.target===ov) qcMeasClose(); });
     document.body.appendChild(ov);
     const inp=ov.querySelector('#meas-input');
@@ -1104,16 +1154,20 @@ window.qcMeas=(no)=>{
   $('meas-title').textContent=t('Characteristic')+' '+no;
   $('meas-type').textContent=c.type?t(c.type):'';
   $('meas-req').textContent=c.requirement||'—';
-  $('meas-tol').textContent=c.tol||'—';
-  const inp=$('meas-input'); inp.value=c.result||''; 
+  const tolEl=$('meas-tol'); tolEl.value=c.tol||''; tolEl.readOnly=!isMgr(); tolEl.placeholder=isMgr()?'±.005':'';
+  const inp=$('meas-input'); inp.value=c.result||'';
   qcMeasPreview();
   setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
 };
 window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; };
 function qcMeasPreview(){
   const c=_chars.find(x=>x.no===_measNo); if(!c) return;
+  const tolEl=$('meas-tol'); const tolv=tolEl?tolEl.value:c.tol;
   const val=$('meas-input').value;
-  const d=qcDev(c.requirement, c.tol, val);
+  const d=qcDev(c.requirement, tolv, val);
+  // show which tolerance is actually being applied (explicit vs callout vs title-block)
+  const eff=resolveTol(c.requirement, tolv); const hint=$('meas-tolhint');
+  if(hint) hint.textContent = eff.src==='none' ? t('No tolerance set — reading will not be checked') : (eff.src==='explicit' ? '' : ('→ '+eff.str+' ('+tolSrcLabel(eff.src)+')'));
   const el=$('meas-dev');
   if(!String(val).trim()||!d.hasResult){ el.textContent=''; el.className='meas-dev'; return; }
   if(isFinite(d.dev)){ el.textContent=(d.oot?('⚠ '+t('Out of tolerance')):('✓ '+t('In tolerance')))+'  ·  Δ '+d.devStr; el.className='meas-dev '+(d.oot?'oot':'ok'); }
@@ -1122,12 +1176,14 @@ function qcMeasPreview(){
 window.qcMeasConfirm=(advance)=>{
   const idx=_chars.findIndex(x=>x.no===_measNo); if(idx<0){ qcMeasClose(); return; }
   const val=$('meas-input').value;
+  const tolEl=$('meas-tol'); const tolv=tolEl?tolEl.value:_chars[idx].tol;
   _chars[idx].result=val;
+  if(isMgr()) _chars[idx].tol=tolv;   // a manager can set/adjust the tolerance right here; operator field is read-only
   const d=qcDev(_chars[idx].requirement, _chars[idx].tol, val);
   _chars[idx].dev=d.devStr; _chars[idx].oot=d.oot;
   // reflect into the table row if present
   const tr=document.querySelector(`#char-body tr[data-row="${idx}"]`);
-  if(tr){ const rEl=tr.querySelector('[data-f="result"]'); if(rEl) rEl.value=val; qcCharCompute(idx); }
+  if(tr){ const rEl=tr.querySelector('[data-f="result"]'); if(rEl) rEl.value=val; const tEl=tr.querySelector('[data-f="tol"]'); if(tEl&&isMgr()) tEl.value=_chars[idx].tol; qcCharCompute(idx); }
   fdvRenderMarkers();
   if(advance){
     const order=_fdvBubbles.map(b=>b.no);
@@ -1149,6 +1205,9 @@ function syncChars(){ document.querySelectorAll('#char-body tr').forEach((tr,i)=
 window.qcCharEdit=(i)=>{ const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr)return; _chars[i]=_chars[i]||{}; tr.querySelectorAll('[data-f]').forEach(el=>_chars[i][el.dataset.f]=el.value); };
 window.qcCharAdd=()=>{ syncChars(); _chars.push({no:_chars.length+1}); $('char-body').insertAdjacentHTML('beforeend',charRow(_chars.length-1,_chars[_chars.length-1])); };
 window.qcCharDel=(i)=>{ syncChars(); _chars.splice(i,1); _chars.forEach((c,n)=>c.no=n+1); $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); };
+// live-edit the title-block defaults → recompute every row's deviation and the balloon colors
+window.qcSetTolDefault=(k,v)=>{ _fairTolDefaults[k]=v; syncChars(); if($('char-body')) $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); if(window.fdvRefreshMarkers) fdvRefreshMarkers(); };
+function qcReadTolDefaults(){ const g=(id,d)=>{ const el=$(id); return el&&el.value!==''?el.value:d; }; return { p1:g('tol-p1',_fairTolDefaults.p1), p2:g('tol-p2',_fairTolDefaults.p2), p3:g('tol-p3',_fairTolDefaults.p3), ang:g('tol-ang',_fairTolDefaults.ang) }; }
 // a characteristic is out of tolerance once it has a result that busts the band
 function charIsOot(c){ return !!(c && String(c.result||'').trim()!=='' && qcDev(c.requirement,c.tol,c.result).oot); }
 // append-only audit trail — each entry is written under its own qc/audit/<id> and never edited
@@ -1196,7 +1255,7 @@ window.qcSaveFair=async (action)=>{
     createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
-    drawing, characteristics:_chars, fairStatus:status,
+    drawing, characteristics:_chars, fairStatus:status, tolDefaults:qcReadTolDefaults(),
     ballooned:_fairBalloonedUrl||(prev&&prev.ballooned)||null,
     bubbles: _fairBubbles.length ? _fairBubbles.map(b=>({no:b.no,bx:b.bx,by:b.by,value:b.value||'',tol:b.tol||'',category:b.category||'',group:b.group||null,box:b.box||null})) : ((prev&&prev.bubbles)||null)
   };
