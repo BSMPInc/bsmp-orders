@@ -256,6 +256,7 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .fair-fs-bar{display:flex;align-items:center;gap:10px;padding:2px 2px 8px;font-size:15px}
 .fair-fs-body{flex:1;min-height:0;overflow:auto}
 .fair-fs .bubble-ws{height:calc(100vh - 140px)}
+.fair-fs .fdv{height:calc(100vh - 140px)}
 .balloon.filled{background:#ffecec;box-shadow:0 0 0 1.5px #fff,0 0 0 3px rgba(255,0,0,.12)}
 .qc-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .qc-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -391,7 +392,7 @@ const I18N = {
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
-    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…',
+    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…',
     'Tap to place':'Tocar para colocar','Box a dimension':'Encuadrar una cota','Drag a box around one dimension — AI reads only what you boxed (most accurate).':'Dibuja un recuadro alrededor de una cota — la IA lee solo lo que encuadraste (lo más preciso).','reading…':'leyendo…','Could not read that box — try boxing a bit tighter.':'No se pudo leer ese recuadro — intenta encuadrar más ajustado.',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
@@ -534,6 +535,8 @@ function render(){
   if(!QC_USER && !window.__qcDemo) return;
   setActive();
   const c=$('content'); if(!c) return;
+  // leaving the First Article page: make sure no full-screen drawing overlay is left hanging
+  if(page!=='fair'){ _fairFull=false; _fdvFull=false; const a=$('fair-fs'); if(a) a.style.display='none'; const b=$('fdv-fs'); if(b) b.style.display='none'; }
   c.classList.toggle('wide', page==='fair');
   if(page==='inspections') c.innerHTML=viewInspections();
   else if(page==='selfcheck') c.innerHTML=viewSelfCheck();
@@ -936,7 +939,7 @@ function viewFair(){
   </div>
   <div class="card">
     <div class="fair-top${_fairDrawMin?' draw-min':''}">
-      <div class="fair-draw">${farViewer(r)}</div>
+      <div class="fair-draw" id="fair-draw-host">${farViewer(r)}</div>
       <div class="fair-info">
         <div class="field"><label class="fl">${t('Report type')}</label>
           <div class="seg" id="fair-mode">
@@ -1003,10 +1006,28 @@ function farViewer(r){
       <span class="fdv-pct" id="fdv-pct">100%</span>
       <button onclick="fdvZoom(1)" title="${t('Zoom in')}"><i class="ti ti-plus"></i></button>
       <button onclick="fdvReset()" title="1:1">1:1</button>
+      ${_fdvFull?'':`<button onclick="qcFdvFull(true)" title="${t('Full screen')}"><i class="ti ti-arrows-maximize"></i></button>`}
     </div></div>`;
 }
 /* ---- drawing viewer: zoom + pan (desktop wheel/drag, iPad pinch/drag) ---- */
-let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false, _fdvBubbles=[], _curDraw=null;
+let fdv={s:1,x:0,y:0,fit:1}, _fdvDrag=false, _fdvLX=0, _fdvLY=0, _fdvPinch=null, _fdvBound=false, _fdvBubbles=[], _curDraw=null, _fdvFull=false;
+/* ---- read-only drawing viewer: full-screen (used while recording dimensions) ---- */
+window.qcFdvFull=(on)=>{
+  _fdvFull=!!on;
+  let ov=$('fdv-fs');
+  if(_fdvFull && !ov){
+    ov=document.createElement('div'); ov.id='fdv-fs'; ov.className='fair-fs';
+    ov.innerHTML='<div class="fair-fs-bar"><b>'+esc(t('Record dimensions'))+'</b><span style="flex:1"></span><button class="btn sm" onclick="qcFdvFull(false)"><i class="ti ti-arrows-minimize"></i> '+esc(t('Exit full screen'))+'</button></div><div class="fair-fs-body" id="fdv-fs-body"></div>';
+    document.body.appendChild(ov);
+  }
+  if(ov) ov.style.display=_fdvFull?'flex':'none';
+  const inline=$('fair-draw-host');
+  const rr=editId?INSPECTIONS[editId]:null;
+  if(_fdvFull){
+    if(inline) inline.innerHTML='<div class="muted" style="padding:10px 0"><i class="ti ti-arrows-maximize"></i> '+esc(t('Viewing in full screen…'))+'</div>';
+    const body=$('fdv-fs-body'); if(body) body.innerHTML=farViewer(rr);
+  } else if(inline){ inline.innerHTML=farViewer(rr); }
+};
 function fdvEls(){ return {c:$('fdv-canvas'), i:$('fdv-img')}; }
 function fdvApply(){ const {i}=fdvEls(); if(!i) return; i.style.transform='translate('+fdv.x+'px,'+fdv.y+'px) scale('+fdv.s+')'; const p=$('fdv-pct'); if(p) p.textContent=Math.round(fdv.s*100)+'%'; fdvPositionMarkers(); }
 function fdvRenderMarkers(){
@@ -1068,6 +1089,8 @@ function qcMeasMount(){
 window.qcMeas=(no)=>{
   syncChars();
   const c=_chars.find(x=>x.no===no); if(!c) return;
+  // recording a dimension → blow the drawing up full screen (minimize from the bar)
+  if(!_fdvFull && _fdvBubbles && _fdvBubbles.length) qcFdvFull(true);
   _measNo=no; qcMeasMount();
   $('meas-n').textContent=no;
   $('meas-title').textContent=t('Characteristic')+' '+no;
@@ -1234,6 +1257,7 @@ window.qcFairAutoBubble=async ()=>{
     _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
     if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
     qcWsRender();
+    qcFairFull(true);
     qcToast(_fairBubbles.length+' '+t('characteristics ballooned — review and drag to fine-tune'),'ok');
   }catch(e){
     console.error('auto-bubble failed', e);
@@ -1269,6 +1293,7 @@ window.qcFairPlaceMode=async ()=>{
     const rr=editId?INSPECTIONS[editId]:null;
     if(!_fairBubbles.length && rr && rr.bubbles && rr.bubbles.length) _fairBubbles=rr.bubbles.map(b=>({...b}));
     qcWsRender();
+    qcFairFull(true);
     qcToast(t('Click the drawing next to each dimension to drop a balloon, then Read dimensions.'),'ok');
   }catch(e){ console.error(e); if(ws) ws.innerHTML=''; qcToast(t('Could not load drawing:')+' '+((e&&e.message)||e),'err'); }
   finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
