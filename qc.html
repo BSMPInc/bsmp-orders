@@ -405,7 +405,7 @@ const I18N = {
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
-    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta','Default tolerances (title block)':'Tolerancias por defecto (cuadro de rótulo)','1 decimal (.X)':'1 decimal (.X)','2 decimals (.XX)':'2 decimales (.XX)','3 decimals (.XXX)':'3 decimales (.XXX)','Angles':'Ángulos','Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.':'Se aplica cuando una característica no tiene su propio ± — se marcan con un * en la columna de tolerancia.','from callout':'del plano','title block':'cuadro de rótulo','No tolerance set — reading will not be checked':'Sin tolerancia — la lectura no se verificará',
+    'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta','Default tolerances (title block)':'Tolerancias por defecto (cuadro de rótulo)','1 decimal (.X)':'1 decimal (.X)','2 decimals (.XX)':'2 decimales (.XX)','3 decimals (.XXX)':'3 decimales (.XXX)','Angles':'Ángulos','Fractional':'Fraccional','Angular':'Angular','Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.':'Se aplica cuando una característica no tiene su propio ± — se marcan con un * en la columna de tolerancia.','from callout':'del plano','title block':'cuadro de rótulo','No tolerance set — reading will not be checked':'Sin tolerancia — la lectura no se verificará',
     'Tap to place':'Tocar para colocar','Box a dimension':'Encuadrar una cota','Drag a box around one dimension — AI reads only what you boxed (most accurate).':'Dibuja un recuadro alrededor de una cota — la IA lee solo lo que encuadraste (lo más preciso).','reading…':'leyendo…','Could not read that box — try boxing a bit tighter.':'No se pudo leer ese recuadro — intenta encuadrar más ajustado.',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
@@ -930,12 +930,17 @@ function charRow(i,c){
 function parseNum(s){ const m=String(s==null?'':s).replace(/[^0-9.+\-]/g,' ').match(/-?\d*\.?\d+/); return m?parseFloat(m[0]):NaN; }
 function parseTol(tol){ let pl=NaN,mi=NaN,m; const s=String(tol||''); if((m=s.match(/[±\u00b1]\s*(\d*\.?\d+)/))){ pl=parseFloat(m[1]); mi=parseFloat(m[1]); } else { const p=s.match(/\+\s*(\d*\.?\d+)/), n=s.match(/-\s*(\d*\.?\d+)/); if(p) pl=parseFloat(p[1]); if(n) mi=parseFloat(n[1]); } return {pl,mi}; }
 // ---- tolerance resolution: explicit field → ± embedded in the callout → title-block default ----
-const DEFAULT_TOL_DEFAULTS={p1:0.03,p2:0.01,p3:0.005,ang:1};
+const DEFAULT_TOL_DEFAULTS={frac:0.0625,p1:'',p2:0.020,p3:0.005,ang:1};
 let _fairTolDefaults=Object.assign({},DEFAULT_TOL_DEFAULTS);
 function fmtTolNum(n){ return isFinite(n)?String(+n.toFixed(4)).replace(/^(-?)0\./,'$1.'):''; }
 function tolStr(pl,mi,ang){ const u=ang?'°':''; return (isFinite(pl)&&isFinite(mi)&&Math.abs(pl-mi)<1e-9)?('±'+fmtTolNum(pl)+u):('+'+fmtTolNum(pl)+u+'/-'+fmtTolNum(mi)+u); }
 function isAngleReq(req){ return /°|deg/i.test(String(req||'')); }
 function decimalPlacesOf(req){ const m=String(req==null?'':req).match(/\d*\.(\d+)/); return m?m[1].length:0; }
+// fractional callouts (e.g. 3/8, 1-1/2, 1 1/2) — real inch fractions only, so material notes like "304/304L" aren't mistaken for fractions
+function isFractionReq(req){ const s=String(req||''); if(/\d\.\d/.test(s)) return false; const m=s.match(/\d+\s*\/\s*(\d+)/); return !!m && [2,4,8,16,32,64].includes(parseInt(m[1],10)); }
+function parseFractionNum(s){ const m=String(s||'').match(/(?:(\d+)\s*[-\s]\s*)?(\d+)\s*\/\s*(\d+)/); if(!m) return NaN; const w=m[1]?parseInt(m[1],10):0, n=parseInt(m[2],10), d=parseInt(m[3],10); return d?w+n/d:NaN; }
+// nominal value, understanding both decimals and fractions
+function nominalOf(v){ return isFractionReq(v)?parseFractionNum(v):parseNum(v); }
 // strict: only read a ± (or a matched +x / -x pair) out of the requirement — never a lone minus (avoids misreading fractions like 1-1/2)
 function parseEmbeddedTol(req){ const s=String(req||''); let m;
   if((m=s.match(/[±]\s*(\d*\.?\d+)/))) return {pl:parseFloat(m[1]),mi:parseFloat(m[1])};
@@ -944,6 +949,7 @@ function parseEmbeddedTol(req){ const s=String(req||''); let m;
   return null; }
 function defaultTolBand(req){ const d=_fairTolDefaults||DEFAULT_TOL_DEFAULTS;
   if(isAngleReq(req)){ const a=parseFloat(d.ang); return (isFinite(a)&&a>0)?{pl:a,mi:a,ang:true}:null; }
+  if(isFractionReq(req)){ const f=parseFloat(d.frac); return (isFinite(f)&&f>0)?{pl:f,mi:f}:null; }
   const dp=decimalPlacesOf(req); let v=NaN;
   if(dp>=3) v=parseFloat(d.p3); else if(dp===2) v=parseFloat(d.p2); else if(dp===1) v=parseFloat(d.p1);
   return (isFinite(v)&&v>0)?{pl:v,mi:v}:null; }
@@ -954,7 +960,7 @@ function resolveTol(req,tol){
   b=defaultTolBand(req); if(b) return {pl:b.pl,mi:b.mi,str:tolStr(b.pl,b.mi,b.ang),src:'title'};
   return {pl:NaN,mi:NaN,str:'',src:'none'}; }
 function tolSrcLabel(src){ return src==='callout'?t('from callout'):src==='title'?t('title block'):''; }
-function qcDev(req,tol,result){ const nom=parseNum(req), act=parseNum(result); let dev=NaN, oot=false, devStr=''; const hasResult=isFinite(act); const band=resolveTol(req,tol); if(isFinite(nom)&&hasResult){ dev=act-nom; devStr=(dev>=0?'+':'')+dev.toFixed(3); if(isFinite(band.pl)&&dev>band.pl+1e-9) oot=true; if(isFinite(band.mi)&&dev<-band.mi-1e-9) oot=true; } return {dev,oot,devStr,hasResult,band}; }
+function qcDev(req,tol,result){ const nom=nominalOf(req), act=nominalOf(result); let dev=NaN, oot=false, devStr=''; const hasResult=isFinite(act); const band=resolveTol(req,tol); if(isFinite(nom)&&hasResult){ dev=act-nom; devStr=(dev>=0?'+':'')+dev.toFixed(3); if(isFinite(band.pl)&&dev>band.pl+1e-9) oot=true; if(isFinite(band.mi)&&dev<-band.mi-1e-9) oot=true; } return {dev,oot,devStr,hasResult,band}; }
 function charStatus(c){ if(!c||String(c.result||'').trim()==='') return 'none'; return qcDev(c.requirement,c.tol,c.result).oot?'oot':'ok'; }
 // compute deviation (actual − nominal) and flag out-of-tolerance
 window.qcCharCompute=(i)=>{
@@ -1029,10 +1035,10 @@ function viewFair(){
 
     ${isMgr()?`<div class="card-title" style="margin-top:14px"><i class="ti ti-adjustments-alt"></i> ${t('Default tolerances (title block)')}</div>
     <div class="tol-defs">
-      <label>${t('1 decimal (.X)')}<div class="pm">±<input id="tol-p1" value="${esc(_fairTolDefaults.p1)}" oninput="qcSetTolDefault('p1',this.value)"></div></label>
+      <label>${t('Fractional')}<div class="pm">±<input id="tol-frac" value="${esc(_fairTolDefaults.frac)}" oninput="qcSetTolDefault('frac',this.value)"></div></label>
       <label>${t('2 decimals (.XX)')}<div class="pm">±<input id="tol-p2" value="${esc(_fairTolDefaults.p2)}" oninput="qcSetTolDefault('p2',this.value)"></div></label>
       <label>${t('3 decimals (.XXX)')}<div class="pm">±<input id="tol-p3" value="${esc(_fairTolDefaults.p3)}" oninput="qcSetTolDefault('p3',this.value)"></div></label>
-      <label>${t('Angles')}<div class="pm">±<input id="tol-ang" value="${esc(_fairTolDefaults.ang)}" oninput="qcSetTolDefault('ang',this.value)">°</div></label>
+      <label>${t('Angular')}<div class="pm">±<input id="tol-ang" value="${esc(_fairTolDefaults.ang)}" oninput="qcSetTolDefault('ang',this.value)">°</div></label>
     </div>
     <div class="muted" style="font-size:11.5px;margin-top:4px">${t('Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.')}</div>`:''}
     <div class="card-title" style="margin-top:14px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
@@ -1207,7 +1213,7 @@ window.qcCharAdd=()=>{ syncChars(); _chars.push({no:_chars.length+1}); $('char-b
 window.qcCharDel=(i)=>{ syncChars(); _chars.splice(i,1); _chars.forEach((c,n)=>c.no=n+1); $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); };
 // live-edit the title-block defaults → recompute every row's deviation and the balloon colors
 window.qcSetTolDefault=(k,v)=>{ _fairTolDefaults[k]=v; syncChars(); if($('char-body')) $('char-body').innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); if(window.fdvRefreshMarkers) fdvRefreshMarkers(); };
-function qcReadTolDefaults(){ const g=(id,d)=>{ const el=$(id); return el&&el.value!==''?el.value:d; }; return { p1:g('tol-p1',_fairTolDefaults.p1), p2:g('tol-p2',_fairTolDefaults.p2), p3:g('tol-p3',_fairTolDefaults.p3), ang:g('tol-ang',_fairTolDefaults.ang) }; }
+function qcReadTolDefaults(){ const g=(id,d)=>{ const el=$(id); return el?el.value:d; }; return { frac:g('tol-frac',_fairTolDefaults.frac), p1:_fairTolDefaults.p1, p2:g('tol-p2',_fairTolDefaults.p2), p3:g('tol-p3',_fairTolDefaults.p3), ang:g('tol-ang',_fairTolDefaults.ang) }; }
 // a characteristic is out of tolerance once it has a result that busts the band
 function charIsOot(c){ return !!(c && String(c.result||'').trim()!=='' && qcDev(c.requirement,c.tol,c.result).oot); }
 // append-only audit trail — each entry is written under its own qc/audit/<id> and never edited
