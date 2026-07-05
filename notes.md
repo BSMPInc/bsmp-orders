@@ -83,9 +83,17 @@ per-uid data path plus the matching security rules, not from roles.
   Plain-text derivatives use `stripHtml()` (snippets, search).
 - **Checklist:** structured array (`{id,text,done}`), NOT part of the rich-text body.
   Rendered by `ntRenderChecklist()`; empty-text items are dropped on save.
-- **Tags:** free text, Enter or comma to add (`ntTagKey`). Quotes/backslashes are
-  stripped from tags (`jsSafe`) because tags are echoed into inline `onclick`
-  attributes in the filter bar.
+- **Tags:** a FIXED set, defined in the `TAGS` constant (`Site Visit`, `Open Orders`,
+  `RFQ`, `Purchasing`, `Fab Note`, `Scheduling`) — tap-to-toggle chips in the editor
+  (`ntToggleTag`) and the same six as filter chips on the list. No free-text tags;
+  to change the vocabulary, edit `TAGS` (old notes keep any retired tag silently on
+  the record). Tag names must stay free of quotes/backslashes — they're echoed into
+  inline `onclick` attributes.
+- **Job / order link:** a type-to-search picker (`ntOrderSearch` → `.rv-results`
+  list → `ntPickOrder`; chosen job shows as a chip with an X, `ntClearOrder`), not a
+  dropdown. Search matches `orderLabel()` = customer · part · Job # · PO. The main
+  list search also matches the linked job via `orderSearchText()`, so a part number
+  or PO finds the notes tied to it.
 - **Photos:** collapsible card ("Photos (n)" header toggles `_photosCollapsed`;
   auto-expands when adding, auto-collapses when opening a note that has photos —
   that's the owner-requested "photos under the note but hideable" behavior).
@@ -111,9 +119,10 @@ notes/<uid>/<noteId> = {
   suite, but remember the rule is per-uid (`notes/$uid`), not a flat namespace.
 - The editor's early-return guard in `render()` (see above) is what protects unsaved
   typing from the realtime listener; if you add new pages, keep that pattern in mind.
-- `noteCard()` and the tag chips embed ids/tags in inline `onclick` strings — ids are
-  app-generated (safe), tags are cleaned by `jsSafe`. If you add new user-entered
-  values to inline handlers, clean them the same way.
+- `noteCard()`, the tag chips, and the job-picker results embed ids/tags in inline
+  `onclick` strings — ids are app-generated and tags come from the fixed `TAGS` list,
+  so both are safe. If you ever put a user-entered value into an inline handler,
+  strip quotes/backslashes from it first.
 - Deleting a note removes the RTDB record but **not** its uploaded photos from
   Storage (same behavior as the other apps — orphaned files are accepted).
 - The body is HTML: never feed it through `esc()` when reopening (it would show tags
