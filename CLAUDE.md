@@ -6,7 +6,7 @@ Instructions for Claude Code when working in this repository. Read this before e
 
 `bsmp-orders` (GitHub org `BSMPInc`) holds the internal business apps for **Bert's Sheet Metal Products (BSMP)**, a sheet metal fabrication shop in Chatsworth, CA. The apps are maintained by the shop owner/operator, who is hands-on but is **not a trained software developer** — explain what you're doing in plain terms, and favor small, reviewable changes over large rewrites.
 
-The suite is four self-contained apps plus supporting files:
+The suite is five self-contained apps plus supporting files:
 
 | File | App | Purpose |
 |------|-----|---------|
@@ -14,8 +14,9 @@ The suite is four self-contained apps plus supporting files:
 | `orders.html` | Order Tracker | On-time delivery, scheduling, dispatch board, team load |
 | `apar.html` | AP / AR Tracker | Accounts payable/receivable, bills, pay runs, aging |
 | `qc.html` | Inspection / QC | Self-checks, First Articles, NCRs, material certs |
+| `notes.html` | Notes | Private per-user notes: rich text, checklists, photos, tags, job links |
 
-All four are deployed as static files on **GitHub Pages** from this repo. There is no build step and no server — see "Architecture" below.
+All five are deployed as static files on **GitHub Pages** from this repo. There is no build step and no server — see "Architecture" below.
 
 ## Per-app deep-dive guides — READ THE MATCHING ONE
 
@@ -27,6 +28,7 @@ open its guide:**
 - Working on `orders.html` → read **`orders.md`**
 - Working on `apar.html`   → read **`apar.md`**
 - Working on `qc.html`     → read **`qc.md`**
+- Working on `notes.html`  → read **`notes.md`**
 
 (These live in the repo root alongside the apps. They don't auto-load — read the
 one that matches the file you're about to edit. If a task spans two apps, read both.)
@@ -37,16 +39,17 @@ one that matches the file you're about to edit. If a task spans two apps, read b
 2. **No build tooling.** No React/Vue/webpack/vite. Plain HTML + vanilla JS + inline `<style>`. Libraries come only from CDN `<script>` tags.
 3. **Edit surgically.** Prefer targeted edits (find the function, change it) over regenerating whole files. These files are large (see sizes below); rewriting them wholesale risks losing working features.
 4. **Validate before finishing.** After editing an app's JavaScript, run a syntax check (see "Validating changes"). A broken app deploys just as fast as a working one.
-5. **Preserve the shared conventions.** The four apps intentionally share an auth model, a Firebase backend, a design system, and a cross-app nav. Keep them consistent — a change to the pattern in one app usually should be mirrored in the others.
+5. **Preserve the shared conventions.** The five apps intentionally share an auth model, a Firebase backend, a design system, and a cross-app nav. Keep them consistent — a change to the pattern in one app usually should be mirrored in the others.
 
 ### File sizes (approximate — expect large files)
 
 - `quote.html` ~8,600 lines
 - `orders.html` ~5,900 lines
 - `apar.html` ~4,400 lines
-- `qc.html` ~2,100 lines
+- `qc.html` ~2,300 lines
+- `notes.html` ~500 lines (the newest and smallest)
 
-## Architecture (shared across all four apps)
+## Architecture (shared across all apps)
 
 ### Single Firebase backend
 
@@ -67,6 +70,7 @@ Each app owns a top-level namespace, and some apps read across namespaces:
 - **orders.html** → owns `orders/`, plus `team`, `customers`, `durations`, `jobCounter`, `trash/`, `backups/`, `backupIndex`; also reads `quotes`
 - **apar.html** → owns `apar/*` (`apar/entries`, `apar/accounts`, `apar/vendorAccounts`, `apar/vendorAliases`, `apar/recurring`, `apar/audit`, `apar/depositLog`, `apar/apSplit`, etc.); also reads `orders`
 - **qc.html** → owns `qc/*` (`qc/inspections`, `qc/ncr`, `qc/certs`, `qc/audit` — append-only change history); also reads `orders` and `quotes`
+- **notes.html** → owns `notes/*`, but namespaced **per user**: `notes/<auth-uid>/<noteId>`. Notes are private — the security rules only let a signed-in user read/write their own `notes/<uid>` branch. Also reads `orders` (job-link dropdown).
 
 **When adding a new data path, keep it under the app's own namespace** (e.g. new QC data goes under `qc/…`, new AP/AR data under `apar/…`). Cross-app reads are fine; cross-app writes should be rare and intentional.
 
@@ -74,14 +78,14 @@ Each app owns a top-level namespace, and some apps read across namespaces:
 
 ### Cloud Storage upload prefixes
 
-Uploaded files (drawings, cert PDFs, invoices) are stored under the owning app's prefix: `quotes/…`, `orders/…`, `apar/…`, `qc/…`. Follow the existing prefix when adding uploads.
+Uploaded files (drawings, cert PDFs, invoices, note photos) are stored under the owning app's prefix: `quotes/…`, `orders/…`, `apar/…`, `qc/…`, `notes/<uid>/…`. Follow the existing prefix when adding uploads.
 
 ### Auth + role model (operator vs manager)
 
 - Email/password sign-in via Firebase Auth.
 - **Two roles: `operator` and `manager`.** An email is treated as operator if it's in `OPERATOR_EMAILS` (currently `['operator@bertsmp.com']`) or the local-part starts with `operator`; everyone else is a manager.
 - Operators get a restricted view. UI that is manager-only is hidden with the `mgr-only` CSS class (`body.role-operator .mgr-only{display:none}`) — reuse that pattern rather than inventing new gating.
-- Keep this model identical across apps.
+- Keep this model identical across apps. (`notes.html` is the one exception: notes are private per user, so it has no operator/manager split — everyone gets the same UI on their own data.)
 
 ### AI features (Claude via a proxy)
 
@@ -103,11 +107,12 @@ Uploaded files (drawings, cert PDFs, invoices) are stored under the owning app's
   - `orders.html` → **maroon** `--accent:#6a1f2e`
   - `apar.html` → **green** `--accent:#1f4d38` (AR green `#2f8f6b`, AP red `#a8443a`)
   - `qc.html` → **graphite** `--accent:#3a4049`
+  - `notes.html` → **indigo** `--accent:#43397a`
 - **Shell pattern:** fixed left sidebar with a "logo flag," a collapsible/pinnable rail (`bsmp_sidebar_pinned` in localStorage), a sticky topbar with the spark underline, and a bottom **dock** that also holds the cross-app switcher.
 
 ### Cross-app navigation
 
-Each app's dock/sidebar links to the other three by relative filename (`quote.html`, `orders.html`, `apar.html`, `qc.html`). If you rename a file or add an app, update the nav in **all** apps.
+Each app's dock links to the others by relative filename (`quote.html`, `orders.html`, `apar.html`, `qc.html`, `notes.html`). If you rename a file or add an app, update the nav in **all** apps. Known gap: `orders.html` has no app-switcher in its dock yet.
 
 ## Coding conventions
 
@@ -144,4 +149,5 @@ There is no automated test suite. Before considering a change done:
 - **Scheduling, dispatch board, team load, order cards** → `orders.html`
 - **Bills, vendors, pay runs, AR/AP aging, invoices** → `apar.html`
 - **Self-checks, First Articles, balloons, NCRs, certs** → `qc.html`
+- **Personal notes, checklists, tagged jottings** → `notes.html`
 - **A save silently does nothing** → check the Firebase security rules for that path first, then the write helper, then the console.
