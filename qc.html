@@ -446,7 +446,21 @@ const I18N = {
     'Material Certificate':'Certificado de material','Traceability sheet':'Hoja de trazabilidad','Certificate':'Certificado','Certificate document':'Documento del certificado','Loading cert document…':'Cargando documento del certificado…','No cert file attached.':'Sin archivo de certificado adjunto.','No cert details.':'Sin detalles del certificado.','Restricted':'Restringido','Could not embed this cert for printing. Open it from the cert viewer to print separately.':'No se pudo incrustar el certificado para imprimir. Ábrelo en el visor para imprimirlo por separado.',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
     'Cert':'Cert.','Document':'Documento','pages':'páginas','Remove':'Quitar','Save all':'Guardar todos','Saving…':'Guardando…','Saved':'Guardado',
-    'applies to all certs in this packet':'aplica a todos los certificados de este paquete'
+    'applies to all certs in this packet':'aplica a todos los certificados de este paquete',
+    // Self-check AI photo inspection
+    'Reference drawing':'Plano de referencia','Add drawing':'Agregar plano','Saved drawing':'Plano guardado',
+    'Attach the part drawing, then let AI compare your photo to it.':'Adjunta el plano de la parte y deja que la IA compare tu foto con él.',
+    'Check photo against drawing (AI)':'Comparar foto con el plano (IA)',
+    'AI checks shape, holes and bends against the drawing — advisory only. You still verify toleranced features with a gauge.':'La IA revisa forma, agujeros y dobleces contra el plano — solo orientativo. Verifica las tolerancias con un instrumento.',
+    'AI is comparing the part to the drawing…':'La IA está comparando la parte con el plano…',
+    'Add the reference drawing first, then run the check.':'Agrega primero el plano de referencia y luego ejecuta la revisión.',
+    'Add at least one part photo first.':'Agrega primero al menos una foto de la parte.',
+    'Looks like it matches the drawing':'Parece coincidir con el plano',
+    'Possible mismatch — review before Pass':'Posible discrepancia — revisa antes de Aprobar',
+    'Could not tell — retake the photo':'No se pudo determinar — vuelve a tomar la foto',
+    'Advisory only — you still verify toleranced features with a gauge.':'Solo orientativo — verifica las tolerancias con un instrumento.',
+    'Photo check failed:':'La revisión de la foto falló:','(from AI photo check)':'(de la revisión de foto con IA)',
+    'major':'mayor','minor':'menor'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -471,6 +485,7 @@ let _pendingFiles={};
 let CERT_FILTER='';
 let _certPacket=null;
 let _certLinks=[];
+let _scPhotoCheck=null, _scPhotoCheckFor=null;
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -624,6 +639,67 @@ async function callAIJson(file, promptText){
   if(fb>=0 && lb>fb) clean=clean.slice(fb,lb+1);
   clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
   return JSON.parse(clean);
+}
+async function callAIJsonContent(content, maxTokens){
+  const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:maxTokens||1500, messages:[{role:'user',content}] });
+  const data=await resp.json();
+  if(data.error) throw new Error(data.error.message||'AI error');
+  const raw=(data.content||[]).map(c=>c.text||'').join('');
+  let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
+  const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
+  if(fb>=0 && lb>fb) clean=clean.slice(fb,lb+1);
+  clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
+  return JSON.parse(clean);
+}
+
+/* ---------- Self-check AI photo inspection (compare the part photo to its drawing) ---------- */
+const SELF_CHECK_PROMPT='You are an experienced sheet-metal QC inspector at a fabrication shop. You are given (1) an engineering drawing of a part, then (2) one or more photos of the actual fabricated part. Compare the PART IN THE PHOTOS against the DRAWING and judge whether the built part matches the drawing GEOMETRY: overall shape and proportions, the number and rough location of holes / cutouts / slots, bend locations and directions, and any obviously missing or extra features. Do NOT measure exact dimensions or tolerances — a person verifies those with gauges. Focus on gross build mistakes: wrong part entirely, mirrored or flipped bends, missing holes, extra or missing features, wrong hole pattern, or a shape that clearly does not match. Respond with ONLY valid JSON, no markdown, no extra text:\n{"verdict":"pass|fail|unsure","confidence":0,"summary":"one short sentence","issues":[{"severity":"major|minor","feature":"short label e.g. hole pattern","detail":"what looks wrong"}]}\nverdict rules: use "fail" only for a clear mismatch you are reasonably confident about; "unsure" if the photo is too blurry, cropped, dark or angled to judge; "pass" if it reasonably matches. confidence is 0-100. Use an empty issues array when it looks good. Keep every detail short and specific.';
+
+async function qcSelfPhotoCheck(){
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  const photos=_pendingFiles['sc']||[];
+  const draws=_pendingFiles['scdraw']||[];
+  if(!draws.length){ qcToast(t('Add the reference drawing first, then run the check.'),'err'); return; }
+  if(!photos.length){ qcToast(t('Add at least one part photo first.'),'err'); return; }
+  const btn=$('sc-aicheck-btn'), panel=$('sc-ai-panel');
+  if(btn) btn.disabled=true;
+  if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('AI is comparing the part to the drawing…')}</div>`; }
+  try{
+    const content=[{type:'text',text:'ENGINEERING DRAWING:'}, aiContentBlock(await toBase64(draws[0]), extFromFile(draws[0])), {type:'text',text:'PHOTO(S) OF THE ACTUAL PART:'}];
+    for(const p of photos){ content.push(aiContentBlock(await toBase64(p), extFromFile(p))); }
+    content.push({type:'text',text:SELF_CHECK_PROMPT});
+    const res=await callAIJsonContent(content, 1500);
+    _scPhotoCheck=Object.assign({ ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'' }, res);
+    _scPhotoCheckFor=editId||'new';
+    qcRenderSelfAI(_scPhotoCheck);
+    if(String(res.verdict||'').toLowerCase()==='fail'){
+      qcPickResult('Flag');
+      const box=$('sc-issue');
+      if(box && !box.value.trim()) box.value=qcIssueTextFromAI(res);
+    }
+  }catch(e){
+    console.error('self photo check failed', e);
+    if(panel) panel.innerHTML=`<div class="hint" style="color:var(--red)"><i class="ti ti-alert-triangle"></i> ${esc(t('Photo check failed:')+' '+((e&&e.message)||e))}</div>`;
+  }finally{ if(btn) btn.disabled=false; }
+}
+window.qcSelfPhotoCheck=qcSelfPhotoCheck;
+function qcSelfAIHtml(res){
+  const v=String(res.verdict||'unsure').toLowerCase();
+  const col=v==='pass'?'var(--green)':(v==='fail'?'var(--red)':'var(--amber)');
+  const ic=v==='pass'?'ti-circle-check':(v==='fail'?'ti-alert-octagon':'ti-help-circle');
+  const label=v==='pass'?t('Looks like it matches the drawing'):(v==='fail'?t('Possible mismatch — review before Pass'):t('Could not tell — retake the photo'));
+  const issues=(res.issues||[]).map(i=>`<li><b>${esc(i.feature||'')}</b>${i.severity?` <span class="muted">(${esc(t(i.severity==='major'?'major':'minor'))})</span>`:''}${(i.feature||i.severity)?' — ':''}${esc(i.detail||'')}</li>`).join('');
+  return `<div style="padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-left:3px solid ${col}">
+    <div style="font-weight:800;color:${col};display:flex;align-items:center;gap:6px"><i class="ti ${ic}"></i> ${esc(label)}${res.confidence!=null?` <span class="muted" style="font-weight:600">${esc(String(res.confidence))}%</span>`:''}</div>
+    ${res.summary?`<div style="margin-top:3px">${esc(res.summary)}</div>`:''}
+    ${issues?`<ul style="margin:6px 0 0;padding-left:18px">${issues}</ul>`:''}
+    <div class="muted" style="margin-top:6px;font-size:11px">${t('Advisory only — you still verify toleranced features with a gauge.')}</div>
+  </div>`;
+}
+function qcRenderSelfAI(res){ const p=$('sc-ai-panel'); if(!p) return; p.style.display='block'; p.innerHTML=qcSelfAIHtml(res); }
+function qcIssueTextFromAI(res){
+  const lines=(res.issues||[]).map(i=>'• '+(i.feature?i.feature+': ':'')+(i.detail||''));
+  return (res.summary?res.summary+'\n':'')+lines.join('\n')+(lines.length?'\n':'')+t('(from AI photo check)');
 }
 function setAIStatus(elId, state, msg){
   const el=$(elId); if(!el) return;
@@ -835,7 +911,17 @@ function viewSelfCheck(){
       <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('sc',this)"></label>
       <div class="thumbs" id="files-sc"></div>
       ${(r&&r.photos&&r.photos.length)?`<div class="thumbs">${r.photos.map(p=>`<img class="thumb" src="${esc(p.url)}">`).join('')}</div>`:''}
-      <div class="aiwip"><i class="ti ti-sparkles"></i> ${t('AI photo check (compare to a known-good reference + flag obvious mistakes) is coming next. For now this saves the photo; you still verify toleranced features with a gauge.')}</div>
+    </div>
+    <div class="field"><label class="fl">${t('Reference drawing')}</label>
+      <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Add drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('scdraw',this)"></label>
+      <div class="thumbs" id="files-scdraw"></div>
+      ${(r&&r.drawing&&r.drawing.url)?`<div class="hint"><i class="ti ti-paperclip"></i> <a href="${esc(r.drawing.url)}" target="_blank">${esc(r.drawing.name||t('Saved drawing'))}</a></div>`:''}
+      <div class="hint">${t('Attach the part drawing, then let AI compare your photo to it.')}</div>
+    </div>
+    <div class="field">
+      <button class="btn sm primary" id="sc-aicheck-btn" onclick="qcSelfPhotoCheck()"><i class="ti ti-sparkles"></i> ${t('Check photo against drawing (AI)')}</button>
+      <div id="sc-ai-panel" style="display:${(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?'block':'none'};margin-top:8px">${(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?qcSelfAIHtml(_scPhotoCheck):''}</div>
+      <div class="hint" style="margin-top:6px">${t('AI checks shape, holes and bends against the drawing — advisory only. You still verify toleranced features with a gauge.')}</div>
     </div>
     <div class="field"><label class="fl">${t('Result')}</label>
       <div class="res-pick">
@@ -863,11 +949,14 @@ window.qcSaveSelf=async ()=>{
   const photos=(prev&&prev.photos)?prev.photos.slice():[];
   const fresh=await uploadPending('sc','inspections');
   fresh.forEach(f=>photos.push(f));
+  const dfresh=await uploadPending('scdraw','inspections');
+  const drawing=dfresh[0]||(prev&&prev.drawing)||null;
+  const photoCheck=(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?_scPhotoCheck:((prev&&prev.photoCheck)||null);
   const rec={
     id, type:'self', createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'',
     updatedAt:Date.now(), orderId:gv('sc-order'),
     partNum:part, customer:cust, rev:gv('sc-rev'), po:gv('sc-po'), job:gv('sc-job'), qty:gv('sc-qty'),
-    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos
+    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos, drawing, photoCheck
   };
   await dbSet('qc/inspections/'+id, rec);
   if(result==='Flag' && !(prev&&prev.ncrId)){
@@ -878,6 +967,11 @@ window.qcSaveSelf=async ()=>{
     await dbSet('qc/ncr/'+ncrId, ncr);
     rec.ncrId=ncrId; await dbSet('qc/inspections/'+id, rec);
   }
+  if(photoCheck && photoCheck.ranAt){
+    try{ await qcLogAudit([{ inspectionId:id, partNum:part, field:'photocheck', action:'ai-photo-check', verdict:photoCheck.verdict||'', confidence:(photoCheck.confidence!=null?photoCheck.confidence:null), note:photoCheck.summary||'' }]); }
+    catch(e){ console.error('audit log failed', e); }
+  }
+  _scPhotoCheck=null; _scPhotoCheckFor=null;
   editId=null; page='inspections'; render();
 };
 
