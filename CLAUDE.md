@@ -78,7 +78,7 @@ Each app owns a top-level namespace, and some apps read across namespaces:
 
 ### Cloud Storage upload prefixes
 
-Uploaded files (drawings, cert PDFs, invoices, note photos) are stored under the owning app's prefix: `quotes/…`, `orders/…`, `apar/…`, `qc/…`, `notes/<uid>/…`. Follow the existing prefix when adding uploads.
+Actual upload prefixes in use (verified against the code 2026-07-05): `drawings/<orderId>/…` (orders.html), `quote-drawings/…` (quote.html), `qc/…` (qc.html), `notes/<uid>/…` (notes.html). **apar.html does not upload files at all** (its CSV import/backups are read locally). Follow the owning app's existing prefix when adding uploads, and remember each prefix needs a matching Storage security rule.
 
 ### Auth + role model (operator vs manager)
 
