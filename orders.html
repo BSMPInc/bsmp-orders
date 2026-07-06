@@ -615,12 +615,12 @@ tr:hover .del-btn{opacity:1}
 .disp-row{display:grid;grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 56px 36px 40px;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
 body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 40px}
 .disp-seq{font-size:11px;font-weight:800;color:var(--text3);min-width:17px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
-.disp-move{display:inline-flex;flex-direction:column;gap:2px;flex-shrink:0;margin-left:2px}
-.dm-btn{border:1px solid var(--border);background:#fff;border-radius:6px;width:28px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);padding:0}
-.dm-btn:active{background:#eef1f6}
-.dm-btn:disabled{opacity:.3;cursor:default}
-.dm-btn i{font-size:13px}
-@media(pointer:coarse){ .dm-btn{width:38px;height:26px} .dm-btn i{font-size:17px} .disp-seq{font-size:12.5px;min-width:20px} }
+.disp-grip{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;color:var(--text3);cursor:grab;border-radius:7px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.disp-grip:hover{background:#eef1f6;color:var(--text2)}
+.disp-grip:active{cursor:grabbing}
+.disp-grip i{font-size:19px}
+.disp-row.disp-dragging{background:#fff6d6;box-shadow:0 4px 14px rgba(0,0,0,.16);position:relative;z-index:5}
+@media(pointer:coarse){ .disp-grip{width:44px;height:44px} .disp-grip i{font-size:23px} .disp-seq{font-size:12.5px;min-width:20px} }
 .disp-row:last-child{border-bottom:none}
 .disp-row:hover{background:#f9fbfd}
 .disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:0;overflow:hidden}
@@ -690,8 +690,8 @@ body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr)
 .undo-toast .ut-x{background:none;border:none;color:#9aa5b4;cursor:pointer;padding:4px;display:inline-flex;flex-shrink:0}
 .undo-toast .ut-x:hover{color:#fff}
 @media (pointer: coarse){
-  .disp-row{padding:12px 16px;gap:10px;grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 56px 42px 42px}
-  body.role-operator .disp-row{grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 42px}
+  .disp-row{padding:12px 16px;gap:10px;grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 56px 42px 46px}
+  body.role-operator .disp-row{grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 46px}
   .disp-proc{font-size:14px}
   .disp-job{font-size:14px}
 }
@@ -3872,23 +3872,60 @@ function dispGroupsSorted(){
   groups.forEach(arr=>arr.sort(dispDayCmp));
   return groups;
 }
-// Move a task up/down within its person's list and lock in today's manual order.
-window._dispMove = (id, dir, e) => {
-  if(e) e.stopPropagation();
-  const groups=dispGroupsSorted();
-  for(const arr of groups.values()){
-    const idx=arr.findIndex(it=>String(it.r.id)===String(id));
-    if(idx<0) continue;
-    const j= dir<0 ? idx-1 : idx+1;
-    if(j<0 || j>=arr.length) return;
-    const tmp=arr[idx]; arr[idx]=arr[j]; arr[j]=tmp;
-    const ds=_todayStr();
-    arr.forEach((it,i)=>{ it.r.daySeq=i+1; it.r.daySeqDate=ds; });   // renumber whole list for today
-    saveDB(); renderDispatch();
-    return;
-  }
+// Drag-to-reorder within a person's list (mouse + touch), locking in today's manual order.
+// Pointer events so it works the same with a finger on the shop iPads.
+let _dd=null;   // {row, list, scroller, moved}
+window._dispDragStart = (e, el) => {
+  if(e.pointerType==='mouse' && e.button!==0) return;
+  e.preventDefault(); e.stopPropagation();
+  const row=el.closest('.disp-row'); if(!row) return;
+  const list=row.parentElement;
+  let sc=list; while(sc && sc!==document.documentElement){ const o=getComputedStyle(sc).overflowY; if(o==='auto'||o==='scroll') break; sc=sc.parentElement; }
+  _dd={row, list, scroller:sc||document.scrollingElement, moved:false};
+  try{ el.setPointerCapture(e.pointerId); }catch{}
+  row.classList.add('disp-dragging');
+  document.addEventListener('pointermove', _ddMove);
+  document.addEventListener('pointerup', _ddEnd);
+  document.addEventListener('pointercancel', _ddEnd);
 };
+function _ddMove(e){
+  if(!_dd) return;
+  e.preventDefault();
+  const {row, list}=_dd;
+  const y=e.clientY;
+  // keep the list scrolling when dragging near the top/bottom of the screen
+  if(y<80) _dd.scroller.scrollTop-=9; else if(y>innerHeight-80) _dd.scroller.scrollTop+=9;
+  const sibs=[...list.children].filter(c=>c!==row);
+  let target=null;
+  for(const s of sibs){ const rc=s.getBoundingClientRect(); if(y < rc.top + rc.height/2){ target=s; break; } }
+  if(target){ if(row.nextElementSibling!==target){ list.insertBefore(row, target); _dd.moved=true; } }
+  else if(list.lastElementChild!==row){ list.appendChild(row); _dd.moved=true; }
+}
+function _ddEnd(){
+  if(!_dd) return;
+  const {row, list, moved, rerenderPending}=_dd;
+  row.classList.remove('disp-dragging');
+  document.removeEventListener('pointermove', _ddMove);
+  document.removeEventListener('pointerup', _ddEnd);
+  document.removeEventListener('pointercancel', _ddEnd);
+  _dd=null;
+  if(moved) _dispDropSave(list);                 // re-renders after saving
+  else if(rerenderPending) renderDispatch();     // a data update arrived mid-drag
+}
+// Stamp the dropped DOM order onto the group's items as today's manual order, then save.
+function _dispDropSave(list){
+  const gkey=list.closest('.disp-group')?.dataset.gkey;
+  const arr=dispGroupsSorted().get(gkey); if(!arr) return;
+  const pool=new Map();
+  arr.forEach(it=>{ const k=String(it.r.id); if(!pool.has(k)) pool.set(k,[]); pool.get(k).push(it); });
+  const ordered=[];
+  [...list.querySelectorAll('.disp-row')].forEach(el=>{ const q=pool.get(String(el.dataset.oid)); if(q && q.length) ordered.push(q.shift()); });
+  const ds=_todayStr();
+  ordered.forEach((it,i)=>{ it.r.daySeq=i+1; it.r.daySeqDate=ds; });
+  saveDB(); renderDispatch();
+}
 function renderDispatch(){
+  if(_dd){ _dd.rerenderPending=true; return; }   // never rebuild the board under someone's finger
   const sumEl=document.getElementById('dispatch-summary');
   const body=document.getElementById('dispatch-body');
   if(!body) return;
@@ -3942,11 +3979,8 @@ window._dispToggleGroup=(k)=>{
   if(g) g.classList.toggle('collapsed', _dispCollapsed.has(k));
 };
 function dispSeqBadge(idx){ return `<span class="disp-seq">${idx+1}</span>`; }
-function dispMoveCtl(r, idx, total){
-  return `<span class="disp-move">
-    <button class="dm-btn" ${idx===0?'disabled':''} title="Move up" onclick="window._dispMove('${r.id}',-1,event)"><i class="ti ti-chevron-up"></i></button>
-    <button class="dm-btn" ${idx===total-1?'disabled':''} title="Move down" onclick="window._dispMove('${r.id}',1,event)"><i class="ti ti-chevron-down"></i></button>
-  </span>`;
+function dispMoveCtl(){
+  return `<span class="disp-grip" title="Drag to reorder" onclick="event.stopPropagation()" onpointerdown="window._dispDragStart(event,this)"><i class="ti ti-grip-vertical"></i></span>`;
 }
 function dispatchRow(it, idx, total){
   if(it.office) return officeDispatchRow(it, idx, total);
@@ -3961,7 +3995,7 @@ function dispatchRow(it, idx, total){
   const op = userRole==='operator';
   const assignCtl = op ? '' : (team.length ? `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : '<span></span>');
   const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
-  return `<div class="disp-row" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
+  return `<div class="disp-row" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
@@ -3986,7 +4020,7 @@ function officeDispatchRow(it, idx, total){
   const op = userRole==='operator';
   const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
   const statusChip = `<span class="status-badge ${STATUS_CLASS[r.status]||''}" style="font-size:10px">${esc2(r.status)}</span>`;
-  return `<div class="disp-row" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
+  return `<div class="disp-row" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
     <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
