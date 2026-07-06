@@ -601,7 +601,11 @@ tr:hover .del-btn{opacity:1}
 .disp-stat.warn{background:#fbf1df;border-color:#f0ddb8;color:#BA7517}.disp-stat.warn b{color:#BA7517}
 .disp-group{background:var(--card);border:1px solid var(--border);border-radius:13px;margin-bottom:13px;overflow:hidden;box-shadow:var(--shadow)}
 .disp-group.none{border-color:#f0ddb8}
-.disp-phead{display:flex;align-items:center;gap:11px;padding:12px 16px;background:#fafbfd;border-bottom:1px solid var(--border)}
+.disp-phead{display:flex;align-items:center;gap:11px;padding:12px 16px;background:#fafbfd;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.disp-chev{font-size:17px;color:var(--text3);transition:transform .18s;flex-shrink:0}
+.disp-group.collapsed .disp-chev{transform:rotate(-90deg)}
+.disp-group.collapsed .disp-rows{display:none}
+.disp-group.collapsed .disp-phead{border-bottom:none}
 .disp-group.none .disp-phead{background:#fdf8ee}
 .disp-pname{font-size:15px;font-weight:800;color:var(--text)}
 .disp-psub{font-size:11.5px;color:var(--text2);margin-top:1px}
@@ -3918,13 +3922,25 @@ function renderDispatch(){
   body.innerHTML = keys.map(k=>{
     const arr=groups.get(k); const none=k==='__none__'; const person=none?null:personById(k);
     const behindCount=arr.filter(i=>i.health.state==='behind').length;
+    const collapsed=_dispCollapsed.has(k);
+    const chev=`<i class="ti ti-chevron-down disp-chev"></i>`;
     const head = none
-      ? `<div class="disp-phead none"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${arr.length} ready step${arr.length!==1?'s':''} with no owner — assign someone</div></div></div>`
-      : `<div class="disp-phead"><span class="pc-dot lg" style="background:${sigColor(person)}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div></div>`;
-    return `<div class="disp-group${none?' none':''}">${head}<div class="disp-rows">${arr.map((it,i)=>dispatchRow(it,i,arr.length)).join('')}</div></div>`;
+      ? `<div class="disp-phead none" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${arr.length} ready step${arr.length!==1?'s':''} with no owner — assign someone</div></div>${chev}</div>`
+      : `<div class="disp-phead" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:${sigColor(person)}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div>${chev}</div>`;
+    return `<div class="disp-group${none?' none':''}${collapsed?' collapsed':''}" data-gkey="${k}">${head}<div class="disp-rows">${arr.map((it,i)=>dispatchRow(it,i,arr.length)).join('')}</div></div>`;
   }).join('');
   renderDailyBrief(); renderTeamLoad();
 }
+// Collapsed people on the Today board — remembered per device across re-renders.
+let _dispCollapsed=new Set();
+try{ _dispCollapsed=new Set(JSON.parse(localStorage.getItem('bsmp_disp_collapsed')||'[]')); }catch{}
+window._dispToggleGroup=(k)=>{
+  if(_dispCollapsed.has(k)) _dispCollapsed.delete(k); else _dispCollapsed.add(k);
+  try{ localStorage.setItem('bsmp_disp_collapsed', JSON.stringify([..._dispCollapsed])); }catch{}
+  // toggle in place — no full re-render, so the page doesn't jump
+  const g=document.querySelector(`.disp-group[data-gkey='${k}']`);
+  if(g) g.classList.toggle('collapsed', _dispCollapsed.has(k));
+};
 function dispSeqBadge(idx){ return `<span class="disp-seq">${idx+1}</span>`; }
 function dispMoveCtl(r, idx, total){
   return `<span class="disp-move">
