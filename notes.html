@@ -174,6 +174,8 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .check-text{flex:1;min-height:34px}
 .check-rm{border:none;background:none;color:var(--text3);cursor:pointer;font-size:16px;padding:4px;line-height:1}
 .check-rm:hover{color:var(--red)}
+.check-row.done .check-text{color:var(--text3);text-decoration:line-through}
+.check-when{font-size:10.5px;color:var(--text3);white-space:nowrap;flex:none}
 .photos-head{cursor:pointer;user-select:none;margin-bottom:10px}
 .thumb-wrap{position:relative;display:inline-block}
 .thumb-x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
@@ -377,6 +379,7 @@ function viewEdit(){
   const n=editId?NOTES[editId]:null;
   _asDeleted=false; _asDirty=false; clearTimeout(_asTimer); _asTimer=null;
   _editChecklist=(n&&n.checklist)?JSON.parse(JSON.stringify(n.checklist)):[];
+  ntSortChecklist();
   _editTags=(n&&n.tags)?n.tags.slice():[];
   _editPhotos=(n&&n.photos)?n.photos.slice():[];
   _pendingPhotos=[];
@@ -437,16 +440,19 @@ window.ntFmt=(e,cmd,arg)=>{ e.preventDefault(); try{ document.execCommand(cmd,fa
 window.ntTogglePinEdit=()=>{ _editPinned=!_editPinned; const b=$('nt-pin-btn'); if(b){ b.className='btn icon '+(_editPinned?'primary':''); b.innerHTML=`<i class="ti ti-pin${_editPinned?'ned':''}"></i>`; } ntQueueSave(); };
 
 /* checklist */
+// done items sink to the bottom, in the order they were ticked off
+function ntSortChecklist(){ _editChecklist.sort((a,b)=>((a.done?1:0)-(b.done?1:0)) || ((a.doneAt||0)-(b.doneAt||0))); }
 function ntRenderChecklist(){
   const c=$('nt-checklist'); if(!c) return;
-  c.innerHTML=_editChecklist.map((it,i)=>`<div class="check-row">
+  c.innerHTML=_editChecklist.map((it,i)=>`<div class="check-row${it.done?' done':''}">
     <input type="checkbox" ${it.done?'checked':''} onchange="ntToggleCheck(${i},this.checked)">
     <input class="in check-text" value="${esc(it.text||'')}" placeholder="List item" oninput="ntEditCheck(${i},this.value)">
+    ${(it.done&&it.doneAt)?`<span class="check-when">${fmtWhen(it.doneAt)}</span>`:''}
     <button class="check-rm" onclick="ntRmCheck(${i})"><i class="ti ti-x"></i></button>
   </div>`).join('');
 }
-window.ntAddCheck=()=>{ _editChecklist.push({id:newId('ci'),text:'',done:false}); ntRenderChecklist(); const rows=document.querySelectorAll('#nt-checklist .check-text'); const last=rows[rows.length-1]; if(last) last.focus(); };
-window.ntToggleCheck=(i,v)=>{ if(_editChecklist[i]) _editChecklist[i].done=!!v; ntQueueSave(); };
+window.ntAddCheck=()=>{ const id=newId('ci'); _editChecklist.push({id,text:'',done:false}); ntSortChecklist(); ntRenderChecklist(); const idx=_editChecklist.findIndex(x=>x.id===id); const rows=document.querySelectorAll('#nt-checklist .check-text'); if(rows[idx]) rows[idx].focus(); };
+window.ntToggleCheck=(i,v)=>{ const it=_editChecklist[i]; if(it){ it.done=!!v; if(v) it.doneAt=Date.now(); else delete it.doneAt; ntSortChecklist(); ntRenderChecklist(); } ntQueueSave(); };
 window.ntEditCheck=(i,v)=>{ if(_editChecklist[i]) _editChecklist[i].text=v; ntQueueSave(); };
 window.ntRmCheck=(i)=>{ _editChecklist.splice(i,1); ntRenderChecklist(); ntQueueSave(); };
 
@@ -542,7 +548,7 @@ function ntCapture(){
   if(_asDeleted || !$('nt-editor')) return null;
   const title=gv('nt-title');
   const body=stripDangerous(($('nt-body')&&$('nt-body').innerHTML)||'');
-  const checklist=_editChecklist.filter(i=>i.text&&i.text.trim()).map(i=>({id:i.id,text:i.text,done:!!i.done}));
+  const checklist=_editChecklist.filter(i=>i.text&&i.text.trim()).map(i=>({id:i.id,text:i.text,done:!!i.done,doneAt:i.doneAt||null}));
   const hasContent=title||stripHtml(body).trim()||checklist.length||_pendingPhotos.length||_editPhotos.length||_editCustomer;
   if(!editId && !hasContent) return null;          // never create an empty note
   if(!editId) editId=newId('note');                // first real content claims the id

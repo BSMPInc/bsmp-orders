@@ -101,8 +101,12 @@ the toolbar shows Saving… / Saved / Not saved. Key invariants:
   `<script>`/`<style>`, `on*=` handlers, `javascript:` URLs). Saved body is injected
   back with `innerHTML` when reopening — keep the sanitizer if you touch the save path.
   Plain-text derivatives use `stripHtml()` (snippets, search).
-- **Checklist:** structured array (`{id,text,done}`), NOT part of the rich-text body.
-  Rendered by `ntRenderChecklist()`; empty-text items are dropped on save.
+- **Checklist:** structured array (`{id,text,done,doneAt}`), NOT part of the
+  rich-text body. Rendered by `ntRenderChecklist()`; empty-text items are dropped
+  on save. Ticking an item stamps `doneAt` (ms) and `ntSortChecklist()` sinks done
+  items to the bottom in tick order (the ARRAY is sorted, not just the display, so
+  the inline `ntToggleCheck(i)` indices stay valid); unticking clears `doneAt` and
+  floats it back up. Done rows show strikethrough + a `fmtWhen` timestamp.
 - **Tags:** a FIXED set, defined in the `TAGS` constant (`Site Visit`, `Open Orders`,
   `RFQ`, `Purchasing`, `Fab Note`, `Scheduling`) — tap-to-toggle chips in the editor
   (`ntToggleTag`) and the same six as filter chips on the list. Chips are
