@@ -134,6 +134,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .rv-opt{padding:7px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
 .rv-opt:last-child{border-bottom:none}
 .rv-opt:hover{background:var(--accent-soft)}
+.rv-opt.rv-add{color:var(--accent);font-weight:700}
 .tagfilter{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
 .tf{font-size:12px;font-weight:700;padding:4px 10px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer}
 .tf.on{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -239,7 +240,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 <script>
 /* ---------- state ---------- */
 window.NT_USER=null; window.NT_UID=null;
-let NOTES={}, ORDERS={};
+let NOTES={}, ORDERS={}, CUSTOMERS={};
 const TAGS=['Site Visit','Open Orders','RFQ','Purchasing','Fab Note','Scheduling'];
 let page='list';       // 'list' | 'edit'
 let editId=null;
@@ -279,6 +280,7 @@ async function upload(file,sub){ if(window.ntUpload) return window.ntUpload(file
 window.ntOnData=(name,val)=>{
   if(name==='notes') NOTES=val||{};
   else if(name==='orders') ORDERS=val||{};
+  else if(name==='customers') CUSTOMERS=val||{};
   render();
 };
 window.ntOnAuth=(user)=>{
@@ -381,7 +383,8 @@ function viewEdit(){
       ${n?`<button class="btn danger" onclick="ntDelete()"><i class="ti ti-trash"></i> Delete</button>`:''}
     </div>
     <div class="card">
-      <input class="in note-titlein" id="nt-title" placeholder="Title" oninput="ntQueueSave()" value="${esc(n?n.title:'')}">
+      <input class="in note-titlein" id="nt-title" placeholder="Title — type a customer name to match one" autocomplete="off" oninput="ntQueueSave();ntTitleSearch(this.value)" onblur="ntTitleBlur()" value="${esc(n?n.title:'')}">
+      <div class="rv-results" id="nt-title-results" style="display:none"></div>
       <div class="rt-toolbar">
         <button type="button" onmousedown="ntFmt(event,'formatBlock','H2')" title="Title">Title</button>
         <button type="button" onmousedown="ntFmt(event,'formatBlock','H3')" title="Heading">Heading</button>
@@ -439,6 +442,39 @@ window.ntRmCheck=(i)=>{ _editChecklist.splice(i,1); ntRenderChecklist(); ntQueue
 /* tags — fixed set, tap to toggle */
 window.ntToggleTag=(tg)=>{ const i=_editTags.indexOf(tg); if(i>=0) _editTags.splice(i,1); else _editTags.push(tg); ntRenderTags(); ntQueueSave(); };
 function ntRenderTags(){ const c=$('nt-tags'); if(!c) return; c.innerHTML=TAGS.map(tg=>`<span class="tf ${_editTags.includes(tg)?'on':''}" onclick="ntToggleTag('${tg}')">${esc(tg)}</span>`).join(''); }
+
+/* title ⇄ customers — the title suggests customer names as you type, with add-new */
+window.ntTitleSearch=(q)=>{
+  const res=$('nt-title-results'); if(!res) return;
+  q=String(q||'').trim();
+  if(!q){ res.style.display='none'; res.innerHTML=''; return; }
+  const ql=q.toLowerCase();
+  const list=vals(CUSTOMERS).filter(c=>c.name&&c.name.toLowerCase().includes(ql)).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,6);
+  const exact=list.some(c=>c.name.toLowerCase()===ql);
+  let html=list.map(c=>`<div class="rv-opt" onmousedown="event.preventDefault();ntPickCustomer('${c.id}')"><i class="ti ti-user" style="opacity:.55;margin-right:4px"></i>${esc(c.name)}</div>`).join('');
+  if(!exact) html+=`<div class="rv-opt rv-add" onmousedown="event.preventDefault();ntAddCustomer()"><i class="ti ti-user-plus" style="margin-right:4px"></i>Add “${esc(q)}” as a new customer</div>`;
+  res.innerHTML=html; res.style.display='block';
+};
+window.ntTitleBlur=()=>{ const res=$('nt-title-results'); if(res){ res.style.display='none'; } };
+window.ntPickCustomer=(id)=>{
+  const c=CUSTOMERS[id]; const t=$('nt-title'); if(!t) return;
+  if(c&&c.name) t.value=c.name;
+  ntTitleBlur(); t.focus(); const L=t.value.length; try{ t.setSelectionRange(L,L); }catch(e){}
+  ntQueueSave();
+};
+window.ntAddCustomer=async ()=>{
+  const t=$('nt-title'); const name=((t&&t.value)||'').trim();
+  ntTitleBlur();
+  if(!name) return;
+  const dup=vals(CUSTOMERS).find(c=>c.name&&c.name.toLowerCase()===name.toLowerCase());
+  if(dup){ ntToast('That customer already exists.','ok'); return; }
+  const id=newId('cust');
+  const rec={ id, name, phone:'', email:'', notes:'', addedAt:new Date().toISOString() };   // same shape the Orders app writes
+  CUSTOMERS[id]=rec;                                    // show immediately; the listener confirms
+  await dbSet('customers/'+id, rec);
+  ntToast('Customer “'+name+'” added.','ok');
+  ntQueueSave();
+};
 
 /* job / order picker — type to search */
 window.ntOrderSearch=(q)=>{
@@ -587,7 +623,11 @@ onAuthStateChanged(auth, (user)=>{
     if(ov) ov.style.display='none';
     if(fd) fd.style.background='#2f7d55'; if(ft) ft.textContent=(user.email||'').split('@')[0]||'Signed in';
     onValue(ref(db,'notes/'+user.uid), s=> window.ntOnData('notes', s.val()||{}));
-    if(!_ordersStarted){ onValue(ref(db,'orders'), s=> window.ntOnData('orders', s.val()||{})); _ordersStarted=true; }
+    if(!_ordersStarted){
+      onValue(ref(db,'orders'), s=> window.ntOnData('orders', s.val()||{}));
+      onValue(ref(db,'customers'), s=> window.ntOnData('customers', s.val()||{}));
+      _ordersStarted=true;
+    }
     window.ntOnAuth(user);
   } else {
     if(ov) ov.style.display='flex';

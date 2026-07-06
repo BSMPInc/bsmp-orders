@@ -20,7 +20,10 @@ per-uid data path plus the matching security rules, not from roles.
 - **Owns RTDB:** `notes/<auth-uid>/<noteId>` — note the extra **per-user** level
   compared to the other apps. `NT_UID` (the signed-in user's Firebase uid) is baked
   into every read/write path.
-- **Reads:** `orders` (for the "Link to a job / order" dropdown).
+- **Reads:** `orders` (for the "Link to a job / order" dropdown) and `customers`
+  (title type-ahead). **Writes `customers/<id>`** when "Add … as a new customer"
+  is used — single-child set, same record shape as the Orders app
+  (`{id,name,phone,email,notes,addedAt}`), so it shows up there too.
 - **Storage:** photo uploads go under `notes/<uid>/photos/...` (`ntUpload`).
 - **No localStorage keys of its own** (sidebar pin is per-session; it does not use AI,
   so it never touches `bsmp_proxy_url`/`bsmp_apikey`).
@@ -106,6 +109,12 @@ the toolbar shows Saving… / Saved / Not saved. Key invariants:
   to change the vocabulary, edit `TAGS` (old notes keep any retired tag silently on
   the record). Tag names must stay free of quotes/backslashes — they're echoed into
   inline `onclick` attributes.
+- **Title:** a plain text input that doubles as a customer type-ahead
+  (`ntTitleSearch` → `#nt-title-results` → `ntPickCustomer`). Matching customer
+  names drop down as you type; picking one fills the title (still free-editable
+  after). If nothing matches exactly, the last option is `ntAddCustomer()` —
+  adds the typed text to the shared `customers` list. Options use `onmousedown`
+  + `preventDefault` so the input's blur doesn't eat the tap.
 - **Job / order link:** a type-to-search picker (`ntOrderSearch` → `.rv-results`
   list → `ntPickOrder`; chosen job shows as a chip with an X, `ntClearOrder`), not a
   dropdown. Search matches `orderLabel()` = customer · part · Job # · PO. The main
