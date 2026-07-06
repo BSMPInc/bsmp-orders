@@ -620,6 +620,7 @@ tr:hover .del-btn{opacity:1}
 .disp-out{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a8553a;background:#a8553a14;border-radius:5px;padding:1px 6px;margin-left:2px}
 .disp-job{flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .disp-dates{font-size:11.5px;white-space:nowrap;flex-shrink:0}
+.disp-draw{width:56px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
 .disp-empty{text-align:center;color:var(--text3);padding:60px 20px;background:var(--card);border:1px solid var(--border);border-radius:13px}
 .disp-empty i{font-size:34px;display:block;margin-bottom:10px;opacity:.5}
 .disp-empty div{font-size:15px;font-weight:700;color:var(--text2)}
@@ -3766,16 +3767,7 @@ function renderQueues(){
       ? `<span style="color:var(--text3)">${step.qtyDone??need} / ${need||'—'}</span>`
       : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${sNameJs}',this.value)">`;
     // drawing cell: thumbnail (images) or a clearly-labeled drawing button → zoomable viewer
-    const d = r.drawing||{};
-    let drawCell;
-    if(d.url){
-      const isImg = isImageUrl(d.url) || (d.ctype||'').startsWith('image/');
-      drawCell = isImg
-        ? `<img src="${d.url}" class="q-thumb" title="View drawing" onclick="window._openDrawing('${r.id}',event)">`
-        : `<button class="q-draw-btn" title="View drawing" onclick="window._openDrawing('${r.id}',event)"><i class="ti ti-file-cad"></i><span>View</span></button>`;
-    } else {
-      drawCell = `<span style="color:var(--text3);font-size:11px" title="No drawing attached">—</span>`;
-    }
+    const drawCell = drawCellHtml(r);
     const prioCell = (done || op) ? `<span style="color:var(--text3)">${PRIORITY_LABEL[prio(r)]}</span>` : prioSelect(r);
     const assignCell = op
       ? `<td>${step.assignee?personChip(step.assignee):'<span style="color:var(--text3);font-size:11px">—</span>'}</td>`
@@ -3952,6 +3944,7 @@ function dispatchRow(it, idx, total){
     <div class="disp-job"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</div>
     ${healthBadge(health)}
     <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span> · `:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
+    <span class="disp-draw">${drawCellHtml(r)}</span>
     ${qtyCtl}
     ${assignCtl}
     ${openBtn}
@@ -3976,6 +3969,7 @@ function officeDispatchRow(it, idx, total){
     <div class="disp-job"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</div>
     ${statusChip}
     <span class="disp-dates"><span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
+    <span class="disp-draw">${drawCellHtml(r)}</span>
     ${openBtn}
     ${dispMoveCtl(r, idx, total)}
   </div>`;
@@ -5376,6 +5370,16 @@ window._setPriority = (id, val) => {
 };
 
 // ── Drawings ──────────────────────────────────────────────────────────────────
+// Drawing cell shared by Work Queues and the Today board: thumbnail (images) or a
+// labeled button → zoomable viewer; em-dash when no drawing is attached.
+function drawCellHtml(r){
+  const d = r.drawing||{};
+  if(!d.url) return `<span style="color:var(--text3);font-size:11px" title="No drawing attached">—</span>`;
+  const isImg = isImageUrl(d.url) || (d.ctype||'').startsWith('image/');
+  return isImg
+    ? `<img src="${d.url}" class="q-thumb" title="View drawing" onclick="window._openDrawing('${r.id}',event)">`
+    : `<button class="q-draw-btn" title="View drawing" onclick="window._openDrawing('${r.id}',event)"><i class="ti ti-file-cad"></i><span>View</span></button>`;
+}
 window._openInOrders = (id, e) => {
   if(e) e.stopPropagation();
   showPage('orders');
