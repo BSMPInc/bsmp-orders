@@ -606,7 +606,10 @@ tr:hover .del-btn{opacity:1}
 .disp-pname{font-size:15px;font-weight:800;color:var(--text)}
 .disp-psub{font-size:11.5px;color:var(--text2);margin-top:1px}
 .disp-rows{display:flex;flex-direction:column}
-.disp-row{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
+/* Fixed column grid so badges, dates and buttons line up across every row:
+   seq | check | process | job | health | dates | drawing | qty | assignee | open | move */
+.disp-row{display:grid;grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 56px 36px 40px;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
+body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 40px}
 .disp-seq{font-size:11px;font-weight:800;color:var(--text3);min-width:17px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
 .disp-move{display:inline-flex;flex-direction:column;gap:2px;flex-shrink:0;margin-left:2px}
 .dm-btn{border:1px solid var(--border);background:#fff;border-radius:6px;width:28px;height:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);padding:0}
@@ -616,11 +619,12 @@ tr:hover .del-btn{opacity:1}
 @media(pointer:coarse){ .dm-btn{width:38px;height:26px} .dm-btn i{font-size:17px} .disp-seq{font-size:12.5px;min-width:20px} }
 .disp-row:last-child{border-bottom:none}
 .disp-row:hover{background:#f9fbfd}
-.disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:150px;flex-shrink:0}
+.disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:0;overflow:hidden}
 .disp-out{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a8553a;background:#a8553a14;border-radius:5px;padding:1px 6px;margin-left:2px}
 .disp-job{flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.disp-dates{font-size:11.5px;white-space:nowrap;flex-shrink:0}
-.disp-draw{width:56px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
+.disp-dates{font-size:11.5px;white-space:nowrap;display:flex;flex-direction:column;line-height:1.45;min-width:0;overflow:hidden}
+.disp-health{display:inline-flex;align-items:center;min-width:0}
+.disp-draw{display:inline-flex;align-items:center;justify-content:center}
 .disp-empty{text-align:center;color:var(--text3);padding:60px 20px;background:var(--card);border:1px solid var(--border);border-radius:13px}
 .disp-empty i{font-size:34px;display:block;margin-bottom:10px;opacity:.5}
 .disp-empty div{font-size:15px;font-weight:700;color:var(--text2)}
@@ -682,13 +686,17 @@ tr:hover .del-btn{opacity:1}
 .undo-toast .ut-x{background:none;border:none;color:#9aa5b4;cursor:pointer;padding:4px;display:inline-flex;flex-shrink:0}
 .undo-toast .ut-x:hover{color:#fff}
 @media (pointer: coarse){
-  .disp-row{padding:14px 16px;gap:13px}
+  .disp-row{padding:12px 16px;gap:10px;grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 56px 42px 42px}
+  body.role-operator .disp-row{grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 42px}
   .disp-proc{font-size:14px}
   .disp-job{font-size:14px}
 }
 @media(max-width:760px){
-  .disp-proc{min-width:0}
+  /* phones: columns don't fit — fall back to a wrapping row */
+  .disp-row,body.role-operator .disp-row{display:flex;flex-wrap:wrap;gap:9px 11px}
+  .disp-dates{display:inline-flex;flex-direction:row;flex-wrap:wrap;gap:2px 8px}
   .disp-dates,.disp-job{white-space:normal}
+  .disp-job{flex:1;min-width:200px}
 }
 .pm-mid{display:flex;align-items:center;gap:7px;margin-top:6px}
 .pm-part{font-size:10.5px;font-weight:700;color:#33405a;background:#eef2f8;border:1px solid #d7dde6;border-radius:5px;padding:1px 7px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
@@ -3933,17 +3941,17 @@ function dispatchRow(it, idx, total){
   const ms=health.mustStart?fmtDate(toISO(health.mustStart)):'';
   const msLate=health.state==='behind';
   const esc=s=>esc2(s);
-  const qtyCtl = ext ? '' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
+  const qtyCtl = ext ? '<span></span>' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
   const op = userRole==='operator';
-  const assignCtl = (op || !team.length) ? '' : `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>`;
+  const assignCtl = op ? '' : (team.length ? `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : '<span></span>');
   const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
   return `<div class="disp-row" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
     <div class="disp-job"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</div>
-    ${healthBadge(health)}
-    <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span> · `:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
+    <span class="disp-health">${healthBadge(health)}</span>
+    <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span>`:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     <span class="disp-draw">${drawCellHtml(r)}</span>
     ${qtyCtl}
     ${assignCtl}
@@ -3967,9 +3975,11 @@ function officeDispatchRow(it, idx, total){
     <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
     <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
     <div class="disp-job"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</div>
-    ${statusChip}
+    <span class="disp-health">${statusChip}</span>
     <span class="disp-dates"><span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     <span class="disp-draw">${drawCellHtml(r)}</span>
+    <span></span>
+    ${op?'':'<span></span>'}
     ${openBtn}
     ${dispMoveCtl(r, idx, total)}
   </div>`;
