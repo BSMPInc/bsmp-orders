@@ -3702,7 +3702,7 @@ function invRow(it){
     <td>${esc2(it.location||'—')}</td>
     <td style="text-align:center"><input type="number" inputmode="numeric" class="q-qty" value="${it.qty??''}" onchange="window._invQty('${it.id}',this.value)">${(it.unit&&it.unit!=='pcs')?` <small style="color:var(--text3)">${esc2(it.unit)}</small>`:''}${low?'<div class="inv-reorder"><i class="ti ti-alert-triangle-filled"></i> reorder</div>':''}</td>
     <td style="text-align:center">${it.minQty||'—'}</td>
-    <td style="text-align:center"><button class="btn sm inv-count-btn" ${_invCounting?'disabled':''} onclick="window._invAiCount('${it.id}')">${counting?'<i class="ti ti-loader-2 spin"></i> Counting…':'<i class="ti ti-camera"></i> Count'}</button></td>
+    <td style="text-align:center"><button class="btn sm inv-count-btn" ${_invCounting?'disabled':''} onclick="window._invAiCount('${it.id}')">${counting?`<i class="ti ti-loader-2 spin"></i> ${esc2(_invCountStatus||'Counting…')}`:'<i class="ti ti-camera"></i> Count'}</button></td>
     <td style="font-size:11.5px;color:var(--text3)">${when}${it.updatedBy?`<br>${esc2(String(it.updatedBy).split('@')[0])}`:''}</td>
     <td style="text-align:center;white-space:nowrap">
       <button class="q-open-btn" title="Edit" onclick="window._invEdit('${it.id}')"><i class="ti ti-pencil"></i></button>
@@ -3742,49 +3742,70 @@ window._invDelete = (id) => {
   remove(ref(db,'inventory/'+id)).catch(e=>alert('Delete failed: '+e.message));
 };
 
-/* AI count from a photo — reuses the same Cloudflare worker as the cut-list reader */
-const INV_COUNT_PROMPT = `You are counting physical parts for a sheet-metal shop’s inventory check. Count the individual pieces visible in the photo carefully: scan the image systematically (for example row by row), including partially visible pieces at the edges, and double-check your total before answering. If pieces are stacked, bagged, or overlapping so an exact count is impossible, give your best estimate and say so. Respond ONLY with JSON: {"count": <integer>, "confidence": "exact"|"close"|"rough", "note": "<one short sentence about what you counted or any difficulty>"}`;
+/* AI count from a photo — reuses the same Cloudflare worker as the cut-list reader.
+   Accuracy strategy: one-shot counting is reliable up to a few dozen pieces but
+   drifts on big batches, so when the first pass sees a large count the photo is
+   sliced into a grid of sections, each section is counted in parallel (with an
+   edge rule so seam pieces are counted exactly once), and the sections are summed. */
+const INV_COUNT_PROMPT = `You are counting physical parts for a sheet-metal shop’s inventory check (parts are often laid out on a gridded cutting mat — use the grid lines to scan systematically). Count the individual pieces visible in the photo carefully, row by row, including partially visible pieces at the edges, and double-check your total before answering. If pieces are stacked, bagged, or overlapping so an exact count is impossible, give your best estimate and say so. Respond ONLY with JSON: {"count": <integer>, "confidence": "exact"|"close"|"rough", "note": "<one short sentence about what you counted or any difficulty>"}`;
+const INV_TILE_PROMPT = `This image is ONE SECTION cut from a larger photo of parts laid out for an inventory count (often on a gridded cutting mat). Count the individual pieces in this section, scanning systematically row by row, and double-check your total. Edge rule — important to avoid double counting across sections: count a piece only if MORE THAN HALF of it is visible in this image; if a piece is mostly cut off at an edge, skip it (the neighboring section counts it). If the section shows no parts, the count is 0. Respond ONLY with JSON: {"count": <integer>, "confidence": "exact"|"close"|"rough", "note": "<one short sentence>"}`;
+let _invCountStatus = '';
 window._invAiCount = (id) => {
   const it = inventoryItems.find(x=>x.id===id); if(!it || _invCounting) return;
   const inp = document.getElementById('inv-photo'); if(!inp) return;
   inp.onchange = async () => { const f = inp.files[0]; inp.value=''; if(f) await invRunAiCount(it, f); };
   inp.click();
 };
-// downscale to ≤2576px long edge JPEG — full iPhone photos are wastefully large, and
-// re-encoding also converts HEIC to something the API accepts
-async function invShrinkPhoto(file){
+// crop a region of the photo to a ≤2576px JPEG (also converts iPhone HEIC)
+function invCropB64(img, sx, sy, sw, sh){
+  const scale = Math.min(1, 2576/Math.max(sw,sh));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(sw*scale)); c.height = Math.max(1, Math.round(sh*scale));
+  c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+}
+async function invAskCount(b64, promptText){
+  const resp = await fetch(AI_WORKER, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+    model:'claude-opus-4-8', max_tokens:3000, thinking:{type:'adaptive'},
+    messages:[{role:'user', content:[
+      {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
+      {type:'text', text: promptText}
+    ]}]
+  })});
+  const data = await resp.json();
+  if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+  const text = (data.content||[]).map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+  let parsed; try{ parsed = JSON.parse(text); }catch{ throw new Error('Could not read a count from the AI reply. Try a clearer photo with the parts spread out.'); }
+  if(!(parseInt(parsed.count)>=0)) throw new Error('The AI could not count that photo. Try spreading the parts out with less overlap.');
+  return parsed;
+}
+async function invRunAiCount(it, file){
+  _invCounting = it.id; _invCountStatus = 'Counting…'; renderInventory();
   const url = URL.createObjectURL(file);
   try{
     const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('Could not read that photo.')); i.src=url; });
-    const scale = Math.min(1, 2576/Math.max(img.width,img.height));
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(img.width*scale)); c.height = Math.max(1, Math.round(img.height*scale));
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.85).split(',')[1];
-  } finally { URL.revokeObjectURL(url); }
-}
-async function invRunAiCount(it, file){
-  _invCounting = it.id; renderInventory();
-  try{
-    const b64 = await invShrinkPhoto(file);
-    const resp = await fetch(AI_WORKER, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
-      model:'claude-opus-4-8', max_tokens:3000, thinking:{type:'adaptive'},
-      messages:[{role:'user', content:[
-        {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
-        {type:'text', text: INV_COUNT_PROMPT + `\n\nThe item being counted: ${[it.name,it.partNum].filter(Boolean).join(' · ')}`}
-      ]}]
-    })});
-    const data = await resp.json();
-    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
-    const text = (data.content||[]).map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
-    let parsed; try{ parsed = JSON.parse(text); }catch{ throw new Error('Could not read a count from the AI reply. Try a clearer photo with the parts spread out.'); }
-    const n = parseInt(parsed.count);
-    if(!(n>=0)) throw new Error('The AI could not count that photo. Try spreading the parts out with less overlap.');
-    const conf = parsed.confidence==='exact' ? 'an exact count' : (parsed.confidence==='close' ? 'a close count' : 'a rough estimate');
-    const msg = `AI counted ${n} ${it.unit||'pcs'} of “${it.name}” — ${conf}.${parsed.note?'\n\n'+parsed.note:''}\n\nUpdate on-hand from ${it.qty??'—'} to ${n}?`;
-    if(confirm(msg)){ it.qty = n; it.lastAiCount = {count:n, at:Date.now(), confidence:parsed.confidence||''}; saveInvItem(it); }
+    const itemLine = `\n\nThe item being counted: ${[it.name,it.partNum].filter(Boolean).join(' · ')}`;
+    const first = await invAskCount(invCropB64(img,0,0,img.width,img.height), INV_COUNT_PROMPT + itemLine);
+    let n = parseInt(first.count), conf = first.confidence||'', note = first.note||'', detail = '';
+    if(n > 60){
+      // big batch — recount section by section for accuracy
+      const grid = n > 250 ? 4 : 3;
+      _invCountStatus = `Big batch — recounting in ${grid*grid} sections…`; renderInventory();
+      const tw = img.width/grid, th = img.height/grid, tiles = [];
+      for(let r=0;r<grid;r++) for(let c=0;c<grid;c++)
+        tiles.push(invCropB64(img, Math.round(c*tw), Math.round(r*th), Math.round(tw), Math.round(th)));
+      const results = await Promise.all(tiles.map(b=>invAskCount(b, INV_TILE_PROMPT + itemLine)));
+      const counts = results.map(x=>parseInt(x.count)||0);
+      n = counts.reduce((a,b)=>a+b,0);
+      conf = results.some(x=>x.confidence==='rough') ? 'rough' : 'close';
+      note = '';
+      detail = `\n\nCounted section by section: ${counts.join(' + ')} = ${n}. (Single-pass count was ${first.count} — the section total is the accurate one.)`;
+    }
+    const confTxt = conf==='exact' ? 'an exact count' : (conf==='close' ? 'a close count' : 'a rough estimate');
+    const msg = `AI counted ${n} ${it.unit||'pcs'} of “${it.name}” — ${confTxt}.${note?'\n\n'+note:''}${detail}\n\nUpdate on-hand from ${it.qty??'—'} to ${n}?`;
+    if(confirm(msg)){ it.qty = n; it.lastAiCount = {count:n, at:Date.now(), confidence:conf}; saveInvItem(it); }
   }catch(e){ alert('AI count failed: ' + e.message); }
-  finally{ _invCounting = null; renderInventory(); }
+  finally{ URL.revokeObjectURL(url); _invCounting = null; _invCountStatus = ''; renderInventory(); }
 }
 
 const PAGE_META = {

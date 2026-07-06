@@ -35,9 +35,14 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
 - Inline qty edits save immediately; full edits via `inv-modal` (`_invAdd`/`_invEdit`
   /`_invSave`); delete is a confirm + hard `remove()` (no trash/undo — new node).
 - **AI photo count** (`_invAiCount` → `invRunAiCount`): camera-capture file input →
-  `invShrinkPhoto` (canvas downscale to ≤2576px JPEG — also converts iPhone HEIC) →
+  `invCropB64` (canvas crop/downscale to ≤2576px JPEG — also converts iPhone HEIC) →
   the same `AI_WORKER` Cloudflare proxy the cut-list uses, model `claude-opus-4-8`
-  (vision) → JSON `{count, confidence, note}` → user confirms before qty updates.
+  with adaptive thinking → JSON `{count, confidence, note}` → user confirms before
+  qty updates. **Big batches tile automatically**: if the first whole-photo pass
+  counts > 60, the photo is re-counted as a 3×3 grid of sections (4×4 above 250),
+  counted in parallel with a more-than-half-visible edge rule so seam pieces are
+  counted once, then summed — one-shot counting drifts badly above ~100 pieces
+  (observed: 407 real parts → 420/430 one-shot; tiling fixes this).
 - ⚠️ The `inventory` node needs its own RTDB security rule (server-side, Firebase
   console) or saves fail — same gotcha as every new path in this suite.
 
