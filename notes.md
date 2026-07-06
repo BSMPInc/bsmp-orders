@@ -105,7 +105,10 @@ the toolbar shows Saving… / Saved / Not saved. Key invariants:
   Rendered by `ntRenderChecklist()`; empty-text items are dropped on save.
 - **Tags:** a FIXED set, defined in the `TAGS` constant (`Site Visit`, `Open Orders`,
   `RFQ`, `Purchasing`, `Fab Note`, `Scheduling`) — tap-to-toggle chips in the editor
-  (`ntToggleTag`) and the same six as filter chips on the list. No free-text tags;
+  (`ntToggleTag`) and the same six as filter chips on the list. Chips are
+  **icon-only** (owner prefers minimal text): `TAG_ICONS` maps tag → Tabler icon
+  (`tagIcon()` falls back to `tag` for retired tags); the name lives in `title=`.
+  The editor toolbar Back/Pin/Delete buttons are icon-only too (`.btn.icon`). No free-text tags;
   to change the vocabulary, edit `TAGS` (old notes keep any retired tag silently on
   the record). Tag names must stay free of quotes/backslashes — they're echoed into
   inline `onclick` attributes.

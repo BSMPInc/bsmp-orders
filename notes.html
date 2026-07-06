@@ -101,6 +101,8 @@ body.sb-pinned .dock{left:var(--sb)}
 .btn.primary:hover{background:var(--accent-2)}
 .btn.danger{color:var(--red);border-color:#e7c9c9}
 .btn.sm{height:32px;padding:0 10px;font-size:12.5px}
+.btn.icon{width:42px;padding:0;justify-content:center}
+.btn.icon i{font-size:19px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
 .card{background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px}
 .card-title{font-size:13px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px}
@@ -139,6 +141,8 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .tagfilter{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
 .tf{font-size:12px;font-weight:700;padding:4px 10px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer}
 .tf.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tf.ico{width:40px;height:36px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:17px}
+@media(pointer:coarse){ .tf.ico{width:46px;height:42px;font-size:19px} }
 .note-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .note-card{position:relative;background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);padding:14px 14px 10px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:96px}
 .note-card:hover{border-color:var(--accent)}
@@ -149,6 +153,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .note-meta{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px}
 .note-tags{display:flex;gap:5px;flex-wrap:wrap}
 .tagchip{font-size:11px;font-weight:700;padding:2px 8px;background:var(--accent-soft);color:var(--accent);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.tagchip.ico{padding:4px 7px;font-size:14px}
 .tagchip i{cursor:pointer}
 .note-foot{margin-top:auto;display:flex;gap:10px;align-items:center;font-size:11px;color:var(--text2);flex-wrap:wrap}
 .note-foot span{display:inline-flex;align-items:center;gap:4px}
@@ -243,6 +248,8 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 window.NT_USER=null; window.NT_UID=null;
 let NOTES={}, ORDERS={}, CUSTOMERS={};
 const TAGS=['Site Visit','Open Orders','RFQ','Purchasing','Fab Note','Scheduling'];
+const TAG_ICONS={'Site Visit':'map-pin','Open Orders':'clipboard-list','RFQ':'file-dollar','Purchasing':'shopping-cart','Fab Note':'hammer','Scheduling':'calendar'};
+const tagIcon=tg=>TAG_ICONS[tg]||'tag';
 let page='list';       // 'list' | 'edit'
 let editId=null;
 let filterTag='', pinnedOnly=false;
@@ -344,7 +351,7 @@ function noteCard(n){
     ${(n.title||n.customer)?`<div class="note-title">${esc(n.title||'')}${n.customer?` <span class="note-cust">(${esc(n.customer)})</span>`:''}</div>`:''}
     ${snip?`<div class="note-snippet">${snip}</div>`:''}
     ${total?`<div class="note-meta"><i class="ti ti-checkbox"></i> ${done}/${total}</div>`:''}
-    ${(n.tags&&n.tags.length)?`<div class="note-tags">${n.tags.map(tg=>`<span class="tagchip">${esc(tg)}</span>`).join('')}</div>`:''}
+    ${(n.tags&&n.tags.length)?`<div class="note-tags">${n.tags.map(tg=>`<span class="tagchip ico" title="${esc(tg)}"><i class="ti ti-${tagIcon(tg)}"></i></span>`).join('')}</div>`:''}
     <div class="note-foot">
       ${(n.photos&&n.photos.length)?`<span><i class="ti ti-photo"></i> ${n.photos.length}</span>`:''}
       ${(n.orderId&&ORDERS[n.orderId])?`<span><i class="ti ti-link"></i> ${esc(orderShort(n.orderId))}</span>`:''}
@@ -357,7 +364,7 @@ function viewList(){
     <button class="btn primary" onclick="ntNew()"><i class="ti ti-plus"></i> New note</button>
     <div class="search-wrap"><i class="ti ti-search"></i><input id="nt-search" class="in" placeholder="Search notes, jobs, tags…" oninput="ntRenderGrid()"></div>
   </div>
-  <div class="tagfilter"><span class="tf ${!filterTag?'on':''}" data-tg="" onclick="ntFilterTag('',event)">All tags</span>${TAGS.map(tg=>`<span class="tf ${filterTag===tg?'on':''}" data-tg="${esc(tg)}" onclick="ntFilterTag('${tg}',event)">${esc(tg)}</span>`).join('')}</div>
+  <div class="tagfilter"><span class="tf ico ${!filterTag?'on':''}" data-tg="" title="All tags" onclick="ntFilterTag('',event)"><i class="ti ti-tags"></i></span>${TAGS.map(tg=>`<span class="tf ico ${filterTag===tg?'on':''}" data-tg="${esc(tg)}" title="${esc(tg)}" onclick="ntFilterTag('${tg}',event)"><i class="ti ti-${tagIcon(tg)}"></i></span>`).join('')}</div>
   <div id="nt-grid">${gridHtml()}</div>`;
 }
 window.ntRenderGrid=()=>{ const g=$('nt-grid'); if(g) g.innerHTML=gridHtml(); };
@@ -379,11 +386,11 @@ function viewEdit(){
   _editCustomer=(n&&n.customer)||'';
   return `<div id="nt-editor">
     <div class="toolbar">
-      <button class="btn" onclick="ntBack()"><i class="ti ti-arrow-left"></i> Back</button>
+      <button class="btn icon" title="Back" aria-label="Back" onclick="ntBack()"><i class="ti ti-arrow-left"></i></button>
       <span class="sp" style="flex:1"></span>
       <span class="savestat" id="nt-savestat"></span>
-      <button class="btn ${_editPinned?'primary':''}" id="nt-pin-btn" onclick="ntTogglePinEdit()"><i class="ti ti-pin${_editPinned?'ned':''}"></i> ${_editPinned?'Pinned':'Pin'}</button>
-      ${n?`<button class="btn danger" onclick="ntDelete()"><i class="ti ti-trash"></i> Delete</button>`:''}
+      <button class="btn icon ${_editPinned?'primary':''}" id="nt-pin-btn" title="Pin" aria-label="Pin" onclick="ntTogglePinEdit()"><i class="ti ti-pin${_editPinned?'ned':''}"></i></button>
+      ${n?`<button class="btn icon danger" title="Delete" aria-label="Delete" onclick="ntDelete()"><i class="ti ti-trash"></i></button>`:''}
     </div>
     <div class="card">
       <input class="in note-titlein" id="nt-title" placeholder="Title — type a customer name to attach one" autocomplete="off" oninput="ntQueueSave();ntTitleSearch(this.value)" onblur="ntTitleBlur()" value="${esc(n?n.title:'')}">
@@ -427,7 +434,7 @@ function viewEdit(){
   </div>`;
 }
 window.ntFmt=(e,cmd,arg)=>{ e.preventDefault(); try{ document.execCommand(cmd,false,arg||null); }catch(err){} const b=$('nt-body'); if(b) b.focus(); ntQueueSave(); };
-window.ntTogglePinEdit=()=>{ _editPinned=!_editPinned; const b=$('nt-pin-btn'); if(b){ b.className='btn '+(_editPinned?'primary':''); b.innerHTML=`<i class="ti ti-pin${_editPinned?'ned':''}"></i> ${_editPinned?'Pinned':'Pin'}`; } ntQueueSave(); };
+window.ntTogglePinEdit=()=>{ _editPinned=!_editPinned; const b=$('nt-pin-btn'); if(b){ b.className='btn icon '+(_editPinned?'primary':''); b.innerHTML=`<i class="ti ti-pin${_editPinned?'ned':''}"></i>`; } ntQueueSave(); };
 
 /* checklist */
 function ntRenderChecklist(){
@@ -445,7 +452,7 @@ window.ntRmCheck=(i)=>{ _editChecklist.splice(i,1); ntRenderChecklist(); ntQueue
 
 /* tags — fixed set, tap to toggle */
 window.ntToggleTag=(tg)=>{ const i=_editTags.indexOf(tg); if(i>=0) _editTags.splice(i,1); else _editTags.push(tg); ntRenderTags(); ntQueueSave(); };
-function ntRenderTags(){ const c=$('nt-tags'); if(!c) return; c.innerHTML=TAGS.map(tg=>`<span class="tf ${_editTags.includes(tg)?'on':''}" onclick="ntToggleTag('${tg}')">${esc(tg)}</span>`).join(''); }
+function ntRenderTags(){ const c=$('nt-tags'); if(!c) return; c.innerHTML=TAGS.map(tg=>`<span class="tf ico ${_editTags.includes(tg)?'on':''}" title="${esc(tg)}" aria-label="${esc(tg)}" onclick="ntToggleTag('${tg}')"><i class="ti ti-${tagIcon(tg)}"></i></span>`).join(''); }
 
 /* title ⇄ customers — the title suggests customer names as you type, with add-new */
 window.ntTitleSearch=(q)=>{
