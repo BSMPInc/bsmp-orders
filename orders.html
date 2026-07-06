@@ -643,6 +643,10 @@ body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr)
 .inv-kind.cust{background:#e7f1ec;color:#1f7d57}
 tr.inv-low td{background:#fdf6ee}
 .inv-reorder{font-size:10px;font-weight:800;color:#BA7517;margin-top:2px;display:inline-flex;align-items:center;gap:3px}
+.inv-pm{width:27px;height:32px;border:1px solid var(--border2);border-radius:6px;background:#fff;cursor:pointer;color:var(--text2);vertical-align:middle;margin:0 3px}
+.inv-pm:hover{background:var(--bg);color:var(--text)}
+.inv-pm i{font-size:14px}
+@media(pointer:coarse){ .inv-pm{width:38px;height:40px} .inv-pm i{font-size:17px} }
 .inv-fl{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.03em}
 .inv-fi{width:100%;font-family:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--border2);border-radius:8px;background:#fff;margin:3px 0 11px;box-sizing:border-box}
 @media(pointer:coarse){ .inv-chip{padding:10px 16px;font-size:14px} }
@@ -1505,6 +1509,22 @@ body.sb-pinned .dock{left:var(--sb)}
 <div class="modal-bg" id="io-detail-modal" style="display:none;z-index:68">
   <div class="modal" style="max-width:470px;padding:0;overflow:hidden">
     <div id="io-detail-body"></div>
+  </div>
+</div>
+
+<!-- Inventory history modal (the digital bag tag: received & used ledger) -->
+<div class="modal-bg" id="inv-log-modal" style="display:none">
+  <div class="modal" style="width:660px;max-height:88vh;overflow:auto">
+    <div class="modal-header"><i class="ti ti-history"></i><h2 id="inv-log-title">Item history</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('inv-log-modal')"><i class="ti ti-x"></i></button></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;background:#f7f9fc;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:12px">
+      <div><label class="inv-fl">Action</label><select id="invl-type" class="inv-fi" style="margin-bottom:0;width:128px"><option value="out">Used</option><option value="in">Received</option></select></div>
+      <div><label class="inv-fl">Qty</label><input type="number" id="invl-qty" class="inv-fi" inputmode="numeric" min="0" style="margin-bottom:0;width:88px"></div>
+      <div><label class="inv-fl">Date</label><input type="date" id="invl-date" class="inv-fi" style="margin-bottom:0;width:150px"></div>
+      <div style="flex:1;min-width:140px"><label class="inv-fl">Job / note</label><input type="text" id="invl-note" class="inv-fi" placeholder="optional" style="margin-bottom:0"></div>
+      <button class="btn green" onclick="window._invLogAdd()"><i class="ti ti-check"></i> Log it</button>
+    </div>
+    <div id="inv-log-list"></div>
   </div>
 </div>
 
@@ -3649,6 +3669,7 @@ function startInventoryListener(){
     const b = document.getElementById('badge-inventory');
     if(b){ b.textContent = lowN; b.style.display = lowN ? '' : 'none'; b.classList.add('badge-red'); }
     renderInventory();
+    if(document.getElementById('inv-log-modal')?.style.display === 'flex') renderInvLog();
   });
 }
 
@@ -3700,11 +3721,12 @@ function invRow(it){
     <td>${it.kind==='customer' ? '<span class="inv-kind cust">Customer part</span>' : '<span class="inv-kind">Hardware</span>'}</td>
     <td>${esc2(it.customer||'—')}</td>
     <td>${esc2(it.location||'—')}</td>
-    <td style="text-align:center"><input type="number" inputmode="numeric" class="q-qty" value="${it.qty??''}" onchange="window._invQty('${it.id}',this.value)">${(it.unit&&it.unit!=='pcs')?` <small style="color:var(--text3)">${esc2(it.unit)}</small>`:''}${low?'<div class="inv-reorder"><i class="ti ti-alert-triangle-filled"></i> reorder</div>':''}</td>
+    <td style="text-align:center;white-space:nowrap"><button class="inv-pm" title="Log parts used" onclick="window._invLog('${it.id}','out')"><i class="ti ti-minus"></i></button><input type="number" inputmode="numeric" class="q-qty" value="${it.qty??''}" onchange="window._invQty('${it.id}',this.value)"><button class="inv-pm" title="Log parts received" onclick="window._invLog('${it.id}','in')"><i class="ti ti-plus"></i></button>${(it.unit&&it.unit!=='pcs')?` <small style="color:var(--text3)">${esc2(it.unit)}</small>`:''}${low?'<div class="inv-reorder"><i class="ti ti-alert-triangle-filled"></i> reorder</div>':''}</td>
     <td style="text-align:center">${it.minQty||'—'}</td>
     <td style="text-align:center"><button class="btn sm inv-count-btn" ${_invCounting?'disabled':''} onclick="window._invAiCount('${it.id}')">${counting?`<i class="ti ti-loader-2 spin"></i> ${esc2(_invCountStatus||'Counting…')}`:'<i class="ti ti-camera"></i> Count'}</button></td>
     <td style="font-size:11.5px;color:var(--text3)">${when}${it.updatedBy?`<br>${esc2(String(it.updatedBy).split('@')[0])}`:''}</td>
     <td style="text-align:center;white-space:nowrap">
+      <button class="q-open-btn" title="Received & used history" onclick="window._invLog('${it.id}')"><i class="ti ti-history"></i></button>
       <button class="q-open-btn" title="Edit" onclick="window._invEdit('${it.id}')"><i class="ti ti-pencil"></i></button>
       <button class="q-open-btn" title="Delete" onclick="window._invDelete('${it.id}')"><i class="ti ti-trash"></i></button>
     </td>
@@ -3712,7 +3734,14 @@ function invRow(it){
 }
 window._invRender = () => renderInventory();
 window._invFilter = (k) => { invFilter = k; renderInventory(); };
-window._invQty = (id, v) => { const it = inventoryItems.find(x=>x.id===id); if(!it) return; it.qty = parseFloat(v)||0; saveInvItem(it); };
+window._invQty = (id, v) => {
+  const it = inventoryItems.find(x=>x.id===id); if(!it) return;
+  const nv = parseFloat(v)||0, old = parseFloat(it.qty)||0;
+  if(nv === old) return;
+  it.qty = nv;
+  invLogEntry(it, 'count', nv, nv-old, new Date().toISOString().slice(0,10), 'manual correction');
+  saveInvItem(it);
+};
 window._invAdd = () => { _invEditId = null; invFillModal({}); document.getElementById('inv-modal-title').textContent='Add inventory item'; document.getElementById('inv-modal').style.display='flex'; };
 window._invEdit = (id) => { const it = inventoryItems.find(x=>x.id===id); if(!it) return; _invEditId = id; invFillModal(it); document.getElementById('inv-modal-title').textContent='Edit inventory item'; document.getElementById('inv-modal').style.display='flex'; };
 function invFillModal(it){
@@ -3741,6 +3770,66 @@ window._invDelete = (id) => {
   if(!confirm(`Delete “${it.name}” from inventory? This cannot be undone.`)) return;
   remove(ref(db,'inventory/'+id)).catch(e=>alert('Delete failed: '+e.message));
 };
+
+/* Received / used ledger — the digital version of the ID tag on each hardware bag.
+   Every entry carries {t:'in'|'out'|'count', n:amount-or-new-count, d:signed delta,
+   date, by, note}; on-hand qty always moves with the entry, and AI counts and
+   manual corrections land in the same history. */
+let _invLogId = null;
+function invLogEntry(it, t, n, d, date, note){
+  it.log = Array.isArray(it.log) ? it.log : [];
+  it.log.unshift({ id: uid(), t, n, d, date, note: note||'', by: (auth.currentUser && auth.currentUser.email)||'', at: Date.now() });
+  if(it.log.length > 300) it.log.length = 300;   // keep the record from growing forever
+}
+window._invLog = (id, preset) => {
+  const it = inventoryItems.find(x=>x.id===id); if(!it) return;
+  _invLogId = id;
+  document.getElementById('inv-log-title').textContent = `${it.name} — received & used`;
+  document.getElementById('invl-type').value = preset==='in' ? 'in' : 'out';
+  document.getElementById('invl-qty').value = '';
+  document.getElementById('invl-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('invl-note').value = '';
+  renderInvLog();
+  document.getElementById('inv-log-modal').style.display = 'flex';
+  setTimeout(()=>document.getElementById('invl-qty').focus(), 60);
+};
+window._invLogAdd = () => {
+  const it = inventoryItems.find(x=>x.id===_invLogId); if(!it) return;
+  const t = document.getElementById('invl-type').value;
+  const q = parseFloat(document.getElementById('invl-qty').value);
+  if(!(q > 0)){ alert('Enter how many were ' + (t==='in' ? 'received.' : 'used.')); return; }
+  const date = document.getElementById('invl-date').value || new Date().toISOString().slice(0,10);
+  const note = document.getElementById('invl-note').value.trim();
+  const d = t==='in' ? q : -q;
+  it.qty = (parseFloat(it.qty)||0) + d;
+  invLogEntry(it, t, q, d, date, note);
+  saveInvItem(it);
+  document.getElementById('invl-qty').value = ''; document.getElementById('invl-note').value = '';
+  renderInvLog();
+};
+function renderInvLog(){
+  const host = document.getElementById('inv-log-list');
+  const it = inventoryItems.find(x=>x.id===_invLogId);
+  if(!host || !it) return;
+  const log = Array.isArray(it.log) ? it.log : [];
+  if(!log.length){
+    host.innerHTML = '<div style="text-align:center;color:var(--text3);padding:24px;font-size:12.5px">No history yet — log what’s received and used here, just like the paper tag on the bag.</div>';
+    return;
+  }
+  let bal = parseFloat(it.qty)||0;
+  const rows = log.map(e=>{
+    const b = bal; bal -= (parseFloat(e.d)||0);
+    const lbl = e.t==='in' ? '<span style="color:var(--green);font-weight:700">Received</span>'
+             : e.t==='out' ? '<span style="color:var(--red);font-weight:700">Used</span>'
+             : '<span style="color:#BA7517;font-weight:700">Count set</span>';
+    const amt = e.t==='count' ? ('→ '+e.n) : ((e.d>0?'+':'−')+Math.abs(e.d));
+    return `<tr><td>${fmtDate(e.date)||'—'}</td><td>${lbl}</td><td style="text-align:center;font-weight:700">${amt}</td><td style="text-align:center">${b}</td><td>${esc2(String(e.by||'').split('@')[0])}</td><td>${esc2(e.note||'')}</td></tr>`;
+  }).join('');
+  host.innerHTML = `<div class="table-scroll"><table class="q-table"><thead><tr>
+    <th style="width:86px">Date</th><th style="width:96px">Action</th><th style="width:74px;text-align:center">Qty</th>
+    <th style="width:86px;text-align:center">On hand</th><th style="width:92px">By</th><th>Job / note</th>
+  </tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 
 /* AI count from a photo — reuses the same Cloudflare worker as the cut-list reader.
    Accuracy strategy: one-shot counting is reliable up to a few dozen pieces but
@@ -3803,7 +3892,12 @@ async function invRunAiCount(it, file){
     }
     const confTxt = conf==='exact' ? 'an exact count' : (conf==='close' ? 'a close count' : 'a rough estimate');
     const msg = `AI counted ${n} ${it.unit||'pcs'} of “${it.name}” — ${confTxt}.${note?'\n\n'+note:''}${detail}\n\nUpdate on-hand from ${it.qty??'—'} to ${n}?`;
-    if(confirm(msg)){ it.qty = n; it.lastAiCount = {count:n, at:Date.now(), confidence:conf}; saveInvItem(it); }
+    if(confirm(msg)){
+      const old = parseFloat(it.qty)||0;
+      it.qty = n; it.lastAiCount = {count:n, at:Date.now(), confidence:conf};
+      invLogEntry(it, 'count', n, n-old, new Date().toISOString().slice(0,10), 'AI photo count');
+      saveInvItem(it);
+    }
   }catch(e){ alert('AI count failed: ' + e.message); }
   finally{ URL.revokeObjectURL(url); _invCounting = null; _invCountStatus = ''; renderInventory(); }
 }

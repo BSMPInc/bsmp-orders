@@ -34,6 +34,15 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
   drive the red `badge-inventory` nav count — that's the purchasing/sourcing list.
 - Inline qty edits save immediately; full edits via `inv-modal` (`_invAdd`/`_invEdit`
   /`_invSave`); delete is a confirm + hard `remove()` (no trash/undo — new node).
+- **Received/used ledger** (replaces the paper ID tag on each hardware bag): each
+  item carries `log:[{id,t:'in'|'out'|'count',n,d,date,by,note,at}]` (newest first,
+  capped at 300; `d` is the signed delta). The +/− buttons beside the qty open
+  `inv-log-modal` preset to Received/Used (`_invLog`/`_invLogAdd`); the history
+  button shows the full ledger with a computed running balance (`renderInvLog`,
+  walks back from current qty). Manual qty corrections and confirmed AI counts
+  append `t:'count'` entries, so every change is attributed. Note: the whole item
+  (log included) is saved with one `set()` — two people logging the same item at
+  the same instant could clobber each other (accepted, consistent with the suite).
 - **AI photo count** (`_invAiCount` → `invRunAiCount`): camera-capture file input →
   `invCropB64` (canvas crop/downscale to ≤2576px JPEG — also converts iPhone HEIC) →
   the same `AI_WORKER` Cloudflare proxy the cut-list uses, model `claude-opus-4-8`
