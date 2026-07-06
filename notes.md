@@ -109,12 +109,15 @@ the toolbar shows Saving… / Saved / Not saved. Key invariants:
   to change the vocabulary, edit `TAGS` (old notes keep any retired tag silently on
   the record). Tag names must stay free of quotes/backslashes — they're echoed into
   inline `onclick` attributes.
-- **Title:** a plain text input that doubles as a customer type-ahead
-  (`ntTitleSearch` → `#nt-title-results` → `ntPickCustomer`). Matching customer
-  names drop down as you type; picking one fills the title (still free-editable
-  after). If nothing matches exactly, the last option is `ntAddCustomer()` —
-  adds the typed text to the shared `customers` list. Options use `onmousedown`
-  + `preventDefault` so the input's blur doesn't eat the tap.
+- **Title + customer:** the title input doubles as a customer type-ahead
+  (`ntTitleSearch` → `#nt-title-results` → `ntPickCustomer`). Picking a match
+  ATTACHES the customer to the note (`_editCustomer` / record field `customer`),
+  clears the search text from the input, and shows a removable chip under the
+  title (`ntRenderCustSel` / `ntClearCustomer`). If nothing matches exactly, the
+  last option is `ntAddCustomer()` — creates the customer AND attaches it. List
+  cards render the customer in parentheses after the title ("Title (Customer)");
+  search matches it. Options use `onmousedown` + `preventDefault` so the input's
+  blur doesn't eat the tap.
 - **Job / order link:** a type-to-search picker (`ntOrderSearch` → `.rv-results`
   list → `ntPickOrder`; chosen job shows as a chip with an X, `ntClearOrder`), not a
   dropdown. Search matches `orderLabel()` = customer · part · Job # · PO. The main
@@ -135,7 +138,7 @@ the toolbar shows Saving… / Saved / Not saved. Key invariants:
 ```
 notes/<uid>/<noteId> = {
   id, title, body (sanitized HTML), checklist:[{id,text,done}],
-  tags:[string], orderId, photos:[{name,url,type}],
+  tags:[string], orderId, customer (name string), photos:[{name,url,type}],
   pinned:bool, createdAt, updatedAt, by (email)
 }
 ```

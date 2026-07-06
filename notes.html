@@ -135,6 +135,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .rv-opt:last-child{border-bottom:none}
 .rv-opt:hover{background:var(--accent-soft)}
 .rv-opt.rv-add{color:var(--accent);font-weight:700}
+.note-cust{font-weight:600;color:var(--text3);font-size:.85em}
 .tagfilter{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
 .tf{font-size:12px;font-weight:700;padding:4px 10px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer}
 .tf.on{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -245,7 +246,7 @@ const TAGS=['Site Visit','Open Orders','RFQ','Purchasing','Fab Note','Scheduling
 let page='list';       // 'list' | 'edit'
 let editId=null;
 let filterTag='', pinnedOnly=false;
-let _editChecklist=[], _editTags=[], _editPhotos=[], _pendingPhotos=[], _editPinned=false, _photosCollapsed=true, _editOrderId='';
+let _editChecklist=[], _editTags=[], _editPhotos=[], _pendingPhotos=[], _editPinned=false, _photosCollapsed=true, _editOrderId='', _editCustomer='';
 
 /* ---------- helpers ---------- */
 const $=id=>document.getElementById(id);
@@ -311,7 +312,7 @@ function render(){
   if(!NT_USER) return;
   setActive();
   const c=$('content'); if(!c) return;
-  if(page==='edit'){ if($('nt-editor')) return; c.innerHTML=viewEdit(); ntRenderChecklist(); ntRenderTags(); ntRenderPhotos(); ntRenderOrderSel(); return; }
+  if(page==='edit'){ if($('nt-editor')) return; c.innerHTML=viewEdit(); ntRenderChecklist(); ntRenderTags(); ntRenderPhotos(); ntRenderOrderSel(); ntRenderCustSel(); return; }
   c.innerHTML=viewList();
 }
 
@@ -325,6 +326,7 @@ function gridHtml(){
   if(pinnedOnly) list=list.filter(n=>n.pinned);
   if(q) list=list.filter(n=>
     (n.title||'').toLowerCase().includes(q) ||
+    (n.customer||'').toLowerCase().includes(q) ||
     stripHtml(n.body||'').toLowerCase().includes(q) ||
     (n.tags||[]).join(' ').toLowerCase().includes(q) ||
     (n.checklist||[]).map(i=>i.text||'').join(' ').toLowerCase().includes(q) ||
@@ -339,7 +341,7 @@ function noteCard(n){
   const snip=esc(stripHtml(n.body||'').slice(0,240));
   return `<div class="note-card" onclick="ntOpen('${n.id}')">
     <button class="note-pin ${n.pinned?'on':''}" title="Pin" onclick="ntTogglePin('${n.id}',event)"><i class="ti ti-pin${n.pinned?'ned':''}"></i></button>
-    ${n.title?`<div class="note-title">${esc(n.title)}</div>`:''}
+    ${(n.title||n.customer)?`<div class="note-title">${esc(n.title||'')}${n.customer?` <span class="note-cust">(${esc(n.customer)})</span>`:''}</div>`:''}
     ${snip?`<div class="note-snippet">${snip}</div>`:''}
     ${total?`<div class="note-meta"><i class="ti ti-checkbox"></i> ${done}/${total}</div>`:''}
     ${(n.tags&&n.tags.length)?`<div class="note-tags">${n.tags.map(tg=>`<span class="tagchip">${esc(tg)}</span>`).join('')}</div>`:''}
@@ -374,6 +376,7 @@ function viewEdit(){
   _editPinned=!!(n&&n.pinned);
   _photosCollapsed=!!(n&&n.photos&&n.photos.length);
   _editOrderId=(n&&n.orderId)||'';
+  _editCustomer=(n&&n.customer)||'';
   return `<div id="nt-editor">
     <div class="toolbar">
       <button class="btn" onclick="ntBack()"><i class="ti ti-arrow-left"></i> Back</button>
@@ -383,8 +386,9 @@ function viewEdit(){
       ${n?`<button class="btn danger" onclick="ntDelete()"><i class="ti ti-trash"></i> Delete</button>`:''}
     </div>
     <div class="card">
-      <input class="in note-titlein" id="nt-title" placeholder="Title — type a customer name to match one" autocomplete="off" oninput="ntQueueSave();ntTitleSearch(this.value)" onblur="ntTitleBlur()" value="${esc(n?n.title:'')}">
+      <input class="in note-titlein" id="nt-title" placeholder="Title — type a customer name to attach one" autocomplete="off" oninput="ntQueueSave();ntTitleSearch(this.value)" onblur="ntTitleBlur()" value="${esc(n?n.title:'')}">
       <div class="rv-results" id="nt-title-results" style="display:none"></div>
+      <div id="nt-cust-sel"></div>
       <div class="rt-toolbar">
         <button type="button" onmousedown="ntFmt(event,'formatBlock','H2')" title="Title">Title</button>
         <button type="button" onmousedown="ntFmt(event,'formatBlock','H3')" title="Heading">Heading</button>
@@ -458,19 +462,26 @@ window.ntTitleSearch=(q)=>{
 window.ntTitleBlur=()=>{ const res=$('nt-title-results'); if(res){ res.style.display='none'; } };
 window.ntPickCustomer=(id)=>{
   const c=CUSTOMERS[id]; const t=$('nt-title'); if(!t) return;
-  if(c&&c.name) t.value=c.name;
-  ntTitleBlur(); t.focus(); const L=t.value.length; try{ t.setSelectionRange(L,L); }catch(e){}
+  if(c&&c.name){ _editCustomer=c.name; t.value=''; }   // the typed text was the search — clear it for the real title
+  ntTitleBlur(); ntRenderCustSel(); t.focus();
   ntQueueSave();
 };
+window.ntClearCustomer=()=>{ _editCustomer=''; ntRenderCustSel(); ntQueueSave(); };
+function ntRenderCustSel(){
+  const c=$('nt-cust-sel'); if(!c) return;
+  c.innerHTML=_editCustomer?`<div class="tagchip" style="margin:0 0 8px;font-size:12px"><i class="ti ti-user"></i> ${esc(_editCustomer)} <i class="ti ti-x" onclick="ntClearCustomer()"></i></div>`:'';
+}
 window.ntAddCustomer=async ()=>{
   const t=$('nt-title'); const name=((t&&t.value)||'').trim();
   ntTitleBlur();
   if(!name) return;
   const dup=vals(CUSTOMERS).find(c=>c.name&&c.name.toLowerCase()===name.toLowerCase());
-  if(dup){ ntToast('That customer already exists.','ok'); return; }
+  if(dup){ _editCustomer=dup.name; if(t) t.value=''; ntRenderCustSel(); ntQueueSave(); return; }
   const id=newId('cust');
   const rec={ id, name, phone:'', email:'', notes:'', addedAt:new Date().toISOString() };   // same shape the Orders app writes
   CUSTOMERS[id]=rec;                                    // show immediately; the listener confirms
+  _editCustomer=name; if(t) t.value='';
+  ntRenderCustSel();
   await dbSet('customers/'+id, rec);
   ntToast('Customer “'+name+'” added.','ok');
   ntQueueSave();
@@ -525,11 +536,11 @@ function ntCapture(){
   const title=gv('nt-title');
   const body=stripDangerous(($('nt-body')&&$('nt-body').innerHTML)||'');
   const checklist=_editChecklist.filter(i=>i.text&&i.text.trim()).map(i=>({id:i.id,text:i.text,done:!!i.done}));
-  const hasContent=title||stripHtml(body).trim()||checklist.length||_pendingPhotos.length||_editPhotos.length;
+  const hasContent=title||stripHtml(body).trim()||checklist.length||_pendingPhotos.length||_editPhotos.length||_editCustomer;
   if(!editId && !hasContent) return null;          // never create an empty note
   if(!editId) editId=newId('note');                // first real content claims the id
   const prev=NOTES[editId];
-  return { id:editId, title, body, checklist, tags:_editTags.slice(), orderId:_editOrderId,
+  return { id:editId, title, body, checklist, tags:_editTags.slice(), orderId:_editOrderId, customer:_editCustomer,
            photos:_editPhotos.slice(), pend:_pendingPhotos.slice(), pinned:_editPinned,
            createdAt:(prev&&prev.createdAt)||Date.now(), by:(NT_USER&&NT_USER.email)||'' };
 }
@@ -555,7 +566,7 @@ async function _ntDoSave(snap){
     }
     ntRenderPhotos();
     const rec={ id:snap.id, title:snap.title, body:snap.body, checklist:snap.checklist, tags:snap.tags,
-      orderId:snap.orderId, photos, pinned:snap.pinned, createdAt:snap.createdAt, updatedAt:Date.now(), by:snap.by };
+      orderId:snap.orderId, customer:snap.customer, photos, pinned:snap.pinned, createdAt:snap.createdAt, updatedAt:Date.now(), by:snap.by };
     await dbSet('notes/'+NT_UID+'/'+snap.id, rec);
     if(_asDeleted){ await dbRemove('notes/'+NT_UID+'/'+snap.id); return; }   // deleted while this save was in flight
     ntSaveStatus(_asDirty?'saving':'saved');
