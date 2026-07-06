@@ -71,6 +71,23 @@ per-uid data path plus the matching security rules, not from roles.
   `render()` early-returns if `#nt-editor` already exists so background Firebase
   refreshes don't wipe unsaved typing — **don't remove that guard.**
 
+## Autosave (no Save button)
+
+Every change (title, body, checklist, tags, job link, photos, pin) calls
+`ntQueueSave()`, which debounces ~0.9s into `ntAutoSave()`. A `savestat` chip in
+the toolbar shows Saving… / Saved / Not saved. Key invariants:
+
+- `ntCapture()` snapshots ALL state **synchronously** — navigating away can't lose
+  what was already typed. An empty NEW note is never created; the first real
+  content assigns `editId` so later saves update the same record.
+- Saves run one at a time on `_asChain` (a promise chain) so pending-photo uploads
+  can't run twice; a failed photo upload stays in `_pendingPhotos` and retries on
+  the next save.
+- `ntFlushSave()` runs on Back, sidebar/dock nav (`showNtPage`), `visibilitychange`
+  → hidden, and `pagehide` — the "locked the phone mid-note" path.
+- `ntDelete` sets `_asDeleted` so an in-flight or queued save can't resurrect the
+  note (`_ntDoSave` re-deletes if a save landed after the delete).
+
 ## Editor pieces
 
 - **Rich text:** a `contenteditable` div (`#nt-body`) with an `execCommand` toolbar —
@@ -99,7 +116,8 @@ per-uid data path plus the matching security rules, not from roles.
   that's the owner-requested "photos under the note but hideable" behavior).
   Saved photos (`_editPhotos`, have `.url`) and pending files (`_pendingPhotos`,
   not yet uploaded) render side by side; X buttons remove either. Uploads happen
-  on Save, sequentially; a failed upload warns in console but doesn't block the save.
+  during autosave, sequentially; a failed upload stays pending and retries on the
+  next save.
 - **Pin:** toolbar button in the editor (`ntTogglePinEdit`), pin icon on each card
   in the list (`ntTogglePin` writes immediately).
 

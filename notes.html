@@ -105,6 +105,13 @@ body.sb-pinned .dock{left:var(--sb)}
 .card{background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:14px}
 .card-title{font-size:13px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .muted{color:var(--text3)}
+/* autosave status chip (replaces the Save button) */
+.savestat{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;padding:7px 10px;border-radius:8px;visibility:hidden}
+.savestat.work{visibility:visible;color:var(--text3)}
+.savestat.ok{visibility:visible;color:var(--green);background:var(--green-soft)}
+.savestat.err{visibility:visible;color:var(--red);background:var(--red-soft)}
+.nt-spin{display:inline-block;animation:ntspin 1s linear infinite}
+@keyframes ntspin{to{transform:rotate(360deg)}}
 .empty{padding:34px 16px;text-align:center;color:var(--text3);font-size:13px}
 label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--text2);margin:0 0 5px}
 .field{margin-bottom:13px}
@@ -283,10 +290,10 @@ window.ntOnAuth=(user)=>{
 window._ntPin=(e)=>{ e&&e.stopPropagation(); const p=document.body.classList.toggle('sb-pinned'); const ic=$('nt-pin-ico'); if(ic) ic.className='ti '+(p?'ti-pinned':'ti-pin'); };
 
 /* ---------- routing / render ---------- */
-window.showNtPage=(p)=>{ pinnedOnly=(p==='pinned'); page='list'; editId=null; _pendingPhotos=[]; render(); };
+window.showNtPage=(p)=>{ ntFlushSave(); pinnedOnly=(p==='pinned'); page='list'; editId=null; _pendingPhotos=[]; render(); };
 window.ntNew=()=>{ editId=null; page='edit'; render(); };
 window.ntOpen=(id)=>{ editId=id; page='edit'; render(); };
-window.ntBack=()=>{ editId=null; page='list'; _pendingPhotos=[]; render(); };
+window.ntBack=async ()=>{ await ntFlushSave(); editId=null; page='list'; _pendingPhotos=[]; render(); };
 
 function setActive(){
   document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
@@ -357,6 +364,7 @@ window.ntTogglePin=async(id,e)=>{ if(e) e.stopPropagation(); const n=NOTES[id]; 
 function orderLabel(o){ return [o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ')||o.id; }
 function viewEdit(){
   const n=editId?NOTES[editId]:null;
+  _asDeleted=false; _asDirty=false; clearTimeout(_asTimer); _asTimer=null;
   _editChecklist=(n&&n.checklist)?JSON.parse(JSON.stringify(n.checklist)):[];
   _editTags=(n&&n.tags)?n.tags.slice():[];
   _editPhotos=(n&&n.photos)?n.photos.slice():[];
@@ -368,12 +376,12 @@ function viewEdit(){
     <div class="toolbar">
       <button class="btn" onclick="ntBack()"><i class="ti ti-arrow-left"></i> Back</button>
       <span class="sp" style="flex:1"></span>
+      <span class="savestat" id="nt-savestat"></span>
       <button class="btn ${_editPinned?'primary':''}" id="nt-pin-btn" onclick="ntTogglePinEdit()"><i class="ti ti-pin${_editPinned?'ned':''}"></i> ${_editPinned?'Pinned':'Pin'}</button>
       ${n?`<button class="btn danger" onclick="ntDelete()"><i class="ti ti-trash"></i> Delete</button>`:''}
-      <button class="btn primary" onclick="ntSave()"><i class="ti ti-device-floppy"></i> Save</button>
     </div>
     <div class="card">
-      <input class="in note-titlein" id="nt-title" placeholder="Title" value="${esc(n?n.title:'')}">
+      <input class="in note-titlein" id="nt-title" placeholder="Title" oninput="ntQueueSave()" value="${esc(n?n.title:'')}">
       <div class="rt-toolbar">
         <button type="button" onmousedown="ntFmt(event,'formatBlock','H2')" title="Title">Title</button>
         <button type="button" onmousedown="ntFmt(event,'formatBlock','H3')" title="Heading">Heading</button>
@@ -383,7 +391,7 @@ function viewEdit(){
         <button type="button" onmousedown="ntFmt(event,'italic')" title="Italic"><i>I</i></button>
         <button type="button" onmousedown="ntFmt(event,'insertUnorderedList')" title="Bullet list"><i class="ti ti-list"></i></button>
       </div>
-      <div class="rt-body" id="nt-body" contenteditable="true">${n?(n.body||''):''}</div>
+      <div class="rt-body" id="nt-body" contenteditable="true" oninput="ntQueueSave()">${n?(n.body||''):''}</div>
     </div>
     <div class="card">
       <div class="card-title"><i class="ti ti-checkbox"></i> Checklist</div>
@@ -411,8 +419,8 @@ function viewEdit(){
     </div>
   </div>`;
 }
-window.ntFmt=(e,cmd,arg)=>{ e.preventDefault(); try{ document.execCommand(cmd,false,arg||null); }catch(err){} const b=$('nt-body'); if(b) b.focus(); };
-window.ntTogglePinEdit=()=>{ _editPinned=!_editPinned; const b=$('nt-pin-btn'); if(b){ b.className='btn '+(_editPinned?'primary':''); b.innerHTML=`<i class="ti ti-pin${_editPinned?'ned':''}"></i> ${_editPinned?'Pinned':'Pin'}`; } };
+window.ntFmt=(e,cmd,arg)=>{ e.preventDefault(); try{ document.execCommand(cmd,false,arg||null); }catch(err){} const b=$('nt-body'); if(b) b.focus(); ntQueueSave(); };
+window.ntTogglePinEdit=()=>{ _editPinned=!_editPinned; const b=$('nt-pin-btn'); if(b){ b.className='btn '+(_editPinned?'primary':''); b.innerHTML=`<i class="ti ti-pin${_editPinned?'ned':''}"></i> ${_editPinned?'Pinned':'Pin'}`; } ntQueueSave(); };
 
 /* checklist */
 function ntRenderChecklist(){
@@ -424,12 +432,12 @@ function ntRenderChecklist(){
   </div>`).join('');
 }
 window.ntAddCheck=()=>{ _editChecklist.push({id:newId('ci'),text:'',done:false}); ntRenderChecklist(); const rows=document.querySelectorAll('#nt-checklist .check-text'); const last=rows[rows.length-1]; if(last) last.focus(); };
-window.ntToggleCheck=(i,v)=>{ if(_editChecklist[i]) _editChecklist[i].done=!!v; };
-window.ntEditCheck=(i,v)=>{ if(_editChecklist[i]) _editChecklist[i].text=v; };
-window.ntRmCheck=(i)=>{ _editChecklist.splice(i,1); ntRenderChecklist(); };
+window.ntToggleCheck=(i,v)=>{ if(_editChecklist[i]) _editChecklist[i].done=!!v; ntQueueSave(); };
+window.ntEditCheck=(i,v)=>{ if(_editChecklist[i]) _editChecklist[i].text=v; ntQueueSave(); };
+window.ntRmCheck=(i)=>{ _editChecklist.splice(i,1); ntRenderChecklist(); ntQueueSave(); };
 
 /* tags — fixed set, tap to toggle */
-window.ntToggleTag=(tg)=>{ const i=_editTags.indexOf(tg); if(i>=0) _editTags.splice(i,1); else _editTags.push(tg); ntRenderTags(); };
+window.ntToggleTag=(tg)=>{ const i=_editTags.indexOf(tg); if(i>=0) _editTags.splice(i,1); else _editTags.push(tg); ntRenderTags(); ntQueueSave(); };
 function ntRenderTags(){ const c=$('nt-tags'); if(!c) return; c.innerHTML=TAGS.map(tg=>`<span class="tf ${_editTags.includes(tg)?'on':''}" onclick="ntToggleTag('${tg}')">${esc(tg)}</span>`).join(''); }
 
 /* job / order picker — type to search */
@@ -442,8 +450,8 @@ window.ntOrderSearch=(q)=>{
     ? list.map(o=>`<div class="rv-opt" onclick="ntPickOrder('${o.id}')">${esc(orderLabel(o))}</div>`).join('')
     : `<div class="rv-opt muted">No jobs found.</div>`;
 };
-window.ntPickOrder=(id)=>{ _editOrderId=id; const res=$('nt-order-results'); if(res) res.innerHTML=''; const inp=$('nt-order-search'); if(inp) inp.value=''; ntRenderOrderSel(); };
-window.ntClearOrder=()=>{ _editOrderId=''; ntRenderOrderSel(); };
+window.ntPickOrder=(id)=>{ _editOrderId=id; const res=$('nt-order-results'); if(res) res.innerHTML=''; const inp=$('nt-order-search'); if(inp) inp.value=''; ntRenderOrderSel(); ntQueueSave(); };
+window.ntClearOrder=()=>{ _editOrderId=''; ntRenderOrderSel(); ntQueueSave(); };
 function ntRenderOrderSel(){
   const c=$('nt-order-sel'); if(!c) return;
   const o=_editOrderId?ORDERS[_editOrderId]:null;
@@ -452,8 +460,8 @@ function ntRenderOrderSel(){
 
 /* photos */
 window.ntTogglePhotos=()=>{ _photosCollapsed=!_photosCollapsed; ntRenderPhotos(); };
-window.ntPickPhotos=(inp)=>{ [...inp.files].forEach(f=>_pendingPhotos.push(f)); inp.value=''; if(_photosCollapsed){ _photosCollapsed=false; } ntRenderPhotos(); };
-window.ntRmPhoto=(kind,i)=>{ if(kind==='saved') _editPhotos.splice(i,1); else _pendingPhotos.splice(i,1); ntRenderPhotos(); };
+window.ntPickPhotos=(inp)=>{ [...inp.files].forEach(f=>_pendingPhotos.push(f)); inp.value=''; if(_photosCollapsed){ _photosCollapsed=false; } ntRenderPhotos(); ntQueueSave(); };
+window.ntRmPhoto=(kind,i)=>{ if(kind==='saved') _editPhotos.splice(i,1); else _pendingPhotos.splice(i,1); ntRenderPhotos(); ntQueueSave(); };
 function ntRenderPhotos(){
   const wrap=$('nt-photos-wrap'), strip=$('nt-photos'), cnt=$('nt-photocount'), chev=$('nt-photochev');
   const total=_editPhotos.length+_pendingPhotos.length;
@@ -467,30 +475,72 @@ function ntRenderPhotos(){
   strip.innerHTML=html;
 }
 
-/* save / delete */
-window.ntSave=async ()=>{
+/* autosave — every change saves itself ~1s later; no Save button.
+   State is captured synchronously (so navigating away can't lose it) and
+   saves run one at a time on a promise chain (so photos never upload twice). */
+let _asTimer=null, _asDirty=false, _asDeleted=false, _asChain=Promise.resolve();
+window.ntQueueSave=()=>{
+  if(_asDeleted) return;
+  _asDirty=true; ntSaveStatus('saving');
+  clearTimeout(_asTimer); _asTimer=setTimeout(ntAutoSave, 900);
+};
+function ntCapture(){
+  if(_asDeleted || !$('nt-editor')) return null;
   const title=gv('nt-title');
   const body=stripDangerous(($('nt-body')&&$('nt-body').innerHTML)||'');
-  const checklist=_editChecklist.filter(i=>i.text&&i.text.trim());
-  if(!title && !stripHtml(body).trim() && !checklist.length && !_pendingPhotos.length && !_editPhotos.length){ ntToast('Add a title or some content first.','err'); return; }
-  const btns=document.querySelectorAll('#nt-editor .toolbar .btn'); btns.forEach(b=>b.disabled=true);
+  const checklist=_editChecklist.filter(i=>i.text&&i.text.trim()).map(i=>({id:i.id,text:i.text,done:!!i.done}));
+  const hasContent=title||stripHtml(body).trim()||checklist.length||_pendingPhotos.length||_editPhotos.length;
+  if(!editId && !hasContent) return null;          // never create an empty note
+  if(!editId) editId=newId('note');                // first real content claims the id
+  const prev=NOTES[editId];
+  return { id:editId, title, body, checklist, tags:_editTags.slice(), orderId:_editOrderId,
+           photos:_editPhotos.slice(), pend:_pendingPhotos.slice(), pinned:_editPinned,
+           createdAt:(prev&&prev.createdAt)||Date.now(), by:(NT_USER&&NT_USER.email)||'' };
+}
+function ntAutoSave(){
+  clearTimeout(_asTimer); _asTimer=null;
+  const snap=ntCapture();
+  if(!snap){ _asDirty=false; ntSaveStatus(''); return _asChain; }
+  _asDirty=false;
+  _asChain=_asChain.then(()=>_ntDoSave(snap)).catch(()=>{});
+  return _asChain;
+}
+async function _ntDoSave(snap){
+  if(_asDeleted) return;
+  ntSaveStatus('saving');
   try{
-    const id=editId||newId('note');
-    const prev=editId?NOTES[editId]:null;
-    const photos=_editPhotos.slice();
-    for(const f of _pendingPhotos){ try{ const u=await upload(f,'photos'); if(u) photos.push({name:f.name,url:u,type:f.type}); }catch(e){ console.warn('photo upload failed',e); } }
-    const rec={
-      id, title, body, checklist, tags:_editTags.slice(), orderId:_editOrderId, photos, pinned:_editPinned,
-      createdAt:(prev&&prev.createdAt)||Date.now(), updatedAt:Date.now(), by:(NT_USER&&NT_USER.email)||''
-    };
-    await dbSet('notes/'+NT_UID+'/'+id, rec);
-    _pendingPhotos=[]; editId=null; page='list'; render();
-    ntToast('Saved.','ok');
-  }catch(e){ btns.forEach(b=>b.disabled=false); }
-};
+    const photos=snap.photos;
+    for(const f of snap.pend){
+      try{
+        const u=await upload(f,'photos');
+        if(u){ const p={name:f.name,url:u,type:f.type}; photos.push(p);
+          const ix=_pendingPhotos.indexOf(f); if(ix>=0){ _pendingPhotos.splice(ix,1); _editPhotos.push(p); } }
+      }catch(e){ console.warn('photo upload failed — will retry on next save',e); }
+    }
+    ntRenderPhotos();
+    const rec={ id:snap.id, title:snap.title, body:snap.body, checklist:snap.checklist, tags:snap.tags,
+      orderId:snap.orderId, photos, pinned:snap.pinned, createdAt:snap.createdAt, updatedAt:Date.now(), by:snap.by };
+    await dbSet('notes/'+NT_UID+'/'+snap.id, rec);
+    if(_asDeleted){ await dbRemove('notes/'+NT_UID+'/'+snap.id); return; }   // deleted while this save was in flight
+    ntSaveStatus(_asDirty?'saving':'saved');
+  }catch(e){ _asDirty=true; ntSaveStatus('err'); }
+}
+function ntFlushSave(){ clearTimeout(_asTimer); _asTimer=null; if(_asDirty) return ntAutoSave(); return _asChain; }
+function ntSaveStatus(state){
+  const el=$('nt-savestat'); if(!el) return;
+  if(state==='saving'){ el.className='savestat work'; el.innerHTML='<i class="ti ti-loader-2 nt-spin"></i> Saving…'; }
+  else if(state==='saved'){ el.className='savestat ok'; el.innerHTML='<i class="ti ti-circle-check"></i> Saved'; }
+  else if(state==='err'){ el.className='savestat err'; el.innerHTML='<i class="ti ti-alert-triangle"></i> Not saved'; }
+  else { el.className='savestat'; el.innerHTML=''; }
+}
+// walking away / locking the phone mid-note: flush right away
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') ntFlushSave(); });
+window.addEventListener('pagehide',()=>{ ntFlushSave(); });
+
 window.ntDelete=async ()=>{
   if(!editId){ ntBack(); return; }
   if(!confirm('Delete this note? This cannot be undone.')) return;
+  _asDeleted=true; clearTimeout(_asTimer); _asTimer=null; _asDirty=false;
   await dbRemove('notes/'+NT_UID+'/'+editId);
   editId=null; page='list'; render();
   ntToast('Note deleted.','ok');
