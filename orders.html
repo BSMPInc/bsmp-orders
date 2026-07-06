@@ -633,6 +633,19 @@ body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr)
 .disp-empty i{font-size:34px;display:block;margin-bottom:10px;opacity:.5}
 .disp-empty div{font-size:15px;font-weight:700;color:var(--text2)}
 .disp-empty span{font-size:12.5px;display:block;margin-top:4px;max-width:420px;margin-left:auto;margin-right:auto}
+/* ── Inventory ── */
+.inv-toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+.inv-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.inv-chip{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:7px 13px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;border-radius:18px}
+.inv-chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.inv-chip.warn:not(.on){color:#BA7517;border-color:#f0ddb8;background:#fbf1df}
+.inv-kind{font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:12px;background:#eef1f6;color:var(--text2);white-space:nowrap}
+.inv-kind.cust{background:#e7f1ec;color:#1f7d57}
+tr.inv-low td{background:#fdf6ee}
+.inv-reorder{font-size:10px;font-weight:800;color:#BA7517;margin-top:2px;display:inline-flex;align-items:center;gap:3px}
+.inv-fl{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.03em}
+.inv-fi{width:100%;font-family:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--border2);border-radius:8px;background:#fff;margin:3px 0 11px;box-sizing:border-box}
+@media(pointer:coarse){ .inv-chip{padding:10px 16px;font-size:14px} }
 /* ── AI Daily Brief ── */
 .brief-card{background:linear-gradient(180deg,#fbf9ff,#fff);border:1px solid #e4dcf3;border-radius:13px;padding:15px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
 .brief-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
@@ -996,6 +1009,7 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="nav-item mgr-only" id="nav-orders" onclick="showPage('orders');setFilter('')"><i class="ti ti-clipboard-list"></i> Open Orders</div>
     <div class="nav-item mgr-only" id="nav-stats" onclick="showPage('stats')"><i class="ti ti-chart-bar"></i> Stats</div>
     <div class="nav-item" id="nav-queues" onclick="showPage('queues')"><i class="ti ti-list-check"></i> Work Queues</div>
+    <div class="nav-item" id="nav-inventory" onclick="showPage('inventory')"><i class="ti ti-packages"></i> <span class="nav-label">Inventory</span><span class="nav-badge" id="badge-inventory" style="display:none"></span></div>
     <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
     <div class="nav-item mgr-only" id="nav-schedule" onclick="showPage('schedule')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 9h11"/><path d="M12 6l3 3-3 3"/><path d="M20 15H9"/><path d="M12 12l-3 3 3 3"/></svg> <span class="nav-label">Incoming / Outgoing</span></div>
     <div class="nav-item mgr-only" id="nav-ready" onclick="setFilter('Ready for Invoice')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 17v1m0-8v1"/><path d="M13.8 12.2a1.6 1.6 0 0 0-1.8-1.2 1.5 1.5 0 0 0-.2 3h.8a1.5 1.5 0 0 1 .2 3 1.6 1.6 0 0 1-1.8-1.2"/></svg> <span class="nav-label">Ready to Invoice</span><span class="nav-badge" id="badge-ready" style="display:none"></span></div>
@@ -1134,6 +1148,17 @@ body.sb-pinned .dock{left:var(--sb)}
     </div><!-- /orders-page -->
 
   <!-- Customers Page -->
+  <!-- Inventory Page -->
+  <div id="inventory-page" style="display:none">
+    <div class="inv-toolbar">
+      <button class="btn primary" onclick="window._invAdd()"><i class="ti ti-plus"></i> Add item</button>
+      <input type="text" id="inv-search" placeholder="Search hardware & customer parts…" oninput="window._invRender()" style="flex:1;min-width:180px;height:38px;font-size:13px;padding:0 12px;border:1px solid var(--border2);border-radius:10px;background:#f7f9fc;color:var(--text);outline:none;font-family:inherit">
+    </div>
+    <div class="inv-chips" id="inv-chips"></div>
+    <div id="inventory-body"></div>
+    <input type="file" id="inv-photo" accept="image/*" capture="environment" style="display:none">
+  </div>
+
   <div id="customers-page" style="display:none">
     <div class="table-card" style="margin-top:0">
       <div class="table-card-header" style="justify-content:space-between">
@@ -1480,6 +1505,60 @@ body.sb-pinned .dock{left:var(--sb)}
 <div class="modal-bg" id="io-detail-modal" style="display:none;z-index:68">
   <div class="modal" style="max-width:470px;padding:0;overflow:hidden">
     <div id="io-detail-body"></div>
+  </div>
+</div>
+
+<!-- Inventory item modal -->
+<div class="modal-bg" id="inv-modal" style="display:none">
+  <div class="modal" style="width:540px">
+    <div class="modal-header"><i class="ti ti-packages"></i><h2 id="inv-modal-title">Add inventory item</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('inv-modal')"><i class="ti ti-x"></i></button></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">
+      <div style="grid-column:1/-1">
+        <label class="inv-fl">Item name</label>
+        <input type="text" id="inv-f-name" class="inv-fi" placeholder="e.g. 1/4-20 hex nut, zinc">
+      </div>
+      <div>
+        <label class="inv-fl">Part #</label>
+        <input type="text" id="inv-f-part" class="inv-fi" placeholder="optional">
+      </div>
+      <div>
+        <label class="inv-fl">Type</label>
+        <select id="inv-f-kind" class="inv-fi">
+          <option value="hardware">Hardware</option>
+          <option value="customer">Customer part</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label class="inv-fl">Customer (for customer-supplied parts)</label>
+        <input type="text" id="inv-f-cust" class="inv-fi" list="inv-cust-list" placeholder="optional">
+        <datalist id="inv-cust-list"></datalist>
+      </div>
+      <div>
+        <label class="inv-fl">Location / bin</label>
+        <input type="text" id="inv-f-loc" class="inv-fi" placeholder="e.g. Shelf B-3">
+      </div>
+      <div>
+        <label class="inv-fl">Unit</label>
+        <input type="text" id="inv-f-unit" class="inv-fi" placeholder="pcs">
+      </div>
+      <div>
+        <label class="inv-fl">On hand</label>
+        <input type="number" inputmode="numeric" id="inv-f-qty" class="inv-fi" placeholder="0">
+      </div>
+      <div>
+        <label class="inv-fl">Reorder at (min qty)</label>
+        <input type="number" inputmode="numeric" id="inv-f-min" class="inv-fi" placeholder="leave blank for none">
+      </div>
+      <div style="grid-column:1/-1">
+        <label class="inv-fl">Notes</label>
+        <input type="text" id="inv-f-notes" class="inv-fi" placeholder="optional">
+      </div>
+    </div>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn" onclick="closeModal('inv-modal')">Cancel</button>
+      <button class="btn green" onclick="window._invSave()"><i class="ti ti-check"></i> Save item</button>
+    </div>
   </div>
 </div>
 
@@ -1838,6 +1917,7 @@ function startDataListeners(){
   }, () => setSyncStatus('error'));
   startCustomerListener();
   startTeamListener();
+  startInventoryListener();
   startTrashListener();
   startDurationsListener();
   startJobCounterListener();
@@ -3554,9 +3634,163 @@ function autoIndexCustomer(name, poNotes) {
 }
 
 // ── Page switching ─────────────────────────────────────────────────────────────
+/* ══════════════ INVENTORY — hardware & customer-supplied parts ══════════════ */
+const inventoryRef = ref(db, 'inventory');
+let inventoryItems = [];
+let invFilter = 'all';           // all | hardware | customer | low
+let _invEditId = null;
+let _invCounting = null;         // item id while an AI count is in flight
+
+function startInventoryListener(){
+  onValue(inventoryRef, (snap) => {
+    const data = snap.val();
+    inventoryItems = data ? Object.values(data) : [];
+    const lowN = inventoryItems.filter(invIsLow).length;
+    const b = document.getElementById('badge-inventory');
+    if(b){ b.textContent = lowN; b.style.display = lowN ? '' : 'none'; b.classList.add('badge-red'); }
+    renderInventory();
+  });
+}
+
+function invIsLow(it){ const min = parseFloat(it.minQty); return min > 0 && (parseFloat(it.qty) || 0) <= min; }
+function saveInvItem(it){
+  autosavePill('saving');
+  it.updatedAt = Date.now();
+  it.updatedBy = (auth.currentUser && auth.currentUser.email) || '';
+  set(ref(db, 'inventory/' + it.id), it)
+    .then(()=> autosavePill('saved'))
+    .catch(e=>{ autosavePill('error'); console.error('inventory save failed', e);
+      alert('Inventory save failed: ' + e.message + '\n\nIf this keeps happening, the “inventory” security rule is probably missing in the Firebase console.'); });
+}
+
+function renderInventory(){
+  const body = document.getElementById('inventory-body'); if(!body) return;
+  const chips = document.getElementById('inv-chips');
+  const q = (document.getElementById('inv-search')?.value || '').toLowerCase().trim();
+  const lowN = inventoryItems.filter(invIsLow).length;
+  if(chips) chips.innerHTML = [
+    ['all','All','packages'], ['hardware','Hardware','screw'], ['customer','Customer parts','user'],
+    ['low', `Low stock${lowN ? ' (' + lowN + ')' : ''}`, 'alert-triangle']
+  ].map(([k,label,ic]) => `<button class="inv-chip${invFilter===k?' on':''}${k==='low'&&lowN?' warn':''}" onclick="window._invFilter('${k}')"><i class="ti ti-${ic}"></i> ${label}</button>`).join('');
+  let list = inventoryItems.slice();
+  if(invFilter==='hardware') list = list.filter(i=>i.kind!=='customer');
+  else if(invFilter==='customer') list = list.filter(i=>i.kind==='customer');
+  else if(invFilter==='low') list = list.filter(invIsLow);
+  if(q) list = list.filter(i=>[i.name,i.partNum,i.customer,i.location,i.notes].filter(Boolean).join(' ').toLowerCase().includes(q));
+  list.sort((a,b)=>((invIsLow(b)?1:0)-(invIsLow(a)?1:0)) || String(a.name||'').localeCompare(String(b.name||'')));
+  if(!list.length){
+    body.innerHTML = `<div class="disp-empty"><i class="ti ti-packages"></i><div>${inventoryItems.length?'Nothing matches':'No inventory yet'}</div><span>${inventoryItems.length?'Try a different search or filter.':'Add hardware or customer-supplied parts, then keep counts current — snap a photo and let AI count for you.'}</span></div>`;
+    return;
+  }
+  body.innerHTML = `<div class="table-scroll"><table class="q-table">
+    <thead><tr>
+      <th>Item</th><th style="width:112px">Type</th><th>Customer</th><th style="width:110px">Location</th>
+      <th style="width:120px;text-align:center">On hand</th><th style="width:64px;text-align:center">Min</th>
+      <th style="width:126px;text-align:center">AI count</th><th style="width:130px">Updated</th><th style="width:88px;text-align:center"></th>
+    </tr></thead>
+    <tbody>${list.map(invRow).join('')}</tbody>
+  </table></div>`;
+}
+function invRow(it){
+  const low = invIsLow(it);
+  const when = it.updatedAt ? new Date(it.updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ', ' + new Date(it.updatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
+  const counting = _invCounting === it.id;
+  return `<tr class="${low?'inv-low':''}">
+    <td><b>${esc2(it.name||'—')}</b>${it.partNum?` <span style="color:var(--text3)">· ${esc2(it.partNum)}</span>`:''}${it.notes?`<div style="font-size:11px;color:var(--text3)">${esc2(it.notes)}</div>`:''}</td>
+    <td>${it.kind==='customer' ? '<span class="inv-kind cust">Customer part</span>' : '<span class="inv-kind">Hardware</span>'}</td>
+    <td>${esc2(it.customer||'—')}</td>
+    <td>${esc2(it.location||'—')}</td>
+    <td style="text-align:center"><input type="number" inputmode="numeric" class="q-qty" value="${it.qty??''}" onchange="window._invQty('${it.id}',this.value)">${(it.unit&&it.unit!=='pcs')?` <small style="color:var(--text3)">${esc2(it.unit)}</small>`:''}${low?'<div class="inv-reorder"><i class="ti ti-alert-triangle-filled"></i> reorder</div>':''}</td>
+    <td style="text-align:center">${it.minQty||'—'}</td>
+    <td style="text-align:center"><button class="btn sm inv-count-btn" ${_invCounting?'disabled':''} onclick="window._invAiCount('${it.id}')">${counting?'<i class="ti ti-loader-2 spin"></i> Counting…':'<i class="ti ti-camera"></i> Count'}</button></td>
+    <td style="font-size:11.5px;color:var(--text3)">${when}${it.updatedBy?`<br>${esc2(String(it.updatedBy).split('@')[0])}`:''}</td>
+    <td style="text-align:center;white-space:nowrap">
+      <button class="q-open-btn" title="Edit" onclick="window._invEdit('${it.id}')"><i class="ti ti-pencil"></i></button>
+      <button class="q-open-btn" title="Delete" onclick="window._invDelete('${it.id}')"><i class="ti ti-trash"></i></button>
+    </td>
+  </tr>`;
+}
+window._invRender = () => renderInventory();
+window._invFilter = (k) => { invFilter = k; renderInventory(); };
+window._invQty = (id, v) => { const it = inventoryItems.find(x=>x.id===id); if(!it) return; it.qty = parseFloat(v)||0; saveInvItem(it); };
+window._invAdd = () => { _invEditId = null; invFillModal({}); document.getElementById('inv-modal-title').textContent='Add inventory item'; document.getElementById('inv-modal').style.display='flex'; };
+window._invEdit = (id) => { const it = inventoryItems.find(x=>x.id===id); if(!it) return; _invEditId = id; invFillModal(it); document.getElementById('inv-modal-title').textContent='Edit inventory item'; document.getElementById('inv-modal').style.display='flex'; };
+function invFillModal(it){
+  const s=(f,v)=>{ document.getElementById('inv-f-'+f).value = v==null?'':v; };
+  s('name',it.name); s('part',it.partNum); s('cust',it.customer); s('loc',it.location);
+  s('unit',it.unit); s('qty',it.qty); s('min',it.minQty||''); s('notes',it.notes);
+  document.getElementById('inv-f-kind').value = it.kind==='customer' ? 'customer' : 'hardware';
+  document.getElementById('inv-cust-list').innerHTML = customers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>`<option value="${esc2(c.name)}">`).join('');
+}
+window._invSave = () => {
+  const v = f => document.getElementById('inv-f-'+f).value.trim();
+  const name = v('name'); if(!name){ alert('Give the item a name first.'); return; }
+  const it = (_invEditId && inventoryItems.find(x=>x.id===_invEditId)) || { id: uid(), createdAt: Date.now() };
+  Object.assign(it, {
+    name, partNum: v('part'), kind: document.getElementById('inv-f-kind').value,
+    customer: v('cust'), location: v('loc'), unit: v('unit')||'pcs',
+    qty: parseFloat(document.getElementById('inv-f-qty').value)||0,
+    minQty: parseFloat(document.getElementById('inv-f-min').value)||0,
+    notes: v('notes')
+  });
+  saveInvItem(it);
+  closeModal('inv-modal');
+};
+window._invDelete = (id) => {
+  const it = inventoryItems.find(x=>x.id===id); if(!it) return;
+  if(!confirm(`Delete “${it.name}” from inventory? This cannot be undone.`)) return;
+  remove(ref(db,'inventory/'+id)).catch(e=>alert('Delete failed: '+e.message));
+};
+
+/* AI count from a photo — reuses the same Cloudflare worker as the cut-list reader */
+const INV_COUNT_PROMPT = `You are counting physical parts for a sheet-metal shop’s inventory check. Count the individual pieces visible in the photo carefully: scan the image systematically (for example row by row), including partially visible pieces at the edges, and double-check your total before answering. If pieces are stacked, bagged, or overlapping so an exact count is impossible, give your best estimate and say so. Respond ONLY with JSON: {"count": <integer>, "confidence": "exact"|"close"|"rough", "note": "<one short sentence about what you counted or any difficulty>"}`;
+window._invAiCount = (id) => {
+  const it = inventoryItems.find(x=>x.id===id); if(!it || _invCounting) return;
+  const inp = document.getElementById('inv-photo'); if(!inp) return;
+  inp.onchange = async () => { const f = inp.files[0]; inp.value=''; if(f) await invRunAiCount(it, f); };
+  inp.click();
+};
+// downscale to ≤2576px long edge JPEG — full iPhone photos are wastefully large, and
+// re-encoding also converts HEIC to something the API accepts
+async function invShrinkPhoto(file){
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('Could not read that photo.')); i.src=url; });
+    const scale = Math.min(1, 2576/Math.max(img.width,img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.width*scale)); c.height = Math.max(1, Math.round(img.height*scale));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.85).split(',')[1];
+  } finally { URL.revokeObjectURL(url); }
+}
+async function invRunAiCount(it, file){
+  _invCounting = it.id; renderInventory();
+  try{
+    const b64 = await invShrinkPhoto(file);
+    const resp = await fetch(AI_WORKER, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      model:'claude-opus-4-8', max_tokens:3000, thinking:{type:'adaptive'},
+      messages:[{role:'user', content:[
+        {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
+        {type:'text', text: INV_COUNT_PROMPT + `\n\nThe item being counted: ${[it.name,it.partNum].filter(Boolean).join(' · ')}`}
+      ]}]
+    })});
+    const data = await resp.json();
+    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+    const text = (data.content||[]).map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    let parsed; try{ parsed = JSON.parse(text); }catch{ throw new Error('Could not read a count from the AI reply. Try a clearer photo with the parts spread out.'); }
+    const n = parseInt(parsed.count);
+    if(!(n>=0)) throw new Error('The AI could not count that photo. Try spreading the parts out with less overlap.');
+    const conf = parsed.confidence==='exact' ? 'an exact count' : (parsed.confidence==='close' ? 'a close count' : 'a rough estimate');
+    const msg = `AI counted ${n} ${it.unit||'pcs'} of “${it.name}” — ${conf}.${parsed.note?'\n\n'+parsed.note:''}\n\nUpdate on-hand from ${it.qty??'—'} to ${n}?`;
+    if(confirm(msg)){ it.qty = n; it.lastAiCount = {count:n, at:Date.now(), confidence:parsed.confidence||''}; saveInvItem(it); }
+  }catch(e){ alert('AI count failed: ' + e.message); }
+  finally{ _invCounting = null; renderInventory(); }
+}
+
 const PAGE_META = {
   dashboard: {title:'Dashboard',     sub:'Shop status at a glance \u2014 orders, schedule, and money'},
   dispatch: {title:'Today',          sub:'Each person\u2019s tasks for today, most urgent first'},
+  inventory:{title:'Inventory',      sub:'Hardware & customer-supplied parts \u2014 snap a photo to count'},
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   stats:    {title:'Stats',           sub:'Order counts and dollar figures at a glance'},
   queues:   {title:'Work Queues',    sub:'Shop-floor task lists grouped by process'},
@@ -3571,8 +3805,8 @@ const PAGE_META = {
   settings: {title:'Process Times',  sub:'Lead times for outside processes'}
 };
 window.showPage = (page) => {
-  if(userRole==='operator' && !['queues','dispatch'].includes(page)) page='queues';   // operators: Work Queues + Today only
-  ['dashboard','orders','stats','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','trash','settings'].forEach(p=>{
+  if(userRole==='operator' && !['queues','dispatch','inventory'].includes(page)) page='queues';   // operators: Work Queues + Today + Inventory
+  ['dashboard','orders','stats','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','trash','settings','inventory'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
   });
   const meta = PAGE_META[page]||PAGE_META.orders;
@@ -3590,6 +3824,7 @@ window.showPage = (page) => {
   if(page==='dispatch') document.getElementById('nav-dispatch')?.classList.add('active');
   if(page==='queues') document.getElementById('nav-queues')?.classList.add('active');
   if(page==='customers') document.getElementById('nav-customers')?.classList.add('active');
+  if(page==='inventory') document.getElementById('nav-inventory')?.classList.add('active');
   if(page==='team') document.getElementById('nav-team')?.classList.add('active');
   if(page==='schedule') document.getElementById('nav-schedule')?.classList.add('active');
   if(page==='needpo') document.getElementById('nav-needpo')?.classList.add('active');
@@ -3603,6 +3838,7 @@ window.showPage = (page) => {
   if(page==='stats') renderSummary();
   if(page==='dispatch') renderDispatch();
   if(page==='customers') renderCustomers();
+  if(page==='inventory') renderInventory();
   if(page==='team') renderTeam();
   if(page==='schedule') renderSchedule();
   if(page==='needpo'){ document.getElementById('npv-order')?.classList.toggle('active',needPOView==='order'); document.getElementById('npv-vendor')?.classList.toggle('active',needPOView==='vendor'); renderNeedPO(); }

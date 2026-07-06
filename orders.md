@@ -9,7 +9,7 @@ Tracks orders from received to shipped with an on-time-delivery system: backward
 
 ## Data & storage
 
-- **Owns RTDB:** `orders/`, plus `team`, `customers`, `durations`, `jobCounter`, `trash/`, `backups/` + `backupIndex`.
+- **Owns RTDB:** `orders/`, plus `team`, `customers`, `durations`, `jobCounter`, `inventory`, `trash/`, `backups/` + `backupIndex`.
 - **Reads:** `quotes` (to pull a quote into an order).
 - **Storage:** uploads under `orders/` prefix; also handles Google-Drive-style drawing links (`driveDirectView`, `isImageUrl`).
 - **localStorage:** `bsmp_daily_brief`, `bsmp_dash_brief`, `bsmp_cutlist_def`, `bsmp_sidebar_pinned`.
@@ -18,7 +18,28 @@ Tracks orders from received to shipped with an on-time-delivery system: backward
 
 ## Pages (left nav → `showPage(...)`)
 
-`dashboard`, `orders`, `schedule`, `dispatch`, `queues`, `ready`, `needpo`, `issuedpos`, `team`, `customers`, `cutlist`, `stats`, `archive`, `trash`, `settings`. Each has a `render*` function (e.g. `renderDashboard`, `renderDispatch`, `renderSchedule`, `renderQueues`, `renderTeam`, `renderTeamLoad`, `renderArchive`, `renderTrash`).
+`dashboard`, `orders`, `schedule`, `dispatch`, `queues`, `inventory`, `ready`, `needpo`, `issuedpos`, `team`, `customers`, `cutlist`, `stats`, `archive`, `trash`, `settings`. Each has a `render*` function (e.g. `renderDashboard`, `renderDispatch`, `renderSchedule`, `renderQueues`, `renderInventory`, `renderTeam`, `renderTeamLoad`, `renderArchive`, `renderTrash`).
+
+## Inventory (added 2026-07-06)
+
+Tracks **hardware and customer-supplied parts** at RTDB `inventory/<id>` =
+`{id, name, partNum, kind:'hardware'|'customer', customer, location, qty, unit,
+minQty, notes, lastAiCount:{count,at,confidence}, createdAt, updatedAt, updatedBy}`.
+Writes are per-child (`set(ref(db,'inventory/'+id))`), listener via
+`startInventoryListener()` inside `startDataListeners()`. **Operators can use this
+page** (added to the operator page allowlist alongside `queues`/`dispatch`).
+
+- Filters: All / Hardware / Customer parts / **Low stock** (`invIsLow`: `qty <= minQty`
+  when `minQty > 0`); low items sort first, get an amber row + "reorder" badge, and
+  drive the red `badge-inventory` nav count — that's the purchasing/sourcing list.
+- Inline qty edits save immediately; full edits via `inv-modal` (`_invAdd`/`_invEdit`
+  /`_invSave`); delete is a confirm + hard `remove()` (no trash/undo — new node).
+- **AI photo count** (`_invAiCount` → `invRunAiCount`): camera-capture file input →
+  `invShrinkPhoto` (canvas downscale to ≤2576px JPEG — also converts iPhone HEIC) →
+  the same `AI_WORKER` Cloudflare proxy the cut-list uses, model `claude-opus-4-8`
+  (vision) → JSON `{count, confidence, note}` → user confirms before qty updates.
+- ⚠️ The `inventory` node needs its own RTDB security rule (server-side, Firebase
+  console) or saves fail — same gotcha as every new path in this suite.
 
 ## Core areas (where to work)
 
