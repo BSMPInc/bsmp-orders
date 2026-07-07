@@ -3784,14 +3784,14 @@ function renderInventory(){
   else if(invFilter==='customer') list = list.filter(i=>i.kind==='customer');
   else if(invFilter==='low') list = list.filter(invIsLow);
   if(q) list = list.filter(i=>[i.name,i.partNum,i.customer,i.location,i.notes,invLastLot(i),...(Array.isArray(i.log)?i.log.map(e=>e.lot):[])].filter(Boolean).join(' ').toLowerCase().includes(q));
-  list.sort((a,b)=>((invIsLow(b)?1:0)-(invIsLow(a)?1:0)) || String(a.name||'').localeCompare(String(b.name||'')));
+  list.sort((a,b)=>((invIsLow(b)?1:0)-(invIsLow(a)?1:0)) || String(a.partNum||a.name||'').localeCompare(String(b.partNum||b.name||'')));
   if(!list.length){
     body.innerHTML = `<div class="disp-empty"><i class="ti ti-packages"></i><div>${inventoryItems.length?'Nothing matches':'No inventory yet'}</div><span>${inventoryItems.length?'Try a different search or filter.':'Add hardware or customer-supplied parts, then keep counts current — scan tags in, log what’s used, and weigh for exact counts.'}</span></div>`;
     return;
   }
   body.innerHTML = `<div class="table-scroll"><table class="q-table">
     <thead><tr>
-      <th>Item</th><th style="width:112px">Type</th><th>Customer</th><th style="width:110px">Location</th>
+      <th>MFG Part #</th><th style="width:112px">Type</th><th>Customer</th><th style="width:110px">Location</th>
       <th style="width:120px;text-align:center">On hand</th><th style="width:64px;text-align:center">Min</th>
       <th style="width:186px;text-align:center">Count</th><th style="width:130px">Updated</th><th style="width:88px;text-align:center"></th>
     </tr></thead>
@@ -3803,7 +3803,7 @@ function invRow(it){
   const when = it.updatedAt ? new Date(it.updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ', ' + new Date(it.updatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
   const counting = _invCounting === it.id;
   return `<tr class="${low?'inv-low':''}">
-    <td><b>${esc2(it.name||'—')}</b>${it.partNum?` <span style="color:var(--text3)">· ${esc2(it.partNum)}</span>`:''}${invLastLot(it)?` <span style="display:inline-block;background:#eef2f7;border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;color:var(--text2)" title="Most recent lot received">Lot ${esc2(invLastLot(it))}</span>`:''}${it.notes?`<div style="font-size:11px;color:var(--text3)">${esc2(it.notes)}</div>`:''}</td>
+    <td><b>${esc2(it.partNum||it.name||'—')}</b>${invLastLot(it)?` <span style="display:inline-block;background:#eef2f7;border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;color:var(--text2)" title="Most recent lot received">Lot ${esc2(invLastLot(it))}</span>`:''}</td>
     <td>${it.kind==='customer' ? '<span class="inv-kind cust">Customer part</span>' : '<span class="inv-kind">Hardware</span>'}</td>
     <td>${esc2(it.customer||'—')}</td>
     <td>${esc2(it.location||'—')}</td>
