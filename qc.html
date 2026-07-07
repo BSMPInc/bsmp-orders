@@ -443,6 +443,7 @@ const I18N = {
     'View cert':'Ver certificado','View invoice':'Ver factura','Open in new tab':'Abrir en pestaña nueva','Print':'Imprimir','Material cert':'Certificado de material','No file is attached to this cert yet.':'Este certificado aún no tiene archivo adjunto.',
     'Saved certs':'Certificados guardados','saved cert':'certificado guardado','saved certs':'certificados guardados','No saved certs yet.':'Aún no hay certificados guardados.','Press':'Pulsa','to add your first one — it will appear here after you save.':'para agregar el primero — aparecerá aquí después de guardar.',
     'Cert saved.':'Certificado guardado.','Save failed:':'Error al guardar:','certs saved':'certificados guardados',
+    'File upload failed:':'Error al subir el archivo:','Attach cert file':'Adjuntar archivo del certificado','File attached.':'Archivo adjuntado.',
     'Order details':'Detalles de la orden','Orders using this material':'Órdenes que usan este material','Printed':'Impreso','No linked orders on this cert.':'Este certificado no tiene órdenes vinculadas.','Please allow pop-ups to open the printable order sheet.':'Permite ventanas emergentes para abrir la hoja imprimible.','View / print full order details':'Ver / imprimir detalles de la orden','Unit price':'Precio unitario','Order date':'Fecha de orden','Due date':'Fecha de entrega','Part #':'N.º de parte','Job #':'N.º de trabajo','Order':'Orden',
     'Material Certificate':'Certificado de material','Traceability sheet':'Hoja de trazabilidad','Certificate':'Certificado','Certificate document':'Documento del certificado','Loading cert document…':'Cargando documento del certificado…','No cert file attached.':'Sin archivo de certificado adjunto.','No cert details.':'Sin detalles del certificado.','Restricted':'Restringido','Could not embed this cert for printing. Open it from the cert viewer to print separately.':'No se pudo incrustar el certificado para imprimir. Ábrelo en el visor para imprimirlo por separado.',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
@@ -599,9 +600,10 @@ window.qcPickFiles=(key,inputEl)=>{
   inputEl.value='';
 };
 async function uploadPending(key,prefix){
-  const files=_pendingFiles[key]||[]; const urls=[];
-  for(const f of files){ try{ const u=await upload(f,prefix); if(u) urls.push({name:f.name,url:u,type:f.type}); }catch(e){ console.warn('upload failed',e); } }
+  const files=_pendingFiles[key]||[]; const urls=[]; const errs=[];
+  for(const f of files){ try{ const u=await upload(f,prefix); if(u) urls.push({name:f.name,url:u,type:f.type}); else errs.push(f.name); }catch(e){ console.warn('upload failed',e); errs.push(f.name+((e&&e.message)?(' — '+e.message):'')); } }
   _pendingFiles[key]=[];
+  if(errs.length) qcToast(t('File upload failed:')+' '+errs.join(' · '),'err');
   return urls;
 }
 function qcRenderStrip(key){
@@ -1916,7 +1918,7 @@ function viewCerts(){
     <td>${esc(c.certNo||'—')}<div class="muted" style="font-size:12px">${fmtDate(c.certDate)}</div></td>
     <td>${linked.length?`<span class="cert-open" onclick="qcOrderSheet('${c.id}')" title="${t('View / print full order details')}">${linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' ')} <i class="ti ti-printer" style="opacity:.55"></i></span>`:'<span class="muted">—</span>'}</td>
     <td>${invCell}</td>
-    <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:''}
+    <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:`<button class="icon-btn" onclick="qcAttachCertFile('${c.id}')" title="${t('Attach cert file')}"><i class="ti ti-paperclip"></i></button>`}
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
   </tr>`;}).join('');
   return `<div class="page-head"><h2>${t('Material Certs')}</h2><p>${t('Mill & material certifications, linkable to the orders that used them.')}</p></div>
@@ -1932,6 +1934,26 @@ function viewCerts(){
 }
 window.qcNewCert=()=>{ _certLinks=[]; editId='__new_cert__'; render(); };
 window.qcDelCert=async (id)=>{ if(!confirm(t('Delete this cert record?')))return; delete CERTS[id]; await dbRemove('qc/certs/'+id); render(); };
+// attach (or re-attach) the PDF/photo to an already-saved cert — repairs certs whose
+// upload failed at save time
+window.qcAttachCertFile=(id)=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='.pdf,image/*';
+  inp.onchange=async ()=>{
+    const f=inp.files[0]; if(!f) return;
+    try{
+      const url=await upload(f,'certs');
+      if(!url) throw new Error('no storage connection — are you signed in?');
+      const c=CERTS[id]; if(!c) return;
+      const fileObj={name:f.name,url,type:f.type||'application/octet-stream'};
+      const files=(c.files?vals(c.files):(c.file?[c.file]:[])).concat([fileObj]);
+      await dbSet('qc/certs/'+id+'/files', files);
+      await dbSet('qc/certs/'+id+'/file', files[0]);
+      c.files=files; c.file=files[0];
+      qcToast(t('File attached.'),'ok'); render();
+    }catch(e){ qcToast(t('File upload failed:')+' '+((e&&e.message)||e),'err'); }
+  };
+  inp.click();
+};
 
 /* =================== CERT VIEWER (view + print the actual PDF) =================== */
 function qcFileKind(f){ const s=((f&&f.url)||'')+' '+((f&&f.name)||'')+' '+((f&&f.type)||''); return /pdf/i.test(s)?'pdf':'img'; }
@@ -2238,12 +2260,16 @@ window.qcSaveReviewedCerts=async ()=>{
   const invFiles=await uploadPending('invoice','invoices');
   const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
   const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
-  let n=0, firstErr=null;
+  let n=0, firstErr=null; const upErrs=[];
   for(const c of P.detected){
     try{
-      const f=await buildCertFile(c, P.files);
+      // upload in its own try — a storage failure should still save the cert data,
+      // loudly, instead of silently dropping the whole cert (or its file)
       let fileObj=null;
-      if(f){ const url=await upload(f,'certs'); if(url) fileObj={name:f.name,url,type:f.type||'application/octet-stream'}; }
+      try{
+        const f=await buildCertFile(c, P.files);
+        if(f){ const url=await upload(f,'certs'); if(url) fileObj={name:f.name,url,type:f.type||'application/octet-stream'}; else upErrs.push((c.heat_lot||c.material||'cert')+' — no upload connection'); }
+      }catch(ue){ console.warn('cert file upload failed',ue); upErrs.push((c.heat_lot||c.material||'cert')+((ue&&ue.message)?(' — '+ue.message):'')); }
       const id=newId('cert');
       await dbSet('qc/certs/'+id, { id, createdAt:Date.now()+n, addedBy:(QC_USER&&QC_USER.email)||'',
         material:c.material||'', spec:c.spec||'', heatLot:c.heat_lot||'', supplier:c.supplier||'', mill:c.mill||'', certNo:c.cert_no||'',
@@ -2255,7 +2281,8 @@ window.qcSaveReviewedCerts=async ()=>{
   const total=P.detected.length;
   _certPacket=null; _pendingFiles['cert']=[]; _pendingFiles['invoice']=[];
   editId=null; render();
-  if(n===total){ qcToast(n+' '+t('certs saved'),'ok'); }
+  if(n===total && !upErrs.length){ qcToast(n+' '+t('certs saved'),'ok'); }
+  else if(n===total){ qcToast(n+' '+t('certs saved')+' · '+t('File upload failed:')+' '+upErrs.join(' · '),'err'); }
   else if(n>0){ qcToast(n+'/'+total+' '+t('certs saved')+' · '+t('Save failed:')+' '+((firstErr&&firstErr.message)||firstErr),'err'); }
   else { qcToast(t('Save failed:')+' '+((firstErr&&firstErr.message)||firstErr),'err'); }
 };
