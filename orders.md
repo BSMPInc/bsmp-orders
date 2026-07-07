@@ -43,7 +43,19 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
   append `t:'count'` entries, so every change is attributed. Note: the whole item
   (log included) is saved with one `set()` — two people logging the same item at
   the same instant could clobber each other (accepted, consistent with the suite).
-- **AI photo count** (`_invAiCount` → `invRunAiCount`): camera-capture file input →
+- **Count by weight** (`_invWeigh` → `inv-weigh-modal`, added 2026-07-06): the
+  RELIABLE counter — owner confirmed AI photo counts miscount and don't repeat on
+  small touching hardware, which no prompt tuning fixes (touching parts have no
+  visual boundary). Piece weight is stored per item as `pieceWtG` (always grams)
+  with preferred display unit `wtUnit` ('g'|'oz'|'lb'; `WT_G` conversion map).
+  Calibrate once by weighing a known sample (`_invWeighCal` — persists immediately)
+  or type the piece weight directly; then a count = batch weight ÷ piece weight
+  (`_invWeighCalc` live math, `_invWeighSet` logs a `t:'count'` ledger entry with a
+  "weight count — 2.4 lb @ 0.006 lb/pc" note). Unit switch converts the shown value
+  (`_invWeighUnit`). Needs a counting scale or any scale at the shop.
+- **AI photo estimate** (`_invAiCount` → `invRunAiCount`; button relabeled from
+  "Count" to "Estimate" 2026-07-06 — treat as estimate ONLY, never source of
+  truth): camera-capture file input →
   `invCropB64` (canvas crop/downscale to ≤2576px JPEG — also converts iPhone HEIC) →
   the same `AI_WORKER` Cloudflare proxy the cut-list uses, model `claude-opus-4-8`
   with adaptive thinking → JSON `{count, confidence, note}` → user confirms before

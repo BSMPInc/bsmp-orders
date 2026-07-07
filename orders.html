@@ -1583,6 +1583,41 @@ body.sb-pinned .dock{left:var(--sb)}
   </div>
 </div>
 
+<!-- Count by weight modal -->
+<div class="modal-bg" id="inv-weigh-modal" style="display:none">
+  <div class="modal" style="width:560px">
+    <div class="modal-header"><i class="ti ti-scale"></i><h2 id="inv-weigh-title">Count by weight</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('inv-weigh-modal')"><i class="ti ti-x"></i></button></div>
+    <div style="background:#f7f9fc;border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+        <div><label class="inv-fl">Piece weight (one part)</label>
+          <input type="number" id="invw-pw" class="inv-fi" step="any" min="0" placeholder="e.g. 1.24" style="margin-bottom:0;width:120px" oninput="window._invWeighCalc()"></div>
+        <div><label class="inv-fl">Unit</label>
+          <select id="invw-unit" class="inv-fi" style="margin-bottom:0;width:72px" onchange="window._invWeighUnit()">
+            <option value="g">g</option><option value="oz">oz</option><option value="lb">lb</option>
+          </select></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
+        <div><label class="inv-fl"># of pieces</label>
+          <input type="number" id="invw-sn" class="inv-fi" inputmode="numeric" min="1" placeholder="e.g. 10" style="margin-bottom:0;width:90px"></div>
+        <div><label class="inv-fl">They weigh</label>
+          <input type="number" id="invw-sw" class="inv-fi" step="any" min="0" style="margin-bottom:0;width:100px"></div>
+        <button class="btn sm" onclick="window._invWeighCal()"><i class="ti ti-calculator"></i> Set piece weight from sample</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text3);margin-top:6px">Don&rsquo;t know the piece weight? Count out 10+ pieces, weigh them, and fill in the two boxes &mdash; the app does the division and remembers it for next time.</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div><label class="inv-fl">Whole batch weight <span id="invw-unit2" style="color:var(--text3)"></span></label>
+        <input type="number" id="invw-total" class="inv-fi" step="any" min="0" style="margin-bottom:0;width:150px;font-size:17px" oninput="window._invWeighCalc()"></div>
+      <div id="invw-result" style="flex:1;min-width:160px;font-size:14px;color:var(--text3);padding-bottom:8px"></div>
+    </div>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+      <button class="btn" onclick="closeModal('inv-weigh-modal')">Cancel</button>
+      <button class="btn green" id="invw-set-btn" disabled onclick="window._invWeighSet()"><i class="ti ti-check"></i> Set on-hand</button>
+    </div>
+  </div>
+</div>
+
 <!-- Drawing Viewer (zoomable lightbox) -->
 <div class="modal-bg" id="draw-modal" style="display:none;z-index:90">
   <div class="modal" style="max-width:94vw;width:1100px;height:92vh;padding:0;display:flex;flex-direction:column;overflow:hidden">
@@ -3701,14 +3736,14 @@ function renderInventory(){
   if(q) list = list.filter(i=>[i.name,i.partNum,i.customer,i.location,i.notes].filter(Boolean).join(' ').toLowerCase().includes(q));
   list.sort((a,b)=>((invIsLow(b)?1:0)-(invIsLow(a)?1:0)) || String(a.name||'').localeCompare(String(b.name||'')));
   if(!list.length){
-    body.innerHTML = `<div class="disp-empty"><i class="ti ti-packages"></i><div>${inventoryItems.length?'Nothing matches':'No inventory yet'}</div><span>${inventoryItems.length?'Try a different search or filter.':'Add hardware or customer-supplied parts, then keep counts current — snap a photo and let AI count for you.'}</span></div>`;
+    body.innerHTML = `<div class="disp-empty"><i class="ti ti-packages"></i><div>${inventoryItems.length?'Nothing matches':'No inventory yet'}</div><span>${inventoryItems.length?'Try a different search or filter.':'Add hardware or customer-supplied parts, then keep counts current — scan tags in, log what’s used, and weigh for exact counts.'}</span></div>`;
     return;
   }
   body.innerHTML = `<div class="table-scroll"><table class="q-table">
     <thead><tr>
       <th>Item</th><th style="width:112px">Type</th><th>Customer</th><th style="width:110px">Location</th>
       <th style="width:120px;text-align:center">On hand</th><th style="width:64px;text-align:center">Min</th>
-      <th style="width:126px;text-align:center">AI count</th><th style="width:130px">Updated</th><th style="width:88px;text-align:center"></th>
+      <th style="width:186px;text-align:center">Count</th><th style="width:130px">Updated</th><th style="width:88px;text-align:center"></th>
     </tr></thead>
     <tbody>${list.map(invRow).join('')}</tbody>
   </table></div>`;
@@ -3724,7 +3759,7 @@ function invRow(it){
     <td>${esc2(it.location||'—')}</td>
     <td style="text-align:center;white-space:nowrap"><button class="inv-pm" title="Log parts used" onclick="window._invLog('${it.id}','out')"><i class="ti ti-minus"></i></button><input type="number" inputmode="numeric" class="q-qty" value="${it.qty??''}" onchange="window._invQty('${it.id}',this.value)"><button class="inv-pm" title="Log parts received" onclick="window._invLog('${it.id}','in')"><i class="ti ti-plus"></i></button>${(it.unit&&it.unit!=='pcs')?` <small style="color:var(--text3)">${esc2(it.unit)}</small>`:''}${low?'<div class="inv-reorder"><i class="ti ti-alert-triangle-filled"></i> reorder</div>':''}</td>
     <td style="text-align:center">${it.minQty||'—'}</td>
-    <td style="text-align:center"><button class="btn sm inv-count-btn" ${_invCounting?'disabled':''} onclick="window._invAiCount('${it.id}')">${counting?`<i class="ti ti-loader-2 spin"></i> ${esc2(_invCountStatus||'Counting…')}`:'<i class="ti ti-camera"></i> Count'}</button></td>
+    <td style="text-align:center;white-space:nowrap"><button class="btn sm" title="Count by weight — exact, works for parts that touch" onclick="window._invWeigh('${it.id}')"><i class="ti ti-scale"></i> Weigh</button> <button class="btn sm inv-count-btn" ${_invCounting?'disabled':''} title="AI photo estimate — rough when parts touch or pile" onclick="window._invAiCount('${it.id}')">${counting?`<i class="ti ti-loader-2 spin"></i> ${esc2(_invCountStatus||'Estimating…')}`:'<i class="ti ti-camera"></i> Estimate'}</button></td>
     <td style="font-size:11.5px;color:var(--text3)">${when}${it.updatedBy?`<br>${esc2(String(it.updatedBy).split('@')[0])}`:''}</td>
     <td style="text-align:center;white-space:nowrap">
       <button class="q-open-btn" title="Received & used history" onclick="window._invLog('${it.id}')"><i class="ti ti-history"></i></button>
@@ -3931,7 +3966,7 @@ async function invAskCount(b64, promptText){
   return parsed;
 }
 async function invRunAiCount(it, file){
-  _invCounting = it.id; _invCountStatus = 'Counting…'; renderInventory();
+  _invCounting = it.id; _invCountStatus = 'Estimating…'; renderInventory();
   const url = URL.createObjectURL(file);
   try{
     const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('Could not read that photo.')); i.src=url; });
@@ -3952,22 +3987,99 @@ async function invRunAiCount(it, file){
       note = '';
       detail = `\n\nCounted section by section: ${counts.join(' + ')} = ${n}. (Single-pass count was ${first.count} — the section total is the accurate one.)`;
     }
-    const confTxt = conf==='exact' ? 'an exact count' : (conf==='close' ? 'a close count' : 'a rough estimate');
-    const msg = `AI counted ${n} ${it.unit||'pcs'} of “${it.name}” — ${confTxt}.${note?'\n\n'+note:''}${detail}\n\nUpdate on-hand from ${it.qty??'—'} to ${n}?`;
+    const confTxt = conf==='exact' ? 'looks exact' : (conf==='close' ? 'should be close' : 'is a rough guess');
+    const msg = `AI estimates ${n} ${it.unit||'pcs'} of “${it.name}” — ${confTxt}. Parts that touch or pile can't be counted exactly; for an exact number use Weigh.${note?'\n\n'+note:''}${detail}\n\nUpdate on-hand from ${it.qty??'—'} to ${n}?`;
     if(confirm(msg)){
       const old = parseFloat(it.qty)||0;
       it.qty = n; it.lastAiCount = {count:n, at:Date.now(), confidence:conf};
-      invLogEntry(it, 'count', n, n-old, new Date().toISOString().slice(0,10), 'AI photo count');
+      invLogEntry(it, 'count', n, n-old, new Date().toISOString().slice(0,10), 'AI photo estimate');
       saveInvItem(it);
     }
   }catch(e){ alert('AI count failed: ' + e.message); }
   finally{ URL.revokeObjectURL(url); _invCounting = null; _invCountStatus = ''; renderInventory(); }
 }
 
+/* Count by weight — the reliable way to count small hardware (photo estimates
+   can't separate touching parts; a scale doesn't care). Piece weight is stored
+   per item in grams (pieceWtG) plus a preferred display unit (wtUnit); a count
+   is batch weight ÷ piece weight, logged as a 'count' entry like any other. */
+const WT_G = { g:1, oz:28.3495, lb:453.592 };
+let _invWeighId = null, _invWeighUnitPrev = 'g';
+window._invWeigh = (id) => {
+  const it = inventoryItems.find(x=>x.id===id); if(!it) return;
+  _invWeighId = id;
+  const u = WT_G[it.wtUnit] ? it.wtUnit : 'g';
+  _invWeighUnitPrev = u;
+  document.getElementById('inv-weigh-title').textContent = `${it.name} — count by weight`;
+  document.getElementById('invw-unit').value = u;
+  document.getElementById('invw-pw').value = it.pieceWtG > 0 ? +(it.pieceWtG / WT_G[u]).toPrecision(4) : '';
+  document.getElementById('invw-sn').value = '';
+  document.getElementById('invw-sw').value = '';
+  document.getElementById('invw-total').value = '';
+  window._invWeighCalc();
+  document.getElementById('inv-weigh-modal').style.display = 'flex';
+  setTimeout(()=>document.getElementById(it.pieceWtG > 0 ? 'invw-total' : 'invw-sn').focus(), 60);
+};
+window._invWeighUnit = () => {
+  // unit switch keeps the same physical weight — convert the shown piece weight
+  const pw = parseFloat(document.getElementById('invw-pw').value);
+  const u = document.getElementById('invw-unit').value;
+  if(pw > 0 && WT_G[_invWeighUnitPrev]) document.getElementById('invw-pw').value = +(pw * WT_G[_invWeighUnitPrev] / WT_G[u]).toPrecision(4);
+  _invWeighUnitPrev = u;
+  window._invWeighCalc();
+};
+window._invWeighCal = () => {
+  const n = parseFloat(document.getElementById('invw-sn').value);
+  const w = parseFloat(document.getElementById('invw-sw').value);
+  if(!(n >= 1) || !(w > 0)){ alert('Enter how many pieces are on the scale and what they weigh together.'); return; }
+  document.getElementById('invw-pw').value = +(w/n).toPrecision(4);
+  // remember the calibration even if no count follows
+  const it = inventoryItems.find(x=>x.id===_invWeighId);
+  const u = document.getElementById('invw-unit').value;
+  if(it){ it.pieceWtG = +((w/n) * WT_G[u]).toPrecision(6); it.wtUnit = u; saveInvItem(it); }
+  window._invWeighCalc();
+  document.getElementById('invw-total').focus();
+};
+window._invWeighCalc = () => {
+  const pw = parseFloat(document.getElementById('invw-pw').value);
+  const twRaw = document.getElementById('invw-total').value;
+  const tw = parseFloat(twRaw);
+  const u = document.getElementById('invw-unit').value;
+  const it = inventoryItems.find(x=>x.id===_invWeighId);
+  const res = document.getElementById('invw-result');
+  const btn = document.getElementById('invw-set-btn');
+  document.getElementById('invw-unit2').textContent = `(${u})`;
+  if(pw > 0 && twRaw !== '' && tw >= 0){
+    const n = Math.round(tw/pw);
+    res.innerHTML = `= <b style="font-size:22px;color:var(--text)">${n}</b> ${esc2((it&&it.unit)||'pcs')}`;
+    btn.disabled = false;
+    btn.innerHTML = `<i class="ti ti-check"></i> Set on-hand to ${n}`;
+  } else {
+    res.textContent = pw > 0 ? 'Enter the whole batch weight…' : 'Set the piece weight first — weigh a sample above.';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-check"></i> Set on-hand';
+  }
+};
+window._invWeighSet = () => {
+  const it = inventoryItems.find(x=>x.id===_invWeighId); if(!it) return;
+  const pw = parseFloat(document.getElementById('invw-pw').value);
+  const tw = parseFloat(document.getElementById('invw-total').value);
+  const u = document.getElementById('invw-unit').value;
+  if(!(pw > 0) || !(tw >= 0)) return;
+  const n = Math.round(tw/pw);
+  const old = parseFloat(it.qty)||0;
+  it.pieceWtG = +(pw * WT_G[u]).toPrecision(6);
+  it.wtUnit = u;
+  it.qty = n;
+  invLogEntry(it, 'count', n, n-old, new Date().toISOString().slice(0,10), `weight count — ${tw} ${u} @ ${pw} ${u}/pc`);
+  saveInvItem(it);
+  closeModal('inv-weigh-modal');
+};
+
 const PAGE_META = {
   dashboard: {title:'Dashboard',     sub:'Shop status at a glance \u2014 orders, schedule, and money'},
   dispatch: {title:'Today',          sub:'Each person\u2019s tasks for today, most urgent first'},
-  inventory:{title:'Inventory',      sub:'Hardware & customer-supplied parts \u2014 snap a photo to count'},
+  inventory:{title:'Inventory',      sub:'Hardware & customer-supplied parts \u2014 weigh to count, photo to estimate'},
   orders:   {title:'Open Orders',    sub:'Track and manage active jobs'},
   stats:    {title:'Stats',           sub:'Order counts and dollar figures at a glance'},
   queues:   {title:'Work Queues',    sub:'Shop-floor task lists grouped by process'},
