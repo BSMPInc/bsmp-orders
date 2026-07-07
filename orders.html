@@ -3853,7 +3853,7 @@ window._invSave = () => {
     if(_invPendingScan.lot) it.lastLot = _invPendingScan.lot;
     if(!existing && it.qty > 0)              // brand-new item: start the ledger with the scanned intake
       invLogEntry(it, 'in', it.qty, it.qty, new Date().toISOString().slice(0,10),
-        ['Tag scan', _invPendingScan.vendor].filter(Boolean).join(' · '),
+        ['Tag scan', _invPendingScan.vendor, _invPendingScan.po&&('PO '+_invPendingScan.po)].filter(Boolean).join(' · '),
         _invPendingScan.lot ? { lot: _invPendingScan.lot } : null);
     _invPendingScan = null;
   }
@@ -3970,8 +3970,10 @@ function renderInvLog(){
    the AI read it. If the part matches an existing item (by part # or name) it offers
    to log the received qty into that item’s ledger; otherwise it opens the Add form
    pre-filled for review. */
-const INV_TAG_PROMPT = `This photo shows a supplier or manufacturer tag/label that arrived with a bag or box of hardware for a sheet-metal shop. Read the tag and extract its information. Look carefully for a lot number — it may be labeled LOT, LOT NO, LOT#, L/N, BATCH, or HEAT; it matters for traceability, so read it exactly, character for character. Respond ONLY with JSON:
-{"name": "<short item name/description, e.g. '1/4-20 hex nut zinc'>", "partNum": "<part or SKU number, or ''>", "qty": <number of pieces stated on the tag, or null>, "unit": "<unit if stated, else 'pcs'>", "vendor": "<supplier or manufacturer name, or ''>", "lot": "<lot / batch / heat number exactly as printed, or ''>", "notes": "<anything else useful on the tag (PO #, date), or ''>"}
+const INV_TAG_PROMPT = `This photo shows a supplier or manufacturer tag/label that arrived with a bag or box of hardware for Bert's Sheet Metal Products, a sheet-metal shop. Read the tag and extract its information.
+Distributor labels (e.g. D.B. Roberts) often list several part numbers: the part number we track is the MFG PART # (manufacturer part number). Put distributor/internal part numbers (like "D.B. Part#") in notes instead. Build the item name from the part-name and description lines (e.g. CUSTOMER PART# "NUT, MINILOCK, FILM ONLY" + DESCRIPTION "4-40 THREAD" → "Nut, minilock, film only — 4-40 thread").
+Look carefully for a lot number — it may be labeled LOT, LOT NO, LOT#, L/N, BATCH, or HEAT; it matters for traceability, so read it exactly, character for character. Respond ONLY with JSON:
+{"name": "<short item name/description as built above>", "partNum": "<MFG PART # exactly as printed, or ''>", "qty": <QUANTITY stated on the tag, or null>, "unit": "<unit if stated, else 'pcs'>", "vendor": "<supplier/distributor name printed at the top of the label, or ''>", "po": "<PO NUMBER on the tag, or ''>", "lot": "<lot / batch / heat number exactly as printed, or ''>", "customer": "<ONLY if the tag shows the parts are supplied/owned by one of the shop's end customers, that customer's name; Bert's Sheet Metal itself is never the customer — use ''>", "notes": "<anything else useful (distributor part #, serial number, reference ID, order/line number, date, COO), or ''>"}
 Use only what is actually readable on the tag; use '' or null for anything not present. Do not guess part numbers or lot numbers.`;
 window._invScanTag = () => {
   if(_invCounting) return;
@@ -4016,7 +4018,7 @@ async function invRunTagScan(file){
       if(confirm(`Tag matches existing item “${match.name}”${match.partNum?' · '+match.partNum:''}.${lotLine}\n\nLog ${qty} ${p.unit||match.unit||'pcs'} received? On hand ${match.qty??0} → ${newQty}.`)){
         match.qty = newQty;
         if(lot) match.lastLot = lot;
-        invLogEntry(match, 'in', qty, qty, new Date().toISOString().slice(0,10), ['Tag scan', p.vendor, p.notes].filter(Boolean).join(' · '),
+        invLogEntry(match, 'in', qty, qty, new Date().toISOString().slice(0,10), ['Tag scan', p.vendor, p.po&&('PO '+p.po), p.notes].filter(Boolean).join(' · '),
           lot ? { lot, ...(lotChanged?{lotChange:true}:{}) } : null);
         saveInvItem(match);
         return;
@@ -4024,11 +4026,12 @@ async function invRunTagScan(file){
     }
     // new (or declined match): open the Add form pre-filled for review
     _invEditId = match ? match.id : null;
-    _invPendingScan = (lot || p.vendor) ? { lot, vendor: p.vendor||'' } : null;
+    _invPendingScan = (lot || p.vendor || p.po) ? { lot, vendor: p.vendor||'', po: p.po||'' } : null;
     invFillModal(match ? match : {
-      name: p.name||'', partNum: p.partNum||'', kind:'hardware',
+      name: p.name||'', partNum: p.partNum||'',
+      kind: p.customer ? 'customer' : 'hardware', customer: p.customer||'',
       qty: (qty>0?qty:''), unit: p.unit||'pcs',
-      notes: [p.vendor, p.notes].filter(Boolean).join(' · ')
+      notes: [p.vendor, p.po&&('PO '+p.po), p.notes].filter(Boolean).join(' · ')
     });
     document.getElementById('inv-modal-title').textContent = match ? 'Edit inventory item' : 'Add inventory item — read from tag';
     document.getElementById('inv-modal').style.display = 'flex';
