@@ -2843,6 +2843,7 @@ function archivePrintedQuote(q, kind){
     ARCHIVE.unshift(entry);
     if(ARCHIVE.length > 2000) ARCHIVE.pop();
     localStorage.setItem('bsmp_archive', JSON.stringify(ARCHIVE));
+    if(window._qCloudSyncArchive) window._qCloudSyncArchive(entry);
   } catch(e){ console.error('Archive failed', e); }
 }
 
@@ -2930,6 +2931,7 @@ function deleteArchived(id){
   if(!confirm('Remove this quote from the archive? The record will be permanently deleted.')) return;
   ARCHIVE = ARCHIVE.filter(a=>a.id!==id);
   localStorage.setItem('bsmp_archive', JSON.stringify(ARCHIVE));
+  if(window._qCloudRemoveArchived) window._qCloudRemoveArchived(id);
   renderArchive();
 }
 
@@ -8058,7 +8060,7 @@ function openCustomerQuoteModal(prefill){
       items.push({desc: desc, qty: cqQty, rate: cqRate, amt: cqQty*cqRate});
     }
     const cqExpedite = parseFloat(document.getElementById("cq-expedite")?.value)||0;
-    if(cqExpedite > 0) items.push({desc: "Expedite fee — expedited lead time", qty: 1, rate: cqExpedite, amt: cqExpedite});
+    if(cqExpedite > 0) items.push({desc: "Expedite Fee — Expedited Lead Time", qty: 1, rate: cqExpedite, amt: cqExpedite});
     const subtotal = items.reduce((s,i)=>s+i.amt,0);
     const tax = subtotal * (taxPct/100);
     const total = subtotal + tax;
@@ -8566,7 +8568,7 @@ window.syncOptCards=function(){
 <div id="toast-host" aria-live="polite"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, set, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getDatabase, ref, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getStorage, ref as sref, uploadString, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 const firebaseConfig = {
@@ -8648,6 +8650,45 @@ window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
   try{ await remove(ref(db,'quotes/'+id)); _qSynced.delete(id); _qSaveSynced(); }catch(e){ console.warn('quote remove failed', e); }
 };
+
+// ── Printed Archive cloud sync — mirrors the quote-history sync so the archive
+//    ('quoteArchive' node) is shared across machines instead of per-browser. ──
+let _qaSynced = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_archive_synced')||'[]')); }catch(e){ return new Set(); } })();
+function _qaSaveSynced(){ try{ localStorage.setItem('bsmp_archive_synced', JSON.stringify([..._qaSynced])); }catch(e){} }
+window._qCloudSyncArchive = async (a) => {
+  if(!_qUser || !a || a.id==null) return;
+  try{ await set(ref(db,'quoteArchive/'+a.id), JSON.parse(JSON.stringify(a))); _qaSynced.add(a.id); _qaSaveSynced(); }
+  catch(e){ console.warn('archive sync failed — the database rules may be blocking writes to "quoteArchive".', e); }
+};
+window._qCloudRemoveArchived = async (id) => {
+  if(!_qUser || id==null) return;
+  try{ await remove(ref(db,'quoteArchive/'+id)); _qaSynced.delete(id); _qaSaveSynced(); }catch(e){ console.warn('archive remove failed', e); }
+};
+async function _qaBackfill(){
+  const pending = (Array.isArray(ARCHIVE)?ARCHIVE:[]).filter(a=>a && a.id!=null && !_qaSynced.has(a.id));
+  for(const a of pending){ await window._qCloudSyncArchive(a); }
+}
+// Merge-down: entries printed on other machines appear here too. Additive only —
+// a failed/empty read can never wipe the local archive.
+let _qaListening = false;
+function _qaListen(){
+  if(_qaListening) return; _qaListening = true;
+  onValue(ref(db,'quoteArchive'), snap => {
+    try{
+      const remote = Object.values(snap.val()||{}).filter(r=>r && r.id!=null);
+      if(!remote.length) return;
+      const byId = new Map(ARCHIVE.map(a=>[a.id,a]));
+      let added = 0;
+      remote.forEach(r=>{ _qaSynced.add(r.id); if(!byId.has(r.id)){ byId.set(r.id,r); added++; } });
+      _qaSaveSynced();
+      if(!added) return;
+      ARCHIVE = [...byId.values()].sort((a,b)=>(b.id||0)-(a.id||0));
+      if(ARCHIVE.length > 2000) ARCHIVE.length = 2000;
+      localStorage.setItem('bsmp_archive', JSON.stringify(ARCHIVE));
+      if(typeof renderArchive==='function' && document.getElementById('archive-body')) renderArchive();
+    }catch(e){ console.warn('archive merge failed', e); }
+  }, e => console.warn('archive listener failed — the database rules may be blocking reads of "quoteArchive".', e));
+}
 window._qSyncAll = async () => {
   const st = $q('q-syncall-status');
   if(!_qUser){ if(st) st.textContent='Sign in first to sync.'; return; }
@@ -8672,7 +8713,7 @@ window._qLogout = () => { signOut(auth); };
 onAuthStateChanged(auth, (user) => {
   _qUser = user || null;
   const ov=$q('q-login');
-  if(user){ if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); }
+  if(user){ if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); }
   else { if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
 });
 document.addEventListener('keydown', (e) => {
