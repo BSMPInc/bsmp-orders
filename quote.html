@@ -736,6 +736,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <div class="field"><label>Finance %</label><input id="finance" type="number" value="7" step="0.5" onchange="calculate()"></div>
       <div class="field"><label>Purchasing ($)</label><input id="purchasing" type="number" value="0" step="0.01" onchange="calculate()"></div>
     </div>
+    <div class="grid4" style="margin-top:4px">
+      <div class="field"><label>Expedite fee</label>
+        <select id="exp-type" onchange="calculate()">
+          <option value="none">None</option>
+          <option value="pct">% of price</option>
+          <option value="flat">Flat $ on job</option>
+        </select>
+      </div>
+      <div class="field"><label>Expedite amount <span style="font-weight:400;color:var(--text3);text-transform:none">(% or $)</span></label><input id="exp-amount" type="number" value="0" min="0" step="0.5" onchange="calculate()"></div>
+    </div>
     <div class="grid3" style="margin-top:4px">
       <div class="field">
         <label>Due date</label>
@@ -3979,7 +3989,13 @@ function calculate(){
   const totalCostPart = matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart+cncCostPart;
   const markupCost = totalCostPart*markup;
   const finalPrice = roundPrice(totalCostPart+markupCost);
-  const jobTotal = finalPrice*qty;
+  // Expedite fee — a separate job-level line item, never baked into price/part
+  const expType = document.getElementById('exp-type')?.value||'none';
+  const expAmt = parseFloat(document.getElementById('exp-amount')?.value)||0;
+  const baseJobTotal = finalPrice*qty;
+  const expediteFee = (expAmt>0 && expType==='pct') ? Math.round(baseJobTotal*expAmt/100*100)/100
+                    : (expAmt>0 && expType==='flat') ? expAmt : 0;
+  const jobTotal = baseJobTotal + expediteFee;
   const margin = finalPrice>0 ? ((finalPrice-totalCostPart)/finalPrice*100) : 0;
 
   const fmt = v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4054,10 +4070,14 @@ function calculate(){
   }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Total cost / part</span><span class="breakdown-val">${fmt(totalCostPart)}</span></div>`;
   bd+=br(`Markup (${(markup*100).toFixed(0)}% + ${(finance*100).toFixed(1)}% finance)`,fmt(markupCost));
+  if(expediteFee>0){
+    bd+=br(`Subtotal (×${qty})`,fmt(baseJobTotal));
+    bd+=br(`Expedite fee${expType==='pct' ? ` (${expAmt}% of subtotal)` : ''}`,fmt(expediteFee));
+  }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Job total (×${qty})</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('breakdown').innerHTML=bd;
 
-  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
+  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,expType,expAmt,expediteFee,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
   if(typeof renderCostMix==='function') renderCostMix();
 }
 
@@ -4626,7 +4646,7 @@ function copyQuote(){
   d.outLines.forEach(l=>txt+=`\nOutsource — ${l.desc}: ${fmt(l.total)}`);
   if(d.weld && d.weld.enabled){ d.weld.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
   if(d.cnc && d.cnc.enabled){ d.cnc.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
-  txt+=`\n\nCost/part: ${fmt(d.totalCostPart)}\nMarkup (${(d.markup*100).toFixed(0)}%): ${fmt(d.markupCost)}\nPrice/part: ${fmt(d.finalPricePart||d.finalPrice)}\nJob total (×${d.qty}): ${fmt(d.jobTotal)}`;
+  txt+=`\n\nCost/part: ${fmt(d.totalCostPart)}\nMarkup (${(d.markup*100).toFixed(0)}%): ${fmt(d.markupCost)}\nPrice/part: ${fmt(d.finalPricePart||d.finalPrice)}${(d.expediteFee>0)?`\nExpedite fee: ${fmt(d.expediteFee)}`:''}\nJob total (×${d.qty}): ${fmt(d.jobTotal)}`;
   if(notes) txt+=`\n\nNotes: ${notes}`;
   navigator.clipboard.writeText(txt).then(()=>{
     const btn=event.target.closest('button');
@@ -4904,6 +4924,7 @@ function saveQuote(){
     costPerPart: d.totalCostPart,
     pricePerPart: d.finalPrice||d.finalPricePart,
     jobTotal: d.jobTotal,
+    expediteFee: d.expediteFee||0,
     markup: d.markup,
     finance: d.finance,
     qtyBreaks: window._qtyBreaksResults || [],
@@ -4919,6 +4940,8 @@ function saveQuote(){
     scrapAllowance: document.getElementById('scrap-allowance')?.value || '0',
     dueDate: document.getElementById('due-date')?.value || '',
     poNumber: document.getElementById('po-number')?.value || '',
+    expType: document.getElementById('exp-type')?.value || 'none',
+    expAmount: document.getElementById('exp-amount')?.value || '0',
     formComplexity: document.getElementById('form-complexity')?.value || '',
     formBendCount: document.getElementById('form-bend-count')?.value || '',
     matwArea: gv('matw-area'), matwPerlb: gv('matw-perlb'), matwScrap: gv('matw-scrap'),
@@ -5028,6 +5051,8 @@ function resetForm(){
   document.getElementById('perim').value='';
   document.getElementById('pierces').value='1';
   document.getElementById('notes').value='';
+  { const et=document.getElementById('exp-type'); if(et) et.value='none';
+    const ea=document.getElementById('exp-amount'); if(ea) ea.value='0'; }
   document.getElementById('cut-info').style.display='none';
   document.getElementById('ai-status').className='ai-status';
   document.getElementById('ai-tags').innerHTML='';
@@ -5337,6 +5362,8 @@ function reloadQuote(id){
   sv2('scrap-allowance', q.scrapAllowance || '0');
   sv2('due-date', q.dueDate || '');
   sv2('po-number', q.poNumber || '');
+  { const et=document.getElementById('exp-type'); if(et) et.value = q.expType || 'none';
+    const ea=document.getElementById('exp-amount'); if(ea) ea.value = q.expAmount || '0'; }
   sv2('form-complexity', q.formComplexity || '');
   sv2('form-bend-count', q.formBendCount || '');
   if(q.dueDate) checkRushDue();
@@ -5827,9 +5854,13 @@ function calcBreakForQty(qty){
   const totalCostPart=matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart;
   const markupCost=totalCostPart*markup;
   const finalPrice=roundPrice(totalCostPart+markupCost);
-  const jobTotal=finalPrice*qty;
+  const expType=document.getElementById('exp-type')?.value||'none';
+  const expAmt=parseFloat(document.getElementById('exp-amount')?.value)||0;
+  const baseJobTotal=finalPrice*qty;
+  const expediteFee=(expAmt>0&&expType==='pct')?Math.round(baseJobTotal*expAmt/100*100)/100:(expAmt>0&&expType==='flat')?expAmt:0;
+  const jobTotal=baseJobTotal+expediteFee;
   const margin=finalPrice>0?((finalPrice-totalCostPart)/finalPrice*100):0;
-  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,totalCostPart,markup,markupCost,finalPrice,jobTotal,margin};
+  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,totalCostPart,markup,markupCost,expediteFee,finalPrice,jobTotal,margin};
 }
 
 function calcQtyBreaks(){
@@ -7905,8 +7936,7 @@ function printCustomerQuote(sourceId){
       }
     });
   }
-
-  openCustomerQuoteModal({ customer, descLines, qty, pricePerPart, lockedQuoteNo, srcQuote, showTwoLines:true });
+  openCustomerQuoteModal({ customer, descLines, qty, pricePerPart, expediteFee: d.expediteFee||0, lockedQuoteNo, srcQuote, showTwoLines:true });
 }
 
 function openCustomerQuoteModal(prefill){
@@ -7915,6 +7945,7 @@ function openCustomerQuoteModal(prefill){
   const descLines = prefill.descLines || [];
   const qty = prefill.qty || 0;
   const pricePerPart = prefill.pricePerPart || 0;
+  const expediteFee = prefill.expediteFee || 0;
   const lockedQuoteNo = prefill.lockedQuoteNo || null;
   const srcQuote = prefill.srcQuote || null;
   const showTwoLines = prefill.showTwoLines !== false;
@@ -7962,6 +7993,10 @@ function openCustomerQuoteModal(prefill){
         <div>
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Rate (price/part)</label>
           <input id="cq-rate" type="number" step="0.01" value="${pricePerPart.toFixed(2)}" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
+        </div>
+        <div style="grid-column:1/3">
+          <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Expedite fee ($) <span style="font-weight:400;text-transform:none">— prints as its own line item; 0 to omit</span></label>
+          <input id="cq-expedite" type="number" step="0.01" min="0" value="${expediteFee.toFixed(2)}" style="width:120px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
         </div>
         ${twoLinesRow}
         <div style="grid-column:1/3">
@@ -8022,6 +8057,8 @@ function openCustomerQuoteModal(prefill){
     } else {
       items.push({desc: desc, qty: cqQty, rate: cqRate, amt: cqQty*cqRate});
     }
+    const cqExpedite = parseFloat(document.getElementById("cq-expedite")?.value)||0;
+    if(cqExpedite > 0) items.push({desc: "Expedite fee — expedited lead time", qty: 1, rate: cqExpedite, amt: cqExpedite});
     const subtotal = items.reduce((s,i)=>s+i.amt,0);
     const tax = subtotal * (taxPct/100);
     const total = subtotal + tax;
