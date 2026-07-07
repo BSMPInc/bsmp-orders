@@ -979,6 +979,38 @@ body.sb-pinned .dock{left:var(--sb)}
 .act-ico.primary:hover{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
 .act-ico.green{background:var(--green2);border-color:var(--green2);color:#fff}
 .act-ico.green:hover{filter:brightness(1.1);color:#fff}
+
+/* ===== Phone-only layout (≤700px). iPads are 744px+ even in portrait, so this
+   block can never match a tablet or desktop — those layouts are untouched. ===== */
+@media(max-width:700px){
+  /* shell: drop the rail and logo plate; the sidebar becomes a hamburger drawer */
+  .sidebar-logo{display:none!important}
+  #sidebar-edge-hint{display:none!important}
+  .sidebar-pin{display:none!important}
+  .menu-toggle{display:flex!important}
+  body:not(.sb-pinned) .sidebar{display:none!important}
+  body.sb-pinned .sidebar{position:fixed!important;top:0!important;left:0!important;bottom:0!important;height:auto!important;width:min(82vw,264px)!important;min-width:0!important;z-index:200;box-shadow:12px 0 40px rgba(0,0,0,.4);padding-top:14px}
+  body.sb-pinned::before{content:'';position:fixed;inset:0;background:rgba(15,22,36,.45);z-index:150}
+  .main,body.sb-pinned .main{margin-left:0!important}
+  /* topbar: normal-size title, actions in a swipeable strip underneath */
+  .topbar,body.sb-pinned .topbar{height:auto!important;min-height:0!important;padding:10px 12px!important;flex-wrap:wrap;gap:8px}
+  .topbar-title{font-size:19px!important}
+  .topbar-sub{font-size:11px}
+  .topbar-actions{width:100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+  .topbar-actions .btn{flex:none;white-space:nowrap;padding:7px 11px;font-size:12px}
+  /* bottom dock: share the width evenly instead of overflowing */
+  .dock,body.sb-pinned .dock{left:0!important}
+  .dock-tab{flex:1 1 0;width:auto;min-width:0;font-size:10px;padding:0 2px}
+  /* content: tighter gutters, keep clear of the dock */
+  .content{padding:12px 10px calc(14px + var(--dock-h))!important}
+  .cards-grid{grid-template-columns:1fr}
+  .filterbar{padding:10px 12px}
+  .filterbar input[type="text"]{flex:1 1 160px;min-width:0}
+  .filterbar select{flex:1 1 40%;min-width:130px}
+  .modal{padding:16px 14px;max-width:calc(100vw - 12px);max-height:94vh}
+  /* iOS Safari zooms the page when it focuses a field under 16px — keep fields at 16 so the layout stays put */
+  input,select,textarea{font-size:16px!important}
+}
 </style>
 </head>
 <body>
@@ -1526,6 +1558,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div><label class="inv-fl">Action</label><select id="invl-type" class="inv-fi" style="margin-bottom:0;width:128px"><option value="out">Used</option><option value="in">Received</option></select></div>
       <div><label class="inv-fl">Qty</label><input type="number" id="invl-qty" class="inv-fi" inputmode="numeric" min="0" style="margin-bottom:0;width:88px"></div>
       <div><label class="inv-fl">Date</label><input type="date" id="invl-date" class="inv-fi" style="margin-bottom:0;width:150px"></div>
+      <div><label class="inv-fl">Lot #</label><input type="text" id="invl-lot" class="inv-fi" placeholder="from tag" style="margin-bottom:0;width:110px"></div>
       <div style="flex:1.2;min-width:200px;position:relative"><label class="inv-fl">Job (open orders)</label>
         <input type="text" id="invl-job" class="inv-fi" placeholder="search job # · PO · customer · part" autocomplete="off" style="margin-bottom:0"
           oninput="window._invJobSearch(1)" onfocus="window._invJobSearch()" onblur="setTimeout(()=>{const l=document.getElementById('invl-job-list');if(l)l.style.display='none'},150)">
@@ -3704,6 +3737,15 @@ let inventoryItems = [];
 let invFilter = 'all';           // all | hardware | customer | low
 let _invEditId = null;
 let _invCounting = null;         // item id while an AI count is in flight
+let _invPendingScan = null;      // {lot, vendor} carried from a tag scan into the Add/Edit form
+
+// the lot number of the most recent intake — stored on the item, with a fallback
+// scan of the ledger for items that received lots before lastLot existed
+function invLastLot(it){
+  if(it.lastLot) return it.lastLot;
+  const e = (Array.isArray(it.log)?it.log:[]).find(x=>x.lot);
+  return e ? e.lot : '';
+}
 
 function startInventoryListener(){
   onValue(inventoryRef, (snap) => {
@@ -3741,7 +3783,7 @@ function renderInventory(){
   if(invFilter==='hardware') list = list.filter(i=>i.kind!=='customer');
   else if(invFilter==='customer') list = list.filter(i=>i.kind==='customer');
   else if(invFilter==='low') list = list.filter(invIsLow);
-  if(q) list = list.filter(i=>[i.name,i.partNum,i.customer,i.location,i.notes].filter(Boolean).join(' ').toLowerCase().includes(q));
+  if(q) list = list.filter(i=>[i.name,i.partNum,i.customer,i.location,i.notes,invLastLot(i),...(Array.isArray(i.log)?i.log.map(e=>e.lot):[])].filter(Boolean).join(' ').toLowerCase().includes(q));
   list.sort((a,b)=>((invIsLow(b)?1:0)-(invIsLow(a)?1:0)) || String(a.name||'').localeCompare(String(b.name||'')));
   if(!list.length){
     body.innerHTML = `<div class="disp-empty"><i class="ti ti-packages"></i><div>${inventoryItems.length?'Nothing matches':'No inventory yet'}</div><span>${inventoryItems.length?'Try a different search or filter.':'Add hardware or customer-supplied parts, then keep counts current — scan tags in, log what’s used, and weigh for exact counts.'}</span></div>`;
@@ -3761,7 +3803,7 @@ function invRow(it){
   const when = it.updatedAt ? new Date(it.updatedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ', ' + new Date(it.updatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '—';
   const counting = _invCounting === it.id;
   return `<tr class="${low?'inv-low':''}">
-    <td><b>${esc2(it.name||'—')}</b>${it.partNum?` <span style="color:var(--text3)">· ${esc2(it.partNum)}</span>`:''}${it.notes?`<div style="font-size:11px;color:var(--text3)">${esc2(it.notes)}</div>`:''}</td>
+    <td><b>${esc2(it.name||'—')}</b>${it.partNum?` <span style="color:var(--text3)">· ${esc2(it.partNum)}</span>`:''}${invLastLot(it)?` <span style="display:inline-block;background:#eef2f7;border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;color:var(--text2)" title="Most recent lot received">Lot ${esc2(invLastLot(it))}</span>`:''}${it.notes?`<div style="font-size:11px;color:var(--text3)">${esc2(it.notes)}</div>`:''}</td>
     <td>${it.kind==='customer' ? '<span class="inv-kind cust">Customer part</span>' : '<span class="inv-kind">Hardware</span>'}</td>
     <td>${esc2(it.customer||'—')}</td>
     <td>${esc2(it.location||'—')}</td>
@@ -3786,8 +3828,8 @@ window._invQty = (id, v) => {
   invLogEntry(it, 'count', nv, nv-old, new Date().toISOString().slice(0,10), 'manual correction');
   saveInvItem(it);
 };
-window._invAdd = () => { _invEditId = null; invFillModal({}); document.getElementById('inv-modal-title').textContent='Add inventory item'; document.getElementById('inv-modal').style.display='flex'; };
-window._invEdit = (id) => { const it = inventoryItems.find(x=>x.id===id); if(!it) return; _invEditId = id; invFillModal(it); document.getElementById('inv-modal-title').textContent='Edit inventory item'; document.getElementById('inv-modal').style.display='flex'; };
+window._invAdd = () => { _invEditId = null; _invPendingScan = null; invFillModal({}); document.getElementById('inv-modal-title').textContent='Add inventory item'; document.getElementById('inv-modal').style.display='flex'; };
+window._invEdit = (id) => { const it = inventoryItems.find(x=>x.id===id); if(!it) return; _invEditId = id; _invPendingScan = null; invFillModal(it); document.getElementById('inv-modal-title').textContent='Edit inventory item'; document.getElementById('inv-modal').style.display='flex'; };
 function invFillModal(it){
   const s=(f,v)=>{ document.getElementById('inv-f-'+f).value = v==null?'':v; };
   s('name',it.name); s('part',it.partNum); s('cust',it.customer); s('loc',it.location);
@@ -3798,7 +3840,8 @@ function invFillModal(it){
 window._invSave = () => {
   const v = f => document.getElementById('inv-f-'+f).value.trim();
   const name = v('name'); if(!name){ alert('Give the item a name first.'); return; }
-  const it = (_invEditId && inventoryItems.find(x=>x.id===_invEditId)) || { id: uid(), createdAt: Date.now() };
+  const existing = _invEditId && inventoryItems.find(x=>x.id===_invEditId);
+  const it = existing || { id: uid(), createdAt: Date.now() };
   Object.assign(it, {
     name, partNum: v('part'), kind: document.getElementById('inv-f-kind').value,
     customer: v('cust'), location: v('loc'), unit: v('unit')||'pcs',
@@ -3806,6 +3849,14 @@ window._invSave = () => {
     minQty: parseFloat(document.getElementById('inv-f-min').value)||0,
     notes: v('notes')
   });
+  if(_invPendingScan){                       // arrived here via tag scan — keep the lot
+    if(_invPendingScan.lot) it.lastLot = _invPendingScan.lot;
+    if(!existing && it.qty > 0)              // brand-new item: start the ledger with the scanned intake
+      invLogEntry(it, 'in', it.qty, it.qty, new Date().toISOString().slice(0,10),
+        ['Tag scan', _invPendingScan.vendor].filter(Boolean).join(' · '),
+        _invPendingScan.lot ? { lot: _invPendingScan.lot } : null);
+    _invPendingScan = null;
+  }
   saveInvItem(it);
   closeModal('inv-modal');
 };
@@ -3832,6 +3883,7 @@ window._invLog = (id, preset) => {
   document.getElementById('invl-type').value = preset==='in' ? 'in' : 'out';
   document.getElementById('invl-qty').value = '';
   document.getElementById('invl-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('invl-lot').value = '';
   document.getElementById('invl-note').value = '';
   _invLogOrderId = null;
   document.getElementById('invl-job').value = '';
@@ -3847,12 +3899,21 @@ window._invLogAdd = () => {
   if(!(q > 0)){ alert('Enter how many were ' + (t==='in' ? 'received.' : 'used.')); return; }
   const date = document.getElementById('invl-date').value || new Date().toISOString().slice(0,10);
   const note = document.getElementById('invl-note').value.trim();
+  const lot = document.getElementById('invl-lot').value.trim();
+  const prevLot = invLastLot(it);
+  const lotChanged = t==='in' && !!(lot && prevLot && lot.toLowerCase()!==prevLot.toLowerCase());
+  if(lotChanged && !confirm(`⚠ Lot ${lot} is different from the last received lot (${prevLot}).\n\nLog this intake as a new lot?`)) return;
   const d = t==='in' ? q : -q;
   it.qty = (parseFloat(it.qty)||0) + d;
+  if(t==='in' && lot) it.lastLot = lot;
   const lo = _invLogOrderId && orders.find(x=>x.id===_invLogOrderId);
-  invLogEntry(it, t, q, d, date, note, lo ? { orderId: lo.id, orderLbl: [lo.job&&('Job '+lo.job), lo.customer].filter(Boolean).join(' · ') || 'order' } : null);
+  const extra = {
+    ...(lo ? { orderId: lo.id, orderLbl: [lo.job&&('Job '+lo.job), lo.customer].filter(Boolean).join(' · ') || 'order' } : {}),
+    ...(lot ? { lot } : {}), ...(lotChanged ? { lotChange: true } : {})
+  };
+  invLogEntry(it, t, q, d, date, note, Object.keys(extra).length ? extra : null);
   saveInvItem(it);
-  document.getElementById('invl-qty').value = ''; document.getElementById('invl-note').value = '';
+  document.getElementById('invl-qty').value = ''; document.getElementById('invl-note').value = ''; document.getElementById('invl-lot').value = '';
   _invLogOrderId = null; document.getElementById('invl-job').value = '';
   renderInvLog();
 };
@@ -3896,7 +3957,8 @@ function renderInvLog(){
              : '<span style="color:#BA7517;font-weight:700">Count set</span>';
     const amt = e.t==='count' ? ('→ '+e.n) : ((e.d>0?'+':'−')+Math.abs(e.d));
     const job = e.orderId ? `<a href="#" style="color:var(--navy);font-weight:700;text-decoration:none" title="Open this order" onclick="event.preventDefault();closeModal('inv-log-modal');window.openEditFromSchedule('${e.orderId}')">${esc2(e.orderLbl||'order')}</a>` : '';
-    return `<tr><td>${fmtDate(e.date)||'—'}</td><td>${lbl}</td><td style="text-align:center;font-weight:700">${amt}</td><td style="text-align:center">${b}</td><td>${esc2(String(e.by||'').split('@')[0])}</td><td>${job}${job&&e.note?' — ':''}${esc2(e.note||'')}</td></tr>`;
+    const lotTag = e.lot ? `<span style="display:inline-block;background:#eef2f7;border:1px solid var(--border);border-radius:5px;padding:0 5px;font-size:10.5px;font-weight:700;margin-right:4px">Lot ${esc2(e.lot)}</span>${e.lotChange?'<span style="display:inline-block;background:#fdeacc;color:#BA7517;border-radius:5px;padding:0 5px;font-size:10.5px;font-weight:700;margin-right:4px">new lot</span>':''}` : '';
+    return `<tr><td>${fmtDate(e.date)||'—'}</td><td>${lbl}</td><td style="text-align:center;font-weight:700">${amt}</td><td style="text-align:center">${b}</td><td>${esc2(String(e.by||'').split('@')[0])}</td><td>${lotTag}${job}${(lotTag||job)&&e.note?' — ':''}${esc2(e.note||'')}</td></tr>`;
   }).join('');
   host.innerHTML = `<div class="table-scroll"><table class="q-table"><thead><tr>
     <th style="width:86px">Date</th><th style="width:96px">Action</th><th style="width:74px;text-align:center">Qty</th>
@@ -3908,9 +3970,9 @@ function renderInvLog(){
    the AI read it. If the part matches an existing item (by part # or name) it offers
    to log the received qty into that item’s ledger; otherwise it opens the Add form
    pre-filled for review. */
-const INV_TAG_PROMPT = `This photo shows a supplier or manufacturer tag/label that arrived with a bag or box of hardware for a sheet-metal shop. Read the tag and extract its information. Respond ONLY with JSON:
-{"name": "<short item name/description, e.g. '1/4-20 hex nut zinc'>", "partNum": "<part or SKU number, or ''>", "qty": <number of pieces stated on the tag, or null>, "unit": "<unit if stated, else 'pcs'>", "vendor": "<supplier or manufacturer name, or ''>", "notes": "<anything else useful on the tag (PO #, lot, heat #, date), or ''>"}
-Use only what is actually readable on the tag; use '' or null for anything not present. Do not guess part numbers.`;
+const INV_TAG_PROMPT = `This photo shows a supplier or manufacturer tag/label that arrived with a bag or box of hardware for a sheet-metal shop. Read the tag and extract its information. Look carefully for a lot number — it may be labeled LOT, LOT NO, LOT#, L/N, BATCH, or HEAT; it matters for traceability, so read it exactly, character for character. Respond ONLY with JSON:
+{"name": "<short item name/description, e.g. '1/4-20 hex nut zinc'>", "partNum": "<part or SKU number, or ''>", "qty": <number of pieces stated on the tag, or null>, "unit": "<unit if stated, else 'pcs'>", "vendor": "<supplier or manufacturer name, or ''>", "lot": "<lot / batch / heat number exactly as printed, or ''>", "notes": "<anything else useful on the tag (PO #, date), or ''>"}
+Use only what is actually readable on the tag; use '' or null for anything not present. Do not guess part numbers or lot numbers.`;
 window._invScanTag = () => {
   if(_invCounting) return;
   const inp = document.getElementById('inv-photo'); if(!inp) return;
@@ -3938,21 +4000,31 @@ async function invRunTagScan(file){
     let p; try{ p = JSON.parse(text); }catch{ throw new Error('Could not read the tag. Try a straight-on, well-lit photo of just the tag.'); }
     if(!p.name && !p.partNum) throw new Error('No item name or part number was readable on that tag. Try a closer photo.');
     const qty = parseFloat(p.qty);
+    const lot = String(p.lot||'').trim();
     const norm = s => String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
     const match = inventoryItems.find(x =>
       (p.partNum && norm(x.partNum) && norm(x.partNum)===norm(p.partNum)) ||
       (p.name && norm(x.name)===norm(p.name)));
     if(match && qty > 0){
+      const prevLot = invLastLot(match);
+      const lotChanged = !!(lot && prevLot && norm(lot)!==norm(prevLot));
+      const lotLine = lot
+        ? (lotChanged ? `\n\n⚠ NEW LOT: ${lot} — last received was lot ${prevLot}. It will be logged as a separate lot.`
+                      : `\nLot ${lot}${prevLot?' (same as last received)':''}.`)
+        : (prevLot ? `\nNo lot number was readable on this tag (last received was lot ${prevLot}).` : '');
       const newQty = (parseFloat(match.qty)||0) + qty;
-      if(confirm(`Tag matches existing item “${match.name}”${match.partNum?' · '+match.partNum:''}.\n\nLog ${qty} ${p.unit||match.unit||'pcs'} received? On hand ${match.qty??0} → ${newQty}.`)){
+      if(confirm(`Tag matches existing item “${match.name}”${match.partNum?' · '+match.partNum:''}.${lotLine}\n\nLog ${qty} ${p.unit||match.unit||'pcs'} received? On hand ${match.qty??0} → ${newQty}.`)){
         match.qty = newQty;
-        invLogEntry(match, 'in', qty, qty, new Date().toISOString().slice(0,10), ['Tag scan', p.vendor, p.notes].filter(Boolean).join(' · '));
+        if(lot) match.lastLot = lot;
+        invLogEntry(match, 'in', qty, qty, new Date().toISOString().slice(0,10), ['Tag scan', p.vendor, p.notes].filter(Boolean).join(' · '),
+          lot ? { lot, ...(lotChanged?{lotChange:true}:{}) } : null);
         saveInvItem(match);
         return;
       }
     }
     // new (or declined match): open the Add form pre-filled for review
     _invEditId = match ? match.id : null;
+    _invPendingScan = (lot || p.vendor) ? { lot, vendor: p.vendor||'' } : null;
     invFillModal(match ? match : {
       name: p.name||'', partNum: p.partNum||'', kind:'hardware',
       qty: (qty>0?qty:''), unit: p.unit||'pcs',
@@ -4131,6 +4203,7 @@ const PAGE_META = {
   settings: {title:'Process Times',  sub:'Lead times for outside processes'}
 };
 window.showPage = (page) => {
+  if(window._phoneCloseDrawer) window._phoneCloseDrawer();   // phones: tuck the nav drawer away after picking a page
   if(userRole==='operator' && !['queues','dispatch','inventory'].includes(page)) page='queues';   // operators: Work Queues + Today + Inventory
   ['dashboard','orders','stats','queues','customers','team','schedule','needpo','issuedpos','cutlist','dispatch','archive','trash','settings','inventory'].forEach(p=>{
     const el=document.getElementById(p+'-page'); if(el) el.style.display = p===page?'block':'none';
@@ -6458,10 +6531,13 @@ window.openHelp = () => { document.getElementById('help-modal').style.display='f
   const mtbtn = document.getElementById('menu-toggle');
   if(!sb) return;
   const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const phoneMq = window.matchMedia && window.matchMedia('(max-width: 700px)');
+  const isPhone = () => !!(phoneMq && phoneMq.matches);
   let pinned = false;
   const stored = (()=>{ try{ return localStorage.getItem('bsmp_sidebar_pinned'); }catch{ return null; } })();
   if(stored==null){ pinned = false; }      // default: collapsed icon rail (tap the pin to lock it open)
   else { pinned = stored==='1'; }
+  if(isPhone()) pinned = false;            // phones: the sidebar is a drawer and always starts closed
   function apply(){
     sb.classList.toggle('auto-hide', !pinned);
     document.body.classList.toggle('sb-pinned', pinned);
@@ -6480,16 +6556,24 @@ window.openHelp = () => { document.getElementById('help-modal').style.display='f
   };
   // Called on login / role change: operators always auto-hide; managers keep their saved choice.
   window._refreshSidebarForRole = () => {
-    if(userRole==='operator'){ pinned = false; }
+    if(userRole==='operator' || isPhone()){ pinned = false; }
     else { try{ pinned = localStorage.getItem('bsmp_sidebar_pinned')==='1'; }catch{ pinned = false; } }
     apply();
   };
-  // tapping the collapsed sliver opens it (touch has no hover to reveal it)
+  // tapping the collapsed sliver opens it (touch has no hover to reveal it) — rail only,
+  // never on phones, where the drawer is hidden (width 0) and this would reopen it after every nav tap
   sb.addEventListener('click', (e)=>{
+    if(isPhone()) return;
     if(sb.classList.contains('auto-hide') && !pinned && (e.target===sb || sb.getBoundingClientRect().width < 60)){
       window._toggleSidebarPin(e);
     }
   });
+  // phones: tapping the dimmed backdrop (anywhere outside the drawer) closes it
+  document.addEventListener('click', (e)=>{
+    if(isPhone() && pinned && !sb.contains(e.target)) window._toggleSidebarPin(e);
+  });
+  // phones: after navigating from the drawer, tuck it away
+  window._phoneCloseDrawer = () => { if(isPhone() && pinned) window._toggleSidebarPin(); };
   apply();
 })();
 document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window._login(); });
