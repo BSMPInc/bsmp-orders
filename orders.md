@@ -40,7 +40,14 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
   `inv-log-modal` preset to Received/Used (`_invLog`/`_invLogAdd`); the history
   button shows the full ledger with a computed running balance (`renderInvLog`,
   walks back from current qty). Manual qty corrections and confirmed AI counts
-  append `t:'count'` entries, so every change is attributed. Note: the whole item
+  append `t:'count'` entries, so every change is attributed. Entries can **link to
+  an open order** (added 2026-07-06): type-to-search picker over non-archived,
+  non-Invoiced orders (`_invJobSearch`/`_invJobPick`, matches `invJobLbl` = job/PO/
+  customer/part); the entry stores `orderId` + snapshot `orderLbl` (so history
+  reads fine after the order is archived/deleted), and the history renders the
+  label as a link that closes the modal and opens the order (`openEditFromSchedule`,
+  which no-ops if the order is gone). `invLogEntry` takes an optional `extra`
+  object merged into the entry. Note: the whole item
   (log included) is saved with one `set()` — two people logging the same item at
   the same instant could clobber each other (accepted, consistent with the suite).
 - **Count by weight** (`_invWeigh` → `inv-weigh-modal`, added 2026-07-06): the

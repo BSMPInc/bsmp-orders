@@ -649,6 +649,10 @@ tr.inv-low td{background:#fdf6ee}
 @media(pointer:coarse){ .inv-pm{width:38px;height:40px} .inv-pm i{font-size:17px} }
 .inv-fl{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.03em}
 .inv-fi{width:100%;font-family:inherit;font-size:13.5px;padding:9px 11px;border:1px solid var(--border2);border-radius:8px;background:#fff;margin:3px 0 11px;box-sizing:border-box}
+.invl-job-list{position:absolute;top:100%;left:0;right:0;z-index:40;background:#fff;border:1px solid var(--border2);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.14);max-height:210px;overflow:auto}
+.invl-job-item{padding:7px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.invl-job-item:last-child{border-bottom:none}
+.invl-job-item:hover{background:#f0f4fa}
 @media(pointer:coarse){ .inv-chip{padding:10px 16px;font-size:14px} }
 /* ── AI Daily Brief ── */
 .brief-card{background:linear-gradient(180deg,#fbf9ff,#fff);border:1px solid #e4dcf3;border-radius:13px;padding:15px 17px;margin-bottom:14px;box-shadow:var(--shadow)}
@@ -1522,7 +1526,11 @@ body.sb-pinned .dock{left:var(--sb)}
       <div><label class="inv-fl">Action</label><select id="invl-type" class="inv-fi" style="margin-bottom:0;width:128px"><option value="out">Used</option><option value="in">Received</option></select></div>
       <div><label class="inv-fl">Qty</label><input type="number" id="invl-qty" class="inv-fi" inputmode="numeric" min="0" style="margin-bottom:0;width:88px"></div>
       <div><label class="inv-fl">Date</label><input type="date" id="invl-date" class="inv-fi" style="margin-bottom:0;width:150px"></div>
-      <div style="flex:1;min-width:140px"><label class="inv-fl">Job / note</label><input type="text" id="invl-note" class="inv-fi" placeholder="optional" style="margin-bottom:0"></div>
+      <div style="flex:1.2;min-width:200px;position:relative"><label class="inv-fl">Job (open orders)</label>
+        <input type="text" id="invl-job" class="inv-fi" placeholder="search job # · PO · customer · part" autocomplete="off" style="margin-bottom:0"
+          oninput="window._invJobSearch(1)" onfocus="window._invJobSearch()" onblur="setTimeout(()=>{const l=document.getElementById('invl-job-list');if(l)l.style.display='none'},150)">
+        <div id="invl-job-list" class="invl-job-list" style="display:none"></div></div>
+      <div style="flex:1;min-width:140px"><label class="inv-fl">Note</label><input type="text" id="invl-note" class="inv-fi" placeholder="optional" style="margin-bottom:0"></div>
       <button class="btn green" onclick="window._invLogAdd()"><i class="ti ti-check"></i> Log it</button>
     </div>
     <div id="inv-log-list"></div>
@@ -3812,9 +3820,9 @@ window._invDelete = (id) => {
    date, by, note}; on-hand qty always moves with the entry, and AI counts and
    manual corrections land in the same history. */
 let _invLogId = null;
-function invLogEntry(it, t, n, d, date, note){
+function invLogEntry(it, t, n, d, date, note, extra){
   it.log = Array.isArray(it.log) ? it.log : [];
-  it.log.unshift({ id: uid(), t, n, d, date, note: note||'', by: (auth.currentUser && auth.currentUser.email)||'', at: Date.now() });
+  it.log.unshift({ id: uid(), t, n, d, date, note: note||'', by: (auth.currentUser && auth.currentUser.email)||'', at: Date.now(), ...(extra||{}) });
   if(it.log.length > 300) it.log.length = 300;   // keep the record from growing forever
 }
 window._invLog = (id, preset) => {
@@ -3825,6 +3833,9 @@ window._invLog = (id, preset) => {
   document.getElementById('invl-qty').value = '';
   document.getElementById('invl-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('invl-note').value = '';
+  _invLogOrderId = null;
+  document.getElementById('invl-job').value = '';
+  document.getElementById('invl-job-list').style.display = 'none';
   renderInvLog();
   document.getElementById('inv-log-modal').style.display = 'flex';
   setTimeout(()=>document.getElementById('invl-qty').focus(), 60);
@@ -3838,10 +3849,35 @@ window._invLogAdd = () => {
   const note = document.getElementById('invl-note').value.trim();
   const d = t==='in' ? q : -q;
   it.qty = (parseFloat(it.qty)||0) + d;
-  invLogEntry(it, t, q, d, date, note);
+  const lo = _invLogOrderId && orders.find(x=>x.id===_invLogOrderId);
+  invLogEntry(it, t, q, d, date, note, lo ? { orderId: lo.id, orderLbl: [lo.job&&('Job '+lo.job), lo.customer].filter(Boolean).join(' · ') || 'order' } : null);
   saveInvItem(it);
   document.getElementById('invl-qty').value = ''; document.getElementById('invl-note').value = '';
+  _invLogOrderId = null; document.getElementById('invl-job').value = '';
   renderInvLog();
+};
+
+/* Job link on ledger entries — type-to-search over open orders (same picker idea
+   as the Notes app). The entry stores orderId plus a snapshot label (orderLbl) so
+   history still reads well after the order is archived or deleted. */
+let _invLogOrderId = null;
+function invJobLbl(o){ return [o.job&&('Job '+o.job), o.po&&('PO '+o.po), o.customer, o.part].filter(Boolean).join(' · '); }
+window._invJobSearch = (typed) => {
+  const inp = document.getElementById('invl-job');
+  const list = document.getElementById('invl-job-list');
+  if(typed) _invLogOrderId = null;             // typing invalidates a previous pick (refocus doesn't)
+  const q = inp.value.toLowerCase().trim();
+  const open = orders.filter(o=>!o.archived && !isDoneRow(o));
+  const hits = (q ? open.filter(o=>invJobLbl(o).toLowerCase().includes(q)) : open).slice(0,8);
+  if(!hits.length){ list.style.display='none'; return; }
+  list.innerHTML = hits.map(o=>`<div class="invl-job-item" onmousedown="window._invJobPick('${o.id}')">${esc2(invJobLbl(o)||'(no detail)')}</div>`).join('');
+  list.style.display='block';
+};
+window._invJobPick = (id) => {
+  const o = orders.find(x=>x.id===id); if(!o) return;
+  _invLogOrderId = id;
+  document.getElementById('invl-job').value = invJobLbl(o);
+  document.getElementById('invl-job-list').style.display='none';
 };
 function renderInvLog(){
   const host = document.getElementById('inv-log-list');
@@ -3859,7 +3895,8 @@ function renderInvLog(){
              : e.t==='out' ? '<span style="color:var(--red);font-weight:700">Used</span>'
              : '<span style="color:#BA7517;font-weight:700">Count set</span>';
     const amt = e.t==='count' ? ('→ '+e.n) : ((e.d>0?'+':'−')+Math.abs(e.d));
-    return `<tr><td>${fmtDate(e.date)||'—'}</td><td>${lbl}</td><td style="text-align:center;font-weight:700">${amt}</td><td style="text-align:center">${b}</td><td>${esc2(String(e.by||'').split('@')[0])}</td><td>${esc2(e.note||'')}</td></tr>`;
+    const job = e.orderId ? `<a href="#" style="color:var(--navy);font-weight:700;text-decoration:none" title="Open this order" onclick="event.preventDefault();closeModal('inv-log-modal');window.openEditFromSchedule('${e.orderId}')">${esc2(e.orderLbl||'order')}</a>` : '';
+    return `<tr><td>${fmtDate(e.date)||'—'}</td><td>${lbl}</td><td style="text-align:center;font-weight:700">${amt}</td><td style="text-align:center">${b}</td><td>${esc2(String(e.by||'').split('@')[0])}</td><td>${job}${job&&e.note?' — ':''}${esc2(e.note||'')}</td></tr>`;
   }).join('');
   host.innerHTML = `<div class="table-scroll"><table class="q-table"><thead><tr>
     <th style="width:86px">Date</th><th style="width:96px">Action</th><th style="width:74px;text-align:center">Qty</th>
