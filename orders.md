@@ -52,8 +52,16 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
   counted in parallel with a more-than-half-visible edge rule so seam pieces are
   counted once, then summed — one-shot counting drifts badly above ~100 pieces
   (observed: 407 real parts → 420/430 one-shot; tiling fixes this).
+- **AI tag scan** (`_invScanTag` → `invRunTagScan`): "Scan tag" toolbar button →
+  photograph the supplier tag that arrives with a bag/box of hardware → same
+  `AI_WORKER` + `invCropB64` pipeline → JSON `{name, partNum, qty, unit, vendor,
+  notes}` (prompt forbids guessing part numbers). If the part matches an existing
+  item (exact part # or name, normalized), a confirm offers to log the qty as a
+  `t:'in'` ledger entry (note: "Tag scan · vendor · extras"); otherwise — or if the
+  match is declined — the `inv-modal` opens pre-filled for review before saving.
 - ⚠️ The `inventory` node needs its own RTDB security rule (server-side, Firebase
-  console) or saves fail — same gotcha as every new path in this suite.
+  console) or saves fail — same gotcha as every new path in this suite. (Rule was
+  added and verified 2026-07-06.)
 
 ## Core areas (where to work)
 

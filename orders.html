@@ -1156,6 +1156,7 @@ body.sb-pinned .dock{left:var(--sb)}
   <div id="inventory-page" style="display:none">
     <div class="inv-toolbar">
       <button class="btn primary" onclick="window._invAdd()"><i class="ti ti-plus"></i> Add item</button>
+      <button class="btn" id="inv-scan-btn" onclick="window._invScanTag()"><i class="ti ti-scan"></i> Scan tag</button>
       <input type="text" id="inv-search" placeholder="Search hardware & customer parts…" oninput="window._invRender()" style="flex:1;min-width:180px;height:38px;font-size:13px;padding:0 12px;border:1px solid var(--border2);border-radius:10px;background:#f7f9fc;color:var(--text);outline:none;font-family:inherit">
     </div>
     <div class="inv-chips" id="inv-chips"></div>
@@ -3830,6 +3831,67 @@ function renderInvLog(){
     <th style="width:86px;text-align:center">On hand</th><th style="width:92px">By</th><th>Job / note</th>
   </tr></thead><tbody>${rows}</tbody></table></div>`;
 }
+
+/* AI tag scan — photograph the supplier tag that arrives with the hardware and let
+   the AI read it. If the part matches an existing item (by part # or name) it offers
+   to log the received qty into that item’s ledger; otherwise it opens the Add form
+   pre-filled for review. */
+const INV_TAG_PROMPT = `This photo shows a supplier or manufacturer tag/label that arrived with a bag or box of hardware for a sheet-metal shop. Read the tag and extract its information. Respond ONLY with JSON:
+{"name": "<short item name/description, e.g. '1/4-20 hex nut zinc'>", "partNum": "<part or SKU number, or ''>", "qty": <number of pieces stated on the tag, or null>, "unit": "<unit if stated, else 'pcs'>", "vendor": "<supplier or manufacturer name, or ''>", "notes": "<anything else useful on the tag (PO #, lot, heat #, date), or ''>"}
+Use only what is actually readable on the tag; use '' or null for anything not present. Do not guess part numbers.`;
+window._invScanTag = () => {
+  if(_invCounting) return;
+  const inp = document.getElementById('inv-photo'); if(!inp) return;
+  inp.onchange = async () => { const f = inp.files[0]; inp.value=''; if(f) await invRunTagScan(f); };
+  inp.click();
+};
+async function invRunTagScan(file){
+  const btn = document.getElementById('inv-scan-btn');
+  const origBtn = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Reading tag…'; }
+  const url = URL.createObjectURL(file);
+  try{
+    const img = await new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('Could not read that photo.')); i.src=url; });
+    const b64 = invCropB64(img, 0, 0, img.width, img.height);
+    const resp = await fetch(AI_WORKER, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      model:'claude-opus-4-8', max_tokens:1500, thinking:{type:'adaptive'},
+      messages:[{role:'user', content:[
+        {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
+        {type:'text', text: INV_TAG_PROMPT}
+      ]}]
+    })});
+    const data = await resp.json();
+    if(data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+    const text = (data.content||[]).map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    let p; try{ p = JSON.parse(text); }catch{ throw new Error('Could not read the tag. Try a straight-on, well-lit photo of just the tag.'); }
+    if(!p.name && !p.partNum) throw new Error('No item name or part number was readable on that tag. Try a closer photo.');
+    const qty = parseFloat(p.qty);
+    const norm = s => String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+    const match = inventoryItems.find(x =>
+      (p.partNum && norm(x.partNum) && norm(x.partNum)===norm(p.partNum)) ||
+      (p.name && norm(x.name)===norm(p.name)));
+    if(match && qty > 0){
+      const newQty = (parseFloat(match.qty)||0) + qty;
+      if(confirm(`Tag matches existing item “${match.name}”${match.partNum?' · '+match.partNum:''}.\n\nLog ${qty} ${p.unit||match.unit||'pcs'} received? On hand ${match.qty??0} → ${newQty}.`)){
+        match.qty = newQty;
+        invLogEntry(match, 'in', qty, qty, new Date().toISOString().slice(0,10), ['Tag scan', p.vendor, p.notes].filter(Boolean).join(' · '));
+        saveInvItem(match);
+        return;
+      }
+    }
+    // new (or declined match): open the Add form pre-filled for review
+    _invEditId = match ? match.id : null;
+    invFillModal(match ? match : {
+      name: p.name||'', partNum: p.partNum||'', kind:'hardware',
+      qty: (qty>0?qty:''), unit: p.unit||'pcs',
+      notes: [p.vendor, p.notes].filter(Boolean).join(' · ')
+    });
+    document.getElementById('inv-modal-title').textContent = match ? 'Edit inventory item' : 'Add inventory item — read from tag';
+    document.getElementById('inv-modal').style.display = 'flex';
+  }catch(e){ alert('Tag scan failed: ' + e.message); }
+  finally{ URL.revokeObjectURL(url); if(btn){ btn.disabled = false; btn.innerHTML = origBtn; } }
+}
+window._invScanFile = invRunTagScan;
 
 /* AI count from a photo — reuses the same Cloudflare worker as the cut-list reader.
    Accuracy strategy: one-shot counting is reliable up to a few dozen pieces but
