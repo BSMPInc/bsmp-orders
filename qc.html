@@ -731,7 +731,8 @@ async function callAICerts(files){
     content.push(aiContentBlock(await toBase64(f), extFromFile(f)));
   }
   content.push({type:'text',text:CERT_PROMPT});
-  const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:2000, messages:[{role:'user',content}] });
+  // big packets can hold a dozen+ heat lots — give the reply plenty of room (only used tokens cost)
+  const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:8000, messages:[{role:'user',content}] });
   const data=await resp.json();
   if(data.error) throw new Error(data.error.message||'AI error');
   const raw=(data.content||[]).map(c=>c.text||'').join('');
@@ -739,7 +740,14 @@ async function callAICerts(files){
   const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
   if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
   clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
-  const parsed=JSON.parse(clean);
+  let parsed;
+  try{ parsed=JSON.parse(clean); }
+  catch(err){
+    // reply cut off at max_tokens: the slice above ends at the last COMPLETE cert, so
+    // closing the array/object salvages every cert that finished
+    try{ parsed=JSON.parse(clean+']}'); }
+    catch(e2){ throw new Error(data.stop_reason==='max_tokens' ? 'Reply ran out of room — split the packet into smaller PDFs and retry.' : ('Bad AI reply: '+err.message)); }
+  }
   let certs=Array.isArray(parsed)?parsed:(parsed.certs||(parsed.material!==undefined?[parsed]:[]));
   return Array.isArray(certs)?certs:[];
 }
@@ -780,7 +788,7 @@ async function analyzeCertPacket(){
     editId='__cert_review__';
     render();
   }catch(e){
-    setAIStatus('cert-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')));
+    setAIStatus('cert-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')+(e&&e.message?' — '+e.message:'')));
   }
 }
 // split a PDF into a new File containing only the given 1-based pages
