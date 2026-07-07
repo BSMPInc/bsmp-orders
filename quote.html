@@ -3800,7 +3800,7 @@ function calculate(){
     const rawPps = (ph&&pl) ? Math.max(1,bestPartsPerSheet(w,h,ph,pl,web,border)) : 1;
     // Apply nesting efficiency — actual nest is typically less than theoretical max
     const nestEff = Math.min(1, Math.max(0.1, (parseFloat(document.getElementById('nesting-efficiency')?.value)||85)/100));
-    pps = Math.max(1, Math.floor(rawPps * nestEff));
+    pps = Math.max(1, Math.round(rawPps * nestEff));
     // Scrap allowance — run extra parts to cover expected rejects
     const scrapPct = parseFloat(document.getElementById('scrap-allowance')?.value)||0;
     const effectiveQty = qty * (1 + scrapPct/100);
@@ -5697,7 +5697,7 @@ function calcBreakForQty(qty){
     const rawPps = (ph&&pl) ? Math.max(1,bestPartsPerSheet(w,h,ph,pl,web,border)) : 1;
     // Apply nesting efficiency — actual nest is typically less than theoretical max
     const nestEff = Math.min(1, Math.max(0.1, (parseFloat(document.getElementById('nesting-efficiency')?.value)||85)/100));
-    pps = Math.max(1, Math.floor(rawPps * nestEff));
+    pps = Math.max(1, Math.round(rawPps * nestEff));
     // Scrap allowance — run extra parts to cover expected rejects
     const scrapPct = parseFloat(document.getElementById('scrap-allowance')?.value)||0;
     const effectiveQty = qty * (1 + scrapPct/100);
