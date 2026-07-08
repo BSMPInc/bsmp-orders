@@ -549,6 +549,12 @@ tr:hover .del-btn{opacity:1}
 .ss-vin.grow{flex:1}
 .ss-vin::placeholder{color:var(--text3)}
 .ss-vpo{font-size:10px;font-weight:700;color:#3B6D11;background:#eaf5d8;border-radius:6px;padding:2px 7px;white-space:nowrap;flex-shrink:0}
+select.ss-vin{width:170px;flex-shrink:0}
+/* approved vendor list rows (Settings) */
+.vs-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border2);font-size:13px;font-weight:600}
+.vs-row:last-child{border-bottom:none}
+.vs-row .ti-trash{cursor:pointer;color:var(--text3);font-size:14px}
+.vs-row .ti-trash:hover{color:var(--red)}
 @media(max-width:700px){.ss-vrow{flex-wrap:wrap;padding-left:8px}.ss-vin{width:100%}}
 .ss-check{font-size:17px}
 .ss-move{display:flex;flex-direction:column;line-height:.6}
@@ -1493,6 +1499,20 @@ body.sb-pinned .dock{left:var(--sb)}
         </div>
       </div>
     </div>
+    <div class="table-card" style="max-width:560px;margin-bottom:16px">
+      <div class="table-card-header">
+        <i class="ti ti-truck-delivery"></i><span>Approved Vendors</span>
+      </div>
+      <div style="padding:16px">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">The vendor dropdowns on order steps and the Need PO page pick from this list, so every vendor is always spelled exactly the same — that's what lets several items pool onto one PO.</p>
+        <div id="vendor-list-ui" style="border:1px solid var(--border);border-radius:9px;max-height:220px;overflow:auto;margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <input id="vs-new" placeholder="New vendor name" style="flex:1;min-width:160px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px" onkeydown="if(event.key==='Enter')window._vsAdd()">
+          <button class="btn green" onclick="window._vsAdd()"><i class="ti ti-plus"></i> Add</button>
+          <button class="btn" onclick="window._vsImport()" title="Pull in every vendor name already typed on any order's steps"><i class="ti ti-download"></i> Import from orders</button>
+        </div>
+      </div>
+    </div>
     <div class="table-card" style="max-width:560px">
       <div class="table-card-header">
         <i class="ti ti-settings"></i><span>Default Process Durations</span>
@@ -2043,6 +2063,7 @@ function startDataListeners(){
   startTrashListener();
   startDurationsListener();
   startJobCounterListener();
+  startVendorsListener();
 }
 
 function setSyncStatus(s) {
@@ -2728,7 +2749,6 @@ function procState(r, p){
   return '';
 }
 function detailInner(r){
-  ensureVendorDatalist();
   const procBtns=(list)=>list.map(p=>{
     const st=procState(r,p);
     return`<button class="proc-btn icon-btn${st==='done'?' done':st==='active'?' active':''}" title="${p}${st?' — '+(st==='done'?'done':'in progress'):''}" aria-label="${p}" onclick="window._tp('${r.id}','${p}',event)">${procIcon(p)}</button>`;
@@ -2771,10 +2791,10 @@ function detailInner(r){
     // purchasing everything it needs — the same fields the Need PO tab reads and pools on
     const vendorRow = (ext && !done) ? `<div class="ss-vrow" onclick="event.stopPropagation()">
       <i class="ti ti-truck-delivery" title="Vendor info for the PO"></i>
-      <input class="ss-vin" list="vendor-list" placeholder="Vendor" value="${esc(step.vendor||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','vendor',this.value)">
-      <input class="ss-vin grow" placeholder="${extKind(p).group==='outsource'?'Item(s) sent out — e.g. (15) brackets':'Item(s) to purchase — e.g. 14ga 304 sheet'}" value="${esc(step.itemsPurchased||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','itemsPurchased',this.value)">
-      <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black" value="${esc(step.detail||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','detail',this.value)">
-      ${step.vendorPO?`<span class="ss-vpo" title="PO already assigned">PO ${esc(step.vendorPO)}</span>`:''}
+      ${vendorSelectHtml(step.vendor, `class="ss-vin" title="Approved vendor for this step" onchange="window._stepVendorSel(this,'${r.id}','${pJs}')"`)}
+      <input class="ss-vin grow" placeholder="${extKind(p).group==='outsource'?'Item(s) sent out — e.g. (15) brackets':'Item(s) to purchase — e.g. 14ga 304 sheet'}" value="${esc2(step.itemsPurchased||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','itemsPurchased',this.value)">
+      <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black" value="${esc2(step.detail||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','detail',this.value)">
+      ${step.vendorPO?`<span class="ss-vpo" title="PO already assigned">PO ${esc2(step.vendorPO)}</span>`:''}
     </div>` : '';
     return`<div class="sched-step ss-on${done?' ss-done':''}">
       <i class="ti ti-${done?'circle-check-filled':'circle'} ss-check" style="cursor:pointer;color:${done?'var(--text3)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${p}',event)"></i>
@@ -4283,7 +4303,7 @@ window.showPage = (page) => {
   if(page==='cutlist') clInit();
   if(page==='archive') renderArchive();
   if(page==='trash') renderTrash();
-  if(page==='settings'){ renderDurationSettings(); if(typeof maybeAutoBackup==='function') maybeAutoBackup(); }
+  if(page==='settings'){ renderDurationSettings(); renderVendorSettings(); if(typeof maybeAutoBackup==='function') maybeAutoBackup(); }
   { const dm={dashboard:'dock-dashboard',orders:'dock-orders',queues:'dock-queues',dispatch:'dock-dispatch'};
     document.querySelectorAll('.dock-tab').forEach(t=>t.classList.remove('active'));
     if(dm[page]) document.getElementById(dm[page])?.classList.add('active'); }
@@ -4954,6 +4974,100 @@ function startJobCounterListener(){
   });
 }
 function saveJobCounter(){ set(jobCounterRef, jobCounter); }
+
+// ── Approved vendors: one shared list (RTDB 'vendors') feeding every vendor dropdown ──
+// Consistent spelling is what lets the Need PO tab pool items onto one PO, so vendor
+// fields are dropdowns picking from this list instead of free text.
+const vendorsRef = ref(db, 'vendors');
+let vendorsDB = {};
+function startVendorsListener(){
+  onValue(vendorsRef, (snap) => {
+    vendorsDB = snap.val() || {};
+    if(document.getElementById('settings-page')?.style.display==='block') renderVendorSettings();
+  });
+}
+function approvedVendorNames(){
+  return [...new Set(Object.values(vendorsDB||{}).filter(Boolean).map(v=>(v.name||'').trim()).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b));
+}
+// Add a name to the approved list (case-insensitive dedupe). Returns the canonical name.
+function addVendor(nm){
+  nm=(nm||'').trim(); if(!nm) return '';
+  const existing=approvedVendorNames().find(n=>n.toLowerCase()===nm.toLowerCase());
+  if(existing) return existing;
+  const id='v_'+Date.now().toString(36)+Math.floor(Math.random()*1e4).toString(36);
+  vendorsDB[id]={name:nm};
+  set(ref(db,'vendors/'+id),{name:nm}).catch(()=>{
+    if(!window.__vendorRuleWarned){
+      window.__vendorRuleWarned=true;
+      alert('Could not save to the approved vendor list — the "vendors" database rule isn\'t published yet, so the list won\'t stick between sessions. The name still works on this order.');
+    }
+  });
+  renderVendorSettings();   // instant feedback if the Settings page is open
+  return nm;
+}
+// A vendor <select>: approved names + the current value (even if off-list) + "add new".
+function vendorSelectHtml(current, attrs){
+  const names=approvedVendorNames();
+  const cur=(current||'').trim();
+  return `<select ${attrs||''}>
+    <option value="">— vendor —</option>
+    ${cur&&!names.includes(cur)?`<option value="${esc2(cur)}" selected>${esc2(cur)}</option>`:''}
+    ${names.map(n=>`<option value="${esc2(n)}"${n===cur?' selected':''}>${esc2(n)}</option>`).join('')}
+    <option value="__new__">＋ Add new vendor…</option>
+  </select>`;
+}
+// Handle the "+ Add new vendor…" choice: prompt, save to the list, select it.
+// Returns the chosen name, or null if the prompt was cancelled.
+window._resolveVendorSel=(sel)=>{
+  if(sel.value!=='__new__') return sel.value;
+  const nm=(prompt('New vendor — exact name to add to the approved list:')||'').trim();
+  if(!nm){ sel.value=''; return null; }
+  const finalNm=addVendor(nm);
+  if(![...sel.options].some(o=>o.value===finalNm)){
+    const opt=document.createElement('option'); opt.value=finalNm; opt.textContent=finalNm;
+    sel.insertBefore(opt, sel.querySelector('option[value="__new__"]'));
+  }
+  sel.value=finalNm;
+  return finalNm;
+};
+window._stepVendorSel=(sel,id,name)=>{
+  const v=window._resolveVendorSel(sel);
+  if(v==null) return;
+  window._stepVendorInfo(id,name,'vendor',v);
+};
+// Settings page: manage the list
+function renderVendorSettings(){
+  const host=document.getElementById('vendor-list-ui'); if(!host) return;
+  const entries=Object.entries(vendorsDB||{}).filter(([,v])=>v&&(v.name||'').trim())
+    .sort((a,b)=>a[1].name.localeCompare(b[1].name));
+  host.innerHTML=entries.length
+    ? entries.map(([id,v])=>`<div class="vs-row"><span>${esc2(v.name)}</span><i class="ti ti-trash" title="Remove from list" onclick="window._vsDel('${id}')"></i></div>`).join('')
+    : '<div style="padding:12px;font-size:12px;color:var(--text3)">No approved vendors yet. Add one below, or press <b>Import from orders</b> to pull in the names already used.</div>';
+}
+window._vsAdd=()=>{
+  const inp=document.getElementById('vs-new');
+  const nm=(inp&&inp.value||'').trim(); if(!nm) return;
+  addVendor(nm); if(inp) inp.value='';
+  renderVendorSettings();
+};
+window._vsDel=(id)=>{
+  const v=vendorsDB[id]; if(!v) return;
+  if(!confirm(`Remove "${v.name}" from the approved vendor list?\n\nOrders already using this vendor keep the name — it just stops being offered in the dropdowns.`)) return;
+  delete vendorsDB[id];
+  remove(ref(db,'vendors/'+id)).catch(e=>alert('Delete failed: '+e.message));
+  renderVendorSettings();
+};
+window._vsImport=()=>{
+  const stepsOf=o=>{const st=o&&o.schedule&&o.schedule.steps;return Array.isArray(st)?st:(st&&typeof st==='object'?Object.values(st):[]);};
+  const names=[...new Set(orders.flatMap(o=>stepsOf(o).map(s=>s&&(s.vendor||'').trim()).filter(Boolean)))];
+  const have=new Set(approvedVendorNames().map(n=>n.toLowerCase()));
+  const fresh=names.filter(n=>!have.has(n.toLowerCase()));
+  if(!fresh.length){ alert('Nothing new to import — every vendor already typed on your orders is on the list.'); return; }
+  fresh.forEach(n=>addVendor(n));
+  renderVendorSettings();
+  alert('Imported '+fresh.length+' vendor'+(fresh.length!==1?'s':'')+':\n'+fresh.join('\n'));
+};
 function baseToString(letter, num){ return letter + String(num).padStart(2,'0'); }
 function nextLetter(L){ let c=L.charCodeAt(0)+1; if(c>90) c=65; return String.fromCharCode(c); }
 function advanceJobCounter(){
@@ -5090,7 +5204,7 @@ window.confirmRestore = async () => {
 };
 
 // ── Automatic rolling snapshots (kept in Firebase) ───────────────────────────
-const AUTO_BACKUP_NODES = ['orders','trash','team','customers','durations','jobCounter'];
+const AUTO_BACKUP_NODES = ['orders','trash','team','customers','durations','jobCounter','vendors'];
 const AUTO_BACKUP_INTERVAL_MS = 20*60*60*1000;   // ~daily (only one per ~20h)
 const AUTO_BACKUP_KEEP = 14;
 let _autoBackupBusy=false, _autoBackupTimer=null, _backupRulesOk=true;
@@ -5521,7 +5635,6 @@ window.setNeedPOView=(v)=>{
 };
 function renderNeedPO(){
   if(needPOView==='vendor'){ renderNeedPOByVendor(); return; }
-  ensureVendorDatalist();
   const host=document.getElementById('needpo-body'); if(!host) return;
   const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order')
     .sort((a,b)=>((a.priority==null?2:a.priority)-(b.priority==null?2:b.priority)) || (a.due||'').localeCompare(b.due||''));
@@ -5552,7 +5665,7 @@ function renderNeedPO(){
         <div class="np-step-top">
           <span class="np-stepic" style="color:${col}">${procIcon(s.name,16)}</span>
           <span class="np-stepname">${shortProc(s.name)}<span class="np-steptag">${k.group==='outsource'?'send out':'purchase'}</span></span>
-          <input class="np-in" id="np-v-${r.id}-${i}" list="vendor-list" placeholder="Vendor" value="${esc(s.vendor)}">
+          ${vendorSelectHtml(s.vendor, `class="np-in" id="np-v-${r.id}-${i}" onchange="window._resolveVendorSel(this)"`)}
           <input class="np-in" id="np-p-${r.id}-${i}" placeholder="Our PO #" value="${esc(s.vendorPO)}">
           <button class="btn sm ${has?'':'blue'}" onclick="assignVendorPO('${r.id}','${esc(s.name)}',${i})">${has?'Update':'Assign'}</button>
         </div>
@@ -5580,7 +5693,6 @@ function renderNeedPO(){
 
 // ── Need PO, grouped for purchasing: pools un-assigned steps so one PO can cover everything from a vendor ──
 function renderNeedPOByVendor(){
-  ensureVendorDatalist();
   const host=document.getElementById('needpo-body'); if(!host) return;
   const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order');
@@ -5646,7 +5758,7 @@ function renderNeedPOByVendor(){
       </div>
       <div class="npv-rows">${rowsHtml}</div>
       <div class="npv-po-row">
-        ${noVendor?`<input id="npv-vend-${gi}" list="vendor-list" placeholder="Vendor for this group" style="max-width:220px">`:''}
+        ${noVendor?vendorSelectHtml('', `id="npv-vend-${gi}" title="Vendor for this group" style="max-width:220px" onchange="window._resolveVendorSel(this)"`):''}
         <input id="npv-po-${gi}" placeholder="Our PO # — goes on every ticked item above">
         <button class="btn sm blue" id="npv-btn-${gi}" onclick="window._npvAssignAll(${gi})">Assign to selected (${g.rows.length})</button>
       </div>
@@ -6062,22 +6174,7 @@ window._stepVendorInfo = (id, name, field, val) => {
   const step = ensureSchedule(r).steps.find(s=>s.name===name); if(!step) return;
   step[field] = (val||'').trim();
   saveDB();
-  ensureVendorDatalist();
 };
-// One shared <datalist> of every vendor name already used on any step, so vendor boxes
-// autocomplete and the same shop is always spelled the same way (grouping depends on it).
-// Hardened against Firebase data shapes: null holes in the orders list, and step lists
-// stored as objects instead of arrays. Autocomplete is a nicety — it must never be the
-// reason a page fails to render, hence the blanket catch.
-function ensureVendorDatalist(){
-  try{
-    let dl=document.getElementById('vendor-list');
-    if(!dl){ dl=document.createElement('datalist'); dl.id='vendor-list'; document.body.appendChild(dl); }
-    const stepsOf=o=>{ const st=o&&o.schedule&&o.schedule.steps; return Array.isArray(st)?st:(st&&typeof st==='object'?Object.values(st):[]); };
-    const names=[...new Set(orders.flatMap(o=>stepsOf(o).map(s=>s&&(s.vendor||'').trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b));
-    dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
-  }catch(e){}
-}
 window._stepStart = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
   const sch = ensureSchedule(r);
