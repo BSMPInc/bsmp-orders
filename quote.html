@@ -5299,6 +5299,7 @@ function clearHistory(){
 
 function reloadQuote(id){
   const q=HISTORY.find(h=>h.id===id); if(!q) return;
+  if(q.isAssembly){ loadAssemblyQuote(q); return; }   // assemblies reopen in their own panel
   showPanel('quote');
   const sv=(id,val)=>{const el=document.getElementById(id); if(el && val!==undefined && val!==null && val!=='') el.value=val;};
 
@@ -6386,7 +6387,7 @@ function calcAssembly() {
   bd += `<div class="breakdown-row total"><span class="breakdown-label">Price / assembly × ${orderQty}</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('asm-breakdown').innerHTML = bd;
 
-  window._asmCalc = {orderQty, markup, finance, partsCost, opsCost, assemblyCost, markupAmt, assemblyPrice, jobTotal, margin};
+  window._asmCalc = {orderQty, markup, finance, partsCost, opsCost, assemblyCost, markupAmt, assemblyPrice, jobTotal, margin, opsLines};
   calcAsmQtyBreaks();
 }
 
@@ -6399,6 +6400,61 @@ function copyAssembly() {
   asmSelectedParts.forEach(p => txt += `  ${p.name} ×${p.qtyPerAssembly}: ${fmt(p.costPerPart)}/part = ${fmt(p.costPerPart*p.qtyPerAssembly)}/assy\n`);
   txt += `\nParts cost: ${fmt(d.partsCost)}\nAssembly ops: ${fmt(d.opsCost)}\nMarkup: ${fmt(d.markupAmt)}\nPrice/assembly: ${fmt(d.assemblyPrice)}\nJob total (×${d.orderQty}): ${fmt(d.jobTotal)}`;
   navigator.clipboard.writeText(txt).catch(()=>{});
+}
+
+// Reopen a saved assembly quote in the New Assembly panel. Saves made after 2026-07-08
+// carry the full component + ops detail; older ones only stored "Assembly: NAME×2, …"
+// in the notes, so components are rebuilt by matching part names against saved part
+// quotes (ops couldn't be saved back then and need re-adding).
+function loadAssemblyQuote(q){
+  showAssemblyPanel();
+  document.getElementById('asm-job-name').value = (q.partNum && q.partNum!=='—') ? q.partNum : '';
+  const sel=document.getElementById('asm-customer');
+  if(sel){
+    const cust=(q.customer && q.customer!=='—') ? q.customer : '';
+    if(cust && ![...sel.options].some(o=>o.value===cust)){
+      const o=document.createElement('option'); o.value=cust; o.textContent=cust; sel.appendChild(o);
+    }
+    sel.value=cust;
+  }
+  document.getElementById('asm-order-qty').value = q.qty||1;
+  if(q.markup!=null)  document.getElementById('asm-markup').value  = Math.round(q.markup*100);
+  if(q.finance!=null) document.getElementById('asm-finance').value = (q.finance*100).toFixed(1);
+
+  const missing=[];
+  let oldFormat=false;
+  if(Array.isArray(q.components) && q.components.length){
+    asmSelectedParts = q.components.map(c=>({ ...c, instanceId: Date.now()+Math.random() }));
+  } else {
+    oldFormat=true;
+    asmSelectedParts=[];
+    const m=(q.notes||'').match(/Assembly:\s*(.+)/i);
+    if(m){
+      m[1].split(',').map(s=>s.trim()).filter(Boolean).forEach(tok=>{
+        const mm=tok.match(/^(.*?)\s*[×x]\s*(\d+)$/i);
+        const name=(mm?mm[1]:tok).trim();
+        const qpa=mm?(parseInt(mm[2])||1):1;
+        const h=HISTORY.find(x=>!x.isAssembly && (x.partNum||'').toLowerCase()===name.toLowerCase());
+        if(h){
+          asmSelectedParts.push({quoteId:h.id, instanceId:Date.now()+Math.random(),
+            name:h.partNum||name, customer:h.customer||'', material:h.material||'', qty:h.qty||1,
+            pricePerPart:parseFloat(h.pricePerPart)||0, costPerPart:parseFloat(h.costPerPart)||0,
+            qtyPerAssembly:qpa});
+        } else missing.push(name);
+      });
+    }
+  }
+
+  // rebuild the ops rows (calcAssembly skips removed row ids, so clearing is safe)
+  const cont=document.getElementById('asm-ops-list'); if(cont) cont.innerHTML='';
+  (Array.isArray(q.ops)?q.ops:[]).forEach(op=>addAsmOp(op.op, op.mins));
+
+  renderAsmParts();
+  if(asmSelectedParts.length) calcAssembly();
+  if(oldFormat){
+    const parts = missing.length ? ('\n\nThese component part quotes were not found in history and need re-adding: '+missing.join(', ')) : '';
+    alert('This assembly was saved before full details were kept. The component list was rebuilt from the latest saved part quotes, and the welding/assembly operations were NOT saved back then — re-add them and check the price before re-quoting.'+parts);
+  }
 }
 
 function saveAssembly() {
@@ -6414,7 +6470,10 @@ function saveAssembly() {
     markup: d.markup, finance: d.finance,
     laborLines: [], hwLines: [], outLines: [],
     notes: 'Assembly: ' + asmSelectedParts.map(p=>p.name+'×'+p.qtyPerAssembly).join(', '),
-    isAssembly: true, partCount: asmSelectedParts.length
+    isAssembly: true, partCount: asmSelectedParts.length,
+    // full detail so the assembly can be reloaded exactly (older saves only had the note)
+    components: asmSelectedParts.map(p=>({quoteId:p.quoteId,name:p.name,customer:p.customer,material:p.material,qty:p.qty,pricePerPart:p.pricePerPart,costPerPart:p.costPerPart,qtyPerAssembly:p.qtyPerAssembly})),
+    ops: (d.opsLines||[]).map(l=>({op:l.op,mins:l.mins}))
   };
   HISTORY.unshift(quote);
   if (HISTORY.length > 500) HISTORY.pop();
