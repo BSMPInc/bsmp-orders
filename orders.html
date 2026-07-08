@@ -1090,7 +1090,7 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="sidebar-section-label">Directory</div>
     <div class="nav-item" id="nav-customers" onclick="showPage('customers')"><i class="ti ti-users"></i> Customers</div>
     <div class="nav-item" id="nav-team" onclick="showPage('team')"><i class="ti ti-users-group"></i> Team</div>
-    <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> Process Times</div>
+    <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i> <span class="nav-label">Settings</span></div>
     <div class="nav-item" id="nav-issuedpos" onclick="showPage('issuedpos')"><i class="ti ti-receipt"></i> Issued POs</div>
     <div class="nav-item" id="nav-archive" onclick="showPage('archive')"><i class="ti ti-archive"></i> Archive</div>
     <div class="nav-item" id="nav-trash" onclick="showPage('trash')"><i class="ti ti-trash"></i> <span class="nav-label">Recently Deleted</span><span class="nav-badge" id="badge-trash" style="display:none"></span></div>
@@ -4258,7 +4258,7 @@ const PAGE_META = {
   issuedpos:{title:'Issued POs',      sub:'History of every purchase order assigned to a vendor'},
   cutlist:  {title:'Tube Cut List',   sub:'Optimize tube/bar cuts for maximum material utilization'},
   archive:  {title:'Archive',        sub:'Completed orders you have archived'},
-  settings: {title:'Process Times',  sub:'Lead times for outside processes'}
+  settings: {title:'Settings',       sub:'Job numbering, approved vendors, process times & backups'}
 };
 window.showPage = (page) => {
   if(window._phoneCloseDrawer) window._phoneCloseDrawer();   // phones: tuck the nav drawer away after picking a page
