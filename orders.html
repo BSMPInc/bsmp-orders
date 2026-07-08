@@ -215,6 +215,7 @@ select:focus{border-color:var(--green)}
 .q-open-btn:hover{background:var(--bg);border-color:var(--navy3);color:var(--navy3)}
 @keyframes rowflash{0%{background:#fff6d6}100%{background:transparent}}
 .row-flash td{animation:rowflash 1.6s ease-out}
+.ci-row.row-flash{animation:rowflash 1.6s ease-out}
 /* Operator (restricted) role — hide manager-only chrome */
 body.role-operator .mgr-only{display:none !important}
 body.role-operator .op-only{display:block !important}
@@ -2491,7 +2492,7 @@ function poItemsHtml(g){
     const osLine=os?(()=>{const k=extKind(os.name);return `<span class="ci-out" title="${shortProc(os.name)}: ${k.a} ${fmtDate(toISO(os.start))} → ${k.b} ${fmtDate(toISO(os.end))}"><span class="co-dot" style="background:${PROCESS_COLORS[os.name]||'#888'}"></span>${shortProc(os.name)} ${k.a} ${fmtDate(toISO(os.start))}</span>`;})():'';
     const miss=missingFields(r);
     const missBadge=miss.length?`<i class="ti ti-alert-triangle ci-miss" title="Missing: ${miss.join(', ')}"></i>`:'';
-    return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}${r.buildOnly?' build-only':''}" onclick="window._tl('${r.id}',event)">
+    return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}${r.buildOnly?' build-only':''}" data-rowid="${r.id}" onclick="window._tl('${r.id}',event)">
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
         <span class="ci-desc-main" title="${((r.part?('Part '+r.part):'')+(r.part&&r.desc?' · ':'')+(r.desc||'')).replace(/"/g,'&quot;')}">${missBadge}${clip}${r.part||r.desc||'<span style="color:var(--text3)">(no part #)</span>'}</span>
@@ -3319,6 +3320,15 @@ window.addPartToPO = (id) => {
   document.getElementById('f-cost').value='';
   setTimeout(()=>document.getElementById('f-part').focus(), 60);
 };
+// After creating or importing an order, open its card and bring it into view so the
+// schedule, vendor info, and other details can be filled in right away.
+function revealNewOrder(id){
+  expanded.add(id);
+  setTimeout(()=>{
+    const el=document.querySelector(`[data-rowid="${id}"]`);
+    if(el){ el.classList.add('row-flash'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
+  },140);
+}
 window.saveOrder=()=>{
   const customer=document.getElementById('f-customer').value.trim();if(!customer){alert('Customer name is required.');return;}
   const buildOnly=document.getElementById('f-buildonly').checked;
@@ -3339,7 +3349,7 @@ window.saveOrder=()=>{
   // if adding a part with copied process steps, seed its schedule
   if(!editId && _prefillSteps){ order.schedule = { steps: _prefillSteps }; }
   _prefillSteps = null;
-  if(editId){const i=orders.findIndex(o=>o.id===editId);orders[i]=order;}else orders.unshift(order);
+  if(editId){const i=orders.findIndex(o=>o.id===editId);orders[i]=order;}else{orders.unshift(order);revealNewOrder(order.id);}
   maybeAdvanceCounter(order.job);
   saveDB();render();closeModal('add-modal');
 };
@@ -3457,10 +3467,11 @@ window._doQuoteImport = (id) => {
   };
   orders.unshift(order);
   maybeAdvanceCounter(order.job);
-  saveDB(); invalidateSched(); render();
+  saveDB(); invalidateSched();
   closeModal('qimport-modal');
   showPage('orders'); setFilter('');
-  setTimeout(()=>{ const el=document.querySelector(`[data-rowid="${order.id}"]`); if(el){ el.classList.add('row-flash'); el.scrollIntoView({behavior:'smooth',block:'center'}); } }, 140);
+  revealNewOrder(order.id);   // open the new card, scroll to it, flash it
+  render();
 };
 
 window.closeModal=(id)=>document.getElementById(id).style.display='none';
@@ -3486,6 +3497,7 @@ window.handleFile=async(input)=>{
 window.importAIOrders=()=>{
   if(!aiParsed||!aiParsed.length)return;
   // build new order objects, then assign internal job numbers per customer+PO
+  let firstNewId=null;
   aiParsed.forEach(r=>{
     const o={id:uid(),customer:r.customer||'',po:r.po||'',job:'',part:r.part||'',desc:r.desc||'',qty:parseFloat(r.qty)||0,cost:parseFloat(r.cost)||0,total:(parseFloat(r.qty)||0)*(parseFloat(r.cost)||0),ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
     // assign job number considering existing + already-added-this-batch orders
@@ -3493,7 +3505,10 @@ window.importAIOrders=()=>{
     orders.unshift(o);                 // add first so same-PO siblings get -2, -3…
     maybeAdvanceCounter(o.job);         // advance counter only when a new base is claimed
     if(o.customer) autoIndexCustomer(o.customer, r.poNotes||"");
+    expanded.add(o.id);                 // every imported card opens, ready for details
+    if(!firstNewId) firstNewId=o.id;
   });
+  if(firstNewId) revealNewOrder(firstNewId);
   saveDB();render();closeModal('ai-modal');document.getElementById('ai-result-box').style.display='none';document.getElementById('file-input').value='';aiParsed=[];
 };
 
