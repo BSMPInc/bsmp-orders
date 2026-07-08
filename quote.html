@@ -8075,9 +8075,14 @@ function printAssemblyQuote(){
   if(!d || !asmSelectedParts.length){ alert("Add parts and calculate the assembly first."); return; }
   const jobName = (document.getElementById("asm-job-name").value||"").trim() || "Assembly";
   const customer = (document.getElementById("asm-customer").value||"").trim();
+  // Part number first, then each component of the assembly on its own line with its
+  // per-assembly quantity \u2014 reads like a bill of materials on the printed quote.
   const descLines = [ jobName ];
-  const comps = asmSelectedParts.map(p => p.name + " \u00d7" + p.qtyPerAssembly).join(", ");
-  if(comps) descLines.push("Welded assembly \u2014 " + comps);
+  if(asmSelectedParts.length) descLines.push("Welded assembly:");
+  asmSelectedParts.forEach(p => {
+    const q = p.qtyPerAssembly || 1;
+    descLines.push(`${p.name} (${q} ${q===1?"pc":"pcs"})`);
+  });
   openCustomerQuoteModal({
     customer, descLines,
     qty: d.orderQty,
