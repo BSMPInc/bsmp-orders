@@ -541,6 +541,15 @@ tr:hover .del-btn{opacity:1}
 .sched-grp-label.int{color:var(--text3)}
 .sched-steps.grp-ext .sched-step .ss-name,.sched-steps.grp-int .sched-step .ss-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sched-step.ss-done{opacity:.6}
+/* vendor/details line under each outsourced step — filled in when the order is entered
+   so purchasing finds everything ready to pool on the Need PO tab */
+.ss-vrow{display:flex;align-items:center;gap:7px;padding:0 8px 2px 94px;margin-top:-3px}
+.ss-vrow .ti{font-size:13px;color:var(--text3);flex-shrink:0}
+.ss-vin{font-size:11px;padding:4px 8px;border:1px solid var(--border2);border-radius:6px;font-family:inherit;background:#fff;min-width:0;width:150px}
+.ss-vin.grow{flex:1}
+.ss-vin::placeholder{color:var(--text3)}
+.ss-vpo{font-size:10px;font-weight:700;color:#3B6D11;background:#eaf5d8;border-radius:6px;padding:2px 7px;white-space:nowrap;flex-shrink:0}
+@media(max-width:700px){.ss-vrow{flex-wrap:wrap;padding-left:8px}.ss-vin{width:100%}}
 .ss-check{font-size:17px}
 .ss-move{display:flex;flex-direction:column;line-height:.6}
 .ss-seq{font-size:10px;font-weight:700;color:var(--text2);text-align:center}
@@ -2719,6 +2728,7 @@ function procState(r, p){
   return '';
 }
 function detailInner(r){
+  ensureVendorDatalist();
   const procBtns=(list)=>list.map(p=>{
     const st=procState(r,p);
     return`<button class="proc-btn icon-btn${st==='done'?' done':st==='active'?' active':''}" title="${p}${st?' — '+(st==='done'?'done':'in progress'):''}" aria-label="${p}" onclick="window._tp('${r.id}','${p}',event)">${procIcon(p)}</button>`;
@@ -2757,6 +2767,15 @@ function detailInner(r){
          ${sdate('needBy', step.needBy, 'Need this step finished by', false)}
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
          <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`;
+    // outsourced steps get a vendor/details line so whoever enters the order can hand
+    // purchasing everything it needs — the same fields the Need PO tab reads and pools on
+    const vendorRow = (ext && !done) ? `<div class="ss-vrow" onclick="event.stopPropagation()">
+      <i class="ti ti-truck-delivery" title="Vendor info for the PO"></i>
+      <input class="ss-vin" list="vendor-list" placeholder="Vendor" value="${esc(step.vendor||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','vendor',this.value)">
+      <input class="ss-vin grow" placeholder="${extKind(p).group==='outsource'?'Item(s) sent out — e.g. (15) brackets':'Item(s) to purchase — e.g. 14ga 304 sheet'}" value="${esc(step.itemsPurchased||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','itemsPurchased',this.value)">
+      <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black" value="${esc(step.detail||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','detail',this.value)">
+      ${step.vendorPO?`<span class="ss-vpo" title="PO already assigned">PO ${esc(step.vendorPO)}</span>`:''}
+    </div>` : '';
     return`<div class="sched-step ss-on${done?' ss-done':''}">
       <i class="ti ti-${done?'circle-check-filled':'circle'} ss-check" style="cursor:pointer;color:${done?'var(--text3)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${p}',event)"></i>
       <span class="ss-move">
@@ -2771,7 +2790,7 @@ function detailInner(r){
       <span class="ss-spacer"></span>
       <span class="ss-date${done?' done':''}">${dateLabel}</span>
       <i class="ti ti-x ss-rm" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
-    </div>`;
+    </div>${vendorRow}`;
   };
   const rowsOf = (pred)=>ord.map((s,i)=>({s,i})).filter(o=>pred(o.s)).map(o=>renderRow(o.s,o.i)).join('');
   const extRows = rowsOf(s=>isExternal(s.name));
@@ -5502,6 +5521,7 @@ window.setNeedPOView=(v)=>{
 };
 function renderNeedPO(){
   if(needPOView==='vendor'){ renderNeedPOByVendor(); return; }
+  ensureVendorDatalist();
   const host=document.getElementById('needpo-body'); if(!host) return;
   const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order')
     .sort((a,b)=>((a.priority==null?2:a.priority)-(b.priority==null?2:b.priority)) || (a.due||'').localeCompare(b.due||''));
@@ -5532,7 +5552,7 @@ function renderNeedPO(){
         <div class="np-step-top">
           <span class="np-stepic" style="color:${col}">${procIcon(s.name,16)}</span>
           <span class="np-stepname">${shortProc(s.name)}<span class="np-steptag">${k.group==='outsource'?'send out':'purchase'}</span></span>
-          <input class="np-in" id="np-v-${r.id}-${i}" placeholder="Vendor" value="${esc(s.vendor)}">
+          <input class="np-in" id="np-v-${r.id}-${i}" list="vendor-list" placeholder="Vendor" value="${esc(s.vendor)}">
           <input class="np-in" id="np-p-${r.id}-${i}" placeholder="Our PO #" value="${esc(s.vendorPO)}">
           <button class="btn sm ${has?'':'blue'}" onclick="assignVendorPO('${r.id}','${esc(s.name)}',${i})">${has?'Update':'Assign'}</button>
         </div>
@@ -5560,6 +5580,7 @@ function renderNeedPO(){
 
 // ── Need PO, grouped for purchasing: pools un-assigned steps so one PO can cover everything from a vendor ──
 function renderNeedPOByVendor(){
+  ensureVendorDatalist();
   const host=document.getElementById('needpo-body'); if(!host) return;
   const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order');
@@ -5625,7 +5646,7 @@ function renderNeedPOByVendor(){
       </div>
       <div class="npv-rows">${rowsHtml}</div>
       <div class="npv-po-row">
-        ${noVendor?`<input id="npv-vend-${gi}" placeholder="Vendor for this group" style="max-width:220px">`:''}
+        ${noVendor?`<input id="npv-vend-${gi}" list="vendor-list" placeholder="Vendor for this group" style="max-width:220px">`:''}
         <input id="npv-po-${gi}" placeholder="Our PO # — goes on every ticked item above">
         <button class="btn sm blue" id="npv-btn-${gi}" onclick="window._npvAssignAll(${gi})">Assign to selected (${g.rows.length})</button>
       </div>
@@ -6034,6 +6055,23 @@ window._stepDuration = (id, name, val) => {
   step.duration = parseFloat(val)||1;
   saveDB();
 };
+// Vendor / item / details typed on an outsourced step in Open Orders — same fields the
+// Need PO tab reads, so purchasing finds them pre-filled and pooled by vendor+process.
+window._stepVendorInfo = (id, name, field, val) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const step = ensureSchedule(r).steps.find(s=>s.name===name); if(!step) return;
+  step[field] = (val||'').trim();
+  saveDB();
+  ensureVendorDatalist();
+};
+// One shared <datalist> of every vendor name already used on any step, so vendor boxes
+// autocomplete and the same shop is always spelled the same way (grouping depends on it).
+function ensureVendorDatalist(){
+  let dl=document.getElementById('vendor-list');
+  if(!dl){ dl=document.createElement('datalist'); dl.id='vendor-list'; document.body.appendChild(dl); }
+  const names=[...new Set(orders.flatMap(o=>((o.schedule&&o.schedule.steps)||[]).map(s=>s&&(s.vendor||'').trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b));
+  dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
+}
 window._stepStart = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
   const sch = ensureSchedule(r);
