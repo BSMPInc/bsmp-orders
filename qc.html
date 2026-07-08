@@ -2015,6 +2015,11 @@ window.qcCoverSheetOpen=()=>{
     const pos=[...new Set(picked.map(c=>c.po).filter(Boolean))];
     const poEl=ov.querySelector('#cs-po');
     if(poEl && !poEl.value && pos.length===1) poEl.value=pos[0];
+    // same idea for job/part: if the picked certs' linked orders all point at one job, prefill it
+    const jobs=[...new Set(picked.flatMap(c=>(c.linkedOrders||[]).map(oid=>ORDERS[oid]).filter(Boolean))
+      .map(o=>[o.job,o.part].filter(Boolean).join(' — ')).filter(Boolean))];
+    const jobEl=ov.querySelector('#cs-job');
+    if(jobEl && !jobEl.value && jobs.length===1) jobEl.value=jobs[0];
   };
   ov.addEventListener('change',e=>{ if(e.target&&e.target.classList&&e.target.classList.contains('cs-pick')) rebuildCust(); });
   rebuildCust();
@@ -2036,12 +2041,26 @@ window.qcCoverSheetPrint=()=>{
   // customer-facing paperwork matches (no order/due dates on a cert package).
   const th=(txt,extra)=>`<th style="padding:0 8px 8px${extra||''};text-align:left;font-size:10px;font-weight:700;color:#222;letter-spacing:.3px">${txt}</th>`;
   const td=(html,extra)=>`<td style="padding:12px 8px;border-bottom:1px dashed #ccc;font-size:12px;vertical-align:top${extra||''}">${html}</td>`;
+  // job # / part # per cert, from its linked orders — only the chosen customer's orders
+  // (a cert can serve several customers' jobs; this copy goes to one of them)
+  const jobCell=(c)=>{
+    const os=(c.linkedOrders||[]).map(oid=>ORDERS[oid]).filter(Boolean);
+    const rel=customer?os.filter(o=>(o.customer||'').trim().toLowerCase()===customer.trim().toLowerCase()):os;
+    const use=rel.length?rel:os;
+    if(!use.length) return '—';
+    const seen=new Set();
+    return use.map(o=>{
+      const key=(o.job||'')+'|'+(o.part||''); if(seen.has(key)||key==='|') return ''; seen.add(key);
+      return `<div style="font-weight:700;color:#000">${esc(o.job||'—')}</div>${o.part?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(o.part)}</div>`:''}`;
+    }).join('')||'—';
+  };
   const trows=certs.map((c,i)=>`<tr>
     ${td(String(i+1),';color:#888;text-align:right;padding-left:0')}
     ${td(`<div style="font-weight:700;color:#000">${esc(c.material||'—')}</div>${c.size?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(c.size)}</div>`:''}`)}
     ${td(esc(c.spec||'—'))}
     ${td(esc(c.heatLot||'—'))}
     ${td(esc(c.certNo||'—'))}
+    ${td(jobCell(c))}
     ${td(`${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(c.mill)}</div>`:''}`,';padding-right:0')}
   </tr>`).join('');
   const infoCol=(label,val)=>`<div style="flex:1;min-width:90px"><div style="font-size:10px;font-weight:700;color:#222;letter-spacing:.3px">${label}</div><div style="font-size:12px;color:#333;margin-top:2px">${val||'—'}</div></div>`;
@@ -2082,6 +2101,7 @@ window.qcCoverSheetPrint=()=>{
         ${th('SPECIFICATION')}
         ${th('HEAT / LOT')}
         ${th('CERT #')}
+        ${th('JOB # / PART #')}
         ${th('SUPPLIER / MILL',';padding-right:0')}
       </tr></thead>
       <tbody>${trows}</tbody>
