@@ -437,6 +437,12 @@ tr:hover .del-btn{opacity:1}
 .npv-po-row{display:flex;align-items:center;gap:9px;padding:10px 15px;background:#fafbfd;border-top:1px solid var(--border2)}
 .npv-po-row input{flex:1;min-width:90px;font-size:12.5px;padding:7px 10px;border:1px solid var(--border);border-radius:7px}
 .npv-noassign{font-size:10px;font-weight:700;color:#BA7517;text-transform:uppercase;letter-spacing:.04em;background:#BA751714;border-radius:5px;padding:2px 7px}
+/* pick which pooled items go on this PO; unticked rows stay pending for the next one */
+.npv-pick{width:16px;height:16px;margin:0;accent-color:#2563eb;cursor:pointer;flex-shrink:0}
+.npv-row.unpicked{opacity:.4}
+.npv-ordqty{font-size:11px;color:var(--text3);width:70px;text-align:right;flex-shrink:0;white-space:nowrap}
+.np-ordqty{font-size:11.5px;font-weight:700;color:var(--text2);background:#eef2f8;border-radius:20px;padding:2px 10px;white-space:nowrap}
+.np-ordqty b{color:var(--text)}
 .np-empty i{font-size:34px;opacity:.5;display:block;margin-bottom:10px;color:var(--green)}
 .np-empty div{font-size:15px;font-weight:700;color:var(--text2);margin-bottom:4px}
 .np-empty span{font-size:12px}
@@ -5533,6 +5539,7 @@ function renderNeedPO(){
         <span class="np-prio" style="background:${PRIORITY_COLOR[pr]}">${PRIORITY_LABEL[pr]}</span>
         <span class="np-part">${esc(r.part)||esc(r.desc)||'—'}</span>
         <span class="np-cust">${esc(r.customer)||''}${r.po?' · Cust PO '+esc(r.po):''}</span>
+        ${r.qty?`<span class="np-ordqty" title="Quantity required for this order">Order qty <b>${esc(r.qty)}</b></span>`:''}
         ${r.due?`<span class="np-due">Due ${fmtDate(r.due)}</span>`:''}
         <button class="btn sm green" style="margin-left:auto" onclick="npoComplete('${r.id}')" title="POs assigned — move out of Need PO"><i class="ti ti-check"></i> PO done → Confirmed</button>
       </div>
@@ -5556,7 +5563,7 @@ function renderNeedPOByVendor(){
       const sd=sched.find(x=>x.name===s.name);
       items.push({
         orderId:r.id, stepIdx:i, name:s.name, vendor:(s.vendor||'').trim(),
-        item:s.itemsPurchased||'', qty:s.qtyNeeded||'', detail:s.detail||'',
+        item:s.itemsPurchased||'', qty:s.qtyNeeded||'', ordQty:r.qty||'', detail:s.detail||'',
         customer:r.customer||'', job:r.job||'', part:r.part||r.desc||'', due:r.due||'',
         sendBy:sd?toISO(sd.start):'', backBy:sd?toISO(sd.end):'',
         priority:(r.priority==null?2:r.priority)
@@ -5582,11 +5589,13 @@ function renderNeedPOByVendor(){
     const totalQty=g.rows.reduce((s,x)=>s+(Number(x.qty)||0),0);
     const today=new Date(new Date().toDateString());
     const procCol=PROCESS_COLORS[g.proc]||'#888';
-    const rowsHtml=g.rows.map(x=>{
+    const rowsHtml=g.rows.map((x,ri)=>{
       const over = x.sendBy && new Date(x.sendBy+'T00:00:00')<today;
       return `<div class="npv-row">
+        <input type="checkbox" class="npv-pick" data-gi="${gi}" data-ri="${ri}" checked onchange="window._npvPickChange(this)" title="On this PO — untick to leave it for a separate PO">
         <span class="npv-from">${esc(x.customer)}${x.job?' · '+esc(x.job):''}${x.part?' · '+esc(x.part):''}</span>
         <span class="npv-item">${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.detail?` <span style="color:var(--text3)">— ${esc(x.detail)}</span>`:''}</span>
+        <span class="npv-ordqty" title="Quantity required for the order">${x.ordQty?('order '+esc(x.ordQty)):''}</span>
         <span class="npv-qtycell">${x.qty?'×'+esc(x.qty):''}</span>
         <span class="npv-due${over?' over':''}" title="Send by / back by">${x.sendBy?fmtDate(x.sendBy):'—'}${x.backBy?' → '+fmtDate(x.backBy):''}</span>
       </div>`;
@@ -5603,22 +5612,34 @@ function renderNeedPOByVendor(){
       <div class="npv-rows">${rowsHtml}</div>
       <div class="npv-po-row">
         ${noVendor?`<input id="npv-vend-${gi}" placeholder="Vendor for this group" style="max-width:220px">`:''}
-        <input id="npv-po-${gi}" placeholder="Our PO # — applies to all ${g.rows.length} item${g.rows.length!==1?'s':''} above">
-        <button class="btn sm blue" onclick="window._npvAssignAll(${gi})">Assign to all</button>
+        <input id="npv-po-${gi}" placeholder="Our PO # — goes on every ticked item above">
+        <button class="btn sm blue" id="npv-btn-${gi}" onclick="window._npvAssignAll(${gi})">Assign to selected (${g.rows.length})</button>
       </div>
     </div>`;
   }).join('');
   window._npvGroups = groups; // stash for the assign-all handler
 }
+// dim/undim a row as it's ticked on/off the PO, and keep the button count honest
+window._npvPickChange=(cb)=>{
+  const row=cb.closest('.npv-row'); if(row) row.classList.toggle('unpicked',!cb.checked);
+  const gi=cb.dataset.gi;
+  const n=[...document.querySelectorAll(`.npv-pick[data-gi="${gi}"]`)].filter(c=>c.checked).length;
+  const btn=document.getElementById('npv-btn-'+gi);
+  if(btn) btn.textContent=`Assign to selected (${n})`;
+};
 window._npvAssignAll=(gi)=>{
   const g=window._npvGroups && window._npvGroups[gi]; if(!g) return;
+  // only the ticked rows go on this PO — the rest stay pooled for the next one
+  const picks=[...document.querySelectorAll(`.npv-pick[data-gi="${gi}"]`)];
+  const rows=picks.length ? picks.filter(c=>c.checked).map(c=>g.rows[Number(c.dataset.ri)]).filter(Boolean) : g.rows;
+  if(!rows.length){ alert('Tick at least one item to put on this PO.'); return; }
   const poEl=document.getElementById(`npv-po-${gi}`);
   const po=(poEl&&poEl.value||'').trim();
   if(!po){ alert('Enter the PO # first'); return; }
   const vendEl=document.getElementById(`npv-vend-${gi}`);
   const vendor = vendEl ? (vendEl.value||'').trim() : g.vendor;
   if(!vendor){ alert('Enter a vendor for this group first'); return; }
-  g.rows.forEach(x=>{
+  rows.forEach(x=>{
     const r=orders.find(o=>o.id===x.orderId); if(!r) return;
     const s=_extStep(x.orderId, x.name); if(!s) return;
     s.vendor=vendor; s.vendorPO=po;
