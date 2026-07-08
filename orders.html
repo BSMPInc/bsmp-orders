@@ -6066,11 +6066,17 @@ window._stepVendorInfo = (id, name, field, val) => {
 };
 // One shared <datalist> of every vendor name already used on any step, so vendor boxes
 // autocomplete and the same shop is always spelled the same way (grouping depends on it).
+// Hardened against Firebase data shapes: null holes in the orders list, and step lists
+// stored as objects instead of arrays. Autocomplete is a nicety — it must never be the
+// reason a page fails to render, hence the blanket catch.
 function ensureVendorDatalist(){
-  let dl=document.getElementById('vendor-list');
-  if(!dl){ dl=document.createElement('datalist'); dl.id='vendor-list'; document.body.appendChild(dl); }
-  const names=[...new Set(orders.flatMap(o=>((o.schedule&&o.schedule.steps)||[]).map(s=>s&&(s.vendor||'').trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b));
-  dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
+  try{
+    let dl=document.getElementById('vendor-list');
+    if(!dl){ dl=document.createElement('datalist'); dl.id='vendor-list'; document.body.appendChild(dl); }
+    const stepsOf=o=>{ const st=o&&o.schedule&&o.schedule.steps; return Array.isArray(st)?st:(st&&typeof st==='object'?Object.values(st):[]); };
+    const names=[...new Set(orders.flatMap(o=>stepsOf(o).map(s=>s&&(s.vendor||'').trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b));
+    dl.innerHTML=names.map(n=>`<option value="${esc(n)}">`).join('');
+  }catch(e){}
 }
 window._stepStart = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;
