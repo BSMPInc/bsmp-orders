@@ -478,6 +478,14 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .dep-split{text-align:right;font-weight:800;font-size:14px;color:var(--green)}
 .dep-del{color:var(--text3);cursor:pointer;font-size:13px;padding:4px;border-radius:6px;text-align:center}
 .dep-del:hover{color:var(--red);background:#A32D2D0d}
+/* per-bucket transferred tick — dims the row as each split gets moved at the bank */
+.dep-actions{display:inline-flex;align-items:center;gap:10px;justify-content:flex-end}
+.dep-xfer{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--text3);cursor:pointer;white-space:nowrap;user-select:none}
+.dep-xfer input{width:16px;height:16px;margin:0;accent-color:var(--ar);cursor:pointer}
+.dep-row.done{opacity:.45}
+.dep-row.done:hover{opacity:1}
+.dep-row.done .dep-split{color:var(--text3)}
+.dep-row.done .dep-xfer{color:var(--ar)}
 .dep-foot{display:grid;grid-template-columns:1.8fr 0.9fr 1.4fr 1.1fr auto;gap:10px;align-items:center;padding:11px 16px;background:#fafbfd;font-weight:800;font-size:13px}
 .dep-foot-pct{color:var(--green);display:flex;align-items:center;gap:4px}
 .dep-foot.off .dep-foot-pct{color:var(--amber)}
@@ -1172,6 +1180,7 @@ let vendorAliases = {};   // apar/vendorAliases node: {variantKey: canonicalName
 let vendorAliasNames = {}; // apar/vendorAliasNames node: {variantKey: originalDisplayName} — for un-merge labels
 let apSplit = {};         // apar/apSplit node: {groupKey:true} -> keep this vendor+PO's steps as separate bills
 let auditLog = {};        // apar/audit node: {id:{ts,user,action,entryId,party,detail}}
+let aparSettings = {};    // apar/settings node: {deletePin} shared app settings
 let currentUser = null;   // {email, name}
 
 // Friendly display name per login email, stored in apar/userNames (so the log shows "Bert" not the email).
@@ -2904,6 +2913,12 @@ function bucketList(){
 }
 window.calcDeposit=()=>{
   const amt=Number($('dep-amount').value)||0;
+  if(amt!==_depAmount && Object.keys(_depDone).length){
+    // new deposit amount — the old tick-offs no longer apply
+    _depDone={};
+    document.querySelectorAll('.dep-row.done').forEach(r=>r.classList.remove('done'));
+    document.querySelectorAll('.dep-xfer input').forEach(c=>{c.checked=false;});
+  }
   _depAmount=amt;
   bucketList().forEach(b=>{
     const cell=$('dep-split-'+b.id);
@@ -2916,6 +2931,14 @@ window.calcDeposit=()=>{
   }
 };
 let _depAmount=0;
+let _depDone={};   // per-bucket "moved it" ticks for the CURRENT deposit only — on purpose not
+                   // saved anywhere: they reset when the amount changes, the deposit is logged,
+                   // or the page reloads (the logged entry's Transferred box is the lasting record)
+window.setBucketDone=(id,on)=>{
+  if(on)_depDone[id]=true; else delete _depDone[id];
+  const row=document.getElementById('dep-row-'+id);
+  if(row)row.classList.toggle('done',!!on);
+};
 function renderDeposit(){
   const buckets=bucketList();
   const totalPct=buckets.reduce((s,b)=>s+(Number(b.pct)||0),0);
@@ -2926,12 +2949,16 @@ function renderDeposit(){
 
   const bucketRow=b=>{
     const acctOpts=`<option value="">No account</option>`+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${b.account===id?'selected':''}>${esc(a.name)}</option>`).join('');
-    return `<div class="dep-row">
+    const done=!!_depDone[b.id];
+    return `<div class="dep-row${done?' done':''}" id="dep-row-${b.id}">
       <input class="dep-name" value="${esc(b.name)}" onchange="setBucket('${b.id}','name',this.value)">
       <div class="dep-pct-wrap"><input class="dep-pct" type="number" step="0.1" min="0" value="${b.pct}" onchange="setBucket('${b.id}','pct',this.value)"><span>%</span></div>
       <select class="dep-acct" onchange="setBucket('${b.id}','account',this.value)">${acctOpts}</select>
       <div class="dep-split" id="dep-split-${b.id}">${fmtMoney(amt*(Number(b.pct)||0)/100)}</div>
-      <span class="dep-del" onclick="deleteBucket('${b.id}','${esc(b.name)}')" title="Delete bucket"><i class="ti ti-trash"></i></span>
+      <span class="dep-actions">
+        <label class="dep-xfer" title="Check off once this bucket's cut has been moved into its account — clears when you change the amount or log the deposit"><input type="checkbox" ${done?'checked':''} onchange="setBucketDone('${b.id}',this.checked)">Transferred</label>
+        <span class="dep-del" onclick="deleteBucket('${b.id}','${esc(b.name)}')" title="Delete bucket"><i class="ti ti-trash"></i></span>
+      </span>
     </div>`;
   };
 
@@ -2998,13 +3025,18 @@ window.logDeposit=()=>{
   const id='dl_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
   const entry={id, at:Date.now(), amount:Math.round(amt*100)/100, note, lines, leftover};
   depositLog[id]=entry; dbSet('apar/depositLog/'+id, entry);
+  _depDone={};
   if(noteEl) noteEl.value='';
   if(typeof showToast==='function'){ try{ showToast('Deposit logged \u00b7 '+fmtMoney(entry.amount)); }catch(e){} }
   render();
 };
 window.deleteDepositLog=(id)=>{
-  if(!confirm('Remove this deposit log entry? This only clears the snapshot, not any account balances.'))return;
-  delete depositLog[id]; dbRemove('apar/depositLog/'+id); render();
+  const e=depositLog[id];
+  askDeletePin('Remove this deposit log entry? This only clears the snapshot, not any account balances.',()=>{
+    delete depositLog[id]; dbRemove('apar/depositLog/'+id);
+    logAudit('purge',{detail:'Deposit log entry'+(e?(' · '+fmtMoney(e.amount)+(e.note?(' · '+e.note):'')):'')});
+    render();
+  });
 }
 window.setDepositTransferred=(id,on)=>{
   const e=depositLog[id]; if(!e)return;
@@ -3027,8 +3059,87 @@ window.addBucket=()=>{
   depositBuckets[id]=b; dbSet('apar/depositBuckets/'+id,b); render();
 };
 window.deleteBucket=(id,name)=>{
-  if(!confirm(`Delete bucket "${name}"?`))return;
-  delete depositBuckets[id]; dbRemove('apar/depositBuckets/'+id); render();
+  askDeletePin(`Delete the bucket "${esc(name)}"? Its percentage goes away with it.`,()=>{
+    delete depositBuckets[id]; dbRemove('apar/depositBuckets/'+id);
+    logAudit('purge',{detail:'Deposit bucket · '+name});
+    render();
+  });
+};
+
+/* =================== PIN-CONFIRMED DELETE ===================
+   A small shared PIN (apar/settings/deletePin) guards the delete buttons in the
+   Deposits Calculator so a stray tap can't wipe a bucket or a logged deposit.
+   First delete ever asks you to create the PIN; "Delete PIN" on the Activity
+   page changes it later. */
+const PIN_IN='width:100%;box-sizing:border-box;font-size:20px;letter-spacing:6px;text-align:center;padding:9px 10px;border:1px solid var(--border);border-radius:9px;font-family:inherit;font-weight:800;outline:none';
+function _pinBox(inner){
+  const ov=document.createElement('div');
+  ov.className='pin-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:380px;width:100%;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.25)" onclick="event.stopPropagation()">${inner}</div>`;
+  ov.onclick=()=>ov.remove();
+  document.body.appendChild(ov);
+  return ov;
+}
+function pinSetup(onDone){
+  const had=!!(aparSettings&&aparSettings.deletePin);
+  const ov=_pinBox(`
+    <h3 style="margin:0 0 4px">${had?'Change the delete PIN':'Create a delete PIN'}</h3>
+    <p style="margin:0 0 12px;font-size:12.5px;color:var(--text2)">${had?'Pick the new PIN.':'From now on, deleting a bucket or a logged deposit will ask for this PIN first — so nothing gets wiped by a stray tap.'} 4 digits is plenty.</p>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <input id="pin-n1" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="New PIN" style="${PIN_IN}">
+      <input id="pin-n2" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Repeat new PIN" style="${PIN_IN}">
+    </div>
+    <div id="pin-err" style="color:var(--red);font-size:12px;font-weight:700;min-height:16px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" id="pin-cancel">Cancel</button>
+      <button class="btn primary" id="pin-save"><i class="ti ti-lock"></i> Save PIN</button>
+    </div>`);
+  const save=()=>{
+    const a=ov.querySelector('#pin-n1').value.trim(), b=ov.querySelector('#pin-n2').value.trim();
+    if(!/^\d{4,8}$/.test(a)){ ov.querySelector('#pin-err').textContent='The PIN must be 4 to 8 digits (numbers only).'; return; }
+    if(a!==b){ ov.querySelector('#pin-err').textContent='The two PINs don\'t match — try again.'; return; }
+    aparSettings.deletePin=a;
+    dbSet('apar/settings/deletePin', a, 'set delete PIN');
+    logAudit(had?'Changed the delete PIN':'Created the delete PIN',{});
+    ov.remove();
+    if(typeof showToast==='function'){ try{ showToast('Delete PIN saved'); }catch(e){} }
+    if(onDone)onDone();
+  };
+  ov.querySelector('#pin-cancel').onclick=()=>ov.remove();
+  ov.querySelector('#pin-save').onclick=save;
+  ov.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{ if(e.key==='Enter')save(); }));
+  setTimeout(()=>{ const i=ov.querySelector('#pin-n1'); if(i)i.focus(); },50);
+}
+window.askDeletePin=(message,onOk,okLabel)=>{
+  const pin=(aparSettings&&aparSettings.deletePin)||'';
+  if(!pin){ pinSetup(()=>askDeletePin(message,onOk,okLabel)); return; }
+  const ov=_pinBox(`
+    <h3 style="margin:0 0 4px">${okLabel?'Enter PIN':'Confirm delete'}</h3>
+    <p style="margin:0 0 12px;font-size:12.5px;color:var(--text2)">${message}</p>
+    <input id="pin-in" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Delete PIN" style="${PIN_IN}">
+    <div id="pin-err" style="color:var(--red);font-size:12px;font-weight:700;min-height:16px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn" id="pin-cancel">Cancel</button>
+      <button class="btn ${okLabel?'primary':'danger'}" id="pin-ok"><i class="ti ${okLabel?'ti-check':'ti-trash'}"></i> ${okLabel||'Delete'}</button>
+    </div>`);
+  const go=()=>{
+    const v=ov.querySelector('#pin-in').value.trim();
+    if(v!==pin){
+      ov.querySelector('#pin-err').textContent='Wrong PIN — try again.';
+      const i=ov.querySelector('#pin-in'); i.value=''; i.focus();
+      return;
+    }
+    ov.remove(); onOk();
+  };
+  ov.querySelector('#pin-cancel').onclick=()=>ov.remove();
+  ov.querySelector('#pin-ok').onclick=go;
+  ov.querySelector('#pin-in').addEventListener('keydown',e=>{ if(e.key==='Enter')go(); });
+  setTimeout(()=>{ const i=ov.querySelector('#pin-in'); if(i)i.focus(); },50);
+};
+window.changeDeletePin=()=>{
+  if(aparSettings&&aparSettings.deletePin) askDeletePin('Enter the current PIN to change it.',()=>pinSetup(),'Continue');
+  else pinSetup();
 };
 window.normalizeBuckets=()=>{
   const bs=bucketList(); const total=bs.reduce((s,b)=>s+(Number(b.pct)||0),0);
@@ -3259,7 +3370,7 @@ function renderActivity(){
   const rows=auditSorted();
   const me=currentUser?whoami():'';
   const head=`<div class="au-toolbar">
-    <div class="au-whoami">Signed in as <b>${esc(me||'—')}</b> <button class="btn sm" onclick="setMyName()"><i class="ti ti-pencil"></i> Change name</button></div>
+    <div class="au-whoami">Signed in as <b>${esc(me||'—')}</b> <button class="btn sm" onclick="setMyName()"><i class="ti ti-pencil"></i> Change name</button> <button class="btn sm" onclick="changeDeletePin()" title="The PIN asked for before deleting in the Deposits Calculator"><i class="ti ti-lock"></i> Delete PIN</button></div>
     <div class="au-count">${rows.length} event${rows.length!==1?'s':''} logged</div>
   </div>`;
   if(!rows.length){
@@ -4334,6 +4445,7 @@ onAuthStateChanged(auth,(user)=>{
     onValue(ref(db,'apar/apSplit'),snap=>{ apSplit=snap.val()||{}; render(); });
     onValue(ref(db,'apar/audit'),snap=>{ auditLog=snap.val()||{}; if(page==='activity')render(); });
     onValue(ref(db,'apar/userNames'),snap=>{ userNames=snap.val()||{}; });
+    onValue(ref(db,'apar/settings'),snap=>{ aparSettings=snap.val()||{}; });
   }else{
     currentUser=null;
     $('login').style.display='flex'; $('app').style.display='none';
