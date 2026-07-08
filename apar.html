@@ -1359,9 +1359,21 @@ function statusOf(e){
   return 'open';
 }
 const STATUS_LABEL={open:'Open',partial:'Partial',paid:'Paid',over:'Overdue'};
-// An invoice is archived once it's settled — fully paid, or (for payables) withdrawn,
-// which statusOf already reports as 'paid'. Also honors a manual archive flag if present.
-function isArchived(e){ return statusOf(e)==='paid' || !!e.archived; }
+// An invoice is archived once it's settled — fully paid, or (for payables) withdrawn.
+// Withdrawn bills get a grace window: they stay on the active lists (greyed out on the
+// Cash Flow tab) until 45+ days past their withdrawal date, then file themselves to the
+// Archive. No withdrawal date recorded = never auto-filed (stays visible, which is the
+// safe direction). Also honors a manual archive flag if present.
+const ARCHIVE_GRACE_DAYS=45;
+function isArchived(e){
+  if(e.archived) return true;
+  if(statusOf(e)!=='paid') return false;
+  if((e.payStatus||'')==='withdrawn'){
+    const d=daysSince(e.withdrawnDate);
+    return d!=null && d>=ARCHIVE_GRACE_DAYS;
+  }
+  return true;
+}
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 const $=id=>document.getElementById(id);
@@ -2209,7 +2221,7 @@ window.toggleCashCard=(id)=>{ cashCollapsed[id]=!cashCollapsed[id]; render(); };
 window.toggleCashCollapseAll=()=>{
   const ids=Object.keys(accounts);
   const cardIds=[...ids];
-  const ap=allEntries().filter(e=>e.type==='ap'&&!e.archived&&Math.max(0,(e.amount||0)-(e.paid||0))>0.005);
+  const ap=allEntries().filter(e=>e.type==='ap'&&!isArchived(e)&&(Math.max(0,(e.amount||0)-(e.paid||0))>0.005||(e.payStatus||'')==='withdrawn'));
   if(ap.some(e=>!e.account))cardIds.push('unassigned');
   const allCollapsed=cardIds.length>0&&cardIds.every(k=>cashCollapsed[k]);
   cardIds.forEach(k=>{ cashCollapsed[k]=!allCollapsed; });
@@ -2241,12 +2253,17 @@ function balanceFreshness(a){
 function renderCash(entries){
   const ap=entries.filter(e=>e.type==='ap');
   const unpaid=e=>Math.max(0,(e.amount||0)-(e.paid||0));
+  // A bill belongs on this tab while money is still owed, OR while it's withdrawn but
+  // inside the 45-day grace window (isArchived) — withdrawn rows show greyed out.
+  const activeBill=e=>!isArchived(e)&&(unpaid(e)>0.005||(e.payStatus||'')==='withdrawn');
+  // withdrawn bills are auto-paid in full, so "what left the account" is the bill amount
+  const wdAmt=e=>(e.payStatus||'')==='withdrawn'?(e.amount||0):unpaid(e);
   const ids=Object.keys(accounts);
   const totalBal=ids.reduce((s,id)=>s+(Number(accounts[id].balance)||0),0);
   // only bills marked 'scheduled' reduce the balance; archived bills drop out entirely
-  const assignedActive=ap.filter(e=>e.account&&unpaid(e)>0.005&&!e.archived);
+  const assignedActive=ap.filter(e=>e.account&&activeBill(e));
   const totalSched=assignedActive.filter(e=>(e.payStatus||'open')==='scheduled').reduce((s,e)=>s+unpaid(e),0);
-  const totalWd=assignedActive.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+  const totalWd=assignedActive.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+wdAmt(e),0);
 
   const methodSelect=(e)=>`<select class="acct-sel" onclick="event.stopPropagation()" onchange="setPlanMethod('${e.id}',this.value)">
     <option value="">—</option>
@@ -2273,7 +2290,7 @@ function renderCash(entries){
       ${accountSelect(e)}
       ${methodSelect(e)}
       ${statusSelect(e)}
-      <span class="ab-amt" onclick="openEntry('${e.id}')">${fmtMoney(unpaid(e))}</span>
+      <span class="ab-amt" onclick="openEntry('${e.id}')">${fmtMoney(wd?(e.amount||0):unpaid(e))}</span>
     </div>`;
   };
   const billHead=(sectionKey)=>`<div class="acct-bill-head">
@@ -2286,9 +2303,9 @@ function renderCash(entries){
   </div>`;
 
   const acctTile=(id,a)=>{
-    const bills=ap.filter(e=>e.account===id&&unpaid(e)>0.005&&!e.archived);
+    const bills=ap.filter(e=>e.account===id&&activeBill(e));
     const sched=bills.filter(e=>(e.payStatus||'open')==='scheduled').reduce((s,e)=>s+unpaid(e),0);
-    const wd=bills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const wd=bills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+wdAmt(e),0);
     const pending=bills.filter(e=>['open','attention'].includes(e.payStatus||'open')).reduce((s,e)=>s+unpaid(e),0);
     const bal=Number(a.balance)||0;
     const proj=bal-sched;
@@ -2310,7 +2327,7 @@ function renderCash(entries){
   };
 
   const acctBillSection=(id,a)=>{
-    const allBillsRaw=ap.filter(e=>e.account===id&&unpaid(e)>0.005&&!e.archived);
+    const allBillsRaw=ap.filter(e=>e.account===id&&activeBill(e));
     if(!allBillsRaw.length)return'';
     const allBills=allBillsRaw.filter(cashBillMatchesFilter);
     // when filtering, hide cards that have no matching bills
@@ -2320,7 +2337,7 @@ function renderCash(entries){
     const shown=hidden?allBills.filter(e=>(e.payStatus||'open')!=='withdrawn'):allBills;
     const bills=sortBills(shown,id);
     const sched=allBills.filter(e=>(e.payStatus||'open')==='scheduled').reduce((s,e)=>s+unpaid(e),0);
-    const wd=allBills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+unpaid(e),0);
+    const wd=allBills.filter(e=>(e.payStatus||'open')==='withdrawn').reduce((s,e)=>s+wdAmt(e),0);
     const totTxt=`${fmtMoney(sched)} scheduled`+(wd>0.005?` · ${fmtMoney(wd)} withdrawn`:'');
     const c=colorFor(id);
     const collapsed=!!cashCollapsed[id];
@@ -2333,7 +2350,7 @@ function renderCash(entries){
     </div>`;
   };
 
-  const unassignedRaw=ap.filter(e=>!e.account&&unpaid(e)>0.005&&!e.archived).filter(cashBillMatchesFilter);
+  const unassignedRaw=ap.filter(e=>!e.account&&activeBill(e)).filter(cashBillMatchesFilter);
   const unassigned=sortBills(unassignedRaw,'unassigned');
   const unassignedTotal=unassigned.reduce((s,e)=>s+unpaid(e),0);
   const uCollapsed=!!cashCollapsed['unassigned'];
@@ -2344,10 +2361,10 @@ function renderCash(entries){
 
   // collapse-all state: are all account cards (incl. unassigned if present) collapsed?
   const allCardIds=[...ids];
-  if(ap.some(e=>!e.account&&unpaid(e)>0.005&&!e.archived))allCardIds.push('unassigned');
+  if(ap.some(e=>!e.account&&activeBill(e)))allCardIds.push('unassigned');
   const allCashCollapsed=allCardIds.length>0&&allCardIds.every(k=>cashCollapsed[k]);
   // any bill matching the active filter (for the empty-state message)
-  const anyCashMatch=ap.some(e=>unpaid(e)>0.005&&!e.archived&&cashBillMatchesFilter(e));
+  const anyCashMatch=ap.some(e=>activeBill(e)&&cashBillMatchesFilter(e));
 
   $('content').innerHTML=`
     <div class="stats">
@@ -2536,9 +2553,10 @@ window.unarchiveBill=(id)=>{
   // Fallback: clear any manual archive flag.
   const o=ovl(id); delete o.archived; writeOverlay(id,o); render();
 };
-// auto-archive: withdrawn bills move to Archive once 45+ days past their withdrawal date
+// auto-archive: the 45-day rule lives in isArchived (computed live at render time, no
+// sweep needed) — withdrawn bills file to the Archive once 45+ days past withdrawal.
 let _archiveRan=false;
-function autoArchiveOld(){ /* retired: invoices now archive automatically when paid/withdrawn (see isArchived) */ }
+function autoArchiveOld(){ /* no-op: see isArchived / ARCHIVE_GRACE_DAYS */ }
 function daysSince(iso){ if(!iso)return null; const d=daysUntil(iso); return d==null?null:-d; }
 
 // ── Recurring bills (templates that generate payables each cycle) ──────────────
