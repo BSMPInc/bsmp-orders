@@ -1976,7 +1976,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <div class="card" style="background:var(--surface2)">
     <div class="card-title">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Assembly Pricing
+      Pricing Summary
     </div>
     <div class="grid4" style="margin-bottom:0">
       <div class="field"><label>Markup %</label>
@@ -1990,11 +1990,29 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       </div>
       <div class="field"></div>
     </div>
-    <div class="results-metrics" style="grid-template-columns:repeat(4,1fr);margin:16px 0">
-      <div class="metric-card"><div class="metric-label">Parts cost</div><div class="metric-value" id="asm-r-parts">—</div></div>
-      <div class="metric-card"><div class="metric-label">Assembly ops</div><div class="metric-value" id="asm-r-ops">—</div></div>
-      <div class="metric-card highlight"><div class="metric-label">Price / assembly</div><div class="metric-value" id="asm-r-price">—</div></div>
-      <div class="metric-card"><div class="metric-label">Job total</div><div class="metric-value" id="asm-r-total">—</div></div>
+    <!-- Same five-card summary as the New Quote panel, per-assembly instead of per-part -->
+    <div class="results-metrics" style="grid-template-columns:repeat(5,1fr);margin:16px 0">
+      <div class="metric-card">
+        <div class="metric-label">Cost / assembly</div>
+        <div class="metric-value" id="asm-r-cost">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Price / assembly</div>
+        <div class="metric-value" id="asm-r-price">—</div>
+      </div>
+      <div class="metric-card highlight">
+        <div class="metric-label">Job total</div>
+        <div class="metric-value" id="asm-r-total">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Margin</div>
+        <div class="metric-value" id="asm-r-margin">—</div>
+      </div>
+      <div class="metric-card" style="border:1px solid var(--border);background:var(--cool-bg)">
+        <div class="metric-label" style="color:var(--text3)">Parts cost</div>
+        <div class="metric-value" id="asm-r-parts" style="color:var(--accent)">—</div>
+        <div id="asm-r-ops-sub" style="font-size:11px;color:var(--text3);margin-top:3px;font-family:'DM Mono',monospace"></div>
+      </div>
     </div>
     <div id="asm-breakdown" style="font-size:12px;margin-bottom:14px"></div>
     <div class="btn-row">
@@ -6365,11 +6383,13 @@ function calcAssembly() {
   const jobTotal      = assemblyPrice * orderQty;
   const margin        = assemblyPrice > 0 ? (markupAmt/assemblyPrice*100) : 0;
 
-  // Update metrics
-  document.getElementById('asm-r-parts').textContent  = fmt(partsCost);
-  document.getElementById('asm-r-ops').textContent    = fmt(opsCost);
+  // Update metrics — same five cards as the New Quote summary
+  document.getElementById('asm-r-cost').textContent   = fmt(assemblyCost);
   document.getElementById('asm-r-price').textContent  = fmt(assemblyPrice);
   document.getElementById('asm-r-total').textContent  = fmt(jobTotal);
+  document.getElementById('asm-r-margin').textContent = margin.toFixed(1)+'%';
+  document.getElementById('asm-r-parts').textContent  = fmt(partsCost);
+  document.getElementById('asm-r-ops-sub').textContent = '+ '+fmt(opsCost)+' ops';
 
   // Breakdown
   let bd = '';
