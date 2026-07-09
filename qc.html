@@ -414,7 +414,7 @@ const I18N = {
     'Tap a balloon to enter its measurement':'Toca un globo para ingresar su medición','Characteristic':'Característica','Tolerance':'Tolerancia','Measured result':'Resultado medido','Confirm & next':'Confirmar y siguiente','Confirm':'Confirmar','In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia','All balloons measured.':'Todos los globos medidos.',
     'msr:req':'Requisito','msr:tol':'Tolerancia','msr:measured':'Resultado medido','msr:next':'Confirmar y siguiente','msr:confirm':'Confirmar',
     'msr:hole':'Ø del agujero','Should be':'Debe ser','(near edge)':'(borde cercano)','(far edge)':'(borde lejano)',
-    'Center':'Centro','Near edge':'Borde cercano','Far edge':'Borde lejano','(center)':'(centro)',
+    'Center':'Centro','Near edge':'Borde cercano','Far edge':'Borde lejano','(center)':'(centro)','Undo':'Deshacer',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
     'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
     'Tolerance Range':'Rango de tolerancia','Type':'Tipo','Deviation':'Desviación','Linear':'Lineal','Diameter':'Diámetro','Radius':'Radio','Angular':'Angular','Note':'Nota',
@@ -1032,8 +1032,8 @@ function viewFairs(){
         :`<div class="empty">${t('No first articles yet.')}</div>`}
     </div>`;
 }
-window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
-window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
+window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
+window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
 
 function charRow(i,c){
   c=c||{};
@@ -1108,7 +1108,7 @@ window.qcCharCompute=(i)=>{
 };
 function catToType(cat){ return cat==='cutout_dia'?'Diameter':((cat==='material'||cat==='finish'||cat==='thickness')?'Note':'Linear'); }
 let _chars=[];
-let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false, _fairFull=false, _wsMode='place', _wsBox=null, _fairDrawMin=false;
+let _fairBubbles=[], _fairImg=null, _fairBalloonedUrl=null, _bubDrag=null, _bubDidDrag=false, _fairFull=false, _wsMode='place', _wsBox=null, _fairDrawMin=false, _bubUndo=[];
 function viewFair(){
   const r=editId?INSPECTIONS[editId]:null;
   if(r && !_fairBubbles.length) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
@@ -1556,6 +1556,7 @@ function qcSpreadBubbles(bs){
 // snap all balloons into a tidy numbered column down the right margin (then drag onto each callout)
 window.qcBubblesLineUp=()=>{
   if(!_fairBubbles.length) return;
+  qcBubSnap();
   const n=_fairBubbles.length, top=0.04, bot=0.96, x=0.955;
   _fairBubbles.forEach((b,i)=>{ b.bx=x; b.by=n>1?(top+(bot-top)*i/(n-1)):0.5; });
   qcWsRender();
@@ -1605,7 +1606,7 @@ window.qcFairAutoBubble=async ()=>{
     const parsed=JSON.parse(clean);
     let chars=Array.isArray(parsed)?parsed:(parsed.characteristics||[]);
     if(!chars.length) throw new Error(t('No characteristics found on the drawing.'));
-    _fairImg=img; _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null; _bws={s:1,x:0,y:0,fit:1}; _bwsBound=false;
+    _fairImg=img; qcBubSnap(); _fairBubbles=qcSortBubbles(chars); _fairBalloonedUrl=null; _bws={s:1,x:0,y:0,fit:1}; _bwsBound=false;
     _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
     if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
     qcWsRender();
@@ -1652,6 +1653,7 @@ window.qcFairPlaceMode=async ()=>{
 };
 window.qcFairReadBubbles=async ()=>{
   if(!_fairImg||!_fairBubbles.length){ qcToast(t('Place at least one balloon first.'),'err'); return; }
+  qcBubSnap();
   if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
   const btn=$('fair-read-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
   try{
@@ -1673,6 +1675,7 @@ window.qcFairReadBubbles=async ()=>{
 };
 window.qcBubblesSort=()=>{
   if(!_fairBubbles.length) return;
+  qcBubSnap();
   _fairBubbles=qcSortByHierarchy(_fairBubbles);
   qcSyncCharsFromBubbles();
   qcWsRender();
@@ -1717,6 +1720,7 @@ window.qcBubStageClick=(e)=>{
   const r=im.getBoundingClientRect();
   const bx=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
   const by=Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+  qcBubSnap();
   _fairBubbles.push({no:_fairBubbles.length+1, bx, by});
   st.insertAdjacentHTML('beforeend', balloonHtml(_fairBubbles[_fairBubbles.length-1], _fairBubbles.length-1));
   const bar=$('fair-read-btn'); if(bar) bar.disabled=false;
@@ -1757,6 +1761,7 @@ function qcStageUp(){
   const iw=im?im.naturalWidth:box.st.offsetWidth, ih=im?im.naturalHeight:box.st.offsetHeight;
   const nb={ x:c.L/iw, y:c.T/ih, w:c.W/iw, h:c.H/ih };
   const b={ no:_fairBubbles.length+1, bx:nb.x+nb.w/2, by:nb.y+nb.h/2, box:nb, reading:true };
+  qcBubSnap();
   _fairBubbles.push(b); qcWsRender(); qcReadBox(b);
 }
 async function cropRegion(box, pad){
@@ -1786,8 +1791,20 @@ async function qcReadBox(b){
   qcSyncCharsFromBubbles();
   qcWsRender();
 }
-window.qcBubRemove=(i)=>{ _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); };
-window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; _fairBubbles=[]; qcWsRender(); };
+/* ---- balloon undo: snapshot before every change (add, drag, remove, sort, line-up, clear, AI passes) ---- */
+function qcBubSnap(){ _bubUndo.push(_fairBubbles.map(b=>({...b, reading:false}))); if(_bubUndo.length>50) _bubUndo.shift(); qcBubUndoBtn(); }
+function qcBubUndoBtn(){ const b=$('bws-undo-btn'); if(b) b.disabled=!_bubUndo.length; }
+window.qcBubbleUndo=()=>{ if(!_bubUndo.length) return; _fairBubbles=_bubUndo.pop(); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); qcBubUndoBtn(); };
+// Ctrl/Cmd+Z while the balloon workspace is on screen (and focus isn't in a text field)
+document.addEventListener('keydown',e=>{
+  if(!(e.ctrlKey||e.metaKey) || e.shiftKey || String(e.key).toLowerCase()!=='z') return;
+  const tg=e.target, tag=((tg&&tg.tagName)||'').toLowerCase();
+  if(tag==='input'||tag==='textarea'||(tg&&tg.isContentEditable)) return;
+  if(!$('bubble-stage')) return;
+  e.preventDefault(); qcBubbleUndo();
+});
+window.qcBubRemove=(i)=>{ qcBubSnap(); _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); };
+window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; qcBubSnap(); _fairBubbles=[]; qcWsRender(); };
 function qcWsHost(){ return _fairFull ? ($('fair-fs-body')||$('fair-bubble-ws')) : $('fair-bubble-ws'); }
 function qcWsRender(){ _bwsBound=false; const h=qcWsHost(); if(h) h.innerHTML=fairBubbleWorkspace(); }
 window.qcFairFull=(on)=>{
@@ -1818,6 +1835,7 @@ function fairBubbleWorkspace(){
       <button class="btn sm" onclick="qcBubblesSort()"><i class="ti ti-sort-ascending-numbers"></i> ${t('Sort by hierarchy')}</button>
       <button class="btn sm" onclick="qcBubblesLineUp()"><i class="ti ti-layout-align-right"></i> ${t('Line up in margin')}</button>
       <button class="btn sm" id="bws-save-btn" onclick="qcFairSaveBallooned()"><i class="ti ti-device-floppy"></i> ${t('Save ballooned drawing')}</button>
+      <button class="btn sm" id="bws-undo-btn" onclick="qcBubbleUndo()" ${_bubUndo.length?'':'disabled'}><i class="ti ti-arrow-back-up"></i> ${t('Undo')}</button>
       <button class="btn sm" onclick="qcBubbleClear()"><i class="ti ti-trash"></i> ${t('Clear')}</button>
       ${_fairFull?'':`<button class="btn sm" onclick="qcFairFull(true)"><i class="ti ti-arrows-maximize"></i> ${t('Full screen')}</button>`}
     </div>
@@ -1838,7 +1856,7 @@ function fairBubbleWorkspace(){
 }
 function _bubPoint(e){ return (e.touches&&e.touches[0])?e.touches[0]:e; }
 window.qcBubDown=(e,i)=>{ e.preventDefault(); _bubDrag=i; _bubDidDrag=false; document.addEventListener('mousemove',qcBubMove); document.addEventListener('mouseup',qcBubUp); document.addEventListener('touchmove',qcBubMove,{passive:false}); document.addEventListener('touchend',qcBubUp); };
-function qcBubMove(e){ if(_bubDrag==null) return; if(e.cancelable) e.preventDefault(); _bubDidDrag=true; const st=$('bubble-stage'); if(!st) return; const im=st.querySelector('img'); if(!im) return; const r=im.getBoundingClientRect(); const p=_bubPoint(e); let bx=(p.clientX-r.left)/r.width, by=(p.clientY-r.top)/r.height; bx=Math.max(0,Math.min(1,bx)); by=Math.max(0,Math.min(1,by)); const b=_fairBubbles[_bubDrag]; if(!b) return; b.bx=bx; b.by=by; const el=st.querySelector('.balloon[data-i="'+_bubDrag+'"]'); if(el){ el.style.left=(bx*100)+'%'; el.style.top=(by*100)+'%'; } }
+function qcBubMove(e){ if(_bubDrag==null) return; if(e.cancelable) e.preventDefault(); if(!_bubDidDrag) qcBubSnap(); _bubDidDrag=true; const st=$('bubble-stage'); if(!st) return; const im=st.querySelector('img'); if(!im) return; const r=im.getBoundingClientRect(); const p=_bubPoint(e); let bx=(p.clientX-r.left)/r.width, by=(p.clientY-r.top)/r.height; bx=Math.max(0,Math.min(1,bx)); by=Math.max(0,Math.min(1,by)); const b=_fairBubbles[_bubDrag]; if(!b) return; b.bx=bx; b.by=by; const el=st.querySelector('.balloon[data-i="'+_bubDrag+'"]'); if(el){ el.style.left=(bx*100)+'%'; el.style.top=(by*100)+'%'; } }
 function qcBubUp(){ _bubDrag=null; document.removeEventListener('mousemove',qcBubMove); document.removeEventListener('mouseup',qcBubUp); document.removeEventListener('touchmove',qcBubMove); document.removeEventListener('touchend',qcBubUp); }
 
 /* ---- bubble workspace pan + zoom ---- */
