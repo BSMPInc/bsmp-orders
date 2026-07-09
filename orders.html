@@ -534,8 +534,12 @@ tr:hover .del-btn{opacity:1}
 /* ── Schedule steps in detail row ── */
 .sched-steps{display:flex;flex-direction:column;gap:5px;margin-top:6px}
 .sched-step{display:grid;align-items:center;gap:6px;font-size:11px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:5px 8px;min-width:0}
-.sched-steps.grp-int .sched-step{grid-template-columns:18px 16px 14px 22px minmax(110px,max-content) 56px auto auto auto auto 1fr minmax(86px,auto) 16px}
-.sched-steps.grp-ext .sched-step{grid-template-columns:18px 16px 14px 22px minmax(110px,max-content) 56px auto auto auto auto auto auto 1fr minmax(86px,auto) 16px}
+.sched-steps.grp-int .sched-step,.sched-steps.grp-ext .sched-step{grid-template-columns:18px 16px 14px 22px minmax(110px,max-content) 56px minmax(0,1fr) 16px}
+/* everything right of the assignee (dates, days, status label) is one flex cluster, so a narrow
+   panel (14" laptop) wraps it onto a second line inside the row instead of clipping at the edge */
+.ss-ctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.ss-ctl .ss-spacer{flex:1}
+.ss-ctl .ss-date{margin-left:auto}
 .ss-spacer{min-width:0}
 .sched-grp-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:12px 0 5px;padding-left:2px}
 .sched-grp-label.ext{color:var(--blue)}
@@ -2777,7 +2781,7 @@ function detailInner(r){
     // right-side controls differ for internal (qty done) vs external (days + anchor date)
     const pJs=p.replace(/'/g,"\\'");
     const sdate=(kind,val,title,disabled)=>`<button type="button" class="sdate${val?'':' empty'}" title="${title}" ${disabled?'disabled':''} onclick="window._editStepDate(event,'${r.id}','${pJs}','${kind}')">${val?fmtDate(val):'mm/dd/yy'}</button>`;
-    const rightControls = ext
+    const rightControls = (ext
       ? `<span style="font-size:10px;color:var(--text3)">need by</span>
          ${sdate('needBy', step.needBy, 'Need this step finished/back by — also shows in Work Queues', false)}
          <input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Lead time in business days" style="width:44px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
@@ -2787,7 +2791,7 @@ function detailInner(r){
       : `<span style="font-size:10px;color:var(--text3)">need by</span>
          ${sdate('needBy', step.needBy, 'Need this step finished by', false)}
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
-         <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`;
+         <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`);
     // outsourced steps get a vendor/details line so whoever enters the order can hand
     // purchasing everything it needs — the same fields the Need PO tab reads and pools on
     const vendorRow = (ext && !done) ? `<div class="ss-vrow" onclick="event.stopPropagation()">
@@ -2807,9 +2811,7 @@ function detailInner(r){
       <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,20)}</span>
       <span class="ss-name${done?' done':''}">${p}${anchorIcon}</span>
       <span class="ss-assignee-cell">${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}</span>
-      ${rightControls}
-      <span class="ss-spacer"></span>
-      <span class="ss-date${done?' done':''}">${dateLabel}</span>
+      <span class="ss-ctl">${rightControls}<span class="ss-spacer"></span><span class="ss-date${done?' done':''}">${dateLabel}</span></span>
       <i class="ti ti-x ss-rm" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
     </div>${vendorRow}`;
   };
