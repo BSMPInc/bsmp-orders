@@ -621,19 +621,13 @@ function render(){
 
 /* ---------- order linking ---------- */
 function orderLabel(o){ return [o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ')||o.id; }
-function orderOptions(sel){
-  const list=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||''));
-  return `<option value="">${t('— Not linked / free entry —')}</option>`+list.map(o=>{
-    return `<option value="${esc(o.id)}" ${sel===o.id?'selected':''}>${esc(orderLabel(o))}</option>`;
-  }).join('');
-}
 /* searchable order picker — a text box that filters orders as you type.
    Keeps a hidden input with the classic "<prefix>-order" id so save code reads it unchanged. */
-function orderSearchHtml(prefix,sel){
+function orderSearchHtml(prefix,sel,dis){
   const o=sel?ORDERS[sel]:null;
   return `<div class="ordpick">
     <input class="in" id="${prefix}-order-search" placeholder="${esc(t('Search orders — customer, part, job, PO'))}" autocomplete="off" value="${esc(o?orderLabel(o):'')}"
-      oninput="qcOrdFilter('${prefix}')" onfocus="qcOrdFilter('${prefix}')" onblur="qcOrdBlur('${prefix}')">
+      oninput="qcOrdFilter('${prefix}')" onfocus="qcOrdFilter('${prefix}')" onblur="qcOrdBlur('${prefix}')" ${dis||''}>
     <input type="hidden" id="${prefix}-order" value="${esc(sel||'')}">
     <div class="ordpick-list" id="${prefix}-order-list" style="display:none"></div>
   </div>`;
@@ -1187,7 +1181,7 @@ function viewFair(){
           <input type="hidden" id="fair-modev" value="${esc(mode)}">
         </div>
         <div class="field"><label class="fl">${t('Link to an order')}</label>
-          <select class="in" id="fr-order" onchange="qcFillFromOrder('fr',this.value)" ${dis}>${orderOptions(v('orderId',''))}</select></div>
+          ${orderSearchHtml('fr', v('orderId',''), dis)}</div>
         <div class="grid2">
           <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="fr-part" value="${esc(v('partNum'))}" ${ro}></div>
           <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="fr-rev" value="${esc(v('rev'))}" ${ro}></div>
@@ -2018,7 +2012,7 @@ window.qcFairSaveBallooned=async ()=>{
 function ncrBadge(s){ const map={open:'flag',dispositioned:'warn',closed:'ok'}; const lbl={open:'Open',dispositioned:'Dispositioned',closed:'Closed'}; return `<span class="badge ${map[s]||'neutral'}">${t(lbl[s]||s)}</span>`; }
 function viewNcr(){
   const list=vals(NCRS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  if(editId&&NCRS[editId]) return ncrDetail(NCRS[editId]);
+  if(editId && (editId==='__new_ncr__' || NCRS[editId])) return ncrDetail(NCRS[editId]||null);
   const rows=list.map(n=>`<tr class="click" onclick="window.qcOpenNcr('${n.id}')">
     <td><b>${esc(n.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(n.customer||'')} ${n.job?('· '+t('Job #')+' '+esc(n.job)):''}</div></td>
     <td style="max-width:280px">${esc((n.description||'').slice(0,90))}</td>
@@ -2044,7 +2038,7 @@ function ncrDetail(n){
   const mgr=isMgr();
   return `<div class="page-head"><h2>${isNew?t('New nonconformance'):t('Nonconformance')}</h2><p>${isNew?t('Record a flagged part.'):ncrBadge(st)+' · '+t('raised by')+' '+esc((n.raisedBy||'').split('@')[0])+' · '+fmtWhen(n.createdAt)}</p></div>
   <div class="card">
-    ${isNew?`<div class="field"><label class="fl">${t('Link to an order')}</label><select class="in" id="nc-order" onchange="qcFillFromOrder('nc',this.value)">${orderOptions('')}</select></div>`:''}
+    ${isNew?`<div class="field"><label class="fl">${t('Link to an order')}</label>${orderSearchHtml('nc','')}</div>`:''}
     <div class="grid2">
       <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="nc-part" value="${esc(v('partNum'))}" ${!isNew&&!mgr?'readonly':''}></div>
       <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="nc-customer" value="${esc(v('customer'))}" ${!isNew&&!mgr?'readonly':''}></div>
