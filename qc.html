@@ -205,6 +205,13 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas-dev.ok{color:#2f7d55} .meas-dev.oot{color:var(--red)}
 .meas-btns{display:flex;gap:8px}
 .meas-btns .btn{justify-content:center}
+/* built-in number pad — shown on touch devices so the iPad keyboard never opens over the drawing */
+.meas-pad{display:grid;grid-template-columns:repeat(4,52px);grid-auto-rows:42px;gap:6px}
+.meas-pad button{border:1px solid var(--border);background:#fff;color:var(--text);font-size:18px;font-weight:800;border-radius:8px;cursor:pointer;line-height:1;padding:0;min-height:0}
+.meas-pad button:active{background:var(--bg)}
+.meas-pad .zero{grid-column:span 2}
+.meas-pad .ok{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media (hover:hover) and (pointer:fine){ .meas-pad{display:none} }
 /* while the ribbon is open, pull the full-screen drawing up so none of it hides behind the ribbon */
 body.meas-open .fair-fs{padding-bottom:var(--measH,120px)}
 body.meas-open .fair-fs .fdv,body.meas-open .fair-fs .bubble-ws{height:calc(100vh - 140px - var(--measH,120px))}
@@ -1257,13 +1264,17 @@ function qcMeasMount(){
   let ov=$('meas-ov');
   if(!ov){
     ov=document.createElement('div'); ov.id='meas-ov'; ov.className='meas-ov';
-    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div></div><div><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
+    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div></div><div><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
     document.body.appendChild(ov);
     const inp=ov.querySelector('#meas-input');
     inp.addEventListener('input', qcMeasPreview);
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); qcMeasConfirm(true); } else if(e.key==='Escape'){ qcMeasClose(); } });
   }
   ov.style.display='flex';
+  // keypad visible (touch device) → tell iOS not to raise its own keyboard; hardware keys still type
+  const pad=ov.querySelector('.meas-pad');
+  const inp2=ov.querySelector('#meas-input');
+  if(inp2) inp2.setAttribute('inputmode', (pad&&pad.offsetParent)?'none':'decimal');
   // reserve the ribbon's real height under the drawing, then re-fit so the whole print stays visible
   const wasOpen=document.body.classList.contains('meas-open');
   document.body.classList.add('meas-open');
@@ -1289,6 +1300,15 @@ window.qcMeas=(no)=>{
   setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
 };
 window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; document.body.classList.remove('meas-open'); if(_fdvFull) fdvFit(); };
+// on-screen keypad → edits the measured-result field (± toggles the sign at the front)
+window.qcMeasKey=(k)=>{
+  const inp=$('meas-input'); if(!inp) return;
+  if(k==='back') inp.value=inp.value.slice(0,-1);
+  else if(k==='clear') inp.value='';
+  else if(k==='-') inp.value=inp.value.startsWith('-')?inp.value.slice(1):('-'+inp.value);
+  else inp.value+=k;
+  qcMeasPreview();
+};
 function qcMeasPreview(){
   const c=_chars.find(x=>x.no===_measNo); if(!c) return;
   const tolEl=$('meas-tol'); const tolv=tolEl?tolEl.value:c.tol;
