@@ -540,6 +540,9 @@ tr:hover .del-btn{opacity:1}
 .ss-ctl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
 .ss-ctl .ss-spacer{flex:1}
 .ss-ctl .ss-date{margin-left:auto}
+/* outsourced steps: need-by and start stack as two rows with the date boxes in one aligned column */
+.ss-extgrid{display:grid;grid-template-columns:auto auto auto auto;gap:3px 6px;align-items:center}
+.ss-extgrid .ss-lbl{font-size:10px;color:var(--text3);justify-self:end}
 .ss-spacer{min-width:0}
 .sched-grp-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin:12px 0 5px;padding-left:2px}
 .sched-grp-label.ext{color:var(--blue)}
@@ -2782,12 +2785,14 @@ function detailInner(r){
     const pJs=p.replace(/'/g,"\\'");
     const sdate=(kind,val,title,disabled)=>`<button type="button" class="sdate${val?'':' empty'}" title="${title}" ${disabled?'disabled':''} onclick="window._editStepDate(event,'${r.id}','${pJs}','${kind}')">${val?fmtDate(val):'mm/dd/yy'}</button>`;
     const rightControls = (ext
-      ? `<span style="font-size:10px;color:var(--text3)">need by</span>
-         ${sdate('needBy', step.needBy, 'Need this step finished/back by — also shows in Work Queues', false)}
-         <input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Lead time in business days" style="width:44px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
-         <span style="font-size:10px;color:var(--text3);min-width:24px">days</span>
-         <span style="font-size:10px;color:var(--text3)" title="Optional: pin the start date as a fixed schedule anchor">start</span>
-         ${sdate('start', step.start, 'Pin the start date (optional anchor)', done)}`
+      ? `<span class="ss-extgrid">
+           <span class="ss-lbl">need by</span>
+           ${sdate('needBy', step.needBy, 'Need this step finished/back by — also shows in Work Queues', false)}
+           <input type="number" min="0" step="1" value="${step.duration??defDur(p)}" title="Lead time in business days" style="width:44px" onchange="window._stepDuration('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>
+           <span style="font-size:10px;color:var(--text3);min-width:24px">days</span>
+           <span class="ss-lbl" title="Optional: pin the start date as a fixed schedule anchor">start</span>
+           ${sdate('start', step.start, 'Pin the start date (optional anchor)', done)}
+         </span>`
       : `<span style="font-size:10px;color:var(--text3)">need by</span>
          ${sdate('needBy', step.needBy, 'Need this step finished by', false)}
          <input type="number" min="0" placeholder="0" value="${step.qtyDone??''}" title="Parts completed" style="width:52px" onchange="window._stepQty('${r.id}','${p}',this.value)" onclick="event.stopPropagation()">
