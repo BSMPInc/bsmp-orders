@@ -1129,6 +1129,8 @@ function viewFair(){
   // title-block default tolerances for this report (used when a characteristic has no ± of its own)
   _fairTolDefaults=Object.assign({}, DEFAULT_TOL_DEFAULTS, (r&&r.tolDefaults)||{});
   _fdvBubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
+  // heal older reports: every ballooned dimension must have a characteristics row (tap-added bubbles used to miss one)
+  (Array.isArray(_fdvBubbles)?_fdvBubbles:Object.values(_fdvBubbles||{})).forEach(b=>{ if(b && b.no!=null && !_chars.find(x=>x.no===b.no)) _chars.push({no:b.no, requirement:b.value||'', tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}); });
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
   <div class="toolbar" style="margin-bottom:12px">
     <button class="btn primary" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
@@ -1645,6 +1647,17 @@ async function qcCompositeBalloonsDataUrl(){
     ctx.fillStyle='#d40000'; ctx.fillText(String(b.no),cx,cy+R*0.04); });
   return {dataUrl:cv.toDataURL('image/jpeg',0.9), w, h};
 }
+// one bubble → its characteristics row, without touching any other row (results, notes, manual edits survive)
+function qcCharUpsertFromBubble(b){
+  if($('char-body')) syncChars();
+  let c=_chars.find(x=>x.no===b.no);
+  if(!c){ c={no:b.no, result:'', dev:'', notes:''}; _chars.push(c); }
+  if(b.value) c.requirement=b.value;
+  if(b.tol) c.tol=b.tol;
+  if(b.category) c.type=catToType(b.category);
+  if(!c.type) c.type=catToType(b.category);
+  const tb=$('char-body'); if(tb) tb.innerHTML=_chars.map((x,n)=>charRow(n,x)).join('');
+}
 function qcSyncCharsFromBubbles(){
   _chars=_fairBubbles.map(b=>({no:b.no, requirement:(b.value||''), tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}));
   if($('char-body')) $('char-body').innerHTML=_chars.map((c,i)=>charRow(i,c)).join('');
@@ -1736,6 +1749,7 @@ window.qcBubStageClick=(e)=>{
   qcBubSnap();
   _fairBubbles.push({no:_fairBubbles.length+1, bx, by});
   st.insertAdjacentHTML('beforeend', balloonHtml(_fairBubbles[_fairBubbles.length-1], _fairBubbles.length-1));
+  qcCharUpsertFromBubble(_fairBubbles[_fairBubbles.length-1]);   // every balloon gets a characteristics row right away
   const bar=$('fair-read-btn'); if(bar) bar.disabled=false;
 };
 /* ---- box / lasso a single dimension → AI reads just that crop (far more accurate) ---- */
@@ -1775,7 +1789,7 @@ function qcStageUp(){
   const nb={ x:c.L/iw, y:c.T/ih, w:c.W/iw, h:c.H/ih };
   const b={ no:_fairBubbles.length+1, bx:nb.x+nb.w/2, by:nb.y+nb.h/2, box:nb, reading:true };
   qcBubSnap();
-  _fairBubbles.push(b); qcWsRender(); qcReadBox(b);
+  _fairBubbles.push(b); qcCharUpsertFromBubble(b); qcWsRender(); qcReadBox(b);
 }
 async function cropRegion(box, pad){
   pad=pad==null?0.015:pad;
@@ -1801,13 +1815,13 @@ async function qcReadBox(b){
     b.value=d.value||''; b.tol=d.tol||''; b.category=d.category||b.category||'';
   }catch(e){ console.warn('box read failed', e); qcToast(t('Could not read that box — try boxing a bit tighter.'),'err'); }
   b.reading=false;
-  qcSyncCharsFromBubbles();
+  qcCharUpsertFromBubble(b);   // update just this row — never rebuild the list over typed results
   qcWsRender();
 }
 /* ---- balloon undo: snapshot before every change (add, drag, remove, sort, line-up, clear, AI passes) ---- */
-function qcBubSnap(){ _bubUndo.push(_fairBubbles.map(b=>({...b, reading:false}))); if(_bubUndo.length>50) _bubUndo.shift(); qcBubUndoBtn(); }
+function qcBubSnap(){ if($('char-body')) syncChars(); _bubUndo.push({bubbles:_fairBubbles.map(b=>({...b, reading:false})), chars:_chars.map(c=>({...c}))}); if(_bubUndo.length>50) _bubUndo.shift(); qcBubUndoBtn(); }
 function qcBubUndoBtn(){ const b=$('bws-undo-btn'); if(b) b.disabled=!_bubUndo.length; }
-window.qcBubbleUndo=()=>{ if(!_bubUndo.length) return; _fairBubbles=_bubUndo.pop(); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); qcBubUndoBtn(); };
+window.qcBubbleUndo=()=>{ if(!_bubUndo.length) return; const s=_bubUndo.pop(); _fairBubbles=s.bubbles; _chars=s.chars; qcWsRender(); const tb=$('char-body'); if(tb) tb.innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); qcBubUndoBtn(); };
 // Ctrl/Cmd+Z while the balloon workspace is on screen (and focus isn't in a text field)
 document.addEventListener('keydown',e=>{
   if(!(e.ctrlKey||e.metaKey) || e.shiftKey || String(e.key).toLowerCase()!=='z') return;
@@ -1816,7 +1830,12 @@ document.addEventListener('keydown',e=>{
   if(!$('bubble-stage')) return;
   e.preventDefault(); qcBubbleUndo();
 });
-window.qcBubRemove=(i)=>{ qcBubSnap(); _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1); qcWsRender(); if(_chars.length) qcSyncCharsFromBubbles(); };
+window.qcBubRemove=(i)=>{ qcBubSnap();
+  const no=_fairBubbles[i]&&_fairBubbles[i].no;
+  _fairBubbles.splice(i,1); _fairBubbles.forEach((b,n)=>b.no=n+1);
+  // drop the matching characteristics row (only that one) and renumber the rest in step
+  if(_chars.length){ if($('char-body')) syncChars(); const ci=_chars.findIndex(x=>x.no===no); if(ci>=0){ _chars.splice(ci,1); _chars.forEach((c,n)=>c.no=n+1); } const tb=$('char-body'); if(tb) tb.innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); }
+  qcWsRender(); };
 window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; qcBubSnap(); _fairBubbles=[]; qcWsRender(); };
 function qcWsHost(){ return _fairFull ? ($('fair-fs-body')||$('fair-bubble-ws')) : $('fair-bubble-ws'); }
 function qcWsRender(){ _bwsBound=false; const h=qcWsHost(); if(h) h.innerHTML=fairBubbleWorkspace(); }
