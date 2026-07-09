@@ -189,24 +189,24 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .fmark.ok:hover{background:rgba(47,125,85,.85);color:#fff}
 .fmark.oot:hover{background:rgba(192,38,28,.85);color:#fff}
 .fdv-hint{position:absolute;left:8px;bottom:8px;background:rgba(58,64,73,.92);color:#fff;font-size:11px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none}
-/* measurement entry: docked ribbon along the bottom — no backdrop, drawing stays visible & tappable */
-.meas-ov{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:9550;display:none;pointer-events:none}
-.meas{pointer-events:auto;background:var(--card);width:100%;border-top:1px solid var(--border);box-shadow:0 -12px 32px rgba(0,0,0,.35);display:flex;align-items:stretch}
+/* measurement entry: docked sidebar on the right — no backdrop, drawing stays visible & tappable */
+.meas-ov{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:9550;display:none;pointer-events:none}
+.meas{pointer-events:auto;background:var(--card);width:min(330px,45vw);height:100%;border-left:1px solid var(--border);box-shadow:-12px 0 32px rgba(0,0,0,.35);display:flex;flex-direction:column}
 .meas-h{background:#3a4049;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:11px;flex:none}
 .meas-h .n{width:36px;height:36px;border-radius:999px;background:#fff;color:#3a4049;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
-.meas-x{border:none;background:none;color:var(--text2);cursor:pointer;font-size:20px;padding:2px 14px;line-height:1;flex:none;align-self:center}
-.meas-b{padding:10px 14px;display:flex;align-items:center;gap:10px 20px;flex:1;flex-wrap:wrap;min-width:0}
+.meas-x{border:none;background:none;color:#fff;cursor:pointer;font-size:20px;padding:2px 4px;line-height:1;flex:none}
+.meas-b{padding:14px;display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;overflow-y:auto}
 .meas-b .k{font-size:10px;text-transform:uppercase;color:var(--text3);font-weight:700;letter-spacing:.05em}
-.meas-spec{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.meas-spec{display:flex;gap:16px 22px;flex-wrap:wrap;align-items:flex-start}
 .meas-spec .val{font-size:17px;font-weight:800;margin-top:2px}
-.meas .big{width:170px;font-size:22px;font-weight:800;text-align:center;padding:8px 10px;border:2px solid var(--border);border-radius:8px;outline:none;background:#fff;color:var(--text)}
+.meas .big{width:100%;font-size:22px;font-weight:800;text-align:center;padding:10px;border:2px solid var(--border);border-radius:8px;outline:none;background:#fff;color:var(--text)}
 .meas .big:focus{border-color:var(--accent)}
-.meas-dev{text-align:center;font-weight:800;font-size:14px;min-height:20px;min-width:170px}
+.meas-dev{text-align:center;font-weight:800;font-size:14px;min-height:20px}
 .meas-dev.ok{color:#2f7d55} .meas-dev.oot{color:var(--red)}
-.meas-btns{display:flex;gap:8px}
+.meas-btns{display:flex;flex-direction:column;gap:8px;margin-top:auto}
 .meas-btns .btn{justify-content:center}
 /* built-in number pad — shown on touch devices so the iPad keyboard never opens over the drawing */
-.meas-pad{display:grid;grid-template-columns:repeat(4,52px);grid-auto-rows:42px;gap:6px}
+.meas-pad{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:44px;gap:6px}
 .meas-pad button{border:1px solid var(--border);background:#fff;color:var(--text);font-size:18px;font-weight:800;border-radius:8px;cursor:pointer;line-height:1;padding:0;min-height:0}
 .meas-pad button:active{background:var(--bg)}
 .meas-pad .zero{grid-column:span 2}
@@ -221,10 +221,9 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas-mode button{font-size:10.5px;font-weight:800;padding:4px 9px;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:999px;cursor:pointer;line-height:1;min-height:0}
 .meas-mode button.on{background:#3a4049;color:#fff;border-color:#3a4049}
 .meas-work{font-size:12.5px;font-weight:800;color:var(--text2);margin-top:4px;min-height:15px;text-align:center}
-/* while the ribbon is open, pull the full-screen drawing up so none of it hides behind the ribbon */
-body.meas-open .fair-fs{padding-bottom:var(--measH,120px)}
-body.meas-open .fair-fs .fdv,body.meas-open .fair-fs .bubble-ws{height:calc(100vh - 140px - var(--measH,120px))}
-@media (max-width:700px){ .meas-b{gap:8px 14px} .meas-dev{min-width:0} .meas .big{width:130px;font-size:19px} }
+/* while the sidebar is open, pull the full-screen drawing left so none of it hides behind the panel */
+body.meas-open .fair-fs{padding-right:var(--measW,330px)}
+@media (max-width:700px){ .meas-b{padding:10px;gap:10px} .meas .big{font-size:19px;padding:8px} }
 @media (max-width:900px){ .fair-top{grid-template-columns:1fr} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
@@ -1291,7 +1290,7 @@ function qcMeasMount(){
   let ov=$('meas-ov');
   if(!ov){
     ov=document.createElement('div'); ov.id='meas-ov'; ov.className='meas-ov';
-    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div class="meas-tolwrap"><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div><div class="meas-holewrap"><div class="k" data-t="msr:hole">Hole Ø</div><input class="val meas-tolin" id="meas-hole" oninput="qcMeasPreview()" autocomplete="off" placeholder=".500"><div class="meas-holeout" id="meas-holeout"></div></div></div><div class="meas-reswrap"><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><div class="meas-mode" id="meas-mode" style="display:none"><button type="button" data-m="center" onclick="qcMeasMode(\'center\')" data-t="Center">Center</button><button type="button" data-m="near" onclick="qcMeasMode(\'near\')" data-t="Near edge">Near edge</button><button type="button" data-m="far" onclick="qcMeasMode(\'far\')" data-t="Far edge">Far edge</button></div><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"><div class="meas-work" id="meas-work"></div></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
+    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div><span style="flex:1"></span><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div class="meas-tolwrap"><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div><div class="meas-holewrap"><div class="k" data-t="msr:hole">Hole Ø</div><input class="val meas-tolin" id="meas-hole" oninput="qcMeasPreview()" autocomplete="off" placeholder=".500"><div class="meas-holeout" id="meas-holeout"></div></div></div><div class="meas-reswrap"><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><div class="meas-mode" id="meas-mode" style="display:none"><button type="button" data-m="center" onclick="qcMeasMode(\'center\')" data-t="Center">Center</button><button type="button" data-m="near" onclick="qcMeasMode(\'near\')" data-t="Near edge">Near edge</button><button type="button" data-m="far" onclick="qcMeasMode(\'far\')" data-t="Far edge">Far edge</button></div><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"><div class="meas-work" id="meas-work"></div></div><div class="meas-dev" id="meas-dev"></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div></div>';
     document.body.appendChild(ov);
     const inp=ov.querySelector('#meas-input');
     inp.addEventListener('input', qcMeasPreview);
@@ -1304,11 +1303,11 @@ function qcMeasMount(){
   const pad=ov.querySelector('.meas-pad');
   const im=(pad&&pad.offsetParent)?'none':'decimal';
   ['meas-input','meas-hole'].forEach(id=>{ const el=ov.querySelector('#'+id); if(el) el.setAttribute('inputmode',im); });
-  // reserve the ribbon's real height under the drawing, then re-fit so the whole print stays visible
+  // reserve the sidebar's real width beside the drawing, then re-fit so the whole print stays visible
   const wasOpen=document.body.classList.contains('meas-open');
   document.body.classList.add('meas-open');
   const m=ov.querySelector('.meas');
-  if(m) document.documentElement.style.setProperty('--measH', m.offsetHeight+'px');
+  if(m) document.documentElement.style.setProperty('--measW', m.offsetWidth+'px');
   if(!wasOpen && _fdvFull) fdvFit();
 }
 window.qcMeas=(no)=>{
@@ -1337,7 +1336,6 @@ window.qcMeas=(no)=>{
     inp.value=c.rawReading; _measMode=c.edgeMode;
   } else { inp.value=c.result||''; _measMode='center'; }
   qcMeasPreview();
-  if(mm) document.documentElement.style.setProperty('--measH', mm.offsetHeight+'px');
   if(!isTxt) setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
 };
 window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; document.body.classList.remove('meas-open'); if(_fdvFull) fdvFit(); };
@@ -1383,9 +1381,6 @@ function qcMeasPreview(){
   if(!String(conv.val).trim()||!d.hasResult){ el.textContent=''; el.className='meas-dev'; }
   else if(isFinite(d.dev)){ el.textContent=(d.oot?('⚠ '+t('Out of tolerance')):('✓ '+t('In tolerance')))+'  ·  Δ '+d.devStr; el.className='meas-dev '+(d.oot?'oot':'ok'); }
   else { el.textContent=''; el.className='meas-dev'; }
-  // helper rows appear/disappear as the operator works — keep the space reserved under the drawing current
-  const mEl=document.querySelector('#meas-ov .meas');
-  if(mEl && mEl.offsetParent) document.documentElement.style.setProperty('--measH', mEl.offsetHeight+'px');
 }
 window.qcMeasConfirm=(advance)=>{
   const idx=_chars.findIndex(x=>x.no===_measNo); if(idx<0){ qcMeasClose(); return; }
