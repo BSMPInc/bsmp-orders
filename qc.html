@@ -1073,8 +1073,8 @@ function decimalPlacesOf(req){ const m=String(req==null?'':req).match(/\d*\.(\d+
 // fractional callouts (e.g. 3/8, 1-1/2, 1 1/2) — real inch fractions only, so material notes like "304/304L" aren't mistaken for fractions
 function isFractionReq(req){ const s=String(req||''); if(/\d\.\d/.test(s)) return false; const m=s.match(/\d+\s*\/\s*(\d+)/); return !!m && [2,4,8,16,32,64].includes(parseInt(m[1],10)); }
 function parseFractionNum(s){ const m=String(s||'').match(/(?:(\d+)\s*[-\s]\s*)?(\d+)\s*\/\s*(\d+)/); if(!m) return NaN; const w=m[1]?parseInt(m[1],10):0, n=parseInt(m[2],10), d=parseInt(m[3],10); return d?w+n/d:NaN; }
-// nominal value, understanding both decimals and fractions
-function nominalOf(v){ return isFractionReq(v)?parseFractionNum(v):parseNum(v); }
+// nominal value, understanding both decimals and fractions; a quantity prefix ("2X .177 THRU ALL") is not the dimension
+function nominalOf(v){ const s=String(v==null?'':v).replace(/^\s*\d+\s*[x×]\s*(?=[Ø⌀.\d])/i,''); return isFractionReq(s)?parseFractionNum(s):parseNum(s); }
 // strict: only read a ± (or a matched +x / -x pair) out of the requirement — never a lone minus (avoids misreading fractions like 1-1/2)
 function parseEmbeddedTol(req){ const s=String(req||''); let m;
   if((m=s.match(/[±]\s*(\d*\.?\d+)/))) return {pl:parseFloat(m[1]),mi:parseFloat(m[1])};
