@@ -212,6 +212,8 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas-pad .zero{grid-column:span 2}
 .meas-pad .ok{background:var(--accent);color:#fff;border-color:var(--accent)}
 @media (hover:hover) and (pointer:fine){ .meas-pad{display:none} }
+/* text/attribute characteristic (Note, or nothing to measure) → just the requirement + Confirm */
+.meas.textmode .meas-pad,.meas.textmode .meas-reswrap,.meas.textmode .meas-tolwrap,.meas.textmode .meas-dev{display:none}
 /* while the ribbon is open, pull the full-screen drawing up so none of it hides behind the ribbon */
 body.meas-open .fair-fs{padding-bottom:var(--measH,120px)}
 body.meas-open .fair-fs .fdv,body.meas-open .fair-fs .bubble-ws{height:calc(100vh - 140px - var(--measH,120px))}
@@ -1085,6 +1087,8 @@ function resolveTol(req,tol){
 function tolSrcLabel(src){ return src==='callout'?t('from callout'):src==='title'?t('title block'):''; }
 function qcDev(req,tol,result){ const nom=nominalOf(req), act=nominalOf(result); let dev=NaN, oot=false, devStr=''; const hasResult=isFinite(act); const band=resolveTol(req,tol); if(isFinite(nom)&&hasResult){ dev=act-nom; devStr=(dev>=0?'+':'')+dev.toFixed(3); if(isFinite(band.pl)&&dev>band.pl+1e-9) oot=true; if(isFinite(band.mi)&&dev<-band.mi-1e-9) oot=true; } return {dev,oot,devStr,hasResult,band}; }
 function charStatus(c){ if(!c||String(c.result||'').trim()==='') return 'none'; return qcDev(c.requirement,c.tol,c.result).oot?'oot':'ok'; }
+// text/attribute characteristic — a Note, or a requirement with nothing measurable in it: no reading, just confirm it conforms
+function isTextChar(c){ return !!c && (c.type==='Note' || !isFinite(nominalOf(c.requirement))); }
 // compute deviation (actual − nominal) and flag out-of-tolerance
 window.qcCharCompute=(i)=>{
   const tr=document.querySelector(`#char-body tr[data-row="${i}"]`); if(!tr) return;
@@ -1264,7 +1268,7 @@ function qcMeasMount(){
   let ov=$('meas-ov');
   if(!ov){
     ov=document.createElement('div'); ov.id='meas-ov'; ov.className='meas-ov';
-    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div></div><div><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
+    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div class="meas-tolwrap"><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div></div><div class="meas-reswrap"><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
     document.body.appendChild(ov);
     const inp=ov.querySelector('#meas-input');
     inp.addEventListener('input', qcMeasPreview);
@@ -1294,10 +1298,12 @@ window.qcMeas=(no)=>{
   $('meas-req').textContent=c.requirement||'—';
   const tolEl=$('meas-tol'); tolEl.value=c.tol||''; tolEl.readOnly=!isMgr(); tolEl.placeholder=isMgr()?'±.005':'';
   const inp=$('meas-input'); inp.value=c.result||'';
-  qcMeasPreview();
+  const isTxt=isTextChar(c);
   const mm=document.querySelector('#meas-ov .meas');
+  if(mm) mm.classList.toggle('textmode', isTxt);
+  qcMeasPreview();
   if(mm) document.documentElement.style.setProperty('--measH', mm.offsetHeight+'px');
-  setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+  if(!isTxt) setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
 };
 window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; document.body.classList.remove('meas-open'); if(_fdvFull) fdvFit(); };
 // on-screen keypad → edits the measured-result field (± toggles the sign at the front)
@@ -1324,7 +1330,8 @@ function qcMeasPreview(){
 }
 window.qcMeasConfirm=(advance)=>{
   const idx=_chars.findIndex(x=>x.no===_measNo); if(idx<0){ qcMeasClose(); return; }
-  const val=$('meas-input').value;
+  // text/attribute characteristic: Confirm stamps it conforming (keeps any result already typed in the table)
+  const val=isTextChar(_chars[idx]) ? (String(_chars[idx].result||'').trim()||'OK') : $('meas-input').value;
   const tolEl=$('meas-tol'); const tolv=tolEl?tolEl.value:_chars[idx].tol;
   _chars[idx].result=val;
   if(isMgr()) _chars[idx].tol=tolv;   // a manager can set/adjust the tolerance right here; operator field is read-only
