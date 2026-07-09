@@ -216,6 +216,11 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas.textmode .meas-pad,.meas.textmode .meas-reswrap,.meas.textmode .meas-tolwrap,.meas.textmode .meas-holewrap,.meas.textmode .meas-dev{display:none}
 /* hole-center helper: enter the hole Ø → shows the caliper readings to the hole edges */
 .meas-holeout{font-size:12.5px;font-weight:800;color:var(--accent);margin-top:3px;min-height:15px;max-width:240px}
+/* what the operator is reading to: hole center, or raw caliper reading to an edge (app converts) */
+.meas-mode{display:flex;gap:4px;margin-bottom:5px}
+.meas-mode button{font-size:10.5px;font-weight:800;padding:4px 9px;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:999px;cursor:pointer;line-height:1;min-height:0}
+.meas-mode button.on{background:#3a4049;color:#fff;border-color:#3a4049}
+.meas-work{font-size:12.5px;font-weight:800;color:var(--text2);margin-top:4px;min-height:15px;text-align:center}
 /* while the ribbon is open, pull the full-screen drawing up so none of it hides behind the ribbon */
 body.meas-open .fair-fs{padding-bottom:var(--measH,120px)}
 body.meas-open .fair-fs .fdv,body.meas-open .fair-fs .bubble-ws{height:calc(100vh - 140px - var(--measH,120px))}
@@ -410,6 +415,7 @@ const I18N = {
     'Tap a balloon to enter its measurement':'Toca un globo para ingresar su medición','Characteristic':'Característica','Tolerance':'Tolerancia','Measured result':'Resultado medido','Confirm & next':'Confirmar y siguiente','Confirm':'Confirmar','In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia','All balloons measured.':'Todos los globos medidos.',
     'msr:req':'Requisito','msr:tol':'Tolerancia','msr:measured':'Resultado medido','msr:next':'Confirmar y siguiente','msr:confirm':'Confirmar',
     'msr:hole':'Ø del agujero','Should be':'Debe ser','(near edge)':'(borde cercano)','(far edge)':'(borde lejano)',
+    'Center':'Centro','Near edge':'Borde cercano','Far edge':'Borde lejano','(center)':'(centro)',
     'Auto-bubble: AI reading the drawing and pre-filling these characteristics is the next phase. For now, add them by hand.':'Auto-globos: que la IA lea el plano y precargue estas características es la siguiente fase. Por ahora, agrégalas a mano.',
     'Characteristics':'Características','Requirement':'Requisito','Add characteristic':'Agregar característica',
     'Tolerance Range':'Rango de tolerancia','Type':'Tipo','Deviation':'Desviación','Linear':'Lineal','Diameter':'Diámetro','Radius':'Radio','Angular':'Angular','Note':'Nota',
@@ -1267,12 +1273,25 @@ window.fdvInit=()=>{
   }
 };
 /* ---- tap a balloon → enter its measurement ---- */
-let _measNo=null;
+let _measNo=null, _measMode='center';   // center = reading IS the dimension; near/far = raw caliper reading to a hole edge
+window.qcMeasMode=(m)=>{ _measMode=m; document.querySelectorAll('#meas-mode button').forEach(b=>b.classList.toggle('on', b.dataset.m===m)); qcMeasPreview(); };
+// raw edge reading → center value (near edge: + r, far edge: − r), with the math spelled out for the report
+function qcMeasConverted(c){
+  const inpEl=$('meas-input'); const rawStr=inpEl?inpEl.value:'';
+  const he=$('meas-hole'); const dia=parseNum(he?he.value:'');
+  if(!(isFinite(dia)&&dia>0) || _measMode==='center' || isTextChar(c)) return {val:rawStr, raw:rawStr, work:'', converted:false};
+  const raw=nominalOf(rawStr);
+  if(!isFinite(raw)) return {val:rawStr, raw:rawStr, work:'', converted:false};
+  const dp=Math.max(decimalPlacesOf(c.requirement), decimalPlacesOf(he.value), decimalPlacesOf(rawStr), 3);
+  const f=(n)=>n.toFixed(dp).replace(/^(-?)0\./,'$1.');
+  const r=dia/2; const cvt=_measMode==='near' ? raw+r : raw-r;
+  return {val:f(cvt), raw:rawStr, work:f(raw)+' '+(_measMode==='near'?'+':'−')+' r '+f(r)+' = '+f(cvt)+' '+t('(center)'), converted:true};
+}
 function qcMeasMount(){
   let ov=$('meas-ov');
   if(!ov){
     ov=document.createElement('div'); ov.id='meas-ov'; ov.className='meas-ov';
-    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div class="meas-tolwrap"><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div><div class="meas-holewrap"><div class="k" data-t="msr:hole">Hole Ø</div><input class="val meas-tolin" id="meas-hole" oninput="qcMeasPreview()" autocomplete="off" placeholder=".500"><div class="meas-holeout" id="meas-holeout"></div></div></div><div class="meas-reswrap"><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
+    ov.innerHTML='<div class="meas" role="dialog"><div class="meas-h"><span class="n" id="meas-n"></span><div style="min-width:0"><div style="font-weight:800" id="meas-title"></div><div style="font-size:11px;opacity:.85" id="meas-type"></div></div></div><div class="meas-b"><div class="meas-spec"><div><div class="k" data-t="msr:req">Requirement</div><div class="val" id="meas-req"></div></div><div class="meas-tolwrap"><div class="k" data-t="msr:tol">Tolerance</div><input class="val meas-tolin" id="meas-tol" oninput="qcMeasPreview()" autocomplete="off"><div class="meas-tolhint" id="meas-tolhint"></div></div><div class="meas-holewrap"><div class="k" data-t="msr:hole">Hole Ø</div><input class="val meas-tolin" id="meas-hole" oninput="qcMeasPreview()" autocomplete="off" placeholder=".500"><div class="meas-holeout" id="meas-holeout"></div></div></div><div class="meas-reswrap"><label class="k" style="display:block;margin-bottom:4px" data-t="msr:measured">Measured result</label><div class="meas-mode" id="meas-mode" style="display:none"><button type="button" data-m="center" onclick="qcMeasMode(\'center\')" data-t="Center">Center</button><button type="button" data-m="near" onclick="qcMeasMode(\'near\')" data-t="Near edge">Near edge</button><button type="button" data-m="far" onclick="qcMeasMode(\'far\')" data-t="Far edge">Far edge</button></div><input class="big" id="meas-input" inputmode="decimal" autocomplete="off"><div class="meas-work" id="meas-work"></div></div><div class="meas-pad" onpointerdown="event.preventDefault()"><button onclick="qcMeasKey(\'7\')">7</button><button onclick="qcMeasKey(\'8\')">8</button><button onclick="qcMeasKey(\'9\')">9</button><button onclick="qcMeasKey(\'back\')" aria-label="Backspace"><i class="ti ti-backspace"></i></button><button onclick="qcMeasKey(\'4\')">4</button><button onclick="qcMeasKey(\'5\')">5</button><button onclick="qcMeasKey(\'6\')">6</button><button onclick="qcMeasKey(\'clear\')">C</button><button onclick="qcMeasKey(\'1\')">1</button><button onclick="qcMeasKey(\'2\')">2</button><button onclick="qcMeasKey(\'3\')">3</button><button onclick="qcMeasKey(\'-\')">±</button><button class="zero" onclick="qcMeasKey(\'0\')">0</button><button onclick="qcMeasKey(\'.\')">.</button><button class="ok" onclick="qcMeasConfirm(true)" aria-label="Confirm & next"><i class="ti ti-check"></i></button></div><div class="meas-dev" id="meas-dev"></div><div class="meas-btns"><button class="btn primary" id="meas-next" onclick="qcMeasConfirm(true)"><i class="ti ti-check"></i> <span data-t="msr:next">Confirm & next</span></button><button class="btn" onclick="qcMeasConfirm(false)" data-t="msr:confirm">Confirm</button></div></div><button class="meas-x" onclick="qcMeasClose()" aria-label="Close"><i class="ti ti-x"></i></button></div>';
     document.body.appendChild(ov);
     const inp=ov.querySelector('#meas-input');
     inp.addEventListener('input', qcMeasPreview);
@@ -1303,7 +1322,7 @@ window.qcMeas=(no)=>{
   $('meas-type').textContent=c.type?t(c.type):'';
   $('meas-req').textContent=c.requirement||'—';
   const tolEl=$('meas-tol'); tolEl.value=c.tol||''; tolEl.readOnly=!isMgr(); tolEl.placeholder=isMgr()?'±.005':'';
-  const inp=$('meas-input'); inp.value=c.result||'';
+  const inp=$('meas-input');
   const isTxt=isTextChar(c);
   const mm=document.querySelector('#meas-ov .meas');
   if(mm) mm.classList.toggle('textmode', isTxt);
@@ -1312,6 +1331,11 @@ window.qcMeas=(no)=>{
   const hw=mm?mm.querySelector('.meas-holewrap'):null;
   if(hw) hw.style.display=showHole?'':'none';
   const he=$('meas-hole'); if(he) he.value=showHole?(c.holeDia||''):'';
+  // a result recorded from an edge reading reopens as that raw reading so the shown math still matches
+  const mr=$('meas-mode'); if(mr) mr.style.display='none';
+  if(showHole && c.edgeMode && c.edgeMode!=='center' && c.rawReading && String(c.result||'').trim()!==''){
+    inp.value=c.rawReading; _measMode=c.edgeMode;
+  } else { inp.value=c.result||''; _measMode='center'; }
   qcMeasPreview();
   if(mm) document.documentElement.style.setProperty('--measH', mm.offsetHeight+'px');
   if(!isTxt) setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
@@ -1332,29 +1356,46 @@ window.qcMeasKey=(k)=>{
 function qcMeasPreview(){
   const c=_chars.find(x=>x.no===_measNo); if(!c) return;
   const tolEl=$('meas-tol'); const tolv=tolEl?tolEl.value:c.tol;
-  const val=$('meas-input').value;
-  const d=qcDev(c.requirement, tolv, val);
   // show which tolerance is actually being applied (explicit vs callout vs title-block)
   const eff=resolveTol(c.requirement, tolv); const hint=$('meas-tolhint');
   if(hint) hint.textContent = eff.src==='none' ? t('No tolerance set — reading will not be checked') : (eff.src==='explicit' ? '' : ('→ '+eff.str+' ('+tolSrcLabel(eff.src)+')'));
   // hole-center helper: dimension is to the hole center, calipers read to the edge → show dim ∓ radius
+  const he2=$('meas-hole'); const dia=parseNum(he2?he2.value:'');
+  const hasDia=isFinite(dia)&&dia>0;
   const ho=$('meas-holeout');
-  if(ho){ const he2=$('meas-hole'); const nom=nominalOf(c.requirement); const dia=parseNum(he2?he2.value:'');
+  if(ho){ const nom=nominalOf(c.requirement);
     const dp=Math.max(decimalPlacesOf(c.requirement), decimalPlacesOf(he2?he2.value:''), 3);
     const f=(n)=>n.toFixed(dp).replace(/^(-?)0\./,'$1.');
-    ho.textContent=(isFinite(nom)&&isFinite(dia)&&dia>0) ? (t('Should be')+' '+f(nom-dia/2)+' '+t('(near edge)')+' · '+f(nom+dia/2)+' '+t('(far edge)')) : '';
+    ho.textContent=(hasDia&&isFinite(nom)) ? (t('Should be')+' '+f(nom-dia/2)+' '+t('(near edge)')+' · '+f(nom+dia/2)+' '+t('(far edge)')) : '';
   }
+  // edge-reading mode: a Ø is set → offer center / near edge / far edge; default to near edge for a fresh reading
+  const mr=$('meas-mode');
+  if(!hasDia) _measMode='center';
+  if(mr){
+    if(hasDia && !isTextChar(c) && mr.style.display==='none' && !String($('meas-input').value).trim()) _measMode='near';
+    mr.style.display=(hasDia&&!isTextChar(c))?'flex':'none';
+    mr.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.m===_measMode));
+  }
+  const conv=qcMeasConverted(c);
+  const wk=$('meas-work'); if(wk) wk.textContent=conv.work;
+  const d=qcDev(c.requirement, tolv, conv.val);
   const el=$('meas-dev');
-  if(!String(val).trim()||!d.hasResult){ el.textContent=''; el.className='meas-dev'; return; }
-  if(isFinite(d.dev)){ el.textContent=(d.oot?('⚠ '+t('Out of tolerance')):('✓ '+t('In tolerance')))+'  ·  Δ '+d.devStr; el.className='meas-dev '+(d.oot?'oot':'ok'); }
+  if(!String(conv.val).trim()||!d.hasResult){ el.textContent=''; el.className='meas-dev'; }
+  else if(isFinite(d.dev)){ el.textContent=(d.oot?('⚠ '+t('Out of tolerance')):('✓ '+t('In tolerance')))+'  ·  Δ '+d.devStr; el.className='meas-dev '+(d.oot?'oot':'ok'); }
   else { el.textContent=''; el.className='meas-dev'; }
+  // helper rows appear/disappear as the operator works — keep the space reserved under the drawing current
+  const mEl=document.querySelector('#meas-ov .meas');
+  if(mEl && mEl.offsetParent) document.documentElement.style.setProperty('--measH', mEl.offsetHeight+'px');
 }
 window.qcMeasConfirm=(advance)=>{
   const idx=_chars.findIndex(x=>x.no===_measNo); if(idx<0){ qcMeasClose(); return; }
   // text/attribute characteristic: Confirm stamps it conforming (keeps any result already typed in the table)
-  const val=isTextChar(_chars[idx]) ? (String(_chars[idx].result||'').trim()||'OK') : $('meas-input').value;
+  const isTxt=isTextChar(_chars[idx]);
+  const conv=isTxt?null:qcMeasConverted(_chars[idx]);   // edge reading → recorded as the center value
+  const val=isTxt ? (String(_chars[idx].result||'').trim()||'OK') : conv.val;
   const tolEl=$('meas-tol'); const tolv=tolEl?tolEl.value:_chars[idx].tol;
   _chars[idx].result=val;
+  if(!isTxt){ _chars[idx].rawReading=conv.converted?conv.raw:''; _chars[idx].edgeMode=conv.converted?_measMode:'center'; }
   if(isMgr()) _chars[idx].tol=tolv;   // a manager can set/adjust the tolerance right here; operator field is read-only
   // remember the hole Ø on the characteristic so the should-be note is there next time
   const hw2=document.querySelector('#meas-ov .meas-holewrap');
