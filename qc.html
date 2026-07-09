@@ -341,6 +341,7 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-item" id="nav-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span class="nav-label" data-t="First Articles">First Articles</span></div>
       <div class="nav-item" id="nav-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span class="nav-label" data-t="Nonconformances">Nonconformances</span></div>
       <div class="nav-sec" data-t="Records">Records</div>
+      <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
     </div>
     <div class="sb-foot"><span class="dot" id="qc-foot-dot"></span><span class="lbl" id="qc-foot-txt" data-t="Connecting…">Connecting…</span><button class="pin-btn" id="qc-pin" title="Keep menu open" onclick="window._qcPin(event)"><i class="ti ti-pin" id="qc-pin-ico"></i></button></div>
@@ -409,6 +410,11 @@ const I18N = {
     // self-check form
     'Self-check':'Autoinspección','Snap a photo, confirm your work, then mark Pass or Flag.':'Toma una foto, confirma tu trabajo y marca Aprobado o Marcar.',
     'Link to an order':'Vincular a una orden','— Not linked / free entry —':'— Sin vincular / entrada libre —','Search orders — customer, part, job, PO':'Buscar órdenes — cliente, parte, trabajo, PO',
+    'Drawing Library':'Biblioteca de planos','Part drawings & DXF files — operators pull these into checks':'Planos y archivos DXF — los operadores los cargan en sus inspecciones',
+    'Upload part drawings here — operators pull them straight into self-checks and first articles on the iPad.':'Sube aquí los planos — los operadores los cargan directo en autoinspecciones y primeros artículos desde el iPad.',
+    'Upload drawings':'Subir planos','Search drawings — name, part, customer':'Buscar planos — nombre, parte, cliente','From library':'De la biblioteca',
+    'No drawings yet. Upload PDFs, images or DXF files here.':'Aún no hay planos. Sube PDFs, imágenes o archivos DXF aquí.','No drawings match your search.':'Ningún plano coincide con tu búsqueda.',
+    'Delete this drawing from the library?':'¿Eliminar este plano de la biblioteca?','drawing(s) uploaded':'plano(s) subidos','Uploading…':'Subiendo…','Drawing added to the form.':'Plano agregado al formulario.','Uploaded':'Subido',
     'Pick the order to auto-fill part / customer / job, or leave unlinked and type below.':'Elige la orden para autocompletar parte / cliente / trabajo, o déjala sin vincular y escribe abajo.',
     'Part #':'N.º de parte','Customer':'Cliente','Job #':'N.º de trabajo','PO #':'N.º de OC','Qty inspected':'Cant. inspeccionada','Rev':'Rev',
     'Part photo(s)':'Foto(s) de la parte','Add photo':'Agregar foto',
@@ -521,7 +527,8 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 
 /* ---------- state ---------- */
 window.QC_USER=null; window.QC_ROLE='manager';
-let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={};
+let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={};
+let DRAW_FILTER='';
 let page='inspections';
 let editId=null;
 let _pendingFiles={};
@@ -558,6 +565,7 @@ window.qcOnData=(name,val)=>{
   else if(name==='orders') ORDERS=val||{};
   else if(name==='quotes') QUOTES=val||{};
   else if(name==='audit') AUDIT=val||{};
+  else if(name==='drawings') DRAWINGS=val||{};
   render();
 };
 window.qcOnAuth=(user,role)=>{
@@ -587,7 +595,8 @@ const META={
   fairs:['First Articles','Formal first-article reports'],
   fair:['First Article','First-article report'],
   ncr:['Nonconformances','Flagged parts and corrective action'],
-  certs:['Material Certs','Mill & material certifications']
+  certs:['Material Certs','Mill & material certifications'],
+  drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks']
 };
 window.showPage=(p)=>{
   if(QC_ROLE==='operator' && p==='certs') p='inspections';
@@ -595,7 +604,7 @@ window.showPage=(p)=>{
   render();
 };
 function setActive(){
-  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs'};
+  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',drawings:'nav-drawings'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
   const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs'};
@@ -617,6 +626,7 @@ function render(){
   else if(page==='fair') c.innerHTML=viewFair();
   else if(page==='ncr') c.innerHTML=viewNcr();
   else if(page==='certs') c.innerHTML=viewCerts();
+  else if(page==='drawings') c.innerHTML=viewDrawings();
 }
 
 /* ---------- order linking ---------- */
@@ -993,6 +1003,7 @@ function viewSelfCheck(){
     </div>
     <div class="field"><label class="fl">${t('Reference drawing')}</label>
       <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Add drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('scdraw',this)"></label>
+      <button class="btn sm" onclick="qcDrawPickOpen('scdraw')"><i class="ti ti-books"></i> ${t('From library')}</button>
       <div class="thumbs" id="files-scdraw"></div>
       ${(r&&r.drawing&&r.drawing.url)?`<div class="hint"><i class="ti ti-paperclip"></i> <a href="${esc(r.drawing.url)}" target="_blank">${esc(r.drawing.name||t('Saved drawing'))}</a></div>`:''}
       <div class="hint">${t('Attach the part drawing, then let AI compare your photo to it.')}</div>
@@ -1052,6 +1063,100 @@ window.qcSaveSelf=async ()=>{
   }
   _scPhotoCheck=null; _scPhotoCheckFor=null;
   editId=null; page='inspections'; render();
+};
+
+/* =================== DRAWING LIBRARY =================== */
+function drawMatches(d,q){
+  if(!q) return true;
+  const hay=[d.name,d.partNum,d.rev,d.customer].filter(Boolean).join(' ').toLowerCase();
+  return q.toLowerCase().split(/\s+/).filter(Boolean).every(w=>hay.indexOf(w)>=0);
+}
+function drawExt(name){ const m=String(name||'').match(/\.([a-z0-9]+)$/i); return m?m[1].toLowerCase():''; }
+function viewDrawings(){
+  const list=vals(DRAWINGS).filter(d=>drawMatches(d,DRAW_FILTER)).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const rows=list.map(d=>{
+    const ext=drawExt(d.name);
+    const ic=ext==='dxf'||ext==='dwg'?'ti-vector':(ext==='pdf'?'ti-file-type-pdf':'ti-photo');
+    const cell=(f,ph)=>isMgr()
+      ? `<input class="in" style="min-height:0;padding:5px 8px;font-size:12.5px" value="${esc(d[f]||'')}" placeholder="${ph}" onchange="qcDrawField('${esc(d.id)}','${f}',this.value)">`
+      : `<span>${esc(d[f]||'—')}</span>`;
+    return `<tr>
+      <td style="white-space:nowrap"><i class="ti ${ic}" style="font-size:16px;color:var(--text2);vertical-align:-3px"></i> <a href="${esc(d.url)}" target="_blank" style="font-weight:600">${esc(d.name||d.id)}</a></td>
+      <td>${cell('partNum',t('Part #'))}</td>
+      <td>${cell('rev','Rev')}</td>
+      <td>${cell('customer',t('Customer'))}</td>
+      <td class="muted" style="font-size:11.5px;white-space:nowrap">${esc((d.uploadedBy||'').split('@')[0])}<div>${fmtWhen(d.createdAt)}</div></td>
+      ${isMgr()?`<td style="text-align:right"><i class="ti ti-trash" style="cursor:pointer;color:var(--red)" title="${t('Delete')}" onclick="qcDrawDel('${esc(d.id)}')"></i></td>`:''}
+    </tr>`;
+  }).join('');
+  return `<div class="page-head"><h2>${t('Drawing Library')}</h2><p>${t('Upload part drawings here — operators pull them straight into self-checks and first articles on the iPad.')}</p></div>
+    <div class="toolbar" style="margin-bottom:12px;gap:8px">
+      ${isMgr()?`<label class="btn primary"><i class="ti ti-upload"></i> ${t('Upload drawings')}<input type="file" accept=".pdf,.dxf,.dwg,image/*" multiple style="display:none" onchange="qcDrawUpload(this)"></label>`:''}
+      <input class="in" style="max-width:340px" placeholder="${esc(t('Search drawings — name, part, customer'))}" value="${esc(DRAW_FILTER)}" oninput="DRAW_FILTER=this.value; render(); const el=document.querySelector('.toolbar input'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}">
+    </div>
+    <div class="card" style="padding:0">
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Drawing')}</th><th>${t('Part #')}</th><th>Rev</th><th>${t('Customer')}</th><th>${t('Uploaded')}</th>${isMgr()?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>`
+        :`<div class="empty">${DRAW_FILTER?t('No drawings match your search.'):t('No drawings yet. Upload PDFs, images or DXF files here.')}</div>`}
+    </div>`;
+}
+window.qcDrawUpload=async (inputEl)=>{
+  const files=[...inputEl.files]; inputEl.value='';
+  if(!files.length) return;
+  qcToast(t('Uploading…'),'');
+  let ok=0;
+  for(const f of files){
+    try{
+      const url=await upload(f,'drawings');
+      if(!url) throw new Error('no url');
+      const id=newId('drw');
+      await dbSet('qc/drawings/'+id,{ id, name:f.name, type:f.type||'', url,
+        partNum:'', rev:'', customer:'', uploadedBy:(QC_USER&&QC_USER.email)||'', createdAt:Date.now() });
+      ok++;
+    }catch(e){ console.error('drawing upload failed',e); qcToast(t('File upload failed:')+' '+f.name,'err'); }
+  }
+  if(ok) qcToast(ok+' '+t('drawing(s) uploaded'),'ok');
+};
+window.qcDrawField=(id,f,v)=>dbSet('qc/drawings/'+id+'/'+f, v.trim());
+window.qcDrawDel=async (id)=>{ if(!confirm(t('Delete this drawing from the library?'))) return; await dbRemove('qc/drawings/'+id); };
+/* ---- "From library" picker: fetches the chosen file into the form as if it had been uploaded ---- */
+window.qcDrawPickOpen=(key)=>{
+  let ov=$('dl-overlay'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='dl-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:560px;width:100%;max-height:86vh;display:flex;flex-direction:column;padding:16px" onclick="event.stopPropagation()">
+    <h3 style="margin:0 0 8px">${t('Drawing Library')}</h3>
+    <input class="in" id="dl-q" placeholder="${esc(t('Search drawings — name, part, customer'))}" autocomplete="off" oninput="qcDrawPickList('${key}')">
+    <div id="dl-list" style="border:1px solid var(--border);border-radius:8px;margin-top:10px;overflow:auto;flex:1;min-height:120px"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px"><button class="btn" onclick="document.getElementById('dl-overlay').remove()">${t('Cancel')}</button></div>
+  </div>`;
+  ov.onclick=()=>ov.remove();
+  document.body.appendChild(ov);
+  qcDrawPickList(key);
+  setTimeout(()=>{ const q=$('dl-q'); if(q) q.focus(); },30);
+};
+window.qcDrawPickList=(key)=>{
+  const q=($('dl-q')&&$('dl-q').value)||'';
+  const list=vals(DRAWINGS).filter(d=>drawMatches(d,q)).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,60);
+  const el=$('dl-list'); if(!el) return;
+  el.innerHTML=list.length?list.map(d=>`<div class="ordpick-item" onclick="qcDrawPick('${key}','${esc(d.id)}')">
+      <b>${esc(d.name||d.id)}</b>
+      <div class="muted" style="font-size:11.5px">${esc([d.partNum,d.rev?('Rev '+d.rev):'',d.customer].filter(Boolean).join(' · ')||'')}</div>
+    </div>`).join('')
+    :`<div class="empty" style="padding:24px">${t('No drawings yet. Upload PDFs, images or DXF files here.')}</div>`;
+};
+window.qcDrawPick=async (key,id)=>{
+  const d=DRAWINGS[id]; if(!d) return;
+  const ov=$('dl-overlay'); if(ov) ov.remove();
+  qcToast(t('Loading drawing…'),'');
+  try{
+    const resp=await fetch(d.url); if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const blob=await resp.blob();
+    const file=new File([blob], d.name||'drawing', {type:d.type||blob.type||''});
+    _pendingFiles[key]=_pendingFiles[key]||[]; _pendingFiles[key].push(file);
+    const strip=$('files-'+key);
+    if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map(f=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`).join(' ');
+    qcToast(t('Drawing added to the form.'),'ok');
+  }catch(e){ console.error('library fetch failed',e); qcToast(t('Could not load drawing:')+' '+((e&&e.message)||e),'err'); }
 };
 
 /* =================== FIRST ARTICLES =================== */
@@ -1195,7 +1300,8 @@ function viewFair(){
         <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="fr-itar" ${v('itar')?'checked':''} ${dis} style="width:auto;min-height:0"> ${t('Restricted / ITAR')}</label></div>
         <div class="field"><label class="fl">${t('Drawing')}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            ${isMgr()?`<label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>`:''}
+            ${isMgr()?`<label class="btn sm"><i class="ti ti-upload"></i> ${t('Upload drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('frdraw',this)"></label>
+            <button class="btn sm" onclick="qcDrawPickOpen('frdraw')"><i class="ti ti-books"></i> ${t('From library')}</button>`:''}
             <button class="btn sm" id="draw-min-btn" onclick="qcToggleDrawPreview()"><i class="ti ti-${_fairDrawMin?'eye':'eye-off'}"></i> ${_fairDrawMin?t('Show drawing'):t('Hide drawing')}</button>
           </div>
           <div class="thumbs" id="files-frdraw"></div>
@@ -2683,6 +2789,7 @@ function startListeners(){
   onValue(ref(db,'qc/ncr'),         s=> window.qcOnData('ncr', s.val()||{}));
   onValue(ref(db,'qc/certs'),       s=> window.qcOnData('certs', s.val()||{}));
   onValue(ref(db,'qc/audit'),       s=> window.qcOnData('audit', s.val()||{}));
+  onValue(ref(db,'qc/drawings'),    s=> window.qcOnData('drawings', s.val()||{}));
   onValue(ref(db,'orders'),         s=> window.qcOnData('orders', s.val()||{}));
   onValue(ref(db,'quotes'),         s=> window.qcOnData('quotes', s.val()||{}));
 }
