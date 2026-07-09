@@ -219,8 +219,9 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 @media (hover:hover) and (pointer:fine){ .meas-pad{display:none} }
 /* text/attribute characteristic (Note, or nothing to measure) → just the requirement + Confirm */
 .meas.textmode .meas-pad,.meas.textmode .meas-reswrap,.meas.textmode .meas-tolwrap,.meas.textmode .meas-holewrap,.meas.textmode .meas-dev{display:none}
-/* hole-center helper: enter the hole Ø → shows the caliper readings to the hole edges */
-.meas-holeout{font-size:12.5px;font-weight:800;color:var(--accent);margin-top:3px;min-height:15px;max-width:240px}
+/* hole-center helper: enter the hole Ø → shows the caliper readings to the hole edges.
+   Space for two lines is reserved up front so the note appearing doesn't shove the keypad mid-tap. */
+.meas-holeout{font-size:12.5px;font-weight:800;color:var(--accent);margin-top:3px;line-height:15px;min-height:30px;max-width:240px}
 /* what the operator is reading to: hole center, or raw caliper reading to an edge (app converts) */
 .meas-mode{display:flex;gap:4px;margin-bottom:5px}
 .meas-mode button{font-size:10.5px;font-weight:800;padding:4px 9px;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:999px;cursor:pointer;line-height:1;min-height:0}
@@ -1337,7 +1338,7 @@ window.qcMeas=(no)=>{
   if(hw) hw.style.display=showHole?'':'none';
   const he=$('meas-hole'); if(he) he.value=showHole?(c.holeDia||''):'';
   // a result recorded from an edge reading reopens as that raw reading so the shown math still matches
-  const mr=$('meas-mode'); if(mr) mr.style.display='none';
+  const mr=$('meas-mode'); if(mr){ mr.style.display='none'; mr.dataset.active=''; }
   if(showHole && c.edgeMode && c.edgeMode!=='center' && c.rawReading && String(c.result||'').trim()!==''){
     inp.value=c.rawReading; _measMode=c.edgeMode;
   } else { inp.value=c.result||''; _measMode='center'; }
@@ -1372,12 +1373,18 @@ function qcMeasPreview(){
     const f=(n)=>n.toFixed(dp).replace(/^(-?)0\./,'$1.');
     ho.textContent=(hasDia&&isFinite(nom)) ? (t('Should be')+' '+f(nom-dia/2)+' '+t('(near edge)')+' · '+f(nom+dia/2)+' '+t('(far edge)')) : '';
   }
-  // edge-reading mode: a Ø is set → offer center / near edge / far edge; default to near edge for a fresh reading
+  // edge-reading mode: a Ø is set → offer center / near edge / far edge; default to near edge for a fresh reading.
+  // The row keeps its space (invisible) whenever the Ø field is shown, so appearing doesn't shove the keypad mid-tap.
   const mr=$('meas-mode');
   if(!hasDia) _measMode='center';
   if(mr){
-    if(hasDia && !isTextChar(c) && mr.style.display==='none' && !String($('meas-input').value).trim()) _measMode='near';
-    mr.style.display=(hasDia&&!isTextChar(c))?'flex':'none';
+    const active=hasDia&&!isTextChar(c);
+    if(active && mr.dataset.active!=='1' && !String($('meas-input').value).trim()) _measMode='near';
+    mr.dataset.active=active?'1':'';
+    const hw3=document.querySelector('#meas-ov .meas-holewrap');
+    const holeShown=hw3&&hw3.style.display!=='none';
+    mr.style.display=(active||holeShown)?'flex':'none';
+    mr.style.visibility=active?'visible':'hidden';
     mr.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.m===_measMode));
   }
   const conv=qcMeasConverted(c);
