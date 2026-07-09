@@ -188,6 +188,11 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .fmark:hover{transform:translate(-50%,-50%) scale(1.5);background:rgba(255,255,255,.72);z-index:2}
 .fmark.ok:hover{background:rgba(47,125,85,.85);color:#fff}
 .fmark.oot:hover{background:rgba(192,38,28,.85);color:#fff}
+/* the characteristic being measured right now — big, blue and pulsing so it's easy to spot */
+.fmark.cur{transform:translate(-50%,-50%) scale(2.2);background:#fff;border-color:var(--blue);border-width:1.6px;color:var(--blue);font-weight:800;z-index:3;box-shadow:0 0 0 2px rgba(44,93,134,.28)}
+.fmark.cur:hover{transform:translate(-50%,-50%) scale(2.2);background:#fff}
+.fmark.cur::before{content:'';position:absolute;inset:-5px;border-radius:999px;border:1.6px solid rgba(44,93,134,.6);animation:fmarkPulse 1.3s ease-out infinite}
+@keyframes fmarkPulse{0%{transform:scale(.75);opacity:1}100%{transform:scale(1.9);opacity:0}}
 .fdv-hint{position:absolute;left:8px;bottom:8px;background:rgba(58,64,73,.92);color:#fff;font-size:11px;font-weight:600;padding:6px 10px;border-radius:7px;pointer-events:none}
 /* measurement entry: docked sidebar on the right — no backdrop, drawing stays visible & tappable */
 .meas-ov{position:fixed;top:0;right:0;bottom:0;left:auto;z-index:9550;display:none;pointer-events:none}
@@ -1234,7 +1239,7 @@ function fdvRenderMarkers(){
   const layer=$('fdv-markers'); if(!layer) return;
   if(!_fdvBubbles.length){ layer.innerHTML=''; return; }
   layer.innerHTML=_fdvBubbles.map(b=>{ const c=_chars.find(x=>x.no===b.no); const st=charStatus(c);
-    return `<div class="fmark ${st}" data-no="${b.no}" onclick="qcMeas(${b.no})" title="#${b.no}">${b.no}</div>`; }).join('');
+    return `<div class="fmark ${st}${b.no===_measNo?' cur':''}" data-no="${b.no}" onclick="qcMeas(${b.no})" title="#${b.no}">${b.no}</div>`; }).join('');
   fdvPositionMarkers();
 }
 function fdvPositionMarkers(){
@@ -1316,6 +1321,7 @@ window.qcMeas=(no)=>{
   // recording a dimension → blow the drawing up full screen (minimize from the bar)
   if(!_fdvFull && _fdvBubbles && _fdvBubbles.length) qcFdvFull(true);
   _measNo=no; qcMeasMount();
+  fdvRenderMarkers();   // re-render so the active balloon gets its highlight
   $('meas-n').textContent=no;
   $('meas-title').textContent=t('Characteristic')+' '+no;
   $('meas-type').textContent=c.type?t(c.type):'';
@@ -1338,7 +1344,7 @@ window.qcMeas=(no)=>{
   qcMeasPreview();
   if(!isTxt) setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
 };
-window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; document.body.classList.remove('meas-open'); if(_fdvFull) fdvFit(); };
+window.qcMeasClose=()=>{ const ov=$('meas-ov'); if(ov) ov.style.display='none'; _measNo=null; document.body.classList.remove('meas-open'); if(_fdvFull) fdvFit(); fdvRenderMarkers(); };
 // on-screen keypad → edits the measured-result field (± toggles the sign at the front)
 window.qcMeasKey=(k)=>{
   let inp=$('meas-input'); if(!inp) return;
