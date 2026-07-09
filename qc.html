@@ -227,6 +227,13 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas-mode button{font-size:10.5px;font-weight:800;padding:4px 9px;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:999px;cursor:pointer;line-height:1;min-height:0}
 .meas-mode button.on{background:#3a4049;color:#fff;border-color:#3a4049}
 .meas-work{font-size:12.5px;font-weight:800;color:var(--text2);margin-top:4px;min-height:15px;text-align:center}
+/* searchable order picker */
+.ordpick{position:relative}
+.ordpick-list{position:absolute;left:0;right:0;top:100%;z-index:600;background:#fff;border:1px solid var(--border2);box-shadow:0 10px 24px rgba(0,0,0,.15);max-height:260px;overflow:auto;border-radius:6px}
+.ordpick-item{padding:8px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--border)}
+.ordpick-item:last-child{border-bottom:none}
+.ordpick-item:hover{background:var(--bg)}
+.ordpick-item.none{color:var(--text3)}
 /* while the sidebar is open, pull the full-screen drawing left so none of it hides behind the panel */
 body.meas-open .fair-fs{padding-right:var(--measW,330px)}
 @media (max-width:700px){ .meas-b{padding:10px;gap:10px} .meas .big{font-size:19px;padding:8px} }
@@ -401,7 +408,7 @@ const I18N = {
     'Pass':'Aprobado','Flagged':'Marcado','No self-checks yet. Press':'Aún no hay autoinspecciones. Pulsa','to log one.':'para registrar una.',
     // self-check form
     'Self-check':'Autoinspección','Snap a photo, confirm your work, then mark Pass or Flag.':'Toma una foto, confirma tu trabajo y marca Aprobado o Marcar.',
-    'Link to an order':'Vincular a una orden','— Not linked / free entry —':'— Sin vincular / entrada libre —',
+    'Link to an order':'Vincular a una orden','— Not linked / free entry —':'— Sin vincular / entrada libre —','Search orders — customer, part, job, PO':'Buscar órdenes — cliente, parte, trabajo, PO',
     'Pick the order to auto-fill part / customer / job, or leave unlinked and type below.':'Elige la orden para autocompletar parte / cliente / trabajo, o déjala sin vincular y escribe abajo.',
     'Part #':'N.º de parte','Customer':'Cliente','Job #':'N.º de trabajo','PO #':'N.º de OC','Qty inspected':'Cant. inspeccionada','Rev':'Rev',
     'Part photo(s)':'Foto(s) de la parte','Add photo':'Agregar foto',
@@ -613,13 +620,45 @@ function render(){
 }
 
 /* ---------- order linking ---------- */
+function orderLabel(o){ return [o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ')||o.id; }
 function orderOptions(sel){
   const list=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||''));
   return `<option value="">${t('— Not linked / free entry —')}</option>`+list.map(o=>{
-    const lbl=[o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ');
-    return `<option value="${esc(o.id)}" ${sel===o.id?'selected':''}>${esc(lbl||o.id)}</option>`;
+    return `<option value="${esc(o.id)}" ${sel===o.id?'selected':''}>${esc(orderLabel(o))}</option>`;
   }).join('');
 }
+/* searchable order picker — a text box that filters orders as you type.
+   Keeps a hidden input with the classic "<prefix>-order" id so save code reads it unchanged. */
+function orderSearchHtml(prefix,sel){
+  const o=sel?ORDERS[sel]:null;
+  return `<div class="ordpick">
+    <input class="in" id="${prefix}-order-search" placeholder="${esc(t('Search orders — customer, part, job, PO'))}" autocomplete="off" value="${esc(o?orderLabel(o):'')}"
+      oninput="qcOrdFilter('${prefix}')" onfocus="qcOrdFilter('${prefix}')" onblur="qcOrdBlur('${prefix}')">
+    <input type="hidden" id="${prefix}-order" value="${esc(sel||'')}">
+    <div class="ordpick-list" id="${prefix}-order-list" style="display:none"></div>
+  </div>`;
+}
+window.qcOrdFilter=(prefix)=>{
+  const q=($(prefix+'-order-search').value||'').toLowerCase().trim();
+  const terms=q.split(/\s+/).filter(Boolean);
+  const list=vals(ORDERS).sort((a,b)=>(b.ordered||'').localeCompare(a.ordered||''));
+  const match=list.filter(o=>{ const hay=[o.customer,o.part,o.partNum,o.job,o.po,o.desc].filter(Boolean).join(' ').toLowerCase(); return terms.every(w=>hay.indexOf(w)>=0); }).slice(0,40);
+  const el=$(prefix+'-order-list'); if(!el) return;
+  el.innerHTML=`<div class="ordpick-item none" onmousedown="qcOrdPick('${prefix}','')">${t('— Not linked / free entry —')}</div>`+
+    match.map(o=>`<div class="ordpick-item" onmousedown="qcOrdPick('${prefix}','${esc(o.id)}')">${esc(orderLabel(o))}</div>`).join('');
+  el.style.display='block';
+};
+window.qcOrdPick=(prefix,oid)=>{
+  const hid=$(prefix+'-order'); if(hid) hid.value=oid;
+  const inp=$(prefix+'-order-search'); if(inp) inp.value=(oid&&ORDERS[oid])?orderLabel(ORDERS[oid]):'';
+  const el=$(prefix+'-order-list'); if(el) el.style.display='none';
+  if(oid) qcFillFromOrder(prefix,oid);
+};
+window.qcOrdBlur=(prefix)=>{ setTimeout(()=>{
+  const el=$(prefix+'-order-list'); if(el) el.style.display='none';
+  const hid=$(prefix+'-order'); const inp=$(prefix+'-order-search');
+  if(hid&&inp&&!inp.value.trim()) hid.value='';   // cleared the box = not linked
+},150); };
 window.qcFillFromOrder=(prefix,oid)=>{
   const o=ORDERS[oid]; if(!o) return;
   const set=(suf,v)=>{const el=$(prefix+suf); if(el&&v!=null) el.value=v;};
@@ -942,7 +981,7 @@ function viewSelfCheck(){
   return `<div class="page-head"><h2>${r?t('Self-check'):t('New self-check')}</h2><p>${t('Snap a photo, confirm your work, then mark Pass or Flag.')}</p></div>
   <div class="card">
     <div class="field"><label class="fl">${t('Link to an order')}</label>
-      <select class="in" id="sc-order" onchange="qcFillFromOrder('sc',this.value)">${orderOptions(v('orderId',''))}</select>
+      ${orderSearchHtml('sc', v('orderId',''))}
       <div class="hint">${t('Pick the order to auto-fill part / customer / job, or leave unlinked and type below.')}</div>
     </div>
     <div class="grid2">
