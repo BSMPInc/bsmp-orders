@@ -1112,7 +1112,7 @@ window.qcDrawUpload=async (inputEl)=>{
       await dbSet('qc/drawings/'+id,{ id, name:f.name, type:f.type||'', url,
         partNum:'', rev:'', customer:'', uploadedBy:(QC_USER&&QC_USER.email)||'', createdAt:Date.now() });
       ok++;
-    }catch(e){ console.error('drawing upload failed',e); qcToast(t('File upload failed:')+' '+f.name,'err'); }
+    }catch(e){ console.error('drawing upload failed',e); qcToast(t('File upload failed:')+' '+f.name+' — '+((e&&e.message)||e),'err'); }
   }
   if(ok) qcToast(ok+' '+t('drawing(s) uploaded'),'ok');
 };
