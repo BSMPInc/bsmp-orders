@@ -538,7 +538,10 @@ const I18N = {
     '••• key saved — type a new one to replace it':'••• clave guardada — escribe una nueva para reemplazarla',
     'Save key':'Guardar clave','Clear key':'Borrar clave',
     'Enter a key first — or use Clear key to remove the saved one.':'Primero escribe una clave — o usa Borrar clave para quitar la guardada.',
-    'API key saved in this browser.':'Clave API guardada en este navegador.','API key cleared.':'Clave API borrada.'
+    'API key saved in this browser.':'Clave API guardada en este navegador.','API key cleared.':'Clave API borrada.',
+    // Cert linked-order editing
+    'Link orders':'Vincular órdenes','Edit linked orders':'Editar órdenes vinculadas','Save links':'Guardar vínculos','Links saved.':'Vínculos guardados.',
+    'Cert not found — it may have been deleted.':'Certificado no encontrado — puede haber sido eliminado.'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -2336,6 +2339,7 @@ function viewCerts(){
   const list=vals(CERTS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   if(editId==='__new_cert__') return certForm();
   if(editId==='__cert_review__') return certReviewForm();
+  if(editId && String(editId).indexOf('__cert_links__')===0) return certLinksForm(String(editId).slice('__cert_links__'.length));
   const heatCount={};
   list.forEach(c=>{ const h=(c.heatLot||'').trim().toLowerCase(); if(h) heatCount[h]=(heatCount[h]||0)+1; });
   const rows=list.map(c=>{
@@ -2360,6 +2364,7 @@ function viewCerts(){
     <td>${linked.length?`<span class="cert-open" onclick="qcOrderSheet('${c.id}')" title="${t('View / print full order details')}">${linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' ')} <i class="ti ti-printer" style="opacity:.55"></i></span>`:'<span class="muted">—</span>'}</td>
     <td>${invCell}</td>
     <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:`<button class="icon-btn" onclick="qcAttachCertFile('${c.id}')" title="${t('Attach cert file')}"><i class="ti ti-paperclip"></i></button>`}
+        <span class="icon-btn mgr-only" title="${t('Link orders')}" onclick="window.qcEditCertLinks('${c.id}')"><i class="ti ti-link"></i></span>
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
   </tr>`;}).join('');
   return `<div class="page-head"><h2>${t('Material Certs')}</h2><p>${t('Mill & material certifications, linkable to the orders that used them.')}</p></div>
@@ -2395,6 +2400,44 @@ window.qcAttachCertFile=(id)=>{
     }catch(e){ qcToast(t('File upload failed:')+' '+((e&&e.message)||e),'err'); }
   };
   inp.click();
+};
+/* edit the linked orders on an already-saved cert (manager only) — reuses the
+   add-cert chip/search widgets, which read _certLinks and the cert-* element ids */
+window.qcEditCertLinks=(id)=>{
+  if(!isMgr()) return;
+  const c=CERTS[id]; if(!c) return;
+  _certLinks=(c.linkedOrders?vals(c.linkedOrders):[]).slice();
+  editId='__cert_links__'+id; render();
+};
+function certLinksForm(id){
+  const c=CERTS[id];
+  const back=`<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>`;
+  if(!c) return back+`<div class="card"><div class="empty">${t('Cert not found — it may have been deleted.')}</div></div>`;
+  const sub=[c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):'',c.supplier||''].filter(Boolean).join(' · ');
+  return back+`<div class="page-head"><h2>${t('Edit linked orders')}</h2><p>${esc(c.material||'')}${sub?' — '+esc(sub):''}</p></div>
+  <div class="card" style="max-width:680px">
+    <div class="field"><label class="fl">${t('Linked orders')}</label>
+      <div id="cert-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">${certLinkChips()}</div>
+      <input class="in" id="cert-order-search" placeholder="${t('Search jobs by customer, part, job or PO…')}" oninput="qcCertSearch(this.value)">
+      <div id="cert-order-results" class="rv-results"></div></div>
+    <div class="toolbar" style="margin-top:6px">
+      <button class="btn primary" onclick="window.qcSaveCertLinks('${esc(id)}')"><i class="ti ti-device-floppy"></i> ${t('Save links')}</button>
+      <button class="btn" onclick="editId=null;render()">${t('Cancel')}</button>
+    </div>
+  </div>`;
+}
+window.qcSaveCertLinks=async (id)=>{
+  if(!isMgr()) return;
+  try{
+    const linked=_certLinks.slice();
+    await dbSet('qc/certs/'+id+'/linkedOrders', linked);
+    if(CERTS[id]) CERTS[id].linkedOrders=linked;
+    _certLinks=[]; editId=null; render();
+    qcToast(t('Links saved.'),'ok');
+  }catch(e){
+    console.error('cert link save failed', e);
+    qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err');
+  }
 };
 
 /* =================== CUSTOMER COVER SHEET ===================

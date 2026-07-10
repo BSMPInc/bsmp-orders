@@ -46,7 +46,7 @@ Quality control: operator self-checks, First Article Inspection reports (Simple 
 - **AI features (`claude-sonnet-4-6` via proxy):** auto-bubble (`qcFairAutoBubble`, `FAIR_BUBBLE_PROMPT`), read placed balloons (`qcFairReadBubbles`, composites numbered balloons onto the image via `qcCompositeBalloonsDataUrl`), box-a-dimension crop read (`qcReadBox`, `CROP_PROMPT`, `cropRegion`), re-read a saved ballooned image (`qcFairReadBallooned`). Balloon sorting/hierarchy: `qcSortByHierarchy`, `qcSortBubbles`, `qcSpreadBubbles`, `qcBubblesLineUp`.
 - **Save ballooned drawing:** `qcFairSaveBallooned` composites balloons and uploads a flat JPG; the button shows a spinner while saving. The URL is stored on the report as `ballooned`.
 - **NCRs:** `viewNcr`, `ncrDetail`, `qcSaveNcr`, dispositions (`DISPOSITIONS`), open → dispositioned → closed. Operators raise; managers disposition/close.
-- **Material certs:** `viewCerts`, `certForm`, cert review flow (`certReviewForm`), AI cert intake with multi-cert detection, PDF splitting via `pdf-lib`, cert viewer modal (`qcViewCert`, `qcvRender`), printable order sheet (`qcOrderSheet`). Duplicate heat/lot detection is built in.
+- **Material certs:** `viewCerts`, `certForm`, cert review flow (`certReviewForm`), AI cert intake with multi-cert detection, PDF splitting via `pdf-lib`, cert viewer modal (`qcViewCert`, `qcvRender`), printable order sheet (`qcOrderSheet`). Duplicate heat/lot detection is built in. Linked orders are editable after save (manager-only): link icon on the row → `qcEditCertLinks` / `certLinksForm` / `qcSaveCertLinks`, reusing the add-form chip/search widgets (`_certLinks`, `certLinkChips`, `qcCertSearch`).
 
 ## Record shapes (rough)
 
