@@ -227,6 +227,14 @@ table.tbl tr.click:hover td{background:var(--accent-soft)}
 .meas-mode button{font-size:10.5px;font-weight:800;padding:4px 9px;border:1px solid var(--border);background:#fff;color:var(--text2);border-radius:999px;cursor:pointer;line-height:1;min-height:0}
 .meas-mode button.on{background:#3a4049;color:#fff;border-color:#3a4049}
 .meas-work{font-size:12.5px;font-weight:800;color:var(--text2);margin-top:4px;min-height:15px;text-align:center}
+/* drawing library: previews + customer folders */
+.drw-thumb{width:76px;height:54px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.drw-thumb.sm{width:56px;height:40px}
+.drw-noprev{color:var(--text3);font-size:20px}
+.drw-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.drw-folder{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;display:flex;gap:11px;align-items:center;min-width:0}
+.drw-folder:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.drw-folder>i{font-size:26px;color:var(--amber);flex:none}
 /* searchable order picker */
 .ordpick{position:relative}
 .ordpick-list{position:absolute;left:0;right:0;top:100%;z-index:600;background:#fff;border:1px solid var(--border2);box-shadow:0 10px 24px rgba(0,0,0,.15);max-height:260px;overflow:auto;border-radius:6px}
@@ -415,6 +423,7 @@ const I18N = {
     'Upload drawings':'Subir planos','Search drawings — name, part, customer':'Buscar planos — nombre, parte, cliente','From library':'De la biblioteca',
     'No drawings yet. Upload PDFs, images or DXF files here.':'Aún no hay planos. Sube PDFs, imágenes o archivos DXF aquí.','No drawings match your search.':'Ningún plano coincide con tu búsqueda.',
     'Delete this drawing from the library?':'¿Eliminar este plano de la biblioteca?','drawing(s) uploaded':'plano(s) subidos','Uploading…':'Subiendo…','Drawing added to the form.':'Plano agregado al formulario.','Uploaded':'Subido',
+    'All folders':'Todas las carpetas','Unfiled':'Sin carpeta','drawing(s)':'plano(s)','Open drawing':'Abrir plano','Type a customer on a drawing to move it into that folder.':'Escribe el cliente en un plano para moverlo a esa carpeta.',
     'Pick the order to auto-fill part / customer / job, or leave unlinked and type below.':'Elige la orden para autocompletar parte / cliente / trabajo, o déjala sin vincular y escribe abajo.',
     'Part #':'N.º de parte','Customer':'Cliente','Job #':'N.º de trabajo','PO #':'N.º de OC','Qty inspected':'Cant. inspeccionada','Rev':'Rev',
     'Part photo(s)':'Foto(s) de la parte','Add photo':'Agregar foto',
@@ -528,7 +537,7 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 /* ---------- state ---------- */
 window.QC_USER=null; window.QC_ROLE='manager';
 let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={};
-let DRAW_FILTER='';
+let DRAW_FILTER='', DRAW_FOLDER=null;   // DRAW_FOLDER: null = folder view, ''=Unfiled, else customer name
 let page='inspections';
 let editId=null;
 let _pendingFiles={};
@@ -1072,16 +1081,22 @@ function drawMatches(d,q){
   return q.toLowerCase().split(/\s+/).filter(Boolean).every(w=>hay.indexOf(w)>=0);
 }
 function drawExt(name){ const m=String(name||'').match(/\.([a-z0-9]+)$/i); return m?m[1].toLowerCase():''; }
-function viewDrawings(){
-  const list=vals(DRAWINGS).filter(d=>drawMatches(d,DRAW_FILTER)).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+function drawFolderOf(d){ return String(d.customer||'').trim(); }
+function drawThumbHtml(d,cls){
+  const ext=drawExt(d.name);
+  const ic=ext==='dxf'||ext==='dwg'?'ti-vector':(ext==='pdf'?'ti-file-type-pdf':'ti-photo');
+  if(d.thumbUrl) return `<img class="${cls}" src="${esc(d.thumbUrl)}" loading="lazy" alt="">`;
+  if(String(d.type||'').startsWith('image/')) return `<img class="${cls}" src="${esc(d.url)}" loading="lazy" alt="">`;
+  return `<span class="${cls} drw-noprev"><i class="ti ${ic}"></i></span>`;
+}
+function drawTableHtml(list){
   const rows=list.map(d=>{
-    const ext=drawExt(d.name);
-    const ic=ext==='dxf'||ext==='dwg'?'ti-vector':(ext==='pdf'?'ti-file-type-pdf':'ti-photo');
     const cell=(f,ph)=>isMgr()
       ? `<input class="in" style="min-height:0;padding:5px 8px;font-size:12.5px" value="${esc(d[f]||'')}" placeholder="${ph}" onchange="qcDrawField('${esc(d.id)}','${f}',this.value)">`
       : `<span>${esc(d[f]||'—')}</span>`;
     return `<tr>
-      <td style="white-space:nowrap"><i class="ti ${ic}" style="font-size:16px;color:var(--text2);vertical-align:-3px"></i> <a href="${esc(d.url)}" target="_blank" style="font-weight:600">${esc(d.name||d.id)}</a></td>
+      <td style="width:88px"><a href="${esc(d.url)}" target="_blank" title="${t('Open drawing')}">${drawThumbHtml(d,'drw-thumb')}</a></td>
+      <td><a href="${esc(d.url)}" target="_blank" style="font-weight:600">${esc(d.name||d.id)}</a></td>
       <td>${cell('partNum',t('Part #'))}</td>
       <td>${cell('rev','Rev')}</td>
       <td>${cell('customer',t('Customer'))}</td>
@@ -1089,15 +1104,44 @@ function viewDrawings(){
       ${isMgr()?`<td style="text-align:right"><i class="ti ti-trash" style="cursor:pointer;color:var(--red)" title="${t('Delete')}" onclick="qcDrawDel('${esc(d.id)}')"></i></td>`:''}
     </tr>`;
   }).join('');
-  return `<div class="page-head"><h2>${t('Drawing Library')}</h2><p>${t('Upload part drawings here — operators pull them straight into self-checks and first articles on the iPad.')}</p></div>
-    <div class="toolbar" style="margin-bottom:12px;gap:8px">
+  return `<table class="tbl"><thead><tr><th></th><th>${t('Drawing')}</th><th>${t('Part #')}</th><th>Rev</th><th>${t('Customer')}</th><th>${t('Uploaded')}</th>${isMgr()?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>`;
+}
+window.qcDrawFolder=(c)=>{ DRAW_FOLDER=c; DRAW_FILTER=''; render(); };
+function viewDrawings(){
+  const all=vals(DRAWINGS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const searching=!!DRAW_FILTER.trim();
+  const head=`<div class="page-head"><h2>${t('Drawing Library')}</h2><p>${t('Upload part drawings here — operators pull them straight into self-checks and first articles on the iPad.')}</p></div>
+    <div class="toolbar" style="margin-bottom:12px;gap:8px;flex-wrap:wrap">
       ${isMgr()?`<label class="btn primary"><i class="ti ti-upload"></i> ${t('Upload drawings')}<input type="file" accept=".pdf,.dxf,.dwg,image/*" multiple style="display:none" onchange="qcDrawUpload(this)"></label>`:''}
-      <input class="in" style="max-width:340px" placeholder="${esc(t('Search drawings — name, part, customer'))}" value="${esc(DRAW_FILTER)}" oninput="DRAW_FILTER=this.value; render(); const el=document.querySelector('.toolbar input'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}">
-    </div>
-    <div class="card" style="padding:0">
-      ${list.length?`<table class="tbl"><thead><tr><th>${t('Drawing')}</th><th>${t('Part #')}</th><th>Rev</th><th>${t('Customer')}</th><th>${t('Uploaded')}</th>${isMgr()?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>`
-        :`<div class="empty">${DRAW_FILTER?t('No drawings match your search.'):t('No drawings yet. Upload PDFs, images or DXF files here.')}</div>`}
+      <input class="in" id="drw-search" style="max-width:340px" placeholder="${esc(t('Search drawings — name, part, customer'))}" value="${esc(DRAW_FILTER)}" oninput="DRAW_FILTER=this.value; render(); const el=document.getElementById('drw-search'); if(el){el.focus(); el.setSelectionRange(el.value.length,el.value.length);}">
     </div>`;
+  // searching cuts across every folder
+  if(searching){
+    const list=all.filter(d=>drawMatches(d,DRAW_FILTER));
+    return head+`<div class="card" style="padding:0">${list.length?drawTableHtml(list):`<div class="empty">${t('No drawings match your search.')}</div>`}</div>`;
+  }
+  // inside a customer folder
+  if(DRAW_FOLDER!==null){
+    const list=all.filter(d=>drawFolderOf(d).toLowerCase()===DRAW_FOLDER.toLowerCase());
+    return head+`<div class="toolbar" style="margin-bottom:10px">
+        <button class="btn sm" onclick="qcDrawFolder(null)"><i class="ti ti-arrow-left"></i> ${t('All folders')}</button>
+        <span style="font-weight:800;font-size:15px"><i class="ti ti-folder-open" style="color:var(--amber)"></i> ${esc(DRAW_FOLDER||t('Unfiled'))}</span>
+      </div>
+      <div class="card" style="padding:0">${list.length?drawTableHtml(list):`<div class="empty">${t('No drawings yet. Upload PDFs, images or DXF files here.')}</div>`}</div>
+      ${isMgr()?`<div class="hint" style="margin-top:8px">${t('Type a customer on a drawing to move it into that folder.')}</div>`:''}`;
+  }
+  // folder view (default)
+  if(!all.length) return head+`<div class="card" style="padding:0"><div class="empty">${t('No drawings yet. Upload PDFs, images or DXF files here.')}</div></div>`;
+  const groups={};
+  all.forEach(d=>{ const k=drawFolderOf(d); (groups[k]=groups[k]||[]).push(d); });
+  const names=Object.keys(groups).sort((a,b)=>{ if(!a) return 1; if(!b) return -1; return a.localeCompare(b); });
+  const cards=names.map(n=>`<div class="drw-folder" onclick="qcDrawFolder('${esc(n).replace(/'/g,"\\'")}')">
+      <i class="ti ti-folder-filled"></i>
+      <div style="min-width:0"><div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n||t('Unfiled'))}</div>
+      <div class="muted" style="font-size:11.5px">${groups[n].length} ${t('drawing(s)')}</div></div>
+    </div>`).join('');
+  return head+`<div class="drw-folders">${cards}</div>
+    ${isMgr()?`<div class="hint" style="margin-top:10px">${t('Type a customer on a drawing to move it into that folder.')}</div>`:''}`;
 }
 window.qcDrawUpload=async (inputEl)=>{
   const files=[...inputEl.files]; inputEl.value='';
@@ -1108,9 +1152,20 @@ window.qcDrawUpload=async (inputEl)=>{
     try{
       const url=await upload(f,'drawings');
       if(!url) throw new Error('no url');
+      // small first-page preview (pdf page 1 / the image itself) — DXF and render failures just get an icon
+      let thumbUrl='';
+      try{
+        const im=await imgFromFile(f);
+        const sc=Math.min(1, 420/Math.max(im.w||1,im.h||1));
+        const cv=document.createElement('canvas'); cv.width=Math.max(1,Math.round(im.w*sc)); cv.height=Math.max(1,Math.round(im.h*sc));
+        const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height);
+        g.drawImage(await loadImg(im.dataUrl),0,0,cv.width,cv.height);
+        const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',.82));
+        if(blob) thumbUrl=await upload(new File([blob],'thumb_'+(f.name||'drawing').replace(/\.[a-z0-9]+$/i,'')+'.jpg',{type:'image/jpeg'}),'drawings')||'';
+      }catch(e){ console.warn('thumb skipped', f.name, e); }
       const id=newId('drw');
-      await dbSet('qc/drawings/'+id,{ id, name:f.name, type:f.type||'', url,
-        partNum:'', rev:'', customer:'', uploadedBy:(QC_USER&&QC_USER.email)||'', createdAt:Date.now() });
+      await dbSet('qc/drawings/'+id,{ id, name:f.name, type:f.type||'', url, thumbUrl,
+        partNum:'', rev:'', customer:DRAW_FOLDER||'', uploadedBy:(QC_USER&&QC_USER.email)||'', createdAt:Date.now() });
       ok++;
     }catch(e){ console.error('drawing upload failed',e); qcToast(t('File upload failed:')+' '+f.name+' — '+((e&&e.message)||e),'err'); }
   }
@@ -1138,9 +1193,10 @@ window.qcDrawPickList=(key)=>{
   const q=($('dl-q')&&$('dl-q').value)||'';
   const list=vals(DRAWINGS).filter(d=>drawMatches(d,q)).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,60);
   const el=$('dl-list'); if(!el) return;
-  el.innerHTML=list.length?list.map(d=>`<div class="ordpick-item" onclick="qcDrawPick('${key}','${esc(d.id)}')">
-      <b>${esc(d.name||d.id)}</b>
-      <div class="muted" style="font-size:11.5px">${esc([d.partNum,d.rev?('Rev '+d.rev):'',d.customer].filter(Boolean).join(' · ')||'')}</div>
+  el.innerHTML=list.length?list.map(d=>`<div class="ordpick-item" style="display:flex;gap:10px;align-items:center" onclick="qcDrawPick('${key}','${esc(d.id)}')">
+      ${drawThumbHtml(d,'drw-thumb sm')}
+      <div style="min-width:0"><b>${esc(d.name||d.id)}</b>
+      <div class="muted" style="font-size:11.5px">${esc([d.partNum,d.rev?('Rev '+d.rev):'',d.customer].filter(Boolean).join(' · ')||'')}</div></div>
     </div>`).join('')
     :`<div class="empty" style="padding:24px">${t('No drawings yet. Upload PDFs, images or DXF files here.')}</div>`;
 };
