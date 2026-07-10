@@ -351,6 +351,8 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-sec" data-t="Records">Records</div>
       <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
+      <div class="nav-sec" data-t="Setup">Setup</div>
+      <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span class="nav-label" data-t="Settings">Settings</span></div>
     </div>
     <div class="sb-foot"><span class="dot" id="qc-foot-dot"></span><span class="lbl" id="qc-foot-txt" data-t="Connecting…">Connecting…</span><button class="pin-btn" id="qc-pin" title="Keep menu open" onclick="window._qcPin(event)"><i class="ti ti-pin" id="qc-pin-ico"></i></button></div>
   </nav>
@@ -377,6 +379,7 @@ body.role-operator .mgr-only{display:none!important}
   <button class="dock-tab" id="dock-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span data-t="dock:firstarticles">First Articles</span></button>
   <button class="dock-tab" id="dock-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span data-t="dock:ncr">NCRs</span></button>
   <button class="dock-tab mgr-only" id="dock-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span data-t="dock:materialcerts">Certs</span></button>
+  <button class="dock-tab" id="dock-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span data-t="dock:settings">Settings</span></button>
   <div class="dock-switch">
     <span class="lbl" data-t="Switch app">Switch app</span>
     <div class="dock-chips">
@@ -453,7 +456,7 @@ const I18N = {
     'balloons — click drawing to add · drag to move · double-click to remove':'globos — clic para agregar · arrastra para mover · doble clic para quitar','Loading drawing…':'Cargando plano…','Could not load drawing:':'No se pudo cargar el plano:','Upload the drawing first (re-upload a saved one).':'Sube el plano primero (vuelve a subir uno guardado).',
     'Place at least one balloon first.':'Coloca al menos un globo primero.','dimensions read':'dimensiones leídas','Read failed:':'Lectura falló:',
     'Read dimensions from ballooned drawing':'Leer dimensiones del plano con globos','No ballooned drawing on this report.':'Este reporte no tiene plano con globos.','No numbered balloons found in the image.':'No se encontraron globos numerados en la imagen.','dimensions read — Save the report to keep them':'dimensiones leídas — guarda el reporte para conservarlas',
-    'Ballooned drawing':'Plano con globos','AI reading the drawing…':'La IA está leyendo el plano…','No AI connection set — set the proxy in the Quote app Settings.':'Sin conexión de IA — configura el proxy en Ajustes de la app de Cotizaciones.',
+    'Ballooned drawing':'Plano con globos','AI reading the drawing…':'La IA está leyendo el plano…','No AI connection set — add the proxy URL in Settings (left menu).':'Sin conexión de IA — agrega la URL del proxy en Ajustes (menú izquierdo).',
     'Upload the drawing first (re-upload a saved one to auto-bubble it).':'Sube el plano primero (vuelve a subir uno guardado para poner globos).','No characteristics found on the drawing.':'No se encontraron características en el plano.',
     'characteristics ballooned — review and drag to fine-tune':'características con globos — revisa y arrastra para ajustar','Auto-bubble failed:':'Auto-globos falló:',
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
@@ -485,7 +488,7 @@ const I18N = {
     'Drag & drop or click to add the cert package (PDF or photos). AI reads it and fills the fields below.':'Arrastra o haz clic para agregar el paquete del certificado (PDF o fotos). La IA lo lee y completa los campos.',
     'Reading cert with AI…':'Leyendo certificado con IA…','AI filled the fields below — check them before saving.':'La IA completó los campos — revísalos antes de guardar.',
     'AI could not read the cert. Fill the fields by hand.':'La IA no pudo leer el certificado. Complétalos a mano.',
-    'No AI connection set — open the Quote app Settings to add a proxy URL, then retry.':'Sin conexión de IA — abre Ajustes en la app de Cotizaciones para agregar el proxy y reintenta.',
+    'No AI connection set — open Settings (left menu) to add a proxy URL, then retry.':'Sin conexión de IA — abre Ajustes (menú izquierdo) para agregar el proxy y reintenta.',
     'Search certs (heat, material, supplier, PO)…':'Buscar certificados (colada, material, proveedor, OC)…','Search orders…':'Buscar órdenes…',
     'Search jobs by customer, part, job or PO…':'Buscar trabajos por cliente, parte, trabajo u OC…',
     'Vendor invoice':'Factura del proveedor','Drop invoice here or click to add — AI reads invoice #, date and amount.':'Suelta la factura o haz clic — la IA lee N.º, fecha e importe.',
@@ -518,7 +521,24 @@ const I18N = {
     'Could not tell — retake the photo':'No se pudo determinar — vuelve a tomar la foto',
     'Advisory only — you still verify toleranced features with a gauge.':'Solo orientativo — verifica las tolerancias con un instrumento.',
     'Photo check failed:':'La revisión de la foto falló:','(from AI photo check)':'(de la revisión de foto con IA)',
-    'major':'mayor','minor':'menor'
+    'major':'mayor','minor':'menor',
+    // Settings (AI connection)
+    'Setup':'Configuración','Settings':'Ajustes','dock:settings':'Ajustes','AI connection for this device':'Conexión de IA para este equipo',
+    'One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.':'Una sola conexión alimenta todas las funciones de IA — globos en planos, lectura de certificados y revisión de fotos.',
+    'AI Connection':'Conexión de IA','Connected via proxy':'Conectado vía proxy','Using direct API key':'Usando clave API directa','Not connected':'Sin conexión',
+    'Shared with the Quote app on this computer — set it in either app and both use it. Saved in this browser only, so set it once on each computer or iPad that runs AI features.':'Compartida con la app de Cotizaciones en esta computadora — configúrala en cualquiera de las dos y ambas la usan. Se guarda solo en este navegador, así que configúrala una vez en cada computadora o iPad que use funciones de IA.',
+    'Recommended: AI Proxy URL':'Recomendado: URL del proxy de IA','Save URL':'Guardar URL','Test':'Probar',
+    'Proxy URL saved — AI features on this computer will use it.':'URL del proxy guardada — las funciones de IA en esta computadora la usarán.',
+    'Proxy URL cleared — will fall back to a direct API key if one is saved.':'URL del proxy borrada — se usará la clave API directa si hay una guardada.',
+    'Enter a proxy URL first.':'Primero escribe la URL del proxy.','Testing proxy…':'Probando el proxy…',
+    '✓ Proxy working — AI runs through the secure proxy.':'✓ Proxy funcionando — la IA pasa por el proxy seguro.',
+    '✗ Proxy test failed:':'✗ La prueba del proxy falló:',
+    'Fallback: direct API key':'Alternativa: clave API directa',
+    'Only used when no proxy URL is set. The key is readable by anyone at this computer — prefer the proxy.':'Solo se usa cuando no hay URL de proxy. Cualquiera en esta computadora puede leer la clave — es mejor usar el proxy.',
+    '••• key saved — type a new one to replace it':'••• clave guardada — escribe una nueva para reemplazarla',
+    'Save key':'Guardar clave','Clear key':'Borrar clave',
+    'Enter a key first — or use Clear key to remove the saved one.':'Primero escribe una clave — o usa Borrar clave para quitar la guardada.',
+    'API key saved in this browser.':'Clave API guardada en este navegador.','API key cleared.':'Clave API borrada.'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -605,7 +625,8 @@ const META={
   fair:['First Article','First-article report'],
   ncr:['Nonconformances','Flagged parts and corrective action'],
   certs:['Material Certs','Mill & material certifications'],
-  drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks']
+  drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks'],
+  settings:['Settings','AI connection for this device']
 };
 window.showPage=(p)=>{
   if(QC_ROLE==='operator' && p==='certs') p='inspections';
@@ -613,10 +634,10 @@ window.showPage=(p)=>{
   render();
 };
 function setActive(){
-  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',drawings:'nav-drawings'};
+  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',drawings:'nav-drawings',settings:'nav-settings'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
-  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs'};
+  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',settings:'dock-settings'};
   document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
   if(dockMap[page]&&$(dockMap[page])) $(dockMap[page]).classList.add('active');
   const m=META[page]||['Inspections','Quality control'];
@@ -636,7 +657,77 @@ function render(){
   else if(page==='ncr') c.innerHTML=viewNcr();
   else if(page==='certs') c.innerHTML=viewCerts();
   else if(page==='drawings') c.innerHTML=viewDrawings();
+  else if(page==='settings') c.innerHTML=viewSettings();
 }
+
+/* ---------- settings (AI connection — same browser storage the Quote app uses) ---------- */
+function aiConnBadge(){
+  if(getProxyUrl()) return `<span class="badge ok"><i class="ti ti-shield-check"></i> ${t('Connected via proxy')}</span>`;
+  if(getApiKey()) return `<span class="badge warn"><i class="ti ti-key"></i> ${t('Using direct API key')}</span>`;
+  return `<span class="badge flag"><i class="ti ti-plug-x"></i> ${t('Not connected')}</span>`;
+}
+function viewSettings(){
+  const hasKey=!!getApiKey();
+  return `<div class="page-head"><h2>${t('Settings')}</h2><p>${t('One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.')}</p></div>
+  <div class="card" style="max-width:680px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <h3 style="font-size:14px;margin:0">${t('AI Connection')}</h3>
+      <span id="qc-conn-badge">${aiConnBadge()}</span>
+    </div>
+    <div class="hint" style="margin-bottom:14px">${t('Shared with the Quote app on this computer — set it in either app and both use it. Saved in this browser only, so set it once on each computer or iPad that runs AI features.')}</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">★ ${t('Recommended: AI Proxy URL')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="in" id="qc-proxy-url" style="flex:1;min-width:220px;font-family:monospace;font-size:12px" placeholder="https://bsmp-ai-proxy.yourname.workers.dev" value="${esc(getProxyUrl())}">
+      <button class="btn primary" onclick="qcSaveProxy()">${t('Save URL')}</button>
+      <button class="btn" onclick="qcTestProxy()">${t('Test')}</button>
+    </div>
+    <div class="hint" id="qc-proxy-status" style="min-height:16px;margin-top:6px"></div>
+    <div style="border-top:1px solid var(--border);margin:16px 0 12px"></div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:4px">${t('Fallback: direct API key')}</div>
+    <div class="hint" style="margin-bottom:8px">${t('Only used when no proxy URL is set. The key is readable by anyone at this computer — prefer the proxy.')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="in" type="password" id="qc-api-key" style="flex:1;min-width:220px;font-size:12px" placeholder="${hasKey?esc(t('••• key saved — type a new one to replace it')):'sk-ant-…'}" autocomplete="off">
+      <button class="btn" onclick="qcSaveKey()">${t('Save key')}</button>
+      ${hasKey?`<button class="btn danger" onclick="qcClearKey()">${t('Clear key')}</button>`:''}
+    </div>
+    <div class="hint" id="qc-key-status" style="min-height:16px;margin-top:6px"></div>
+  </div>`;
+}
+function qcSetStatus(id,msg,tone){ const el=$(id); if(!el) return; el.textContent=msg; el.style.color=tone==='ok'?'var(--green)':(tone==='err'?'var(--red)':'var(--text3)'); }
+function qcConnRefresh(){ const b=$('qc-conn-badge'); if(b) b.innerHTML=aiConnBadge(); }
+window.qcSaveProxy=()=>{
+  const url=($('qc-proxy-url').value||'').trim();
+  try{ localStorage.setItem('bsmp_proxy_url',url); }catch(e){}
+  qcSetStatus('qc-proxy-status', url?t('Proxy URL saved — AI features on this computer will use it.'):t('Proxy URL cleared — will fall back to a direct API key if one is saved.'), url?'ok':'');
+  qcConnRefresh();
+};
+window.qcTestProxy=async()=>{
+  const url=($('qc-proxy-url').value||'').trim();
+  if(!url){ qcSetStatus('qc-proxy-status',t('Enter a proxy URL first.'),'err'); return; }
+  try{ localStorage.setItem('bsmp_proxy_url',url); }catch(e){}
+  qcConnRefresh();
+  qcSetStatus('qc-proxy-status',t('Testing proxy…'));
+  try{
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Hi'}]})});
+    const d=await r.json();
+    if(d.error) throw new Error(d.error.message||'error');
+    qcSetStatus('qc-proxy-status',t('✓ Proxy working — AI runs through the secure proxy.'),'ok');
+  }catch(e){
+    qcSetStatus('qc-proxy-status',t('✗ Proxy test failed:')+' '+(e&&e.message?e.message:e),'err');
+  }
+};
+window.qcSaveKey=()=>{
+  const key=($('qc-api-key').value||'').trim();
+  if(!key){ qcSetStatus('qc-key-status',t('Enter a key first — or use Clear key to remove the saved one.'),'err'); return; }
+  try{ localStorage.setItem('bsmp_apikey',key); }catch(e){}
+  qcSetStatus('qc-key-status',t('API key saved in this browser.'),'ok');
+  qcConnRefresh();
+};
+window.qcClearKey=()=>{
+  try{ localStorage.removeItem('bsmp_apikey'); }catch(e){}
+  render();
+  qcSetStatus('qc-key-status',t('API key cleared.'));
+};
 
 /* ---------- order linking ---------- */
 function orderLabel(o){ return [o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ')||o.id; }
@@ -746,7 +837,7 @@ async function callAIJsonContent(content, maxTokens){
 const SELF_CHECK_PROMPT='You are an experienced sheet-metal QC inspector at a fabrication shop. You are given (1) an engineering drawing of a part, then (2) one or more photos of the actual fabricated part. Compare the PART IN THE PHOTOS against the DRAWING and judge whether the built part matches the drawing GEOMETRY: overall shape and proportions, the number and rough location of holes / cutouts / slots, bend locations and directions, and any obviously missing or extra features. Do NOT measure exact dimensions or tolerances — a person verifies those with gauges. Focus on gross build mistakes: wrong part entirely, mirrored or flipped bends, missing holes, extra or missing features, wrong hole pattern, or a shape that clearly does not match. Respond with ONLY valid JSON, no markdown, no extra text:\n{"verdict":"pass|fail|unsure","confidence":0,"summary":"one short sentence","issues":[{"severity":"major|minor","feature":"short label e.g. hole pattern","detail":"what looks wrong"}]}\nverdict rules: use "fail" only for a clear mismatch you are reasonably confident about; "unsure" if the photo is too blurry, cropped, dark or angled to judge; "pass" if it reasonably matches. confidence is 0-100. Use an empty issues array when it looks good. Keep every detail short and specific.';
 
 async function qcSelfPhotoCheck(){
-  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
   const photos=_pendingFiles['sc']||[];
   const draws=_pendingFiles['scdraw']||[];
   if(!draws.length){ qcToast(t('Add the reference drawing first, then run the check.'),'err'); return; }
@@ -860,7 +951,7 @@ function normalizeDetected(c){
     doc:Number(c.doc)||1, pages:Array.isArray(c.pages)?c.pages.map(n=>+n).filter(n=>Number.isFinite(n)&&n>0):null, _linked:linked };
 }
 async function analyzeCertPacket(){
-  if(!hasAIConnection()){ setAIStatus('cert-ai','error',t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.')); return; }
+  if(!hasAIConnection()){ setAIStatus('cert-ai','error',t('No AI connection set — open Settings (left menu) to add a proxy URL, then retry.')); return; }
   const files=[...(_pendingFiles['cert']||[])];
   if(!files.length) return;
   setAIStatus('cert-ai','loading',t('Reading cert with AI…'));
@@ -877,7 +968,7 @@ async function analyzeCertPacket(){
     editId='__cert_review__';
     render();
   }catch(e){
-    setAIStatus('cert-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')+(e&&e.message?' — '+e.message:'')));
+    setAIStatus('cert-ai','error', e.message==='no-connection'?t('No AI connection set — open Settings (left menu) to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')+(e&&e.message?' — '+e.message:'')));
   }
 }
 // split a PDF into a new File containing only the given 1-based pages
@@ -940,7 +1031,7 @@ function qcIngestInvoice(files){
   analyzeInvoice(files[0]);
 }
 async function analyzeInvoice(file){
-  if(!hasAIConnection()){ setAIStatus('inv-ai','error',t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.')); return; }
+  if(!hasAIConnection()){ setAIStatus('inv-ai','error',t('No AI connection set — open Settings (left menu) to add a proxy URL, then retry.')); return; }
   setAIStatus('inv-ai','loading',t('Reading invoice with AI…'));
   const prompt='You are reading a vendor invoice for a material purchase. Respond with ONLY a valid JSON object, no markdown or extra text. Use null when absent.\n{"invoice_no":null,"invoice_date":null,"amount":null,"vendor":null,"po_number":null}\nRules: amount=invoice grand total as a plain number, no currency symbol. invoice_date=YYYY-MM-DD. vendor=the company that issued the invoice. po_number=purchase order referenced.';
   try{
@@ -951,7 +1042,7 @@ async function analyzeInvoice(file){
     if(d.po_number && !gv('ct-po')){ const el=$('ct-po'); if(el) el.value=String(d.po_number); }
     setAIStatus('inv-ai','ok', t('AI filled the fields below — check them before saving.'));
   }catch(e){
-    setAIStatus('inv-ai','error', e.message==='no-connection'?t('No AI connection set — open the Quote app Settings to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')));
+    setAIStatus('inv-ai','error', e.message==='no-connection'?t('No AI connection set — open Settings (left menu) to add a proxy URL, then retry.'):(t('AI could not read the cert. Fill the fields by hand.')));
   }
 }
 
@@ -1801,7 +1892,7 @@ async function qcFairDrawingImage(){
   return null;
 }
 window.qcFairAutoBubble=async ()=>{
-  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
   const btn=$('fair-bubble-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
   const ws=qcWsHost(); if(ws) ws.innerHTML='<div class="muted" style="padding:12px 0"><i class="ti ti-loader-2 spin"></i> '+esc(t('AI reading the drawing…'))+'</div>';
   try{
@@ -1875,7 +1966,7 @@ window.qcFairPlaceMode=async ()=>{
 window.qcFairReadBubbles=async ()=>{
   if(!_fairImg||!_fairBubbles.length){ qcToast(t('Place at least one balloon first.'),'err'); return; }
   qcBubSnap();
-  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
   const btn=$('fair-read-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
   try{
     const comp=await qcCompositeBalloonsDataUrl();
@@ -1906,7 +1997,7 @@ window.qcFairReadBallooned=async ()=>{
   const r=editId?INSPECTIONS[editId]:null;
   const url=(r&&r.ballooned&&r.ballooned.url)||null;
   if(!url){ qcToast(t('No ballooned drawing on this report.'),'err'); return; }
-  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); return; }
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
   const btn=$('fair-readb-btn'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
   try{
     const im=await loadImg(url, true);
@@ -1999,7 +2090,7 @@ async function cropRegion(box, pad){
 }
 const CROP_PROMPT='This image is a small cropped region of a fabrication drawing showing ONE dimension or callout that an inspector boxed. Read it. Respond with ONLY valid JSON: {"value":"","tol":"","category":""}. value=the requirement exactly as printed (keep the \\u00d8 symbol for diameters, e.g. "\\u00d8.250", ".060", "2.500", "R.125", "90\\u00b0"). tol=the tolerance if shown right by it (e.g. "\\u00b1.005", "+.002/-.000") else "". category=EXACTLY one of: material, thickness, finish, major, bend, cutout_dia, cutout_linear. If several numbers are visible, pick the single main dimension callout and ignore zone/grid letters and any title-block text.';
 async function qcReadBox(b){
-  if(!hasAIConnection()){ qcToast(t('No AI connection set — set the proxy in the Quote app Settings.'),'err'); b.reading=false; qcWsRender(); return; }
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); b.reading=false; qcWsRender(); return; }
   try{
     const crop=await cropRegion(b.box);
     const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:400, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/png',data:crop.split(',')[1]}},{type:'text',text:CROP_PROMPT}]}] });

@@ -14,7 +14,7 @@ Quality control: operator self-checks, First Article Inspection reports (Simple 
 - **Out-of-tolerance → NCR:** when a saved FAR has any characteristic whose result busts its tolerance (`charIsOot`), `qcSaveFair` auto-raises a linked NCR (`source:'fair'`, `farId`/`inspectionId`, `rec.ncrId`), mirroring the self-check Flag path. When every dimension is corrected it stamps `correctedAt`/`correctedBy` on that NCR and leaves the final close to a manager. The FAR list shows an "Open NCR" badge until it's closed.
 - **Reads:** `orders` and `quotes` (to link a self-check / FAR / cert to an order).
 - **Storage:** uploads under `qc/` prefix (`qcUpload` → `qc/<subfolder>/...`). Cert packages, part photos, and ballooned drawings all live here.
-- **localStorage:** `bsmp_qc_lang` (EN/ES), plus it *reads* `bsmp_proxy_url` / `bsmp_apikey` set by quote.html for AI.
+- **localStorage:** `bsmp_qc_lang` (EN/ES), plus `bsmp_proxy_url` / `bsmp_apikey` for AI — shared with quote.html; either app's Settings reads/writes the same keys (here: Settings page → `viewSettings`, `qcSaveProxy`/`qcTestProxy`/`qcSaveKey`/`qcClearKey`).
 - **CDN deps unique to this app:** `pdf-lib` (splitting cert PDFs) and `pdf.js` (rendering drawing/cert pages).
 
 > ⚠️ **The classic silent-save bug lives here.** RTDB + Storage security rules must include the `qc/` path (and a matching Storage rule) or saves to certs/inspections fail silently. Rules are server-side (Firebase console), not in this repo, and take effect immediately with no redeploy. If a QC save does nothing, check rules first.
@@ -34,7 +34,7 @@ Quality control: operator self-checks, First Article Inspection reports (Simple 
 
 ## Pages (`showPage(...)`)
 
-`inspections` (list), `selfcheck` (form), `fairs` (First Article list), `fair` (First Article form), `ncr`, `certs`.
+`inspections` (list), `selfcheck` (form), `fairs` (First Article list), `fair` (First Article form), `ncr`, `certs`, `drawings` (drawing library), `settings` (AI connection — per-device, all roles).
 
 ## Core areas (where to work)
 
@@ -59,7 +59,7 @@ Quality control: operator self-checks, First Article Inspection reports (Simple 
 - **Silent saves = missing `qc/` security rule** (see warning above). This is the #1 thing to check.
 - Balloon coordinates are normalized 0–1 against the image — when touching the viewer or workspace, keep click/drag math relative to the **image** element (not the padded stage), or balloons drift under zoom.
 - The `fdv` (read-only, on the form) and `bws` (editable workspace) viewers are **separate** engines with separate state — don't cross their handlers.
-- AI reads need the proxy/key that quote.html sets; if AI "does nothing," check `bsmp_proxy_url` is present.
+- AI reads need the proxy/key — set it in this app's Settings page (or quote.html Settings; same storage). If AI "does nothing," check `bsmp_proxy_url` is present.
 - Adding UI text without a Spanish `I18N` entry leaves Spanish users seeing the English key — always add both.
 
 ## AS9100 / ITAR note
