@@ -2353,11 +2353,12 @@ function viewCerts(){
     const invCell=(inv.no||inv.amount||(inv.file&&inv.file.url))
       ? `${inv.no?('<b>'+esc(inv.no)+'</b>'):''}${inv.amount?('<div class="muted" style="font-size:12px">$'+esc(inv.amount)+'</div>'):''}${inv.file&&inv.file.url?` <button class="icon-btn" onclick="qcViewCert('${c.id}',${nFiles})" title="${t('View invoice')}"><i class="ti ti-file-dollar"></i></button>`:''}`
       : '<span class="muted">—</span>';
-    const sstr=[c.material,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
+    const sstr=[c.material,c.spec,c.size,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
     const hasFile=nFiles>0||!!(inv.file&&inv.file.url);
     const matCell=hasFile?`<b class="cert-open" onclick="qcViewCert('${c.id}')" title="${t('View cert')}">${esc(c.material||'—')}</b>`:`<b>${esc(c.material||'—')}</b>`;
     return `<tr data-s="${esc(sstr)}">
     <td>${matCell}<div class="muted" style="font-size:12px">${esc(c.spec||'')}</div></td>
+    <td>${esc(c.size||'—')}</td>
     <td>${esc(c.heatLot||'—')}${dup?` <span class="badge warn" title="${t('Duplicate heat/lot')}"><i class="ti ti-alert-triangle"></i></span>`:''}${c.itar?` <span class="badge flag" title="ITAR">ITAR</span>`:''}</td>
     <td>${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div class="muted" style="font-size:12px">${esc(c.mill)}</div>`:''}</td>
     <td>${esc(c.certNo||'—')}<div class="muted" style="font-size:12px">${fmtDate(c.certDate)}</div></td>
@@ -2375,7 +2376,7 @@ function viewCerts(){
       <div style="margin-left:auto;font-weight:800;color:var(--text2)">${list.length} ${list.length===1?t('saved cert'):t('saved certs')}</div>
     </div>
     <div class="card" style="padding:0">
-      ${list.length?`<table class="tbl"><thead><tr><th>${t('Material')}</th><th>${t('Heat / Lot')}</th><th>${t('Supplier')}</th><th>${t('Cert #')}</th><th>${t('Linked orders')}</th><th>${t('Invoice')}</th><th></th></tr></thead><tbody id="cert-rows">${rows}</tbody></table>`
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Material')}</th><th>${t('Size / thickness')}</th><th>${t('Heat / Lot')}</th><th>${t('Supplier')}</th><th>${t('Cert #')}</th><th>${t('Linked orders')}</th><th>${t('Invoice')}</th><th></th></tr></thead><tbody id="cert-rows">${rows}</tbody></table>`
         :`<div class="empty"><i class="ti ti-license" style="font-size:30px;opacity:.5;display:block;margin-bottom:8px"></i>${t('No saved certs yet.')}<br><span class="muted">${t('Press')} <b>${t('Add cert')}</b> ${t('to add your first one — it will appear here after you save.')}</span></div>`}
     </div>`;
 }
