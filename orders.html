@@ -3224,8 +3224,8 @@ function chatBtnHtml(customer,po,label){
 }
 function chatAuthorName(e){
   let local=(e.by||'').split('@')[0];
-  // ops.mike@ / operator.mike@ should read as "Mike" (bare operator@ or ops@ keeps its name)
-  const stripped=local.replace(/^(operator|ops)[._-]+/i,'');
+  // ops.mike@ / ofc.bert@ / operator.mike@ should read as "Mike" / "Bert" (a bare prefix keeps its name)
+  const stripped=local.replace(/^(operator|ops|ofc)[._-]+/i,'');
   if(stripped) local=stripped;
   return local ? local.split(/[._-]+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') : 'Unknown';
 }

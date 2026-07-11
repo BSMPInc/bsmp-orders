@@ -4483,7 +4483,7 @@ onAuthStateChanged(auth,(user)=>{
       return;   // no data listeners — the app never loads for operators
     }
     hideMgrLock();
-    currentUser={ email:user.email||'', name:(user.displayName||(user.email||'').split('@')[0]||'') };
+    currentUser={ email:user.email||'', name:(user.displayName||((user.email||'').split('@')[0]||'').replace(/^(operator|ops|ofc)[._-]+/i,'')||(user.email||'').split('@')[0]||'') };
     $('login').style.display='none'; $('app').style.display='flex';
     watchConnection();
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
