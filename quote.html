@@ -8794,11 +8794,49 @@ window._qLogin = async () => {
   finally{ btn.disabled=false; btn.textContent='Sign in'; }
 };
 window._qLogout = () => { signOut(auth); };
+// Operators (ops.name@ / operator\u2026@) don't get the money apps \u2014 managers only.
+const OPERATOR_EMAILS=['operator@bertsmp.com'];
+function isOperatorEmail(email){
+  email=(email||'').toLowerCase();
+  if(OPERATOR_EMAILS.includes(email)) return true;
+  const local=email.split('@')[0]||'';
+  if(local==='ops' || /^ops[._-]/.test(local)) return true;
+  return local.startsWith('operator');
+}
+function showMgrLock(){
+  let el=document.getElementById('mgr-lock');
+  if(!el){
+    el=document.createElement('div'); el.id='mgr-lock';
+    el.style.cssText='position:fixed;inset:0;z-index:9999;background:#f4f6fa;display:flex;align-items:center;justify-content:center;padding:20px';
+    el.innerHTML=`<div style="background:#fff;border:1px solid #dde3ec;border-radius:16px;padding:34px 30px;max-width:380px;width:100%;text-align:center;box-shadow:0 10px 30px rgba(20,40,80,.08)">
+      <div style="font-size:34px;margin-bottom:8px"><i class="ti ti-lock"></i></div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:6px">Managers only</div>
+      <div style="font-size:13px;color:#5b6675;line-height:1.5;margin-bottom:20px">This app isn't part of the operator tools. Your sign-in works on the shop-floor apps:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="orders.html" style="display:block;padding:11px;border-radius:10px;background:#1e3a5f;color:#fff;font-weight:700;font-size:13.5px;text-decoration:none">Order Tracker \u00b7 Work Queues</a>
+        <a href="qc.html" style="display:block;padding:11px;border-radius:10px;background:#1d7a52;color:#fff;font-weight:700;font-size:13.5px;text-decoration:none">QC / Inspection</a>
+        <button id="mgr-lock-out" style="padding:10px;border-radius:10px;background:none;border:1px solid #dde3ec;color:#5b6675;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Sign out</button>
+      </div></div>`;
+    document.body.appendChild(el);
+    el.querySelector('#mgr-lock-out').onclick=()=>signOut(auth);
+  }
+  el.style.display='flex';
+}
+function hideMgrLock(){ const el=document.getElementById('mgr-lock'); if(el) el.style.display='none'; }
+
 onAuthStateChanged(auth, (user) => {
   _qUser = user || null;
   const ov=$q('q-login');
-  if(user){ if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); }
-  else { if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
+  if(user){
+    if(isOperatorEmail(user.email)){
+      if(ov) ov.style.display='none';
+      showMgrLock(); setSync('idle','Managers only');
+      return;   // no sync/backfill \u2014 the quote tool never loads for operators
+    }
+    hideMgrLock();
+    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen();
+  }
+  else { hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
 });
 document.addEventListener('keydown', (e) => {
   const ov=$q('q-login');
