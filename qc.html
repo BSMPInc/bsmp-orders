@@ -2961,6 +2961,7 @@ function isOperatorEmail(email){
   email=(email||'').toLowerCase();
   if(OPERATOR_EMAILS.includes(email)) return true;
   const local=email.split('@')[0]||'';
+  if(local==='ops' || /^ops[._-]/.test(local)) return true;   // ops.mike@, ops_j@ … — keep in sync with orders.html
   return local.startsWith('operator');
 }
 
