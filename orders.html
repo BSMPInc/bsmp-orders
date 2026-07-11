@@ -3224,8 +3224,8 @@ function chatBtnHtml(customer,po,label){
 }
 function chatAuthorName(e){
   let local=(e.by||'').split('@')[0];
-  // operator.mike@… should read as "Mike", not "Operator.mike" (bare operator@ stays "Operator")
-  const stripped=local.replace(/^operator[._-]+/i,'');
+  // ops.mike@ / operator.mike@ should read as "Mike" (bare operator@ or ops@ keeps its name)
+  const stripped=local.replace(/^(operator|ops)[._-]+/i,'');
   if(stripped) local=stripped;
   return local ? local.split(/[._-]+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') : 'Unknown';
 }
@@ -6860,6 +6860,7 @@ function isOperatorEmail(email){
   email=(email||'').toLowerCase();
   if(OPERATOR_EMAILS.includes(email)) return true;
   const local=email.split('@')[0]||'';
+  if(local==='ops' || /^ops[._-]/.test(local)) return true;   // ops.mike@, ops_j@ … (separator required so a name like "opsahl" doesn't match)
   return local.startsWith('operator');   // operator2@, operator.john@ … all count
 }
 let userRole = 'manager';
