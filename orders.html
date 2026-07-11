@@ -1852,6 +1852,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <select id="f-payment"><option value="Unpaid">Open</option><option value="Partial">Partial</option><option value="Paid">Paid</option></select>
       </div>
       <div class="form-group"><label>Invoice #</label><input id="f-invoice" type="text" placeholder="e.g. 6300"></div>
+      <div class="form-group"><label>Invoice Date</label><input id="f-invoice-date" type="date"></div>
       <div class="form-group full"><label>Notes</label><textarea id="f-notes" placeholder="Additional notes…"></textarea></div>
     </div>
   </div>
@@ -1928,6 +1929,10 @@ body.sb-pinned .dock{left:var(--sb)}
         <label style="font-size:11px;font-weight:600;color:var(--text2)">Invoice #</label>
         <input id="combine-invnum" type="text" placeholder="e.g. 1042" onkeydown="if(event.key==='Enter')window._createCombinedInvoice()" style="width:120px;box-sizing:border-box;font-size:15px;padding:9px 11px;border:1px solid var(--border);border-radius:8px">
       </div>
+      <div style="display:flex;align-items:center;gap:7px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">Date</label>
+        <input id="combine-invdate" type="date" style="width:148px;box-sizing:border-box;font-size:14px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit">
+      </div>
       <div style="margin-left:auto;font-size:13px;color:var(--text2)"><span id="combine-count">0</span> selected · <b id="combine-total" style="color:var(--text)">$0.00</b></div>
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
@@ -1939,12 +1944,28 @@ body.sb-pinned .dock{left:var(--sb)}
 
 <!-- Invoice number dialog (Ready for Invoice → Invoiced) -->
 <div class="modal-bg" id="invoice-modal" style="display:none;align-items:center;justify-content:center;z-index:72">
-  <div class="modal" style="max-width:380px;padding:22px">
+  <div class="modal" style="max-width:440px;padding:22px">
     <div style="font-size:17px;font-weight:800;margin-bottom:3px">Mark as Invoiced</div>
     <div style="font-size:12.5px;color:var(--text2);margin-bottom:16px" id="inv-sub"></div>
-    <label style="font-size:11px;font-weight:600;color:var(--text2)">Invoice #</label>
-    <input id="inv-number" type="text" placeholder="e.g. 1042" onkeydown="if(event.key==='Enter')window._confirmInvoice()" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-top:5px">
-    <div style="font-size:11px;color:var(--text3);margin-top:7px">This number carries to the Invoiced list and the AP/AR receivable for this order.</div>
+    <div id="inv-items-wrap" style="display:none;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">Items on this invoice</label>
+        <span id="inv-items-summary" style="margin-left:auto;font-size:11px;font-weight:600;color:var(--text2)"></span>
+      </div>
+      <div id="inv-items" style="max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px"></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">This PO has multiple line items — check the ones this invoice covers. Unchecked items keep their current status so you can invoice them separately later.</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1;min-width:0">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">Invoice #</label>
+        <input id="inv-number" type="text" placeholder="e.g. 1042" onkeydown="if(event.key==='Enter')window._confirmInvoice()" style="width:100%;box-sizing:border-box;font-size:15px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-top:5px">
+      </div>
+      <div style="width:158px;flex-shrink:0">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">Invoice date</label>
+        <input id="inv-date" type="date" style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 10px;border:1px solid var(--border);border-radius:8px;margin-top:5px;font-family:inherit">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:7px">The number and date carry to the Invoiced list and the AP/AR receivable for this order.</div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
       <button class="btn" onclick="window._cancelInvoice()">Cancel</button>
       <button class="btn green" onclick="window._confirmInvoice()">Mark Invoiced</button>
@@ -2503,7 +2524,7 @@ function poItemsHtml(g){
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
         <span class="ci-desc-main" title="${((r.part?('Part '+r.part):'')+(r.part&&r.desc?' · ':'')+(r.desc||'')).replace(/"/g,'&quot;')}">${missBadge}${clip}${r.part||r.desc||'<span style="color:var(--text3)">(no part #)</span>'}</span>
-        ${r.invoice?`<span class="inv-chip" title="Invoice number">Inv ${r.invoice}</span>`:''}
+        ${r.invoice?`<span class="inv-chip" title="Invoice number${r.invoiceDate?(' · invoiced '+fmtDate(r.invoiceDate)):''}">Inv ${r.invoice}${r.invoiceDate?` · ${fmtDate(r.invoiceDate)}`:''}</span>`:''}
         ${osLine}
       </div>
       <span class="ci-qty">${r.qty||''}</span>
@@ -2729,7 +2750,7 @@ function lineRow(r,ind){
     <td>${fmtDate(r.due)}</td>
     <td>${fmtDays(days)}</td>
     <td><span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span></td>
-    <td class="editable" ondblclick="window._ec(event,this,'${r.id}','invoice')">${r.invoice||''}</td>
+    <td class="editable" title="${r.invoiceDate?('Invoiced '+fmtDate(r.invoiceDate)):''}" ondblclick="window._ec(event,this,'${r.id}','invoice')">${r.invoice||''}</td>
     <td>${showPay?`<span class="pay-badge ${PAY_CLASS[pay]||'pay-unpaid'}" onclick="window._pp('${r.id}',event)">${PAY_LABEL[pay]||pay}</span>`:''}</td>
   </tr>`;
 }
@@ -2999,7 +3020,9 @@ window._ss=(id,status)=>{
   if(status==='Invoiced' && r.status!=='Invoiced'){
     _pendingInvoiceId=id;
     const inp=document.getElementById('inv-number'); inp.value=r.invoice||'';
+    document.getElementById('inv-date').value=r.invoiceDate||new Date().toISOString().slice(0,10);
     document.getElementById('inv-sub').textContent=(r.customer||'')+(r.po?(' · PO '+r.po):'')+(r.job?(' · Job '+r.job):'');
+    _renderInvoiceItems(r);
     document.getElementById('invoice-modal').style.display='flex';
     setTimeout(()=>inp.focus(),30);
     return;
@@ -3009,12 +3032,59 @@ window._ss=(id,status)=>{
   saveDB();render();
 };
 let _pendingInvoiceId=null;
+// All line items on the same PO as r — one invoice often covers several of them.
+function _invoiceSiblings(r){
+  return orders.filter(o=>!o.archived && o.customer===r.customer && (o.po||'verbal')===(r.po||'verbal'));
+}
+// When the PO has more than one line item, show a checklist so the user picks
+// which items this invoice covers. Single-item POs skip the list entirely.
+function _renderInvoiceItems(r){
+  const wrap=document.getElementById('inv-items-wrap');
+  const body=document.getElementById('inv-items');
+  const items=_invoiceSiblings(r);
+  if(items.length<2){ wrap.style.display='none'; body.innerHTML=''; return; }
+  wrap.style.display='block';
+  body.innerHTML=items.map(o=>{
+    // pre-check the clicked line plus anything already billable; leave
+    // in-progress work, build-only lines, and already-invoiced lines unchecked
+    const checked = o.id===r.id || (!o.buildOnly && o.status!=='Invoiced' && ['Ready for Invoice','Completed'].includes(o.status));
+    const lbl=[o.part, o.job&&('Job '+o.job)].filter(Boolean).join(' · ')||o.desc||'(no detail)';
+    const t=rowTotal(o);
+    let chip='';
+    if(o.buildOnly) chip=`<span style="font-size:10.5px;font-weight:600;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 6px;flex-shrink:0" title="Build-only sub-component — not invoiced separately">Build only</span>`;
+    else if(o.status==='Invoiced'&&o.invoice) chip=`<span style="font-size:10.5px;font-weight:600;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 6px;flex-shrink:0" title="Already invoiced — checking it moves it onto this invoice">Inv ${esc2(o.invoice)}</span>`;
+    return `<label style="display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid var(--border);cursor:pointer">
+      <input type="checkbox" class="inv-item-cb" data-id="${o.id}" ${checked?'checked':''} onchange="window._updateInvItemsSummary()" style="width:15px;height:15px;flex-shrink:0">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc2(lbl)}</span>
+      <span style="font-size:12px;color:var(--text3);flex-shrink:0">${o.qty||''}</span>
+      ${chip}
+      <span style="font-size:12.5px;font-weight:700;min-width:70px;text-align:right;flex-shrink:0">${t?fmtMoney(t):''}</span>
+    </label>`;
+  }).join('');
+  window._updateInvItemsSummary();
+}
+window._updateInvItemsSummary=()=>{
+  const el=document.getElementById('inv-items-summary'); if(!el) return;
+  const checked=[...document.querySelectorAll('.inv-item-cb:checked')];
+  const total=checked.reduce((s,cb)=>{ const o=orders.find(x=>x.id===cb.getAttribute('data-id')); return s+(o?rowTotal(o):0); },0);
+  el.textContent=checked.length+' selected · '+(fmtMoney(total)||'$0.00');
+};
 window._confirmInvoice=()=>{
-  const r=orders.find(o=>o.id===_pendingInvoiceId);
-  if(r){
-    r.invoice=(document.getElementById('inv-number').value||'').trim();
-    r.status='Invoiced';
-    if(!r.payment)r.payment='Unpaid';
+  const target=orders.find(o=>o.id===_pendingInvoiceId);
+  if(target){
+    const num=(document.getElementById('inv-number').value||'').trim();
+    const idate=document.getElementById('inv-date').value||new Date().toISOString().slice(0,10);
+    // multi-item PO → apply to every checked line; single-item PO → just the clicked line
+    const cbs=[...document.querySelectorAll('.inv-item-cb')];
+    const picked=cbs.length ? cbs.filter(cb=>cb.checked).map(cb=>cb.getAttribute('data-id')) : [target.id];
+    if(!picked.length){ alert('Check at least one line item for this invoice.'); return; }
+    picked.forEach(pid=>{
+      const o=orders.find(x=>x.id===pid); if(!o) return;
+      o.invoice=num;
+      o.invoiceDate=idate;
+      o.status='Invoiced';
+      if(!o.payment)o.payment='Unpaid';
+    });
     saveDB();render();
   }
   document.getElementById('invoice-modal').style.display='none'; _pendingInvoiceId=null;
@@ -3025,6 +3095,7 @@ window._cancelInvoice=()=>{ document.getElementById('invoice-modal').style.displ
 function _readyForInvoiceOrders(){ return orders.filter(o=>!o.archived && o.status==='Ready for Invoice'); }
 window.openCombineInvoice=()=>{
   document.getElementById('combine-invnum').value='';
+  document.getElementById('combine-invdate').value=new Date().toISOString().slice(0,10);
   const w=document.getElementById('combine-warn'); w.style.display='none'; w.textContent='';
   window._renderCombineList();
   document.getElementById('combine-modal').style.display='flex';
@@ -3075,13 +3146,14 @@ window._createCombinedInvoice=()=>{
   if(new Set(checked.map(cb=>cb.getAttribute('data-cust'))).size>1){ showWarn('These orders are for different customers — an invoice can only cover one customer.'); return; }
   const num=(document.getElementById('combine-invnum').value||'').trim();
   if(!num){ showWarn('Enter an invoice number.'); return; }
+  const idate=document.getElementById('combine-invdate').value||new Date().toISOString().slice(0,10);
   const ids=checked.map(cb=>cb.getAttribute('data-id'));
-  const prior=ids.map(id=>{ const r=orders.find(o=>String(o.id)===String(id)); return r?{id:r.id,status:r.status,invoice:r.invoice,payment:r.payment}:null; }).filter(Boolean);
-  ids.forEach(id=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.invoice=num; r.status='Invoiced'; if(!r.payment)r.payment='Unpaid'; } });
+  const prior=ids.map(id=>{ const r=orders.find(o=>String(o.id)===String(id)); return r?{id:r.id,status:r.status,invoice:r.invoice,invoiceDate:r.invoiceDate,payment:r.payment}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.invoice=num; r.invoiceDate=idate; r.status='Invoiced'; if(!r.payment)r.payment='Unpaid'; } });
   saveDB(); render();
   window.closeModal('combine-modal');
   if(typeof showUndoToast==='function') showUndoToast(`Invoiced ${ids.length} orders under #${num}`, ()=>{
-    prior.forEach(p=>{ const r=orders.find(o=>String(o.id)===String(p.id)); if(r){ r.status=p.status; r.invoice=p.invoice; r.payment=p.payment; } });
+    prior.forEach(p=>{ const r=orders.find(o=>String(o.id)===String(p.id)); if(r){ r.status=p.status; r.invoice=p.invoice; r.invoiceDate=p.invoiceDate; r.payment=p.payment; } });
     saveDB(); render();
   });
 };
@@ -3274,7 +3346,7 @@ window.openAdd=()=>{
   ['customer','po','job','part','desc','notes','invoice'].forEach(f=>document.getElementById('f-'+f).value='');
   ['qty','cost'].forEach(f=>document.getElementById('f-'+f).value='');
   document.getElementById('f-status').value='Received';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
-  document.getElementById('f-ordered').value='';document.getElementById('f-due').value='';
+  document.getElementById('f-ordered').value='';document.getElementById('f-due').value='';document.getElementById('f-invoice-date').value='';
   document.getElementById('f-buildonly').checked=false;window._toggleBuildOnly(false);
   document.getElementById('add-modal').style.display='flex';
 };
@@ -3286,7 +3358,7 @@ function openEdit(id){
   document.getElementById('f-desc').value=r.desc||'';document.getElementById('f-qty').value=r.qty||'';
   document.getElementById('f-cost').value=r.cost||'';document.getElementById('f-ordered').value=r.ordered||'';
   document.getElementById('f-due').value=r.due||'';document.getElementById('f-status').value=r.status||'Confirmed';
-  document.getElementById('f-invoice').value=r.invoice||'';document.getElementById('f-payment').value=r.payment||'Unpaid';
+  document.getElementById('f-invoice').value=r.invoice||'';document.getElementById('f-invoice-date').value=r.invoiceDate||'';document.getElementById('f-payment').value=r.payment||'Unpaid';
   document.getElementById('f-notes').value=r.notes||'';
   document.getElementById('f-buildonly').checked=!!r.buildOnly;
   window._toggleBuildOnly(!!r.buildOnly);
@@ -3349,7 +3421,7 @@ window.saveOrder=()=>{
     part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),
     qty,cost,total:qty&&cost?qty*cost:0,buildOnly,
     ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,
-    status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),
+    status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),invoiceDate:document.getElementById('f-invoice-date').value,
     payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),
     currentProcess:(ex||{}).currentProcess||'',completedProcesses:(ex||{}).completedProcesses||[],
     schedule:(ex||{}).schedule||null};
@@ -4966,7 +5038,7 @@ function renderArchive(){
       <td>${r.part?`<b>${r.part}</b> · `:''}${r.desc||''}</td>
       <td>${r.qty||''}</td>
       <td>${total?fmtMoney(total):''}</td>
-      <td>${r.invoice||''}</td>
+      <td>${r.invoice||''}${r.invoiceDate?`<div style="font-size:11px;color:var(--text3)">${fmtDate(r.invoiceDate)}</div>`:''}</td>
       <td><span class="status-badge ${payCls}" style="pointer-events:none">${PAY_LABEL[r.payment||'Unpaid']||r.payment||'Open'}</span></td>
       <td style="font-size:12px;color:var(--text2)">${arch}</td>
       <td><button class="btn sm" onclick="window._unarchiveOrder('${r.id}')"><i class="ti ti-arrow-back-up"></i> Restore</button></td>

@@ -1235,7 +1235,8 @@ function deriveAR(){
   });
   return [...map.entries()].map(([key,g])=>{
     const amount=g.rows.reduce((s,r)=>s+rowTotal(r),0);
-    const dts=g.rows.map(r=>r.ordered).filter(Boolean).sort();
+    // prefer the real invoice date (set when the order is marked Invoiced); fall back to order date
+    const dts=g.rows.map(r=>r.invoiceDate||r.ordered).filter(Boolean).sort();
     const issue=dts[0]||'';
     return {id:'ar_'+hash(key),type:'ar',party:g.customer||'(customer)',
       ref:g.invoice?('Inv '+g.invoice):('PO '+(g.po||'—')),
