@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BSMP Mail</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23145a63%22/%3E%3Cg%20transform%3D%22translate%2832%2027%29%20scale%281.5%29%20translate%28-12%20-12%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%2218%22%20height%3D%2214%22%20rx%3D%222%22/%3E%3Cpath%20d%3D%22M3%207l9%206%209-6%22/%3E%3C/g%3E%3Crect%20x%3D%2211.5%22%20y%3D%2249%22%20width%3D%2241%22%20height%3D%224.5%22%20rx%3D%222.25%22%20fill%3D%22%23d42b2b%22/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap">
+<style>
+:root{
+  --bg:#f5f2ea; --card:#fff;
+  --text:#23262b; --text2:#5b6470; --text3:#8a93a0;
+  --border:#e6e0d3; --border2:#d7d0c0;
+  --accent:#145a63; --accent-2:#0e434a; --accent-soft:#e8eff0; --spark:#d42b2b;
+  --green:#1f7d57; --green-soft:#e7f1ec; --red:#a32d2d; --red-soft:#f7ebeb;
+  --amber:#9a6212; --amber-soft:#f6efdf; --blue:#2c5d86; --blue-soft:#e9eff5;
+  --purple:#43397a; --purple-soft:#edebf5;
+  --sb:216px;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Hanken Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45}
+h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.01em}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+svg.i{width:17px;height:17px;flex:none;vertical-align:-3px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.ti{line-height:1}
+
+/* shell */
+.app{display:none;min-height:100vh}
+.app.on{display:flex}
+.sidebar{width:var(--sb);flex:none;background:var(--accent);color:#fff;display:flex;flex-direction:column}
+.logo{height:76px;display:flex;flex-direction:column;justify-content:center;padding:0 18px;border-bottom:2.25px solid var(--spark)}
+.logo .b1{font-size:21px;font-weight:800;font-style:italic;letter-spacing:.03em}
+.logo .b2{font-size:8.5px;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.nav{padding:8px 0;flex:1}
+.nav-sec{padding:14px 18px 6px;font-size:9px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+.nav-item{position:relative;display:flex;align-items:center;gap:12px;padding:9px 18px;font-size:13px;font-weight:500;color:rgba(255,255,255,.62);cursor:pointer}
+.nav-item:hover{color:rgba(255,255,255,.95);background:rgba(255,255,255,.05)}
+.nav-item.active{color:#fff;background:rgba(255,255,255,.08)}
+.nav-item.active::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--spark)}
+.nav-item .n{margin-left:auto;font-size:10.5px;font-weight:800;background:rgba(255,255,255,.14);padding:1px 7px}
+.sb-foot{padding:12px 18px;font-size:11px;color:rgba(255,255,255,.45);display:flex;flex-direction:column;gap:4px;border-top:1px solid rgba(255,255,255,.08)}
+.sb-apps{display:flex;gap:6px;margin-top:4px}
+.sb-apps a{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;color:#fff;text-decoration:none;font-size:14px;border-radius:6px;opacity:.85}
+.sb-apps a:hover{opacity:1}
+
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{height:76px;flex:none;display:flex;align-items:center;gap:12px;padding:0 22px;background:var(--card);border-bottom:1px solid var(--border)}
+.topbar .sub{font-size:12px;color:var(--text2)}
+.sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;border:1px solid var(--border);background:#fff;color:var(--text2)}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:#8a93a0;flex:none}
+.icon-btn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;background:#fff;border:1px solid var(--border);color:var(--text2);font-size:17px}
+.icon-btn:hover{border-color:var(--border2);color:var(--text)}
+.content{padding:18px 22px;max-width:1060px;width:100%}
+
+/* connect banner */
+.connect-banner{display:flex;gap:12px;align-items:flex-start;background:var(--amber-soft);border:1px solid #e3cf9b;padding:14px 16px;margin-bottom:16px;font-size:13px;color:#6b4d13}
+.connect-banner i{font-size:20px;flex:none;margin-top:1px}
+.connect-banner b{display:block;font-size:13.5px;margin-bottom:2px;color:#5a400d}
+
+/* toolbar + filter chips */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;font-weight:700;font-size:13px;background:#fff;border:1px solid var(--border2);color:var(--text)}
+.btn:hover{border-color:var(--text3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-2)}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:default}
+.search{flex:1;min-width:180px;max-width:340px;height:35px;padding:0 12px;border:1px solid var(--border2);background:#fff;outline:none}
+.search:focus{border-color:var(--accent)}
+.fchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.fchip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--border);color:var(--text2);cursor:pointer}
+.fchip .n{font-size:10.5px;font-weight:800;background:var(--bg);border:1px solid var(--border);padding:0 6px;color:var(--text3)}
+.fchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.fchip.on .n{background:rgba(255,255,255,.16);border-color:transparent;color:#fff}
+.fchip:hover:not(.on){border-color:var(--border2);color:var(--text)}
+
+/* status badges */
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:2px 8px;white-space:nowrap;text-transform:uppercase}
+.badge.rfq{background:var(--amber-soft);color:var(--amber)}
+.badge.quoted{background:var(--blue-soft);color:var(--blue)}
+.badge.waiting{background:var(--purple-soft);color:var(--purple)}
+.badge.won{background:var(--green-soft);color:var(--green)}
+.badge.lost{background:var(--red-soft);color:var(--red)}
+.badge.cert{background:var(--accent-soft);color:var(--accent)}
+.badge.invoice{background:#f1ece1;color:#7a6236}
+.mbx{font-size:9.5px;font-weight:800;letter-spacing:.08em;padding:2px 6px;border:1px solid var(--border2);color:var(--text3);text-transform:uppercase}
+.mbx.both{border-color:var(--accent);color:var(--accent)}
+.avatar{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
+
+/* thread list */
+.card{background:var(--card);border:1px solid var(--border);box-shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06)}
+.row{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+.row:last-child{border-bottom:none}
+.row:hover{background:var(--accent-soft)}
+.row .who{width:168px;flex:none}
+.row .who .fr{font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row.unread .who .fr{font-weight:800}
+.row .who .co{font-size:11.5px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .mid{flex:1;min-width:0}
+.row .sj{font-size:13.5px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.row.unread .sj .t{font-weight:800}
+.row .sn{font-size:12.5px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .meta{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.row .end{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.row .dt{font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.udot{width:8px;height:8px;border-radius:50%;background:var(--spark);flex:none;margin-top:6px}
+.rdot{width:8px;flex:none}
+.empty{padding:40px 20px;text-align:center;color:var(--text3);font-size:13px}
+.empty i{font-size:30px;display:block;margin-bottom:8px}
+
+/* conversation view */
+.page-head{margin-bottom:14px}
+.page-head p{margin:3px 0 0;font-size:12.5px;color:var(--text2)}
+.convo-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.statuspick{display:flex;gap:5px;flex-wrap:wrap}
+.spill{padding:4px 10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;background:#fff;border:1px solid var(--border);color:var(--text3);cursor:pointer}
+.spill:hover{border-color:var(--border2);color:var(--text)}
+.spill.on-rfq{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
+.spill.on-quoted{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
+.spill.on-won{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.spill.on-lost{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.spill.on-waiting{background:var(--purple-soft);border-color:var(--purple);color:var(--purple)}
+.spill.on-cert{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.spill.on-invoice{background:#f1ece1;border-color:#7a6236;color:#7a6236}
+.msg{padding:15px 16px;border-bottom:1px solid var(--border)}
+.msg:last-child{border-bottom:none}
+.msg .mh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.msg .mh .f{font-weight:800;font-size:13px}
+.msg .mh .e{font-size:12px;color:var(--text3)}
+.msg .mh .d{margin-left:auto;font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums}
+.msg .body{font-size:13.5px;color:var(--text);max-width:70ch;white-space:pre-wrap;word-break:break-word}
+.att{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;background:var(--bg);border:1px solid var(--border);margin-top:8px;margin-right:6px}
+.reply{padding:14px 16px;background:#fbfaf6;border-top:1px solid var(--border)}
+.reply .fromline{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text2);margin-bottom:8px;flex-wrap:wrap}
+.reply select{height:30px;border:1px solid var(--border2);background:#fff;padding:0 8px;font-size:12.5px}
+.reply textarea{width:100%;min-height:88px;padding:10px 12px;border:1px solid var(--border2);background:#fff;resize:vertical;outline:none;font-size:13.5px}
+.reply textarea:focus{border-color:var(--accent)}
+.reply .actions{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--text3)}
+.toast{position:fixed;right:18px;bottom:18px;background:#23262b;color:#fff;font-size:13px;font-weight:700;padding:10px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .2s;pointer-events:none;z-index:100}
+.toast.show{opacity:1}
+.toast.err{background:var(--red)}
+
+/* settings */
+.set-card{background:#fff;border:1px solid var(--border);padding:18px;max-width:640px;margin-bottom:16px}
+.set-card h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.set-card label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 4px}
+.set-card input{width:100%;height:36px;padding:0 11px;border:1px solid var(--border2);background:#fff;outline:none}
+.set-card input:focus{border-color:var(--accent)}
+.set-card .rowline{display:flex;gap:8px;align-items:center}
+.set-help{font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5}
+
+/* compose modal */
+.modal-bg{position:fixed;inset:0;background:rgba(20,25,35,.45);display:none;align-items:center;justify-content:center;z-index:80;padding:16px}
+.modal{background:#fff;border:1px solid var(--border);max-width:560px;width:100%;padding:20px;max-height:88vh;overflow:auto}
+.modal h3{font-size:16px;margin-bottom:12px}
+.modal label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 4px}
+.modal input,.modal textarea,.modal select{width:100%;padding:9px 11px;border:1px solid var(--border2);background:#fff;outline:none}
+.modal textarea{min-height:140px;resize:vertical}
+.modal input:focus,.modal textarea:focus{border-color:var(--accent)}
+
+/* login */
+#login{position:fixed;inset:0;background:var(--accent);display:flex;align-items:center;justify-content:center;z-index:200;padding:18px}
+.login-card{background:#fff;padding:34px 30px;max-width:360px;width:100%;border-bottom:3px solid var(--spark)}
+.login-card .b1{font-size:22px;font-weight:800;font-style:italic}
+.login-card .b2{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--text3);margin-bottom:20px}
+.login-card input{width:100%;height:40px;padding:0 12px;border:1px solid var(--border2);margin-bottom:10px;outline:none}
+.login-card input:focus{border-color:var(--accent)}
+.login-card button{width:100%;height:42px;background:var(--accent);color:#fff;border:none;font-weight:800;font-size:14px}
+.login-err{color:var(--red);font-size:12px;min-height:16px;margin-bottom:6px}
+
+@media (max-width:860px){
+  .sidebar{width:60px}
+  .sidebar .logo .b1{font-size:13px}
+  .sidebar .logo .b2,.nav-sec,.nav-item span.lbl,.nav-item .n,.sb-foot .lbl{display:none}
+  .row .who{width:120px}
+  .row .sn{white-space:normal}
+  .content{padding:14px}
+  .topbar{padding:0 12px;gap:8px}
+}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-card">
+    <div class="b1">BSMP Mail</div>
+    <div class="b2">Shared shop inbox</div>
+    <input id="lg-email" type="email" placeholder="Email" autocomplete="username">
+    <input id="lg-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="login-err" id="lg-err"></div>
+    <button id="lg-btn">Sign in</button>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <nav class="sidebar">
+    <div class="logo"><div class="b1">BERT'S</div><div class="b2">Sheet Metal Products Inc.</div></div>
+    <div class="nav">
+      <div class="nav-sec">Mail</div>
+      <div class="nav-item active" data-page="inbox" onclick="go('inbox')"><svg class="i" viewBox="0 0 24 24"><path d="M4 7l8 6 8-6M4 5h16v14H4z"/></svg><span class="lbl">Shop Inbox</span><span class="n" id="n-inbox" style="display:none"></span></div>
+      <div class="nav-item" data-page="rfq" onclick="go('rfq')"><svg class="i" viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></svg><span class="lbl">RFQs</span><span class="n" id="n-rfq" style="display:none"></span></div>
+      <div class="nav-item" data-page="quoted" onclick="go('quoted')"><svg class="i" viewBox="0 0 24 24"><path d="M14 3H6v18h12V7l-4-4zM14 3v4h4M9 13h6M9 17h6"/></svg><span class="lbl">Quotes submitted</span></div>
+      <div class="nav-item" data-page="waiting" onclick="go('waiting')"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><span class="lbl">Waiting on customer</span></div>
+      <div class="nav-sec">Records</div>
+      <div class="nav-item" data-page="certs" onclick="go('certs')"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5"/><path d="M8.5 13.5L7 21l5-2 5 2-1.5-7.5"/></svg><span class="lbl">Certs &amp; invoices</span></div>
+      <div class="nav-sec">Setup</div>
+      <div class="nav-item" data-page="settings" onclick="go('settings')"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.4 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.4-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.2-.8.2-1.2z"/></svg><span class="lbl">Settings</span></div>
+    </div>
+    <div class="sb-foot">
+      <span class="lbl">Other apps</span>
+      <div class="sb-apps">
+        <a href="orders.html" title="Order Tracker"><i class="ti ti-clipboard-list"></i></a>
+        <a href="quote.html" title="Quote Tool"><i class="ti ti-calculator"></i></a>
+        <a href="qc.html" title="QC / Inspection"><i class="ti ti-shield-check"></i></a>
+        <a href="apar.html" title="AP / AR"><i class="ti ti-building-bank"></i></a>
+        <a href="notes.html" title="Notes"><i class="ti ti-notes"></i></a>
+      </div>
+    </div>
+  </nav>
+
+  <main>
+    <header class="topbar">
+      <div><h1 id="tb-t">Shop Inbox</h1><div class="sub" id="tb-s">One list for the whole shop — flags shared</div></div>
+      <span class="sp"></span>
+      <button class="icon-btn" id="refresh-btn" title="Refresh mail" onclick="loadThreads(true)"><i class="ti ti-refresh"></i></button>
+      <span class="chip" id="live-chip" title="Connection status"><span class="dot" id="live-dot"></span><span id="live-txt">Connecting…</span></span>
+      <button class="icon-btn" title="Sign out" onclick="window._logout()"><i class="ti ti-logout"></i></button>
+    </header>
+
+    <!-- ============ INBOX LIST ============ -->
+    <div class="content" id="v-list">
+      <div id="connect-banner" class="connect-banner" style="display:none">
+        <i class="ti ti-plug-connected-x"></i>
+        <div><b>Mail isn't connected yet</b>
+        The app is ready, but it can't read the mailboxes until the Google setup is finished and the mail proxy address is saved in <span style="text-decoration:underline;cursor:pointer;font-weight:700" onclick="go('settings')">Settings</span>. Flags and this screen will come alive the moment that's done.</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn primary" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
+        <input class="search" id="search" placeholder="Search mail — customer, part, PO, job…" oninput="renderList()">
+        <span class="hint" style="margin-left:auto" id="list-count"></span>
+      </div>
+      <div class="fchips" id="fchips"></div>
+      <div class="card" id="rows"><div class="empty"><i class="ti ti-mail-off"></i>No mail loaded yet</div></div>
+      <div class="hint" style="margin-top:8px">The <b>BOTH</b> tag = the same email landed in more than one mailbox — the app shows it once, so nobody answers it twice.</div>
+    </div>
+
+    <!-- ============ CONVERSATION ============ -->
+    <div class="content" id="v-convo" style="display:none">
+      <div class="toolbar" style="margin-bottom:10px">
+        <button class="btn" onclick="backToList()"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg> Back</button>
+      </div>
+      <div class="page-head">
+        <h2 id="cv-subject"></h2>
+        <p id="cv-sub"></p>
+      </div>
+      <div class="convo-top">
+        <span class="hint" style="font-weight:700">Flag:</span>
+        <span class="statuspick" id="statuspick"></span>
+        <span class="sp"></span>
+        <span class="hint" style="font-weight:700">Assigned:</span>
+        <button class="btn sm" id="assignee-btn" onclick="cycleAssign()"></button>
+      </div>
+      <div class="card">
+        <div id="cv-msgs"></div>
+        <div class="reply">
+          <div class="fromline">
+            Reply as
+            <select id="reply-as"></select>
+            <span class="hint">· sends through Gmail — lands in the real Sent folder, threads correctly</span>
+          </div>
+          <textarea id="reply-body" placeholder="Write your reply…"></textarea>
+          <div class="actions">
+            <button class="btn primary" id="reply-send" onclick="sendReply()"><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg> Send</button>
+            <span class="hint" id="reply-hint"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS ============ -->
+    <div class="content" id="v-settings" style="display:none">
+      <div class="page-head"><h2>Mail settings</h2><p>Managers only — the connection between this app and the Gmail mailboxes.</p></div>
+      <div class="set-card">
+        <h3><i class="ti ti-plug"></i> Mail proxy</h3>
+        <label>Proxy URL (Cloudflare Worker)</label>
+        <input id="set-proxy" placeholder="https://bsmp-mail.….workers.dev">
+        <div class="set-help">The mail proxy is a small Cloudflare Worker that holds the Google credentials and talks to Gmail — this app never sees the keys. Paste its address here once it's deployed.</div>
+      </div>
+      <div class="set-card">
+        <h3><i class="ti ti-mailbox"></i> Mailboxes</h3>
+        <label>Addresses (comma separated — must match the proxy's list)</label>
+        <input id="set-boxes" placeholder="info@bertsmp.com, sales@bertsmp.com">
+        <div class="set-help">Each address shows as a tag on the mail cards (INFO / SALES) and as a "Reply as" choice in the composer.</div>
+      </div>
+      <button class="btn primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save settings</button>
+      <span class="hint" id="set-status" style="margin-left:10px"></span>
+    </div>
+  </main>
+</div>
+
+<!-- compose modal -->
+<div class="modal-bg" id="compose-modal">
+  <div class="modal">
+    <h3>New email</h3>
+    <label>From</label>
+    <select id="cp-from"></select>
+    <label>To</label>
+    <input id="cp-to" type="text" placeholder="customer@example.com">
+    <label>Subject</label>
+    <input id="cp-subject" type="text" placeholder="Subject">
+    <label>Message</label>
+    <textarea id="cp-body"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="closeCompose()">Cancel</button>
+      <button class="btn primary" id="cp-send" onclick="sendCompose()"><i class="ti ti-send"></i> Send</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+import { getDatabase, ref, onValue, set, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
+  authDomain: "bsmp-orders.firebaseapp.com",
+  databaseURL: "https://bsmp-orders-default-rtdb.firebaseio.com",
+  projectId: "bsmp-orders",
+  storageBucket: "bsmp-orders.firebasestorage.app",
+  messagingSenderId: "924947028289",
+  appId: "1:924947028289:web:c58c74e37ee51aa1b9e9c0"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+// Mail is an office tool — operators get the managers-only lock (same as quote/apar).
+const OPERATOR_EMAILS=['operator@bertsmp.com'];
+function isOperatorEmail(email){
+  email=(email||'').toLowerCase();
+  if(OPERATOR_EMAILS.includes(email)) return true;
+  const local=email.split('@')[0]||'';
+  if(local==='ops' || /^ops[._-]/.test(local)) return true;
+  return local.startsWith('operator');
+}
+function showMgrLock(){
+  let el=document.getElementById('mgr-lock');
+  if(!el){
+    el=document.createElement('div'); el.id='mgr-lock';
+    el.style.cssText='position:fixed;inset:0;z-index:9999;background:#f4f6fa;display:flex;align-items:center;justify-content:center;padding:20px';
+    el.innerHTML=`<div style="background:#fff;border:1px solid #dde3ec;border-radius:16px;padding:34px 30px;max-width:380px;width:100%;text-align:center;box-shadow:0 10px 30px rgba(20,40,80,.08)">
+      <div style="font-size:34px;margin-bottom:8px"><i class="ti ti-lock"></i></div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:6px">Managers only</div>
+      <div style="font-size:13px;color:#5b6675;line-height:1.5;margin-bottom:20px">This app isn't part of the operator tools. Your sign-in works on the shop-floor apps:</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="orders.html" style="display:block;padding:11px;border-radius:10px;background:#1e3a5f;color:#fff;font-weight:700;font-size:13.5px;text-decoration:none">Order Tracker · Work Queues</a>
+        <a href="qc.html" style="display:block;padding:11px;border-radius:10px;background:#1d7a52;color:#fff;font-weight:700;font-size:13.5px;text-decoration:none">QC / Inspection</a>
+        <button id="mgr-lock-out" style="padding:10px;border-radius:10px;background:none;border:1px solid #dde3ec;color:#5b6675;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit">Sign out</button>
+      </div></div>`;
+    document.body.appendChild(el);
+    el.querySelector('#mgr-lock-out').onclick=()=>signOut(auth);
+  }
+  el.style.display='flex';
+}
+function hideMgrLock(){ const el=document.getElementById('mgr-lock'); if(el) el.style.display='none'; }
+
+function $(id){ return document.getElementById(id); }
+const esc=(s)=>(s==null?'':String(s)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+let toastTimer=null;
+function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast show'+(err?' err':''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3800); }
+
+// ── state ─────────────────────────────────────────────────────────────────────
+const FLAG_DEFS=[
+  {k:'rfq',     label:'RFQ'},
+  {k:'quoted',  label:'Quote submitted'},
+  {k:'waiting', label:'Waiting'},
+  {k:'won',     label:'Won'},
+  {k:'lost',    label:'Lost'},
+  {k:'cert',    label:'Cert'},
+  {k:'invoice', label:'Invoice'},
+];
+let SETTINGS={proxyUrl:'', mailboxes:['info@bertsmp.com']};
+let FLAGS={};                 // mail/threads/<key> → {flag, assignee, by, at}
+let THREADS=[];               // from the proxy: {key, subject, fromName, fromEmail, snippet, date, unread, hasAttach, mailboxes:[…], gmail:{…per-box thread ids…}}
+let CURRENT=null;             // open thread (with .messages once loaded)
+let navPage='inbox', chipFilter='all';
+let _pollTimer=null;
+
+function setLive(state, txt){
+  const dot=$('live-dot'), t=$('live-txt');
+  if(dot) dot.style.background = state==='ok'?'#1f7d57': state==='busy'?'#ba7517': state==='err'?'#a32d2d':'#8a93a0';
+  if(t) t.textContent = txt;
+}
+
+// mailbox short tag: info@bertsmp.com → INFO
+function boxTag(addr){ return (addr||'').split('@')[0].toUpperCase(); }
+function assigneeList(){
+  return [{k:'', initial:'–', name:'Unassigned', color:''}]
+    .concat(SETTINGS.mailboxes.map((a,i)=>{
+      const local=(a||'').split('@')[0];
+      return {k:a, initial:(local[0]||'?').toUpperCase(), name:local.charAt(0).toUpperCase()+local.slice(1), color:i===0?'':'#6a1f2e'};
+    }));
+}
+
+// ── proxy API (Cloudflare Worker holds the Google credentials) ────────────────
+async function api(path, opts){
+  if(!SETTINGS.proxyUrl) { const e=new Error('not-connected'); e.notConnected=true; throw e; }
+  const tok=await auth.currentUser.getIdToken();
+  const r=await fetch(SETTINGS.proxyUrl.replace(/\/+$/,'')+path, Object.assign({}, opts, {
+    headers: Object.assign({'Content-Type':'application/json','Authorization':'Bearer '+tok}, (opts&&opts.headers)||{})
+  }));
+  if(!r.ok) throw new Error('Mail proxy error '+r.status+': '+(await r.text()).slice(0,200));
+  return r.json();
+}
+
+window.loadThreads=async (manual)=>{
+  const btn=$('refresh-btn');
+  try{
+    setLive('busy','Checking mail…'); if(btn) btn.disabled=true;
+    const data=await api('/threads');
+    THREADS=(data.threads||[]);
+    $('connect-banner').style.display='none';
+    setLive('ok','Live');
+    renderList(); renderNavCounts();
+    if(manual) toast('Mail refreshed');
+  }catch(e){
+    if(e.notConnected){ $('connect-banner').style.display='flex'; setLive('err','Not connected'); }
+    else { setLive('err','Mail offline'); if(manual) toast(e.message,true); console.warn(e); }
+  }finally{ if(btn) btn.disabled=false; }
+};
+function startPolling(){ clearInterval(_pollTimer); _pollTimer=setInterval(()=>{ if(SETTINGS.proxyUrl && document.visibilityState==='visible') loadThreads(false); }, 120000); }
+
+// ── rendering ─────────────────────────────────────────────────────────────────
+const NAV_META={
+  inbox:['Shop Inbox','One list for the whole shop — flags shared', t=>true],
+  rfq:['RFQs','Every open request for quote, all mailboxes', t=>flagOf(t)==='rfq'],
+  quoted:['Quotes submitted','Waiting to hear back', t=>flagOf(t)==='quoted'],
+  waiting:['Waiting on customer','The ball is in their court', t=>flagOf(t)==='waiting'],
+  certs:['Certs & invoices','Paperwork that files itself', t=>['cert','invoice'].includes(flagOf(t))],
+};
+function flagOf(t){ const f=FLAGS[t.key]; return (f&&f.flag)||''; }
+function assignOf(t){ const f=FLAGS[t.key]; return (f&&f.assignee)||''; }
+
+window.go=(page)=>{
+  navPage=page;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
+  backToList();
+  $('v-list').style.display = page==='settings'?'none':'';
+  $('v-settings').style.display = page==='settings'?'':'none';
+  if(page==='settings'){ $('tb-t').textContent='Settings'; $('tb-s').textContent='Mail connection'; renderSettings(); return; }
+  const m=NAV_META[page]||NAV_META.inbox;
+  $('tb-t').textContent=m[0]; $('tb-s').textContent=m[1];
+  chipFilter='all';
+  renderList();
+};
+window.backToList=()=>{ $('v-convo').style.display='none'; if(navPage!=='settings') $('v-list').style.display=''; CURRENT=null; };
+
+function visibleThreads(){
+  const m=NAV_META[navPage]||NAV_META.inbox;
+  let list=THREADS.filter(m[2]);
+  if(chipFilter!=='all'){
+    if(chipFilter==='none') list=list.filter(t=>!flagOf(t));
+    else list=list.filter(t=>flagOf(t)===chipFilter);
+  }
+  const q=($('search').value||'').toLowerCase();
+  if(q) list=list.filter(t=>[t.subject,t.fromName,t.fromEmail,t.snippet].join(' ').toLowerCase().includes(q));
+  return list;
+}
+window.renderList=()=>{
+  // filter chips with live counts (within the current nav page)
+  const m=NAV_META[navPage]||NAV_META.inbox;
+  const base=THREADS.filter(m[2]);
+  const counts={all:base.length, none:base.filter(t=>!flagOf(t)).length};
+  FLAG_DEFS.forEach(f=>counts[f.k]=base.filter(t=>flagOf(t)===f.k).length);
+  $('fchips').innerHTML =
+    `<span class="fchip${chipFilter==='all'?' on':''}" onclick="setChip('all')">All <span class="n">${counts.all}</span></span>`+
+    FLAG_DEFS.filter(f=>counts[f.k]>0||chipFilter===f.k).map(f=>
+      `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')">${f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
+    `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`;
+
+  const list=visibleThreads();
+  const unread=list.filter(t=>t.unread).length;
+  $('list-count').textContent=list.length?`${list.length} conversation${list.length!==1?'s':''}${unread?` · ${unread} unread`:''}`:'';
+  const rows=$('rows');
+  if(!list.length){
+    rows.innerHTML=`<div class="empty"><i class="ti ti-mail-off"></i>${THREADS.length?'Nothing matches this view':'No mail loaded yet'}</div>`;
+    return;
+  }
+  const people=assigneeList();
+  rows.innerHTML=list.map(t=>{
+    const f=flagOf(t);
+    const fd=FLAG_DEFS.find(x=>x.k===f);
+    const a=assignOf(t); const p=people.find(x=>x.k===a);
+    const boxes=t.mailboxes||[];
+    const mbx = boxes.length>1 ? `<span class="mbx both">BOTH</span>` : `<span class="mbx">${esc(boxTag(boxes[0]||''))}</span>`;
+    return `<div class="row${t.unread?' unread':''}" onclick="openThread('${esc(t.key)}')">
+      <span class="${t.unread?'udot':'rdot'}"></span>
+      <div class="who"><div class="fr">${esc(t.fromName||t.fromEmail||'—')}</div><div class="co">${esc(t.fromName?t.fromEmail:'')}</div></div>
+      <div class="mid">
+        <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
+        <div class="sn">${esc(t.snippet||'')}</div>
+        <div class="meta">${fd?`<span class="badge ${fd.k}">${fd.label}</span>`:'<span class="hint">no flag</span>'}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
+      </div>
+      <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
+    </div>`;
+  }).join('');
+};
+window.setChip=(k)=>{ chipFilter=k; renderList(); };
+function renderNavCounts(){
+  const un=THREADS.filter(t=>t.unread).length;
+  const rf=THREADS.filter(t=>flagOf(t)==='rfq').length;
+  const set=(id,n)=>{ const el=$(id); if(el){ el.style.display=n?'':'none'; el.textContent=n; } };
+  set('n-inbox',un); set('n-rfq',rf);
+}
+function fmtWhen(ms){
+  if(!ms) return '';
+  const d=new Date(Number(ms)); const now=new Date();
+  const sameDay=d.toDateString()===now.toDateString();
+  if(sameDay) return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  const days=(now-d)/86400000;
+  if(days<6) return d.toLocaleDateString('en-US',{weekday:'short'});
+  return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+}
+
+// ── conversation ──────────────────────────────────────────────────────────────
+window.openThread=async (key)=>{
+  const t=THREADS.find(x=>x.key===key); if(!t) return;
+  CURRENT=t;
+  $('v-list').style.display='none'; $('v-convo').style.display=''; window.scrollTo(0,0);
+  $('cv-subject').textContent=t.subject||'(no subject)';
+  const boxes=(t.mailboxes||[]).map(boxTag).join(' + ');
+  $('cv-sub').innerHTML=`${esc(t.fromName||t.fromEmail||'')}${t.mailboxes&&t.mailboxes.length>1?' · arrived in <b>both</b> mailboxes · shown once':' · '+esc(boxes)}`;
+  renderFlagPills(); renderAssignee(); renderReplyAs();
+  $('cv-msgs').innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Loading conversation…</div>';
+  try{
+    const box=(t.mailboxes||[])[0], gid=t.ids&&t.ids[box];
+    const data=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(gid));
+    if(CURRENT!==t) return;
+    t.messages=data.messages||[];
+    $('cv-msgs').innerHTML=t.messages.map(m=>`
+      <div class="msg">
+        <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
+        <div class="body">${esc(m.bodyText||m.snippet||'')}</div>
+        ${(m.attachments||[]).map(a=>`<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
+      </div>`).join('');
+    if(t.unread){ t.unread=false; renderList(); renderNavCounts(); api('/read',{method:'POST',body:JSON.stringify({ids:t.ids||{}})}).catch(()=>{}); }
+  }catch(e){
+    $('cv-msgs').innerHTML=`<div class="empty"><i class="ti ti-plug-connected-x"></i>${e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':esc(e.message)}</div>`;
+  }
+};
+function renderFlagPills(){
+  const cur=CURRENT?flagOf(CURRENT):'';
+  $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" onclick="setFlag('${f.k}')">${f.label}</span>`).join('');
+}
+window.setFlag=(k)=>{
+  if(!CURRENT) return;
+  const cur=flagOf(CURRENT);
+  const next=(cur===k)?'':k;
+  const rec=Object.assign({}, FLAGS[CURRENT.key]||{}, {flag:next, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
+  FLAGS[CURRENT.key]=rec; renderFlagPills(); renderList(); renderNavCounts();
+  set(ref(db,'mail/threads/'+CURRENT.key), rec).catch(()=>toast('Could not save the flag — check the mail rule is published.',true));
+};
+function renderAssignee(){
+  const people=assigneeList();
+  const a=CURRENT?assignOf(CURRENT):'';
+  const p=people.find(x=>x.k===a)||people[0];
+  $('assignee-btn').innerHTML=`<span class="avatar" style="width:18px;height:18px;font-size:9px${p.color?';background:'+p.color:''}${p.k?'':';background:#8a93a0'}">${p.initial}</span> ${esc(p.name)}`;
+}
+window.cycleAssign=()=>{
+  if(!CURRENT) return;
+  const people=assigneeList();
+  const cur=assignOf(CURRENT);
+  const i=people.findIndex(x=>x.k===cur);
+  const next=people[(i+1)%people.length];
+  const rec=Object.assign({}, FLAGS[CURRENT.key]||{}, {assignee:next.k, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
+  FLAGS[CURRENT.key]=rec; renderAssignee(); renderList();
+  set(ref(db,'mail/threads/'+CURRENT.key), rec).catch(()=>{});
+};
+function renderReplyAs(){
+  const sel=$('reply-as');
+  sel.innerHTML=SETTINGS.mailboxes.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+}
+window.sendReply=async ()=>{
+  if(!CURRENT) return;
+  const body=($('reply-body').value||'').trim(); if(!body){ toast('Write a reply first.',true); return; }
+  const btn=$('reply-send'); btn.disabled=true; $('reply-hint').textContent='Sending…';
+  try{
+    const box=(CURRENT.mailboxes||[])[0];
+    await api('/send',{method:'POST',body:JSON.stringify({replyAs:$('reply-as').value, box, id:CURRENT.ids&&CURRENT.ids[box], ids:CURRENT.ids||{}, body})});
+    $('reply-body').value=''; $('reply-hint').textContent='';
+    toast('Sent ✓'); openThread(CURRENT.key);
+  }catch(e){ $('reply-hint').textContent=''; toast(e.notConnected?'Mail isn’t connected yet.':e.message,true); }
+  finally{ btn.disabled=false; }
+};
+
+// ── compose ───────────────────────────────────────────────────────────────────
+window.openCompose=()=>{
+  $('cp-from').innerHTML=SETTINGS.mailboxes.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
+  $('cp-to').value=''; $('cp-subject').value=''; $('cp-body').value='';
+  $('compose-modal').style.display='flex';
+  setTimeout(()=>$('cp-to').focus(),30);
+};
+window.closeCompose=()=>{ $('compose-modal').style.display='none'; };
+window.sendCompose=async ()=>{
+  const to=($('cp-to').value||'').trim(), subject=($('cp-subject').value||'').trim(), body=($('cp-body').value||'').trim();
+  if(!to||!body){ toast('Fill in To and a message.',true); return; }
+  const btn=$('cp-send'); btn.disabled=true;
+  try{
+    await api('/send',{method:'POST',body:JSON.stringify({replyAs:$('cp-from').value, to, subject, body})});
+    closeCompose(); toast('Sent ✓'); loadThreads(false);
+  }catch(e){ toast(e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':e.message,true); }
+  finally{ btn.disabled=false; }
+};
+
+// ── settings ──────────────────────────────────────────────────────────────────
+function renderSettings(){
+  $('set-proxy').value=SETTINGS.proxyUrl||'';
+  $('set-boxes').value=(SETTINGS.mailboxes||[]).join(', ');
+  $('set-status').textContent='';
+}
+window.saveSettings=async ()=>{
+  const proxyUrl=($('set-proxy').value||'').trim();
+  const mailboxes=($('set-boxes').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+  try{
+    await set(ref(db,'mail/settings'), {proxyUrl, mailboxes});
+    $('set-status').textContent='Saved ✓';
+    toast('Settings saved');
+  }catch(e){ toast('Could not save — is the mail rule published?',true); }
+};
+
+// ── auth + listeners ──────────────────────────────────────────────────────────
+window._logout=()=>signOut(auth);
+$('lg-btn').onclick=async ()=>{
+  $('lg-err').textContent='';
+  try{ await signInWithEmailAndPassword(auth, $('lg-email').value.trim(), $('lg-pass').value); }
+  catch(e){ $('lg-err').textContent=(e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'||e.code==='auth/user-not-found')?'Incorrect email or password.':('Sign-in error: '+e.message); }
+};
+$('lg-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('lg-btn').click(); });
+
+let _listening=false;
+onAuthStateChanged(auth,(user)=>{
+  if(user){
+    if(isOperatorEmail(user.email)){ $('login').style.display='none'; $('app').classList.remove('on'); showMgrLock(); return; }
+    hideMgrLock();
+    $('login').style.display='none'; $('app').classList.add('on');
+    if(!_listening){
+      _listening=true;
+      onValue(ref(db,'mail/settings'),snap=>{
+        const s=snap.val()||{};
+        SETTINGS.proxyUrl=s.proxyUrl||'';
+        SETTINGS.mailboxes=(s.mailboxes&&s.mailboxes.length)?s.mailboxes:['info@bertsmp.com'];
+        if(document.getElementById('v-settings').style.display!=='none') renderSettings();
+        loadThreads(false); startPolling();
+      });
+      onValue(ref(db,'mail/threads'),snap=>{
+        FLAGS=snap.val()||{};
+        renderList(); renderNavCounts();
+        if(CURRENT){ renderFlagPills(); renderAssignee(); }
+      });
+      onValue(ref(db,'.info/connected'),snap=>{
+        if(!snap.val()) setLive('err','Offline');
+      });
+    }
+  }else{
+    hideMgrLock();
+    $('login').style.display='flex'; $('app').classList.remove('on');
+  }
+});
+</script>
+</body>
+</html>
