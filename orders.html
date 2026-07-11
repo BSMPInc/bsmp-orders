@@ -3223,8 +3223,11 @@ function chatBtnHtml(customer,po,label){
   return `<button class="note-btn${n?' has':''}" title="Team notes — everyone can read and add" onclick="event.stopPropagation();window._openChat('${key}','${lbl}')"><i class="ti ti-message-circle-2"></i>${n||''}</button>`;
 }
 function chatAuthorName(e){
-  const local=(e.by||'').split('@')[0];
-  return local ? local.charAt(0).toUpperCase()+local.slice(1) : 'Unknown';
+  let local=(e.by||'').split('@')[0];
+  // operator.mike@… should read as "Mike", not "Operator.mike" (bare operator@ stays "Operator")
+  const stripped=local.replace(/^operator[._-]+/i,'');
+  if(stripped) local=stripped;
+  return local ? local.split(/[._-]+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') : 'Unknown';
 }
 function fmtChatTime(ms){
   if(!ms) return '';
