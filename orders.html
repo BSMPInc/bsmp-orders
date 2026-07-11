@@ -1092,7 +1092,7 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="nav-item mgr-only" id="nav-needpo" onclick="showPage('needpo')"><i class="ti ti-alert-circle"></i> <span class="nav-label">Need PO</span><span class="nav-badge" id="badge-needpo" style="display:none"></span></div>
     <div class="nav-item mgr-only" id="nav-schedule" onclick="showPage('schedule')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M4 9h11"/><path d="M12 6l3 3-3 3"/><path d="M20 15H9"/><path d="M12 12l-3 3 3 3"/></svg> <span class="nav-label">Incoming / Outgoing</span></div>
     <div class="nav-item mgr-only" id="nav-ready" onclick="setFilter('Ready for Invoice')"><svg class="nav-ico" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z"/><path d="M12 17v1m0-8v1"/><path d="M13.8 12.2a1.6 1.6 0 0 0-1.8-1.2 1.5 1.5 0 0 0-.2 3h.8a1.5 1.5 0 0 1 .2 3 1.6 1.6 0 0 1-1.8-1.2"/></svg> <span class="nav-label">Ready to Invoice</span><span class="nav-badge" id="badge-ready" style="display:none"></span></div>
-    <div class="nav-item mgr-only" onclick="showPage('archive')" title="Invoiced orders file themselves to the Archive"><i class="ti ti-circle-check"></i> Invoiced</div>
+    <div class="nav-item mgr-only" onclick="setFilter('Invoiced')" title="Invoiced orders — the done pile"><i class="ti ti-circle-check"></i> Archived Orders</div>
   </div>
   <div class="sidebar-section mgr-only">
     <div class="sidebar-section-label">Directory</div>
@@ -3114,20 +3114,18 @@ window._confirmInvoice=()=>{
     const cbs=[...document.querySelectorAll('.inv-item-cb')];
     const picked=cbs.length ? cbs.filter(cb=>cb.checked).map(cb=>cb.getAttribute('data-id')) : [target.id];
     if(!picked.length){ alert('Check at least one line item for this invoice.'); return; }
-    // snapshot for undo, then invoice + auto-archive each picked line
-    const prior=picked.map(pid=>{ const o=orders.find(x=>x.id===pid); return o?{id:o.id,status:o.status,invoice:o.invoice,invoiceDate:o.invoiceDate,payment:o.payment,archived:o.archived,archivedAt:o.archivedAt}:null; }).filter(Boolean);
+    // snapshot for undo, then invoice each picked line
+    const prior=picked.map(pid=>{ const o=orders.find(x=>x.id===pid); return o?{id:o.id,status:o.status,invoice:o.invoice,invoiceDate:o.invoiceDate,payment:o.payment}:null; }).filter(Boolean);
     picked.forEach(pid=>{
       const o=orders.find(x=>x.id===pid); if(!o) return;
       o.invoice=num;
       o.invoiceDate=idate;
       o.status='Invoiced';
       if(!o.payment)o.payment='Unpaid';
-      o.archived=true; o.archivedAt=new Date().toISOString();   // invoiced → straight to Archive
-      expanded.delete(o.id);
     });
     saveDB();render();
-    if(typeof showUndoToast==='function') showUndoToast(`Invoiced & archived ${prior.length} item${prior.length!==1?'s':''}${num?(' under #'+num):''}`, ()=>{
-      prior.forEach(p=>{ const o=orders.find(x=>x.id===p.id); if(o){ o.status=p.status; o.invoice=p.invoice; o.invoiceDate=p.invoiceDate; o.payment=p.payment; o.archived=p.archived; o.archivedAt=p.archivedAt; } });
+    if(typeof showUndoToast==='function') showUndoToast(`Invoiced ${prior.length} item${prior.length!==1?'s':''}${num?(' under #'+num):''}`, ()=>{
+      prior.forEach(p=>{ const o=orders.find(x=>x.id===p.id); if(o){ o.status=p.status; o.invoice=p.invoice; o.invoiceDate=p.invoiceDate; o.payment=p.payment; } });
       saveDB();render();
     });
   }
@@ -3192,12 +3190,12 @@ window._createCombinedInvoice=()=>{
   if(!num){ showWarn('Enter an invoice number.'); return; }
   const idate=document.getElementById('combine-invdate').value||new Date().toISOString().slice(0,10);
   const ids=checked.map(cb=>cb.getAttribute('data-id'));
-  const prior=ids.map(id=>{ const r=orders.find(o=>String(o.id)===String(id)); return r?{id:r.id,status:r.status,invoice:r.invoice,invoiceDate:r.invoiceDate,payment:r.payment,archived:r.archived,archivedAt:r.archivedAt}:null; }).filter(Boolean);
-  ids.forEach(id=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.invoice=num; r.invoiceDate=idate; r.status='Invoiced'; if(!r.payment)r.payment='Unpaid'; r.archived=true; r.archivedAt=new Date().toISOString(); expanded.delete(r.id); } });
+  const prior=ids.map(id=>{ const r=orders.find(o=>String(o.id)===String(id)); return r?{id:r.id,status:r.status,invoice:r.invoice,invoiceDate:r.invoiceDate,payment:r.payment}:null; }).filter(Boolean);
+  ids.forEach(id=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.invoice=num; r.invoiceDate=idate; r.status='Invoiced'; if(!r.payment)r.payment='Unpaid'; } });
   saveDB(); render();
   window.closeModal('combine-modal');
-  if(typeof showUndoToast==='function') showUndoToast(`Invoiced & archived ${ids.length} orders under #${num}`, ()=>{
-    prior.forEach(p=>{ const r=orders.find(o=>String(o.id)===String(p.id)); if(r){ r.status=p.status; r.invoice=p.invoice; r.invoiceDate=p.invoiceDate; r.payment=p.payment; r.archived=p.archived; r.archivedAt=p.archivedAt; } });
+  if(typeof showUndoToast==='function') showUndoToast(`Invoiced ${ids.length} orders under #${num}`, ()=>{
+    prior.forEach(p=>{ const r=orders.find(o=>String(o.id)===String(p.id)); if(r){ r.status=p.status; r.invoice=p.invoice; r.invoiceDate=p.invoiceDate; r.payment=p.payment; } });
     saveDB(); render();
   });
 };
@@ -3546,13 +3544,9 @@ window.saveOrder=()=>{
   // if adding a part with copied process steps, seed its schedule
   if(!editId && _prefillSteps){ order.schedule = { steps: _prefillSteps }; }
   _prefillSteps = null;
-  // status flipped to Invoiced in the form → same auto-archive as the invoice popup
-  const justInvoiced = order.status==='Invoiced' && (ex||{}).status!=='Invoiced' && !order.archived;
-  if(justInvoiced){ order.archived=true; order.archivedAt=new Date().toISOString(); expanded.delete(order.id); }
   if(editId){const i=orders.findIndex(o=>o.id===editId);orders[i]=order;}else{orders.unshift(order);revealNewOrder(order.id);}
   maybeAdvanceCounter(order.job);
   saveDB();render();closeModal('add-modal');
-  if(justInvoiced && typeof showUndoToast==='function') showUndoToast('Order invoiced and moved to the Archive', ()=>window._unarchiveOrder(order.id));
 };
 
 // ── Import from Quote (consumes quotes/ synced by the quote tool) ────────────

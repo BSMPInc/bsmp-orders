@@ -1226,9 +1226,7 @@ function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/"/g
 
 // ── Derive AR/AP entries from the order tracker, merge with overlay ───────────
 function deriveAR(){
-  // Invoiced orders auto-archive in the order tracker, so archived ones still count
-  // as receivables until they're marked Paid there; archived + Paid = settled history.
-  const list=Object.values(orders).filter(r=>r&&r.status==='Invoiced'&&(!r.archived||r.payment!=='Paid'));
+  const list=Object.values(orders).filter(r=>r&&!r.archived&&r.status==='Invoiced');
   const map=new Map();
   list.forEach(r=>{
     const key=(r.invoice&&String(r.invoice).trim())?'inv:'+String(r.invoice).trim():'po:'+(r.customer||'')+'|'+(r.po||'verbal');
