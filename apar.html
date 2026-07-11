@@ -950,10 +950,8 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
       <div class="nav-item" onclick="openImport()"><i class="ti ti-table-import"></i> Import (CSV/paste)</div>
       <div class="nav-item" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</div>
       <div class="nav-item" onclick="go('backup')"><i class="ti ti-shield-check"></i> Backup &amp; Restore</div>
-      <div class="nav-item" onclick="doSignOut()"><i class="ti ti-logout"></i> Sign out</div>
     </div>
     <div class="sidebar-foot">
-      <span class="dot"></span><span class="lbl">Live · synced</span>
       <button class="pin-btn" id="pin-btn" title="Pin sidebar open" onclick="toggleSidebarPin()"><i class="ti ti-pin" id="pin-ico"></i></button>
     </div>
   </nav>
@@ -968,6 +966,7 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
         <div class="save-status" id="save-status" title="Save status"><span class="ss-dot"></span><span class="ss-txt">All changes saved</span></div>
         <button class="icon-btn" onclick="openHelp()" title="Training manual"><i class="ti ti-help"></i></button>
         <button class="topbar-primary" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add entry</button>
+        <button class="icon-btn" title="Sign out" onclick="doSignOut()"><i class="ti ti-logout"></i></button>
       </div>
     </header>
     <div class="content" id="content"><div class="loading"><i class="ti ti-loader"></i> Loading…</div></div>

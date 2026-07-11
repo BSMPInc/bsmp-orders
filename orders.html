@@ -103,6 +103,14 @@ body{font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sa
 .sync-dot.saving{background:var(--amber);animation:pulse .9s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .sync-label{font-size:11px;color:#f0d8dc}
+/* topbar live chip + sign-out — shared look across all BSMP apps (matches Notes/Quote/QC) */
+.tb-live{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:9px;padding:7px 12px;flex-shrink:0}
+.tb-live .tld{width:8px;height:8px;border-radius:50%;background:#9aa3b2;flex-shrink:0}
+.tb-live.live .tld{background:var(--green)}
+.tb-live.saving .tld{background:var(--amber);animation:pulse .9s infinite}
+.tb-live.err{color:var(--red);border-color:#a32d2d55}.tb-live.err .tld{background:var(--red)}
+.tb-signout{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;border-radius:9px;font-size:17px;flex-shrink:0}
+.tb-signout:hover{background:var(--bg)}
 
 /* ── Main ── */
 #app-root{height:100vh;overflow:hidden}
@@ -1121,13 +1129,8 @@ body.sb-pinned .dock{left:var(--sb)}
   </div>
   <div class="sidebar-footer">
     <div id="role-badge" class="role-badge" style="display:none"></div>
-    <div class="sync-row">
-      <div class="sync-dot" id="sync-dot"></div>
-      <span class="sync-label" id="sync-label">Connecting…</span>
-    </div>
     <div class="city">Chatsworth, CA 91311</div>
     <div class="ver">v2.54.4</div>
-    <div style="font-size:11px;color:#e8c9cf;margin-top:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px" onclick="window._logout()"><i class="ti ti-logout" style="font-size:13px"></i> Sign out</div>
   </div>
 </nav>
 
@@ -1156,6 +1159,8 @@ body.sb-pinned .dock{left:var(--sb)}
       <button class="btn" id="topbar-import-btn" onclick="openQuoteImport()"><i class="ti ti-file-import"></i> Import Quote</button>
       <button class="btn ai" id="topbar-ai-btn" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</button>
       <button class="btn green" id="topbar-add-btn" onclick="openAdd()"><i class="ti ti-plus"></i> Add Order</button>
+      <span class="tb-live" id="tb-live" title="Connection status"><span class="tld"></span><span id="sync-label">Connecting…</span></span>
+      <button class="tb-signout" title="Sign out" onclick="window._logout()"><i class="ti ti-logout"></i></button>
     </div>
   </div>
 
@@ -2132,11 +2137,11 @@ function startDataListeners(){
 }
 
 function setSyncStatus(s) {
-  const dot=document.getElementById('sync-dot'), lbl=document.getElementById('sync-label');
-  if(!dot||!lbl) return;
-  if(s==='live'){dot.className='sync-dot live';lbl.textContent='Live';}
-  else if(s==='saving'){dot.className='sync-dot saving';lbl.textContent='Saving…';}
-  else{dot.className='sync-dot';lbl.textContent='Offline';}
+  const chip=document.getElementById('tb-live'), lbl=document.getElementById('sync-label');
+  if(!chip||!lbl) return;
+  if(s==='live'){chip.className='tb-live live';lbl.textContent='Live';}
+  else if(s==='saving'){chip.className='tb-live saving';lbl.textContent='Saving…';}
+  else{chip.className='tb-live err';lbl.textContent='Offline';}
 }
 let _asHideTimer=null;
 function autosavePill(state){

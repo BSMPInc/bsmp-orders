@@ -366,6 +366,7 @@ body.role-operator .mgr-only{display:none!important}
       <span class="sp"></span>
       <div id="qc-lang"><button data-lang="en" onclick="qcSetLang('en')">EN</button><button data-lang="es" onclick="qcSetLang('es')">ES</button></div>
       <span class="chip" id="qc-role-chip" style="display:none"><i class="ti ti-shield-check"></i><span id="qc-role-txt">Manager</span></span>
+      <span class="chip" id="qc-live" title="Connection status"><span class="dot" id="qc-live-dot"></span><span id="qc-live-txt">Connecting…</span></span>
       <button class="icon-btn" id="qc-signout" title="Sign out" onclick="window._qcLogout()"><i class="ti ti-logout"></i></button>
     </header>
     <div class="content" id="content"></div>
@@ -2965,6 +2966,13 @@ function isOperatorEmail(email){
   return local.startsWith('operator');
 }
 
+// topbar live chip — same connection indicator as the other apps
+onValue(ref(db,'.info/connected'),(snap)=>{
+  const on=!!snap.val();
+  const dot=document.getElementById('qc-live-dot'), txt=document.getElementById('qc-live-txt');
+  if(dot) dot.style.background = on ? '#1f7d57' : '#a32d2d';
+  if(txt) txt.textContent = on ? 'Live' : 'Offline';
+});
 window.qcSet = (path,val)=> set(ref(db,path), val);
 window.qcUpdate = (path,val)=> update(ref(db,path), val);
 window.qcRemove = (path)=> remove(ref(db,path));
