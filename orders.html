@@ -1917,6 +1917,40 @@ body.sb-pinned .dock{left:var(--sb)}
 <div class="picker" id="status-picker"></div>
 <div class="picker" id="pay-picker"></div>
 
+<!-- Team notes: short shared thread per PO -->
+<style>
+.note-btn{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);border-radius:7px;padding:2px 7px;cursor:pointer;transition:all .12s;line-height:1.5}
+.note-btn i{font-size:13px}
+.note-btn:hover{color:#185FA5;border-color:#185FA5}
+.note-btn.has{color:#185FA5;background:#e7f0fb;border-color:#c9ddf3}
+.chat-note{background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px 11px}
+.chat-note.mine{background:#eef7e3;border-color:#d4e8bd}
+.chat-meta{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--text3);margin-bottom:3px}
+.chat-meta b{color:var(--text2);font-size:11px}
+.chat-del{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:0 2px;font-size:13px}
+.chat-del:hover{color:var(--red)}
+.chat-text{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word}
+</style>
+<div class="modal-bg" id="chat-modal" style="display:none;align-items:center;justify-content:center;z-index:74">
+  <div class="modal" style="max-width:440px;width:92vw;padding:0;display:flex;flex-direction:column;max-height:82vh">
+    <div style="padding:15px 18px 12px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:9px">
+        <i class="ti ti-messages" style="font-size:19px;color:#185FA5"></i>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:800">Team notes</div>
+          <div id="chat-sub" style="font-size:11.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+        </div>
+        <button class="btn sm" onclick="window._closeChat()" title="Close"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+    <div id="chat-thread" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:130px;background:var(--bg)"></div>
+    <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <input id="chat-input" type="text" placeholder="Write a note for the team…" maxlength="500" onkeydown="if(event.key==='Enter')window._sendChat()" style="flex:1;min-width:0;font-size:14px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;font-family:inherit;outline:none">
+      <button class="btn green" onclick="window._sendChat()" title="Send"><i class="ti ti-send"></i></button>
+    </div>
+  </div>
+</div>
+
 <!-- Combine multiple orders into one invoice -->
 <div class="modal-bg" id="combine-modal" style="display:none;align-items:center;justify-content:center;z-index:72">
   <div class="modal" style="max-width:620px;width:92vw;padding:22px;max-height:88vh;display:flex;flex-direction:column">
@@ -2088,6 +2122,7 @@ function startDataListeners(){
   }, () => setSyncStatus('error'));
   startCustomerListener();
   startTeamListener();
+  startChatListener();
   startInventoryListener();
   startTrashListener();
   startDurationsListener();
@@ -2575,7 +2610,7 @@ function condensedCard(g){
     <div class="pm-accent" style="background:${accColor}"></div>
     <div class="pm-top"><span class="pm-cust">${g.customer||'—'}</span>${missBadge}<span class="pm-po">#${g.po}</span></div>
     <div class="pm-mid">${partChip}<span class="pm-count">${g.items.length} item${g.items.length!==1?'s':''}</span></div>
-    <div class="pm-bot"><span class="pm-dates">${startVal?`<span class="pm-start" title="Start date">${startVal}</span><span class="pm-arrow">→</span>`:''}<span class="pm-due" style="${g.dueOverdue?'color:var(--red);font-weight:600':''}" title="Due date">${g.overdue?'● ':''}${dueVal}</span></span><span class="pm-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
+    <div class="pm-bot"><span class="pm-dates">${startVal?`<span class="pm-start" title="Start date">${startVal}</span><span class="pm-arrow">→</span>`:''}<span class="pm-due" style="${g.dueOverdue?'color:var(--red);font-weight:600':''}" title="Due date">${g.overdue?'● ':''}${dueVal}</span></span><span style="display:flex;flex-direction:column;align-items:flex-end;gap:3px"><span class="pm-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span>${chatBtnHtml(g.customer,g.po)}</span></div>
     <div class="pm-status">${riskChip}${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span></div>
   </div>`;
 }
@@ -2641,7 +2676,7 @@ function poDetailHtml(g){
         <div class="card-stat"><span class="cs-label">PO Value</span><span class="cs-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
         <div class="card-stat"><span class="cs-label">Earliest Due</span><span class="cs-val" style="${dueValStyle}">${dueVal}</span></div>
       </div>
-      <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span></div>
+      <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto">${chatBtnHtml(g.customer,g.po)}</span></div>
       ${outsourceStripHtml(g)}
     </div>
     ${vendorPOsHtml(g)}
@@ -3157,6 +3192,80 @@ window._createCombinedInvoice=()=>{
     saveDB(); render();
   });
 };
+// ── Team notes: a short shared thread per PO so the whole team knows what's going on ──
+// Stored at orderChat/<key>/<noteId>; every signed-in user can read and add,
+// and each note carries the author's uid so people can only delete their own.
+const chatRef = ref(db, 'orderChat');
+let chats = {};
+let _chatTarget = null;   // {key, label} while the notes popup is open
+function startChatListener(){
+  onValue(chatRef,(snap)=>{ chats=snap.val()||{}; if(_chatTarget)_renderChatThread(); refreshActivePage(); });
+}
+// One thread per Customer + PO. RTDB keys can't contain . # $ / [ ] so squash them.
+function chatKey(customer,po){
+  return ((customer||'')+'||'+(po||'verbal')).toLowerCase().replace(/[.#$\/\[\]\s]+/g,'_').slice(0,150)||'_';
+}
+function chatEntries(key){
+  const t=chats[key]; if(!t) return [];
+  return Object.values(t).filter(Boolean).sort((a,b)=>(a.at||0)-(b.at||0));
+}
+function chatBtnHtml(customer,po,label){
+  const key=chatKey(customer,po);
+  const n=chatEntries(key).length;
+  const lbl=(label||((customer||'')+(po?(' · PO '+po):''))).replace(/\\/g,'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  return `<button class="note-btn${n?' has':''}" title="Team notes — everyone can read and add" onclick="event.stopPropagation();window._openChat('${key}','${lbl}')"><i class="ti ti-message-circle-2"></i>${n||''}</button>`;
+}
+function chatAuthorName(e){
+  const local=(e.by||'').split('@')[0];
+  return local ? local.charAt(0).toUpperCase()+local.slice(1) : 'Unknown';
+}
+function fmtChatTime(ms){
+  if(!ms) return '';
+  const d=new Date(ms);
+  return d.toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'2-digit'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+window._openChat=(key,label)=>{
+  _chatTarget={key,label};
+  document.getElementById('chat-sub').textContent=label;
+  _renderChatThread();
+  document.getElementById('chat-modal').style.display='flex';
+  const inp=document.getElementById('chat-input'); inp.value='';
+  setTimeout(()=>inp.focus(),30);
+};
+window._closeChat=()=>{ document.getElementById('chat-modal').style.display='none'; _chatTarget=null; };
+function _renderChatThread(){
+  const box=document.getElementById('chat-thread'); if(!box||!_chatTarget) return;
+  const list=chatEntries(_chatTarget.key);
+  const me=auth.currentUser?auth.currentUser.uid:'';
+  box.innerHTML = list.length ? list.map(e=>`
+    <div class="chat-note${e.uid===me?' mine':''}">
+      <div class="chat-meta"><b>${esc2(chatAuthorName(e))}</b><span>${fmtChatTime(e.at)}</span>
+        ${e.uid===me?`<button class="chat-del" title="Delete your note" onclick="window._delChat('${e.id}')"><i class="ti ti-trash"></i></button>`:''}
+      </div>
+      <div class="chat-text">${esc2(e.text||'')}</div>
+    </div>`).join('')
+    : `<div style="text-align:center;color:var(--text3);font-size:12.5px;padding:26px 10px">No notes yet — write the first one so the team knows what's going on.</div>`;
+  box.scrollTop=box.scrollHeight;
+}
+window._sendChat=()=>{
+  if(!_chatTarget) return;
+  const inp=document.getElementById('chat-input');
+  const text=(inp.value||'').trim(); if(!text) return;
+  const u=auth.currentUser; if(!u){ alert('You must be signed in to write notes.'); return; }
+  const e={id:uid(),uid:u.uid,by:u.email||'',at:Date.now(),text};
+  (chats[_chatTarget.key]=chats[_chatTarget.key]||{})[e.id]=e;   // optimistic — listener confirms
+  _renderChatThread(); inp.value=''; inp.focus();
+  set(ref(db,'orderChat/'+_chatTarget.key+'/'+e.id), e).catch(()=>alert('Could not save the note — check your connection.'));
+};
+window._delChat=(id)=>{
+  if(!_chatTarget) return;
+  const t=chats[_chatTarget.key]||{}; const e=t[id];
+  const me=auth.currentUser?auth.currentUser.uid:'';
+  if(!e || e.uid!==me) return;         // only your own notes
+  delete t[id]; _renderChatThread();
+  remove(ref(db,'orderChat/'+_chatTarget.key+'/'+id)).catch(()=>{});
+};
+
 window._pp=(id,e)=>{e.stopPropagation();const picker=document.getElementById('pay-picker');picker.innerHTML=`<div class="picker-label">Payment Status</div>`+['Unpaid','Partial','Paid'].map(p=>`<div class="picker-item" onclick="window._pps('${id}','${p}')"><span class="pay-badge ${PAY_CLASS[p]}">${PAY_LABEL[p]||p}</span></div>`).join('');showPicker(picker,e.currentTarget);};
 window._pps=(id,pay)=>{const r=orders.find(o=>o.id===id);if(r){r.payment=pay;saveDB();render();}document.getElementById('pay-picker').style.display='none';};
 window._oe=(id)=>openEdit(id);
@@ -4437,12 +4546,13 @@ function renderOfficeQueue(officeOrders, name){
         <td style="text-align:center;color:var(--text2)">${r.qty||''}</td>
         <td style="${overdue?'color:var(--red);font-weight:700':'color:var(--text2)'}">${r.due?fmtDate(r.due):'—'}</td>
         <td style="font-weight:700">${fmtMoney(rowTotal(r))||''}</td>
+        <td style="text-align:center" onclick="event.stopPropagation()">${chatBtnHtml(r.customer,r.po)}</td>
         ${openCell}
       </tr>`;
     }).join('');
     return `<div style="margin:6px 0 18px">
       <div style="font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin:8px 12px;display:flex;align-items:center;gap:8px">${title} <span class="queue-count-pill">${list.length}</span></div>
-      <div class="table-scroll"><table class="q-table"><thead><tr><th>Customer</th><th>PO / Job / Part</th><th style="text-align:center">Qty</th><th>Due</th><th>Total</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="table-scroll"><table class="q-table"><thead><tr><th>Customer</th><th>PO / Job / Part</th><th style="text-align:center">Qty</th><th>Due</th><th>Total</th><th style="width:58px;text-align:center">Notes</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     </div>`;
   };
   body.innerHTML = head
@@ -4582,6 +4692,7 @@ function renderQueues(){
       <td>${stepChip}${r.part?`<b>${r.part}</b>`:''}${r.part&&r.desc?' · ':''}${r.desc||''}</td>
       ${assignCell}
       <td style="text-align:center">${drawCell}</td>
+      <td style="text-align:center">${chatBtnHtml(r.customer,r.po,(r.customer||'')+(r.po?(' · PO '+r.po):'')+(r.job?(' · Job '+r.job):''))}</td>
       <td style="${overdue&&!done?'color:var(--red);font-weight:600':''}">${dueTxt}</td>
       <td style="text-align:center">${needByCell}</td>
       <td style="text-align:center">${need||'—'}</td>
@@ -4602,6 +4713,7 @@ function renderQueues(){
       <th>Part Number / Description</th>
       <th style="width:130px">Assigned</th>
       <th style="width:72px;text-align:center">Drawing</th>
+      <th style="width:58px;text-align:center">Notes</th>
       <th style="width:96px">Due Date</th>
       <th style="width:110px;text-align:center">Need By</th>
       <th style="width:70px;text-align:center">Qty</th>
