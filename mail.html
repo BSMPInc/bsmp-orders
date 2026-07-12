@@ -202,6 +202,26 @@ body.sb-pinned .dock{left:var(--sb)}
 .login-card button{width:100%;height:42px;background:var(--accent);color:#fff;border:none;font-weight:800;font-size:14px}
 .login-err{color:var(--red);font-size:12px;min-height:16px;margin-bottom:6px}
 
+/* split inbox: list = one third, reading pane = the rest (wide screens) */
+@media (min-width:1000px){
+  #v-list{display:flex;flex-direction:column;height:calc(100vh - 84px);padding-bottom:calc(14px + var(--dock-h))}
+  .split{display:flex;gap:14px;flex:1;min-height:0;align-items:stretch}
+  .pane-list{width:34%;min-width:300px;max-width:440px;flex:none;display:flex;flex-direction:column;min-height:0}
+  .pane-list .card{flex:1;overflow-y:auto}
+  .pane-list .hint{flex:none}
+  .pane-read{flex:1;min-width:0;overflow-y:auto;min-height:0}
+  #v-convo.embedded{padding:0;max-width:none}
+  #v-convo.embedded #convo-back{display:none}
+  .pane-list .row{display:block;position:relative;padding:11px 14px 11px 24px}
+  .pane-list .row .who{width:auto;display:flex;gap:8px;align-items:baseline;padding-right:64px}
+  .pane-list .row .who .fr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pane-list .row .who .co{display:none}
+  .pane-list .row .mid{margin-top:2px}
+  .pane-list .row .end{position:absolute;top:11px;right:12px;flex-direction:row;align-items:center;gap:6px}
+  .pane-list .row .udot,.pane-list .row .rdot{position:absolute;left:9px;top:17px;margin-top:0}
+  .pane-list .row.sel{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+  .pane-list .row .sn{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+}
 @media (max-width:860px){
   .row .who{width:120px}
   .row .sn{white-space:normal}
@@ -267,13 +287,20 @@ body.sb-pinned .dock{left:var(--sb)}
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
       <div class="fchips" id="fchips"></div>
-      <div class="card" id="rows"><div class="empty"><i class="ti ti-mail-off"></i>No mail loaded yet</div></div>
-      <div class="hint" style="margin-top:8px">The <b>BOTH</b> tag = the same email landed in more than one mailbox — the app shows it once, so nobody answers it twice.</div>
+      <div class="split">
+        <div class="pane-list">
+          <div class="card" id="rows"><div class="empty"><i class="ti ti-mail-off"></i>No mail loaded yet</div></div>
+          <div class="hint" style="margin-top:8px">The <b>BOTH</b> tag = the same email landed in more than one mailbox — shown once, so nobody answers it twice.</div>
+        </div>
+        <div class="pane-read" id="read-pane">
+          <div class="empty" id="read-empty" style="padding-top:80px"><i class="ti ti-mail-opened"></i>Select an email to read it here</div>
+        </div>
+      </div>
     </div>
 
     <!-- ============ CONVERSATION ============ -->
     <div class="content" id="v-convo" style="display:none">
-      <div class="toolbar" style="margin-bottom:10px">
+      <div class="toolbar" id="convo-back" style="margin-bottom:10px">
         <button class="btn" onclick="backToList()"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg> Back</button>
       </div>
       <div class="page-head">
@@ -518,7 +545,7 @@ window.go=(page)=>{
   chipFilter='all';
   renderList();
 };
-window.backToList=()=>{ $('v-convo').style.display='none'; if(navPage!=='settings') $('v-list').style.display=''; CURRENT=null; };
+window.backToList=()=>{ CURRENT=null; placeConvo(); renderList(); };
 
 let boxFilter='';   // '' = all mailboxes, else one address
 window.setBox=(b)=>{ boxFilter=b; renderList(); };
@@ -579,7 +606,7 @@ window.renderList=()=>{
     const a=assignOf(t); const p=people.find(x=>x.k===a);
     const boxes=t.mailboxes||[];
     const mbx = boxes.length>1 ? `<span class="mbx both">BOTH</span>` : `<span class="mbx">${esc(boxTag(boxes[0]||''))}</span>`;
-    return `<div class="row${t.unread?' unread':''}" onclick="openThread('${esc(t.key)}')">
+    return `<div class="row${t.unread?' unread':''}${(CURRENT&&CURRENT.key===t.key)?' sel':''}" onclick="openThread('${esc(t.key)}')">
       <span class="${t.unread?'udot':'rdot'}"></span>
       <div class="who"><div class="fr">${esc(t.fromName||t.fromEmail||'—')}</div><div class="co">${esc(t.fromName?t.fromEmail:'')}</div></div>
       <div class="mid">
@@ -609,10 +636,31 @@ function fmtWhen(ms){
 }
 
 // ── conversation ──────────────────────────────────────────────────────────────
+function isWide(){ return window.matchMedia('(min-width:1000px)').matches; }
+function placeConvo(){
+  const convo=$('v-convo'), rp=$('read-pane');
+  if(isWide()){
+    if(convo.parentElement!==rp) rp.appendChild(convo);
+    convo.classList.add('embedded');
+    convo.style.display = CURRENT ? '' : 'none';
+    $('read-empty').style.display = CURRENT ? 'none' : '';
+    if(navPage!=='settings') $('v-list').style.display='';
+  } else {
+    const main=document.querySelector('main');
+    if(convo.parentElement===rp) main.appendChild(convo);
+    convo.classList.remove('embedded');
+    $('read-empty').style.display = '';
+    if(CURRENT && navPage!=='settings'){ $('v-list').style.display='none'; convo.style.display=''; }
+    else { convo.style.display='none'; if(navPage!=='settings') $('v-list').style.display=''; }
+  }
+}
+window.addEventListener('resize', placeConvo);
 window.openThread=async (key)=>{
   const t=THREADS.find(x=>x.key===key); if(!t) return;
   CURRENT=t;
-  $('v-list').style.display='none'; $('v-convo').style.display=''; window.scrollTo(0,0);
+  placeConvo();
+  if(isWide()){ $('read-pane').scrollTop=0; renderList(); }
+  else window.scrollTo(0,0);
   $('cv-subject').textContent=t.subject||'(no subject)';
   const boxes=(t.mailboxes||[]).map(boxTag).join(' + ');
   $('cv-sub').innerHTML=`${esc(t.fromName||t.fromEmail||'')}${t.mailboxes&&t.mailboxes.length>1?' · arrived in <b>both</b> mailboxes · shown once':' · '+esc(boxes)}`;
@@ -734,6 +782,7 @@ $('lg-btn').onclick=async ()=>{
 $('lg-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('lg-btn').click(); });
 
 let _listening=false;
+placeConvo();
 onAuthStateChanged(auth,(user)=>{
   if(user){
     if(isOperatorEmail(user.email)){ $('login').style.display='none'; $('app').classList.remove('on'); $('mail-dock').classList.remove('on'); showMgrLock(); return; }
