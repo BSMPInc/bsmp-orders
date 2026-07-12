@@ -289,13 +289,13 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
       <div class="set-card">
         <h3><i class="ti ti-plug"></i> Mail proxy</h3>
         <label>Proxy URL (Cloudflare Worker)</label>
-        <input id="set-proxy" placeholder="https://bsmp-mail.….workers.dev">
+        <input id="set-proxy" placeholder="https://bsmp-mail.….workers.dev" oninput="window._setChanged()">
         <div class="set-help">The mail proxy is a small Cloudflare Worker that holds the Google credentials and talks to Gmail — this app never sees the keys. Paste its address here once it's deployed.</div>
       </div>
       <div class="set-card">
         <h3><i class="ti ti-mailbox"></i> Mailboxes</h3>
         <label>Addresses (comma separated — must match the proxy's list)</label>
-        <input id="set-boxes" placeholder="info@bertsmp.com, sales@bertsmp.com">
+        <input id="set-boxes" placeholder="info@bertsmp.com, sales@bertsmp.com" oninput="window._setChanged()">
         <div class="set-help">Each address shows as a tag on the mail cards (INFO / SALES) and as a "Reply as" choice in the composer.</div>
       </div>
       <button class="btn primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save settings</button>
@@ -624,18 +624,27 @@ window.sendCompose=async ()=>{
 
 // ── settings ──────────────────────────────────────────────────────────────────
 function renderSettings(){
+  // don't stomp on the user's typing — settings auto-save as they type
+  const ae=document.activeElement && document.activeElement.id;
+  if(ae==='set-proxy'||ae==='set-boxes') return;
   $('set-proxy').value=SETTINGS.proxyUrl||'';
   $('set-boxes').value=(SETTINGS.mailboxes||[]).join(', ');
-  $('set-status').textContent='';
 }
-window.saveSettings=async ()=>{
+let _setTimer=null;
+window._setChanged=()=>{
+  $('set-status').textContent='Saving…';
+  clearTimeout(_setTimer);
+  _setTimer=setTimeout(()=>window.saveSettings(true), 900);
+};
+window.saveSettings=async (auto)=>{
+  clearTimeout(_setTimer);
   const proxyUrl=($('set-proxy').value||'').trim();
   const mailboxes=($('set-boxes').value||'').split(',').map(s=>s.trim()).filter(Boolean);
   try{
     await set(ref(db,'mail/settings'), {proxyUrl, mailboxes});
     $('set-status').textContent='Saved ✓';
-    toast('Settings saved');
-  }catch(e){ toast('Could not save — is the mail rule published?',true); }
+    if(!auto) toast('Settings saved');
+  }catch(e){ $('set-status').textContent='Save failed'; toast('Could not save — is the mail rule published?',true); }
 };
 
 // ── auth + listeners ──────────────────────────────────────────────────────────
