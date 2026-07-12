@@ -106,6 +106,8 @@ body.sb-pinned .dock{left:var(--sb)}
 
 /* status badges */
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:2px 8px;white-space:nowrap;text-transform:uppercase}
+.badge.iconly{padding:3px 7px;font-size:13px;line-height:1}
+.badge.iconly i{font-size:14px}
 .badge.rfq{background:var(--amber-soft);color:var(--amber)}
 .badge.quoted{background:var(--blue-soft);color:var(--blue)}
 .badge.waiting{background:var(--purple-soft);color:var(--purple)}
@@ -450,13 +452,13 @@ function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast s
 
 // ── state ─────────────────────────────────────────────────────────────────────
 const FLAG_DEFS=[
-  {k:'rfq',     label:'RFQ'},
-  {k:'quoted',  label:'Quote submitted'},
-  {k:'waiting', label:'Waiting'},
-  {k:'won',     label:'Won'},
-  {k:'lost',    label:'Lost'},
-  {k:'cert',    label:'Cert'},
-  {k:'invoice', label:'Invoice'},
+  {k:'rfq',     label:'RFQ',             icon:'flag'},
+  {k:'quoted',  label:'Quote submitted', icon:'send'},
+  {k:'waiting', label:'Waiting on customer', icon:'clock'},
+  {k:'won',     label:'Won',             icon:'trophy'},
+  {k:'lost',    label:'Lost',            icon:'circle-x'},
+  {k:'cert',    label:'Cert',            icon:'certificate'},
+  {k:'invoice', label:'Invoice',         icon:'file-dollar'},
 ];
 let SETTINGS={proxyUrl:'', mailboxes:['info@bertsmp.com']};
 let FLAGS={};                 // mail/threads/<key> → {flag, assignee, by, at}
@@ -582,7 +584,7 @@ window.renderList=()=>{
   $('fchips').innerHTML =
     `<span class="fchip${chipFilter==='all'?' on':''}" onclick="setChip('all')">All <span class="n">${counts.all}</span></span>`+
     FLAG_DEFS.filter(f=>counts[f.k]>0||chipFilter===f.k).map(f=>
-      `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')">${f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
+      `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')"><i class="ti ti-${f.icon}" style="font-size:14px"></i>${f.label==='Waiting on customer'?'Waiting':f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
     `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`;
 
   const list=visibleThreads();
@@ -612,7 +614,7 @@ window.renderList=()=>{
       <div class="mid">
         <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
         <div class="sn">${esc(t.snippet||'')}</div>
-        <div class="meta">${fd?`<span class="badge ${fd.k}">${fd.label}</span>`:'<span class="hint">no flag</span>'}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
+        <div class="meta">${fd?`<span class="badge iconly ${fd.k}" title="${fd.label}"><i class="ti ti-${fd.icon}"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
       </div>
       <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
     </div>`;
