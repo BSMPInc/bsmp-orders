@@ -70,8 +70,7 @@ export default {
       if (url.pathname === '/attachment' && request.method === 'GET') {
         const box = url.searchParams.get('box'), msg = url.searchParams.get('msg'), id = url.searchParams.get('id');
         const mime = url.searchParams.get('mime') || 'application/octet-stream';
-        const name = (url.searchParams.get('name') || 'attachment').replace(/["
-]/g, '');
+        const name = (url.searchParams.get('name') || 'attachment').replace(/["\r\n]/g, '');
         if (!mailboxes.includes(box) || !msg || !id) return json({ error: 'bad params' }, 400);
         const att = await gmail(env, box, `messages/${encodeURIComponent(msg)}/attachments/${encodeURIComponent(id)}`);
         const bytes = b64urlToBytes(att.data || '');
