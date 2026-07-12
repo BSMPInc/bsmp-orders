@@ -243,7 +243,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
       <div class="toolbar">
         <button class="btn primary" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
         <span class="fchips" id="mbxpick" style="margin:0" title="Show one mailbox at a time"></span>
-        <input class="search" id="search" placeholder="Search — Enter searches all mail history…" oninput="renderList()" onkeydown="if(event.key==='Enter')window.searchAll()">
+        <input class="search" id="search" placeholder="Search — Enter searches all mail history…" oninput="window.searchInput()" onkeydown="if(event.key==='Enter')window.searchAll()">
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
       <div class="fchips" id="fchips"></div>
@@ -426,6 +426,11 @@ async function api(path, opts){
 
 let _searchQ='';   // non-empty → the list shows a full-history Gmail search
 window.searchAll=()=>{ _searchQ=($('search').value||'').trim(); loadThreads(true, _searchQ); };
+window.searchInput=()=>{
+  // clearing the box automatically leaves search mode and reloads the inbox
+  if(!($('search').value||'').trim() && _searchQ){ _searchQ=''; loadThreads(false); return; }
+  renderList();
+};
 window.loadThreads=async (manual, q)=>{
   if(q===undefined) q=_searchQ;
   const btn=$('refresh-btn');
@@ -487,8 +492,10 @@ function visibleThreads(){
     if(chipFilter==='none') list=list.filter(t=>!flagOf(t));
     else list=list.filter(t=>flagOf(t)===chipFilter);
   }
+  // local typing filter — but NOT on top of an all-history Gmail search:
+  // Gmail matches inside message bodies, which the card text can't see.
   const q=($('search').value||'').toLowerCase();
-  if(q) list=list.filter(t=>[t.subject,t.fromName,t.fromEmail,t.snippet].join(' ').toLowerCase().includes(q));
+  if(q && !_searchQ) list=list.filter(t=>[t.subject,t.fromName,t.fromEmail,t.snippet].join(' ').toLowerCase().includes(q));
   return list;
 }
 window.renderList=()=>{
