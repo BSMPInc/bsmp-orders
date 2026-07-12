@@ -150,11 +150,14 @@ body.sb-pinned .dock{left:var(--sb)}
 .searchmore .key{font-size:10.5px;font-weight:800;border:1px solid var(--accent);border-radius:5px;padding:1px 7px}
 
 /* conversation view */
-.page-head{margin-bottom:14px}
+.page-head{margin-bottom:10px}
+.page-head h2{font-size:18px}
+.page-head p{max-width:none}
 .page-head p{margin:3px 0 0;font-size:12.5px;color:var(--text2)}
-.convo-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.convo-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
 .statuspick{display:flex;gap:5px;flex-wrap:wrap}
-.spill{padding:4px 10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;background:#fff;border:1px solid var(--border);color:var(--text3);cursor:pointer}
+.spill{padding:6px 9px;font-size:15px;line-height:1;background:#fff;border:1px solid var(--border);color:var(--text3);cursor:pointer;display:inline-flex;align-items:center}
+.spill i{font-size:15px}
 .spill:hover{border-color:var(--border2);color:var(--text)}
 .spill.on-rfq{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
 .spill.on-quoted{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
@@ -322,16 +325,14 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="toolbar" id="convo-back" style="margin-bottom:10px">
         <button class="btn" onclick="backToList()"><svg class="i" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></svg> Back</button>
       </div>
+      <div class="convo-top">
+        <span class="statuspick" id="statuspick"></span>
+        <span class="sp"></span>
+        <button class="btn sm" id="assignee-btn" title="Assigned to — click to change" onclick="cycleAssign()"></button>
+      </div>
       <div class="page-head">
         <h2 id="cv-subject"></h2>
         <p id="cv-sub"></p>
-      </div>
-      <div class="convo-top">
-        <span class="hint" style="font-weight:700">Flag:</span>
-        <span class="statuspick" id="statuspick"></span>
-        <span class="sp"></span>
-        <span class="hint" style="font-weight:700">Assigned:</span>
-        <button class="btn sm" id="assignee-btn" onclick="cycleAssign()"></button>
       </div>
       <div class="card">
         <div class="reply">
@@ -727,7 +728,7 @@ window.openThread=async (key)=>{
 };
 function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
-  $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" onclick="setFlag('${f.k}')">${f.label}</span>`).join('');
+  $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')"><i class="ti ti-${f.icon}"></i></span>`).join('');
 }
 window.setFlag=(k)=>{
   if(!CURRENT) return;
