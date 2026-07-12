@@ -242,6 +242,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
       </div>
       <div class="toolbar">
         <button class="btn primary" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
+        <span class="fchips" id="mbxpick" style="margin:0" title="Show one mailbox at a time"></span>
         <input class="search" id="search" placeholder="Search — Enter searches all mail history…" oninput="renderList()" onkeydown="if(event.key==='Enter')window.searchAll()">
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
@@ -468,9 +469,20 @@ window.go=(page)=>{
 };
 window.backToList=()=>{ $('v-convo').style.display='none'; if(navPage!=='settings') $('v-list').style.display=''; CURRENT=null; };
 
+let boxFilter='';   // '' = all mailboxes, else one address
+window.setBox=(b)=>{ boxFilter=b; renderList(); };
+function renderBoxPick(){
+  const el=$('mbxpick'); if(!el) return;
+  const boxes=SETTINGS.mailboxes||[];
+  if(boxes.length<2){ el.innerHTML=''; if(boxFilter){boxFilter='';} return; }
+  if(boxFilter && !boxes.includes(boxFilter)) boxFilter='';
+  el.innerHTML=[{k:'',l:'All mail'}].concat(boxes.map(a=>({k:a,l:boxTag(a)})))
+    .map(o=>`<span class="fchip${boxFilter===o.k?' on':''}" onclick="setBox('${o.k.replace(/'/g,"\\'")}')">${esc(o.l)}</span>`).join('');
+}
 function visibleThreads(){
   const m=NAV_META[navPage]||NAV_META.inbox;
   let list=THREADS.filter(m[2]);
+  if(boxFilter) list=list.filter(t=>(t.mailboxes||[]).includes(boxFilter));
   if(chipFilter!=='all'){
     if(chipFilter==='none') list=list.filter(t=>!flagOf(t));
     else list=list.filter(t=>flagOf(t)===chipFilter);
@@ -480,9 +492,11 @@ function visibleThreads(){
   return list;
 }
 window.renderList=()=>{
-  // filter chips with live counts (within the current nav page)
+  renderBoxPick();
+  // filter chips with live counts (within the current nav page + mailbox pick)
   const m=NAV_META[navPage]||NAV_META.inbox;
-  const base=THREADS.filter(m[2]);
+  let base=THREADS.filter(m[2]);
+  if(boxFilter) base=base.filter(t=>(t.mailboxes||[]).includes(boxFilter));
   const counts={all:base.length, none:base.filter(t=>!flagOf(t)).length};
   FLAG_DEFS.forEach(f=>counts[f.k]=base.filter(t=>flagOf(t)===f.k).length);
   $('fchips').innerHTML =
