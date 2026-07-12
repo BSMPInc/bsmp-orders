@@ -171,7 +171,8 @@ body.sb-pinned .dock{left:var(--sb)}
 .msg .mh .d{margin-left:auto;font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums}
 .msg .body{font-size:13.5px;color:var(--text);max-width:70ch;white-space:pre-wrap;word-break:break-word}
 .att{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;background:var(--bg);border:1px solid var(--border);margin-top:8px;margin-right:6px}
-.reply{padding:14px 16px;background:#fbfaf6;border-top:1px solid var(--border)}
+.reply{padding:14px 16px;background:#fbfaf6;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;box-shadow:0 4px 10px -6px rgba(16,24,40,.15)}
+#v-convo:not(.embedded) .reply{top:84px}
 .reply .fromline{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text2);margin-bottom:8px;flex-wrap:wrap}
 .reply select{height:30px;border:1px solid var(--border2);background:#fff;padding:0 8px;font-size:12.5px}
 .reply textarea{width:100%;min-height:88px;padding:10px 12px;border:1px solid var(--border2);background:#fff;resize:vertical;outline:none;font-size:13.5px}
@@ -333,7 +334,6 @@ body.sb-pinned .dock{left:var(--sb)}
         <button class="btn sm" id="assignee-btn" onclick="cycleAssign()"></button>
       </div>
       <div class="card">
-        <div id="cv-msgs"></div>
         <div class="reply">
           <div class="fromline">
             Reply as
@@ -346,6 +346,8 @@ body.sb-pinned .dock{left:var(--sb)}
             <span class="hint" id="reply-hint"></span>
           </div>
         </div>
+        <div id="cv-msgs"></div>
+        
       </div>
     </div>
 
