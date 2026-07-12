@@ -137,6 +137,12 @@ body.sb-pinned .dock{left:var(--sb)}
 .row .dt{font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap}
 .udot{width:8px;height:8px;border-radius:50%;background:var(--spark);flex:none;margin-top:6px}
 .rdot{width:8px;flex:none}
+.loadmore{padding:12px;text-align:center;font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:7px}
+.loadmore:hover{background:var(--accent-soft)}
+.loadmore.end{color:var(--text3);cursor:default;font-weight:600}
+.loadmore.end:hover{background:none}
+.nt-spin{display:inline-block;animation:mailspin 1s linear infinite}
+@keyframes mailspin{to{transform:rotate(360deg)}}
 .empty{padding:40px 20px;text-align:center;color:var(--text3);font-size:13px}
 .empty i{font-size:30px;display:block;margin-bottom:8px}
 .searchmore{display:flex;align-items:center;gap:9px;padding:11px 16px;background:var(--accent-soft);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;border-bottom:1px solid var(--border)}
@@ -498,6 +504,8 @@ async function api(path, opts){
   return r.json();
 }
 
+let NEXT={};       // per-mailbox Gmail page tokens for "Load older"
+let _loadingOlder=false;
 let _searchQ='';   // non-empty → the list shows a full-history Gmail search
 window.searchAll=()=>{ _searchQ=($('search').value||'').trim(); loadThreads(true, _searchQ); };
 window.searchInput=()=>{
@@ -511,7 +519,8 @@ window.loadThreads=async (manual, q)=>{
   try{
     setLive('busy', q?'Searching all mail…':'Checking mail…'); if(btn) btn.disabled=true;
     const data=await api('/threads'+(q?('?q='+encodeURIComponent(q)):''));
-    THREADS=(data.threads||[]);
+    THREADS=(data.threads||[]).sort((a,b)=>b.date-a.date);
+    NEXT=data.next||{};
     $('connect-banner').style.display='none';
     setLive('ok','Live');
     renderList(); renderNavCounts();
@@ -520,6 +529,20 @@ window.loadThreads=async (manual, q)=>{
     if(e.notConnected){ $('connect-banner').style.display='flex'; setLive('err','Not connected'); }
     else { setLive('err','Mail offline'); if(manual) toast(e.message,true); console.warn(e); }
   }finally{ if(btn) btn.disabled=false; }
+};
+window.loadOlder=async ()=>{
+  if(_loadingOlder || !Object.keys(NEXT).length) return;
+  _loadingOlder=true; renderList();
+  try{
+    const q=_searchQ?('&q='+encodeURIComponent(_searchQ)):'';
+    const data=await api('/threads?tokens='+encodeURIComponent(JSON.stringify(NEXT))+q);
+    const seen=new Set(THREADS.map(t=>t.key));
+    (data.threads||[]).forEach(t=>{ if(!seen.has(t.key)) THREADS.push(t); });
+    THREADS.sort((a,b)=>b.date-a.date);
+    NEXT=data.next||{};
+  }catch(e){ toast(e.message,true); }
+  _loadingOlder=false;
+  renderList(); renderNavCounts();
 };
 function startPolling(){ clearInterval(_pollTimer); _pollTimer=setInterval(()=>{ if(SETTINGS.proxyUrl && !_searchQ && document.visibilityState==='visible') loadThreads(false); }, 120000); }
 
@@ -618,8 +641,14 @@ window.renderList=()=>{
       </div>
       <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
     </div>`;
-  }).join('');
+  }).join('') + loadMoreHtml();
 };
+function loadMoreHtml(){
+  if(_loadingOlder) return '<div class="loadmore end"><i class="ti ti-loader-2 nt-spin"></i> Loading older mail…</div>';
+  if(Object.keys(NEXT).length) return '<div class="loadmore" onclick="window.loadOlder()"><i class="ti ti-arrow-down"></i> Load older emails</div>';
+  if(THREADS.length) return '<div class="loadmore end">Beginning of the mailbox — nothing older</div>';
+  return '';
+}
 window.setChip=(k)=>{ chipFilter=k; renderList(); };
 function renderNavCounts(){
   const un=THREADS.filter(t=>t.unread).length;

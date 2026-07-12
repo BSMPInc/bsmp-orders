@@ -49,8 +49,10 @@ export default {
       if (!mailboxes.length) return json({ error: 'MAILBOXES not configured' }, 500);
 
       if (url.pathname === '/threads' && request.method === 'GET') {
-        // no q → recent working set (6 months); q → search the ENTIRE mailbox history
-        return json(await listThreads(env, mailboxes, url.searchParams.get('q') || ''));
+        // q → search the ENTIRE mailbox history; tokens → page further back
+        let tokens = {};
+        try { tokens = JSON.parse(url.searchParams.get('tokens') || '{}'); } catch { /* fresh load */ }
+        return json(await listThreads(env, mailboxes, url.searchParams.get('q') || '', tokens));
       }
       if (url.pathname === '/thread' && request.method === 'GET') {
         const box = url.searchParams.get('box'), id = url.searchParams.get('id');
@@ -169,12 +171,17 @@ async function gmailBatch(env, mailbox, paths) {
 // ── /threads: recent mail from every box (or full-history search), deduped ──
 // The default inbox view skips Gmail's promotional/social/forum categories;
 // an explicit search (q) still looks through EVERYTHING.
-async function listThreads(env, mailboxes, q) {
+async function listThreads(env, mailboxes, q, tokens) {
   const query = q
     ? q + ' -in:spam -in:trash'
-    : '-in:spam -in:trash -category:promotions -category:social -category:forums newer_than:180d';
+    : '-in:spam -in:trash -category:promotions -category:social -category:forums';
+  const paging = tokens && Object.keys(tokens).length > 0;
+  const next = {};
   const perBox = await Promise.all(mailboxes.map(async (box) => {
-    const list = await gmail(env, box, 'threads?maxResults=100&q=' + encodeURIComponent(query));
+    if (paging && !tokens[box]) return { box, threads: [] };   // this box is exhausted
+    const pt = paging ? '&pageToken=' + encodeURIComponent(tokens[box]) : '';
+    const list = await gmail(env, box, 'threads?maxResults=100&q=' + encodeURIComponent(query) + pt);
+    if (list.nextPageToken) next[box] = list.nextPageToken;
     const metas = await gmailBatch(env, box, (list.threads || []).map(t =>
       `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`));
     return { box, threads: metas.filter(Boolean) };
@@ -207,7 +214,7 @@ async function listThreads(env, mailboxes, q) {
     }
   }
   const threads = [...merged.values()].sort((a, b) => b.date - a.date);
-  return { threads };
+  return { threads, next };
 }
 
 // ── /thread: full conversation from one mailbox ─────────────────────────────
