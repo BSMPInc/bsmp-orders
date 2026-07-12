@@ -700,7 +700,7 @@ function placeConvo(){
   }
 }
 window.addEventListener('resize', placeConvo);
-const MSG_HTML_WRAP = '<base target="_blank"><style>body{font-family:'Hanken Grotesk',system-ui,-apple-system,sans-serif;font-size:13.5px;color:#23262b;margin:0;line-height:1.5;word-break:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style>';
+const MSG_HTML_WRAP = '<base target="_blank"><style>body{font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;font-size:13.5px;color:#23262b;margin:0;line-height:1.5;word-break:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style>';
 function msgBodyHtml(m){
   if(m.bodyHtml){
     const doc=(MSG_HTML_WRAP+m.bodyHtml).replace(/"/g,'&quot;');
