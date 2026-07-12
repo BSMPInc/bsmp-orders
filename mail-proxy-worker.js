@@ -227,7 +227,8 @@ async function getThread(env, box, id) {
       id: m.id, fromName: from.name, fromEmail: from.email,
       to: splitAddrs(h('To')).concat(splitAddrs(h('Cc'))),
       date: Number(m.internalDate || 0), snippet: decodeEntities(m.snippet || ''),
-      bodyText: extractText(m.payload), attachments: listAttachments(m.payload),
+      bodyText: extractText(m.payload), bodyHtml: sanitizeHtml(extractHtml(m.payload)),
+      attachments: listAttachments(m.payload),
     };
   });
   return { messages };
@@ -285,6 +286,24 @@ function listAttachments(payload, out) {
   if (payload.filename) out.push({ filename: payload.filename, size: (payload.body && payload.body.size) || 0 });
   (payload.parts || []).forEach(p => listAttachments(p, out));
   return out;
+}
+function extractHtml(payload) {
+  if (!payload) return '';
+  if (payload.mimeType === 'text/html' && payload.body && payload.body.data) return b64urlDecode(payload.body.data);
+  if (payload.parts) {
+    for (const p of payload.parts) { const h = extractHtml(p); if (h) return h; }
+  }
+  return '';
+}
+function sanitizeHtml(h) {
+  if (!h) return '';
+  return h
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<meta[^>]*http-equiv[^>]*>/gi, '')
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript:/gi, '');
 }
 function extractText(payload) {
   if (!payload) return '';
