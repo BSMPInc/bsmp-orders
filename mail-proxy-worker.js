@@ -167,8 +167,12 @@ async function gmailBatch(env, mailbox, paths) {
 }
 
 // ── /threads: recent mail from every box (or full-history search), deduped ──
+// The default inbox view skips Gmail's promotional/social/forum categories;
+// an explicit search (q) still looks through EVERYTHING.
 async function listThreads(env, mailboxes, q) {
-  const query = q ? q + ' -in:spam -in:trash' : '-in:spam -in:trash newer_than:180d';
+  const query = q
+    ? q + ' -in:spam -in:trash'
+    : '-in:spam -in:trash -category:promotions -category:social -category:forums newer_than:180d';
   const perBox = await Promise.all(mailboxes.map(async (box) => {
     const list = await gmail(env, box, 'threads?maxResults=100&q=' + encodeURIComponent(query));
     const metas = await gmailBatch(env, box, (list.threads || []).map(t =>
