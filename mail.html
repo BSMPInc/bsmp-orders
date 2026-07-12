@@ -217,7 +217,11 @@ body.sb-pinned .dock{left:var(--sb)}
 
 /* split inbox: list = one third, reading pane = the rest (wide screens) */
 @media (min-width:1000px){
-  #v-list{display:flex;flex-direction:column;flex:none;height:calc(100vh - 84px);padding-bottom:calc(14px + var(--dock-h))}
+  #v-list{display:flex;flex-direction:column;flex:none;height:calc(100vh - 84px);padding:12px 22px calc(14px + var(--dock-h))}
+  .pane-list .toolbar{margin-bottom:8px;gap:6px}
+  .pane-list .search{min-width:120px}
+  .pane-list .fchips{margin-bottom:8px}
+  .pane-list .connect-banner{margin-bottom:10px}
   .split{display:flex;gap:14px;flex:1;min-height:0;align-items:stretch}
   .pane-list{width:34%;min-width:300px;max-width:440px;flex:none;display:flex;flex-direction:column;min-height:0}
   .pane-list .card{flex:1;overflow-y:auto}
@@ -298,7 +302,9 @@ body.sb-pinned .dock{left:var(--sb)}
 
     <!-- ============ INBOX LIST ============ -->
     <div class="content" id="v-list">
-      <div id="connect-banner" class="connect-banner" style="display:none">
+      <div class="split">
+        <div class="pane-list">
+          <div id="connect-banner" class="connect-banner" style="display:none">
         <i class="ti ti-plug-connected-x"></i>
         <div><b>Mail isn't connected yet</b>
         The app is ready, but it can't read the mailboxes until the Google setup is finished and the mail proxy address is saved in <span style="text-decoration:underline;cursor:pointer;font-weight:700" onclick="go('settings')">Settings</span>. Flags and this screen will come alive the moment that's done.</div>
@@ -310,9 +316,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
       <div class="fchips" id="fchips"></div>
-      <div class="split">
-        <div class="pane-list">
-          <div class="card" id="rows"><div class="empty"><i class="ti ti-mail-off"></i>No mail loaded yet</div></div>
+      <div class="card" id="rows"><div class="empty"><i class="ti ti-mail-off"></i>No mail loaded yet</div></div>
           <div class="hint" style="margin-top:8px">The <b>BOTH</b> tag = the same email landed in more than one mailbox — shown once, so nobody answers it twice.</div>
         </div>
         <div class="pane-read" id="read-pane">
