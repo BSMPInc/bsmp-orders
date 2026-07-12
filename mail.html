@@ -242,7 +242,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
       </div>
       <div class="toolbar">
         <button class="btn primary" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
-        <input class="search" id="search" placeholder="Search mail — customer, part, PO, job…" oninput="renderList()">
+        <input class="search" id="search" placeholder="Search — Enter searches all mail history…" oninput="renderList()" onkeydown="if(event.key==='Enter')window.searchAll()">
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
       <div class="fchips" id="fchips"></div>
@@ -423,11 +423,14 @@ async function api(path, opts){
   return r.json();
 }
 
-window.loadThreads=async (manual)=>{
+let _searchQ='';   // non-empty → the list shows a full-history Gmail search
+window.searchAll=()=>{ _searchQ=($('search').value||'').trim(); loadThreads(true, _searchQ); };
+window.loadThreads=async (manual, q)=>{
+  if(q===undefined) q=_searchQ;
   const btn=$('refresh-btn');
   try{
-    setLive('busy','Checking mail…'); if(btn) btn.disabled=true;
-    const data=await api('/threads');
+    setLive('busy', q?'Searching all mail…':'Checking mail…'); if(btn) btn.disabled=true;
+    const data=await api('/threads'+(q?('?q='+encodeURIComponent(q)):''));
     THREADS=(data.threads||[]);
     $('connect-banner').style.display='none';
     setLive('ok','Live');
@@ -438,7 +441,7 @@ window.loadThreads=async (manual)=>{
     else { setLive('err','Mail offline'); if(manual) toast(e.message,true); console.warn(e); }
   }finally{ if(btn) btn.disabled=false; }
 };
-function startPolling(){ clearInterval(_pollTimer); _pollTimer=setInterval(()=>{ if(SETTINGS.proxyUrl && document.visibilityState==='visible') loadThreads(false); }, 120000); }
+function startPolling(){ clearInterval(_pollTimer); _pollTimer=setInterval(()=>{ if(SETTINGS.proxyUrl && !_searchQ && document.visibilityState==='visible') loadThreads(false); }, 120000); }
 
 // ── rendering ─────────────────────────────────────────────────────────────────
 const NAV_META={
@@ -490,7 +493,8 @@ window.renderList=()=>{
 
   const list=visibleThreads();
   const unread=list.filter(t=>t.unread).length;
-  $('list-count').textContent=list.length?`${list.length} conversation${list.length!==1?'s':''}${unread?` · ${unread} unread`:''}`:'';
+  const base_txt=list.length?`${list.length} conversation${list.length!==1?'s':''}${unread?` · ${unread} unread`:''}`:'';
+  $('list-count').textContent=_searchQ?`all-history results for “${_searchQ}”${base_txt?' · '+base_txt:''}`:base_txt;
   const rows=$('rows');
   if(!list.length){
     rows.innerHTML=`<div class="empty"><i class="ti ti-mail-off"></i>${THREADS.length?'Nothing matches this view':'No mail loaded yet'}</div>`;

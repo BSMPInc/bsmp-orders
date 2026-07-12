@@ -49,7 +49,8 @@ export default {
       if (!mailboxes.length) return json({ error: 'MAILBOXES not configured' }, 500);
 
       if (url.pathname === '/threads' && request.method === 'GET') {
-        return json(await listThreads(env, mailboxes));
+        // no q → recent working set (6 months); q → search the ENTIRE mailbox history
+        return json(await listThreads(env, mailboxes, url.searchParams.get('q') || ''));
       }
       if (url.pathname === '/thread' && request.method === 'GET') {
         const box = url.searchParams.get('box'), id = url.searchParams.get('id');
@@ -138,14 +139,41 @@ async function gmail(env, mailbox, path, method = 'GET', body = null) {
   return r.json();
 }
 
-// ── /threads: recent mail from every box, deduped by Message-ID ─────────────
-async function listThreads(env, mailboxes) {
+// ── Gmail batch endpoint: up to 100 thread fetches in ONE HTTP call ─────────
+// (keeps us far under Cloudflare's subrequest cap and makes refreshes fast)
+async function gmailBatch(env, mailbox, paths) {
+  if (!paths.length) return [];
+  const tok = await gToken(env, mailbox);
+  const boundary = 'batch_bsmp_' + Math.random().toString(36).slice(2);
+  const body = paths.map((p, i) =>
+    `--${boundary}\r\nContent-Type: application/http\r\nContent-ID: <item${i}>\r\n\r\nGET /gmail/v1/users/${encodeURIComponent(mailbox)}/${p} HTTP/1.1\r\n\r\n`
+  ).join('') + `--${boundary}--`;
+  const r = await fetch('https://gmail.googleapis.com/batch/gmail/v1', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'multipart/mixed; boundary=' + boundary },
+    body,
+  });
+  if (!r.ok) throw new Error('Gmail batch → ' + r.status + ': ' + (await r.text()).slice(0, 200));
+  const ctBoundary = (/boundary=("?)([^";]+)\1/.exec(r.headers.get('Content-Type') || '') || [])[2];
+  if (!ctBoundary) throw new Error('Gmail batch: missing response boundary');
+  const out = new Array(paths.length).fill(null);
+  for (const part of (await r.text()).split('--' + ctBoundary).slice(1, -1)) {
+    const idm = /Content-ID:\s*<?response-item(\d+)/i.exec(part);
+    const start = part.indexOf('{');
+    if (!idm || start < 0) continue;
+    try { out[Number(idm[1])] = JSON.parse(part.slice(start, part.lastIndexOf('}') + 1)); } catch { /* skip bad part */ }
+  }
+  return out;
+}
+
+// ── /threads: recent mail from every box (or full-history search), deduped ──
+async function listThreads(env, mailboxes, q) {
+  const query = q ? q + ' -in:spam -in:trash' : '-in:spam -in:trash newer_than:180d';
   const perBox = await Promise.all(mailboxes.map(async (box) => {
-    const list = await gmail(env, box, 'threads?maxResults=40&q=' + encodeURIComponent('-in:spam -in:trash newer_than:60d'));
-    const threads = await Promise.all((list.threads || []).map(t =>
-      gmail(env, box, `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`)
-        .catch(() => null)));
-    return { box, threads: threads.filter(Boolean) };
+    const list = await gmail(env, box, 'threads?maxResults=100&q=' + encodeURIComponent(query));
+    const metas = await gmailBatch(env, box, (list.threads || []).map(t =>
+      `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`));
+    return { box, threads: metas.filter(Boolean) };
   }));
 
   const merged = new Map();
