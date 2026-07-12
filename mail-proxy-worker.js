@@ -67,6 +67,17 @@ export default {
             : null));
         return json({ ok: true });
       }
+      if (url.pathname === '/attachment' && request.method === 'GET') {
+        const box = url.searchParams.get('box'), msg = url.searchParams.get('msg'), id = url.searchParams.get('id');
+        const mime = url.searchParams.get('mime') || 'application/octet-stream';
+        const name = (url.searchParams.get('name') || 'attachment').replace(/["
+]/g, '');
+        if (!mailboxes.includes(box) || !msg || !id) return json({ error: 'bad params' }, 400);
+        const att = await gmail(env, box, `messages/${encodeURIComponent(msg)}/attachments/${encodeURIComponent(id)}`);
+        const bytes = b64urlToBytes(att.data || '');
+        return new Response(bytes, { headers: { ...cors, 'Content-Type': mime,
+          'Content-Disposition': `inline; filename="${name}"`, 'Cache-Control': 'private, max-age=3600' } });
+      }
       if (url.pathname === '/send' && request.method === 'POST') {
         const p = await request.json();
         if (!mailboxes.includes(p.replyAs)) return json({ error: 'bad replyAs' }, 400);
@@ -283,7 +294,12 @@ function hasAttachment(payload) {
 function listAttachments(payload, out) {
   out = out || [];
   if (!payload) return out;
-  if (payload.filename) out.push({ filename: payload.filename, size: (payload.body && payload.body.size) || 0 });
+  if (payload.filename) out.push({
+    filename: payload.filename,
+    size: (payload.body && payload.body.size) || 0,
+    mime: payload.mimeType || 'application/octet-stream',
+    id: (payload.body && payload.body.attachmentId) || '',
+  });
   (payload.parts || []).forEach(p => listAttachments(p, out));
   return out;
 }
@@ -319,6 +335,13 @@ function extractText(payload) {
       .replace(/\n{3,}/g, '\n\n').trim();
   }
   return '';
+}
+function b64urlToBytes(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const b = atob(s);
+  const a = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
+  return a;
 }
 function b64urlDecode(s) {
   s = s.replace(/-/g, '+').replace(/_/g, '/');

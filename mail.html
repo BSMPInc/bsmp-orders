@@ -175,6 +175,10 @@ body.sb-pinned .dock{left:var(--sb)}
 .msg .body{font-size:13.5px;color:var(--text);max-width:70ch;white-space:pre-wrap;word-break:break-word}
 .msg-html{width:100%;border:none;display:block;background:#fff;min-height:60px}
 .att{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;background:var(--bg);border:1px solid var(--border);margin-top:8px;margin-right:6px}
+.att.clickable{cursor:pointer}
+.att.clickable:hover{border-color:var(--accent);color:var(--accent)}
+.att-dl{margin-left:4px;font-size:14px;opacity:.55;padding:2px}
+.att-dl:hover{opacity:1}
 .reply{padding:14px 16px;background:#fbfaf6;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:5;box-shadow:0 4px 10px -6px rgba(16,24,40,.15)}
 #v-convo:not(.embedded) .reply{top:84px}
 .reply .fromline{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text2);margin-bottom:8px;flex-wrap:wrap}
@@ -704,6 +708,23 @@ function placeConvo(){
   }
 }
 window.addEventListener('resize', placeConvo);
+window.attClick=(el,dl)=>{
+  const d=el.dataset;
+  const w = dl ? null : window.open('about:blank','_blank');   // open now, fill after fetch
+  _fetchAttachment(d, dl, w);
+};
+async function _fetchAttachment(d, dl, w){
+  try{
+    const tok=await auth.currentUser.getIdToken();
+    const r=await fetch(SETTINGS.proxyUrl.replace(/\/+$/,'')+'/attachment?box='+encodeURIComponent(d.box)+'&msg='+encodeURIComponent(d.msg)+'&id='+encodeURIComponent(d.att)+'&mime='+encodeURIComponent(d.mime)+'&name='+encodeURIComponent(d.name),{headers:{Authorization:'Bearer '+tok}});
+    if(!r.ok) throw new Error('Attachment error '+r.status);
+    const blob=await r.blob();
+    const u=URL.createObjectURL(blob);
+    if(w && !w.closed){ w.location=u; }
+    else { const a=document.createElement('a'); a.href=u; a.download=d.name||'attachment'; document.body.appendChild(a); a.click(); a.remove(); }
+    setTimeout(()=>URL.revokeObjectURL(u), 120000);
+  }catch(e){ if(w) try{w.close();}catch(_){} toast(e.message,true); }
+}
 const MSG_HTML_WRAP = '<base target="_blank"><style>body{font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;font-size:13.5px;color:#23262b;margin:0;line-height:1.5;word-break:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style>';
 function msgBodyHtml(m){
   if(m.bodyHtml){
@@ -732,7 +753,9 @@ window.openThread=async (key)=>{
       <div class="msg">
         <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
         ${msgBodyHtml(m)}
-        ${(m.attachments||[]).map(a=>`<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
+        ${(m.attachments||[]).map(a=>a.id
+          ? `<span class="att clickable" title="Click to view" data-box="${esc(box)}" data-msg="${esc(m.id)}" data-att="${esc(a.id)}" data-mime="${esc(a.mime||'')}" data-name="${esc(a.filename)}" onclick="attClick(this,false)"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}<i class="ti ti-download att-dl" title="Download" onclick="event.stopPropagation();attClick(this.parentElement,true)"></i></span>`
+          : `<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
       </div>`).join('');
     if(t.unread){ t.unread=false; renderList(); renderNavCounts(); api('/read',{method:'POST',body:JSON.stringify({ids:t.ids||{}})}).catch(()=>{}); }
   }catch(e){
