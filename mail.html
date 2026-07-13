@@ -925,7 +925,23 @@ window.startQuoteFromEmail=async ()=>{
     by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
   FLAGS[t.key]=frec;
   try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){}
-  location.href='quote.html?fromMail='+encodeURIComponent(t.key);
+  // drawings (PDF / image / DXF) ride along as references — the quote tool
+  // pulls them through the mail worker and feeds its AI drawing analyzer
+  const box=(t.mailboxes||[])[0];
+  let atts=[];
+  (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{
+    const mime=(a.mime||'').toLowerCase(), name=a.filename||'';
+    if(a.id && (mime.includes('pdf')||mime.startsWith('image/')||/\.(pdf|png|jpe?g|dxf)$/i.test(name)))
+      atts.push({b:box, m:m.id, a:a.id, t:a.mime||'', n:name});
+  }));
+  atts=atts.slice(0,3);
+  // carry the prefill in the link itself — the quote tool shouldn't have to
+  // wait on (or trust) a database read to know who the customer is
+  location.href='quote.html?fromMail='+encodeURIComponent(t.key)
+    +'&cust='+encodeURIComponent(t.fromName||t.fromEmail||'')
+    +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
+    +'&from='+encodeURIComponent(t.fromEmail||'')
+    +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
 };
 window.fileCertToQC=async ()=>{
   const t=CURRENT; if(!t) return;

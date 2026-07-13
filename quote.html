@@ -8760,19 +8760,80 @@ window._qCloudSyncQuote = async (q) => {
   }
 };
 // quote.html?fromMail=<key> (mail app's "Create quote from this email") \u2192
-// prefill the calculator from the email's flag snapshot
-async function _qFromMail(){
-  let key='';
-  try{ key=new URLSearchParams(location.search).get('fromMail')||''; }catch(e){}
-  if(!key || window._fromMailKey) return;
+// prefill the calculator. The customer/subject ride in the URL itself so the
+// prefill never depends on auth timing; the flag snapshot in Firebase is only
+// a fallback for old links that carried no data.
+let _fmFilled=false;
+function _fmFill(cust,subj,from){
+  if(_fmFilled || !(cust||subj)) return;
+  _fmFilled=true;
+  // #customer is a SELECT fed from the saved customer list \u2014 assigning an
+  // unknown name silently leaves it empty. Match loosely; add if brand new.
+  const c=$q('customer');
+  if(c && cust && !c.value){
+    const names=[...c.options].map(o=>o.value).filter(Boolean);
+    const norm=s=>s.toLowerCase().replace(/[^a-z0-9 ]/gi,' ').replace(/\s+/g,' ').trim();
+    const lc=norm(cust);
+    // exact first, then shared whole word (4+ chars — substring matching is
+    // how "Hadley Aerospace" ends up matched to a customer named "Ace")
+    let match=names.find(x=>norm(x)===lc);
+    if(!match){
+      const words=lc.split(' ').filter(w=>w.length>=4);
+      match=names.find(x=>{ const nw=norm(x).split(' '); return words.some(w=>nw.includes(w)); });
+    }
+    if(!match){ const o=document.createElement('option'); o.value=cust; o.textContent=cust; c.appendChild(o); match=cust; }
+    c.value=match;
+    if(typeof updateCustomerRates==='function') try{ updateCustomerRates(); }catch(e){}
+  }
+  const n=$q('notes'); if(n && !n.value && subj) n.value='RFQ email: "'+subj+'"'+(from?(' \u2014 '+from):'');
+  if(typeof showToast==='function') showToast({title:'Started from RFQ email', sub:'Customer prefilled \u2014 saving this quote links it back to the email.', duration:6500});
+}
+function _qFromMail(){
+  let p; try{ p=new URLSearchParams(location.search); }catch(e){ return; }
+  const key=p.get('fromMail')||'';
+  if(!key) return;
   window._fromMailKey=key;
-  try{
-    const snap=await get(ref(db,'mail/threads/'+key));
+  _fmFill(p.get('cust')||'', p.get('subj')||'', p.get('from')||'');
+  if(_fmFilled || !_qUser) return;
+  get(ref(db,'mail/threads/'+key)).then(snap=>{
     const m=(snap.val()||{}).meta||{};
-    const cust=$q('customer'); if(cust && !cust.value) cust.value=m.fromName||m.fromEmail||'';
-    const notes=$q('notes'); if(notes && !notes.value && m.subject) notes.value='RFQ email: "'+m.subject+'"'+(m.fromEmail?(' \u2014 '+m.fromEmail):'');
-    if(typeof showToast==='function') showToast({title:'Started from RFQ email', sub:'Customer prefilled \u2014 saving this quote links it back to the email.', duration:6500});
-  }catch(e){ console.warn('fromMail prefill failed', e); }
+    _fmFill(m.fromName||m.fromEmail||'', m.subject||'', m.fromEmail||'');
+  }).catch(e=>console.warn('fromMail prefill failed', e));
+}
+// run after the page's own boot so nothing re-initializes over the prefill
+if(document.readyState!=='loading') setTimeout(_qFromMail,250);
+else document.addEventListener('DOMContentLoaded',()=>setTimeout(_qFromMail,250));
+// ?atts=<json> — drawing attachments from the RFQ email. Needs the signed-in
+// user's token (worker auth), so this runs from the auth listener; the fetched
+// file goes through handleFile() exactly like a drag-and-dropped drawing.
+let _fmAttDone=false;
+async function _qFromMailAtt(){
+  if(_fmAttDone || !_qUser) return;
+  let list=[];
+  try{ list=JSON.parse(new URLSearchParams(location.search).get('atts')||'[]')||[]; }catch(e){}
+  const a=list[0];
+  if(!a || !a.a || !a.b || !a.m) return;
+  _fmAttDone=true;
+  try{
+    if(typeof showToast==='function') showToast({title:'Pulling the drawing from the email…', sub:a.n||'', duration:5000});
+    const s=await get(ref(db,'mail/settings'));
+    const proxy=(((s.val()||{}).proxyUrl)||'').replace(/\/+$/,'');
+    if(!proxy) throw new Error('mail proxy address not set');
+    const tok=await _qUser.getIdToken();
+    const r=await fetch(proxy+'/attachment?box='+encodeURIComponent(a.b)+'&msg='+encodeURIComponent(a.m)+'&id='+encodeURIComponent(a.a)+'&mime='+encodeURIComponent(a.t||'application/octet-stream')+'&name='+encodeURIComponent(a.n||'drawing'),{headers:{Authorization:'Bearer '+tok}});
+    if(!r.ok) throw new Error('attachment fetch failed ('+r.status+')');
+    const blob=await r.blob();
+    let name=a.n||'drawing';
+    if(!/\.[a-z0-9]{2,4}$/i.test(name)){   // handleFile routes by extension
+      const mt=(a.t||blob.type||'').toLowerCase();
+      name+=mt.includes('pdf')?'.pdf':mt.includes('png')?'.png':mt.includes('jpe')?'.jpg':'.pdf';
+    }
+    if(typeof handleFile==='function') await handleFile(new File([blob], name, {type:a.t||blob.type||'application/pdf'}));
+    if(list.length>1 && typeof showToast==='function') showToast({title:'Reading the first drawing', sub:'The email has '+list.length+' — open it in Mail for the others.', duration:7000});
+  }catch(e){
+    console.warn('email drawing fetch failed', e);
+    if(typeof showToast==='function') showToast({title:'Could not pull the drawing from the email', sub:String((e&&e.message)||e)+' — you can still drop the file in by hand.', type:'error', duration:9000});
+  }
 }
 window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
@@ -8878,7 +8939,7 @@ onAuthStateChanged(auth, (user) => {
       return;   // no sync/backfill \u2014 the quote tool never loads for operators
     }
     hideMgrLock();
-    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); _qFromMail();
+    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); _qFromMail(); _qFromMailAtt();
   }
   else { hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
 });
