@@ -314,12 +314,20 @@ function hasAttachment(payload) {
 function listAttachments(payload, out) {
   out = out || [];
   if (!payload) return out;
-  if (payload.filename) out.push({
-    filename: payload.filename,
-    size: (payload.body && payload.body.size) || 0,
-    mime: payload.mimeType || 'application/octet-stream',
-    id: (payload.body && payload.body.attachmentId) || '',
-  });
+  if (payload.filename) {
+    const ph = (n) => (((payload.headers || []).find(x => x.name.toLowerCase() === n)) || {}).value || '';
+    out.push({
+      filename: payload.filename,
+      size: (payload.body && payload.body.size) || 0,
+      mime: payload.mimeType || 'application/octet-stream',
+      id: (payload.body && payload.body.attachmentId) || '',
+      // inline signature images reference these by <img src="cid:..."> — the
+      // app uses this to render them in place and keep them out of the
+      // attachment chip list (like Gmail does)
+      cid: ph('content-id').replace(/[<>]/g, ''),
+      inline: /^inline/i.test(ph('content-disposition')),
+    });
+  }
   (payload.parts || []).forEach(p => listAttachments(p, out));
   return out;
 }

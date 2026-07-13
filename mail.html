@@ -916,6 +916,40 @@ function textQuoteSplit(txt){
 }
 let _msgQuoteOpen={};
 window.toggleQuote=(i)=>{ _msgQuoteOpen[i]=!_msgQuoteOpen[i]; renderMsgs(); };
+// inline "cid:" images (signature logos, banners) — fetched once per session
+// and swapped into the message iframes so they render like Gmail does
+let _cidCache={};
+function cidRefd(m,a){ return !!(a.cid && (m.bodyHtml||'').indexOf(a.cid)>=0); }
+function hydrateCids(){
+  const t=CURRENT; if(!t||!t.messages) return;
+  const box=(t.mailboxes||[])[0];
+  document.querySelectorAll('#cv-msgs .msg').forEach((el,i)=>{
+    const m=t.messages[i]; if(!m||!m.bodyHtml||m.bodyHtml.indexOf('cid:')<0) return;
+    const f=el.querySelector('iframe.msg-html'); if(!f) return;
+    const fix=async ()=>{
+      let doc; try{ doc=f.contentDocument; }catch(e){ return; }
+      if(!doc||!doc.body) return;
+      const imgs=[...doc.querySelectorAll('img[src^="cid:"]')];
+      if(!imgs.length) return;
+      for(const img of imgs){
+        const cid=decodeURIComponent(img.getAttribute('src').slice(4)).replace(/[<>]/g,'');
+        const a=(m.attachments||[]).find(x=>x.cid===cid);
+        if(!a||!a.id){ img.style.display='none'; continue; }   // unresolvable → no broken-image box
+        const ck=(m.id||'')+'|'+cid;
+        try{
+          if(!_cidCache[ck]){
+            const blob=await fetchAttBlob({box, msg:m.id, att:a.id, mime:a.mime||'image/png', name:a.filename||'img'});
+            _cidCache[ck]=URL.createObjectURL(blob);
+          }
+          img.src=_cidCache[ck];
+        }catch(e){ img.style.display='none'; }
+      }
+      setTimeout(()=>{ try{ f.style.height=Math.min(doc.documentElement.scrollHeight+24,3200)+'px'; }catch(e){} },300);
+    };
+    f.addEventListener('load',fix);
+    if(f.contentDocument && f.contentDocument.readyState==='complete') fix();
+  });
+}
 function msgBodyHtml(m,i){
   const open=!!_msgQuoteOpen[i];
   const chip=`<div class="qtoggle" onclick="toggleQuote(${i})"><i class="ti ti-dots"></i> ${open?'Hide quoted history':'Show quoted history'}</div>`;
@@ -935,10 +969,11 @@ function renderMsgs(){
       <div class="msg">
         <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
         ${msgBodyHtml(m,i)}
-        ${(m.attachments||[]).map(a=>a.id
+        ${(m.attachments||[]).filter(a=>!cidRefd(m,a)).map(a=>a.id
           ? `<span class="att clickable" title="Click to view" data-box="${esc(box)}" data-msg="${esc(m.id)}" data-att="${esc(a.id)}" data-mime="${esc(a.mime||'')}" data-name="${esc(a.filename)}" onclick="attClick(this,false)"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}<i class="ti ti-download att-dl" title="Download" onclick="event.stopPropagation();attClick(this.parentElement,true)"></i></span>`
           : `<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
       </div>`).join('');
+  hydrateCids();
 }
 window.openThread=async (key)=>{
   const t=THREADS.find(x=>x.key===key)||ghostThreads().find(x=>x.key===key); if(!t) return;
@@ -1009,7 +1044,7 @@ window.startQuoteFromEmail=async ()=>{
   let atts=[];
   (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{
     const mime=(a.mime||'').toLowerCase(), name=a.filename||'';
-    if(a.id && (mime.includes('pdf')||mime.startsWith('image/')||/\.(pdf|png|jpe?g|dxf)$/i.test(name)))
+    if(a.id && !cidRefd(m,a) && (mime.includes('pdf')||mime.startsWith('image/')||/\.(pdf|png|jpe?g|dxf)$/i.test(name)))
       atts.push({b:box, m:m.id, a:a.id, t:a.mime||'', n:name});
   }));
   atts=atts.slice(0,3);
@@ -1027,7 +1062,7 @@ window.fileCertToQC=async ()=>{
   const box=(t.mailboxes||[])[0];
   const atts=[];
   t.messages.forEach(m=>(m.attachments||[]).forEach(a=>{
-    if(a.id) atts.push({box, msg:m.id, att:a.id, mime:a.mime||'application/octet-stream', name:a.filename||'cert'});
+    if(a.id && !cidRefd(m,a)) atts.push({box, msg:m.id, att:a.id, mime:a.mime||'application/octet-stream', name:a.filename||'cert'});
   }));
   if(!atts.length){ toast('This email has no attachments to file.',true); return; }
   const btn=$('qc-file-btn');
