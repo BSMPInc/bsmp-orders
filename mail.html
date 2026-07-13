@@ -136,6 +136,8 @@ body.sb-pinned .dock{left:var(--sb)}
 .row .meta{margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .row .end{flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .row .dt{font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mutebtn{cursor:pointer;color:var(--text3);font-size:14px;line-height:1;opacity:.45;padding:2px}
+.mutebtn:hover{opacity:1;color:var(--red)}
 .udot{width:8px;height:8px;border-radius:50%;background:var(--spark);flex:none;margin-top:6px}
 .rdot{width:8px;flex:none}
 .loadmore{padding:12px;text-align:center;font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:7px}
@@ -378,6 +380,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <span id="qc-file-slot"></span>
         <span class="sp"></span>
         <button class="btn sm" id="assignee-btn" title="Assigned to — click to change" onclick="cycleAssign()"></button>
+        <button class="btn sm" id="mute-btn" style="display:none" onclick="toggleMute()"></button>
       </div>
       <div class="page-head">
         <h2 id="cv-subject"></h2>
@@ -481,7 +484,7 @@ body.sb-pinned .dock{left:var(--sb)}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, onValue, set, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getDatabase, ref, onValue, set, update, remove } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
@@ -548,6 +551,7 @@ const FLAG_DEFS=[
 ];
 let SETTINGS={proxyUrl:'', mailboxes:['info@bertsmp.com']};
 let FLAGS={};                 // mail/threads/<key> → {flag, assignee, by, at}
+let MUTED={};                 // mail/muted/<emailKey> → {email, name, by, at} — shared hide list
 let THREADS=[];               // from the proxy: {key, subject, fromName, fromEmail, snippet, date, unread, hasAttach, mailboxes:[…], gmail:{…per-box thread ids…}}
 let CURRENT=null;             // open thread (with .messages once loaded)
 let navPage='inbox', chipFilter='all';
@@ -663,6 +667,32 @@ function flagIcon(f,px){
   if(f.ico==='qsent') return '<span class="qsent-ico"'+sz+'><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span>';
   return '<i class="ti ti-'+f.icon+'"'+sz+'></i>';
 }
+// ── mute list: hide every email from a sender, shared across the shop ────────
+const mkey=(e)=>(e||'').toLowerCase().replace(/[.#$\/\[\]]/g,'_');
+function mutedOf(t){ return !!MUTED[mkey(t.fromEmail)]; }
+window.toggleMuteFor=(ev,email,name)=>{ if(ev) ev.stopPropagation(); muteEmail(email,name); };
+window.toggleMute=()=>{ if(CURRENT) muteEmail(CURRENT.fromEmail, CURRENT.fromName); };
+function muteEmail(email,name){
+  const k=mkey(email); if(!k) return;
+  if(MUTED[k]){
+    delete MUTED[k];
+    remove(ref(db,'mail/muted/'+k)).catch(()=>toast('Could not save — check the mail rule.',true));
+    toast('Unmuted '+(name||email)+' — their emails show again.');
+  } else {
+    MUTED[k]={email:email||'', name:name||'', by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()};
+    set(ref(db,'mail/muted/'+k), MUTED[k]).catch(()=>toast('Could not save — check the mail rule.',true));
+    toast('Muted '+(name||email)+' — hidden from the inbox. Find them under the Muted chip.');
+  }
+  renderList(); renderNavCounts(); renderMuteBtn();
+}
+function renderMuteBtn(){
+  const b=$('mute-btn'); if(!b) return;
+  if(!CURRENT||!CURRENT.fromEmail){ b.style.display='none'; return; }
+  const m=!!MUTED[mkey(CURRENT.fromEmail)];
+  b.style.display='';
+  b.title=m?'Show this sender’s emails again':'Hide every email from this sender';
+  b.innerHTML='<i class="ti ti-volume'+(m?'':'-off')+'"></i> '+(m?'Unmute sender':'Mute sender');
+}
 function flagOf(t){ const f=FLAGS[t.key]; return (f&&f.flag)||''; }
 function assignOf(t){ const f=FLAGS[t.key]; return (f&&f.assignee)||''; }
 // Flagged conversations are pinned: the snapshot saved with the flag keeps them
@@ -705,7 +735,11 @@ function visibleThreads(){
   const m=NAV_META[navPage]||NAV_META.inbox;
   let list=(_searchQ?THREADS:allThreads()).filter(m[2]);
   if(boxFilter) list=list.filter(t=>(t.mailboxes||[]).includes(boxFilter));
-  if(chipFilter!=='all'){
+  // muted senders stay hidden everywhere except the Muted chip (a search
+  // still looks through everything — you searched for it, you get it)
+  if(chipFilter==='muted') list=list.filter(t=>mutedOf(t));
+  else if(!_searchQ) list=list.filter(t=>!mutedOf(t));
+  if(chipFilter!=='all' && chipFilter!=='muted'){
     if(chipFilter==='none') list=list.filter(t=>!flagOf(t));
     else list=list.filter(t=>flagOf(t)===chipFilter);
   }
@@ -721,13 +755,16 @@ window.renderList=()=>{
   const m=NAV_META[navPage]||NAV_META.inbox;
   let base=(_searchQ?THREADS:allThreads()).filter(m[2]);
   if(boxFilter) base=base.filter(t=>(t.mailboxes||[]).includes(boxFilter));
+  const mutedCount=base.filter(t=>mutedOf(t)).length;
+  base=base.filter(t=>!mutedOf(t));   // chip counts describe the visible inbox
   const counts={all:base.length, none:base.filter(t=>!flagOf(t)).length};
   FLAG_DEFS.forEach(f=>counts[f.k]=base.filter(t=>flagOf(t)===f.k).length);
   $('fchips').innerHTML =
     `<span class="fchip${chipFilter==='all'?' on':''}" onclick="setChip('all')">All <span class="n">${counts.all}</span></span>`+
     FLAG_DEFS.filter(f=>counts[f.k]>0||chipFilter===f.k).map(f=>
       `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')">${flagIcon(f,14)}${f.label==='Waiting on customer'?'Waiting':f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
-    `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`;
+    `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`+
+    ((mutedCount>0||chipFilter==='muted')?`<span class="fchip${chipFilter==='muted'?' on':''}" onclick="setChip('muted')"><i class="ti ti-volume-off" style="font-size:14px"></i>Muted <span class="n">${mutedCount}</span></span>`:'');
 
   const list=visibleThreads();
   const unread=list.filter(t=>t.unread).length;
@@ -760,7 +797,7 @@ window.renderList=()=>{
         <div class="sn">${esc(t.snippet||'')}</div>
         <div class="meta">${(lk&&lk.app==='qc')?`<span class="badge iconly cert" title="Filed in QC — click to open" onclick="event.stopPropagation();location.href='qc.html?cert=${encodeURIComponent(lk.id)}'"><i class="ti ti-license"></i></span>`:''}${(lk&&lk.app==='quote')?`<span class="badge iconly quoted" title="${esc(lk.label||'Quote')} — click to open" onclick="event.stopPropagation();location.href='quote.html?quote=${encodeURIComponent(lk.id)}'"><i class="ti ti-calculator"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
       </div>
-      <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
+      <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}<span class="mutebtn" title="${mutedOf(t)?'Unmute sender':'Mute sender — hide their emails'}" onclick="toggleMuteFor(event,'${esc(t.fromEmail||'')}','${esc((t.fromName||'').replace(/'/g,'’'))}')"><i class="ti ti-volume${mutedOf(t)?'':'-off'}"></i></span></div>
     </div>`;
   }).join('') + loadMoreHtml();
 };
@@ -772,8 +809,8 @@ function loadMoreHtml(){
 }
 window.setChip=(k)=>{ chipFilter=k; renderList(); };
 function renderNavCounts(){
-  const un=THREADS.filter(t=>t.unread).length;
-  const rf=allThreads().filter(t=>flagOf(t)==='rfq').length;
+  const un=THREADS.filter(t=>t.unread && !mutedOf(t)).length;
+  const rf=allThreads().filter(t=>flagOf(t)==='rfq' && !mutedOf(t)).length;
   const set=(id,n)=>{ const el=$(id); if(el){ el.style.display=n?'':'none'; el.textContent=n; } };
   set('n-inbox',un); set('n-rfq',rf);
 }
@@ -890,7 +927,7 @@ window.openThread=async (key)=>{
 function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
   $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')">${flagIcon(f)}</span>`).join('');
-  renderQcFile();
+  renderQcFile(); renderMuteBtn();
 }
 // ── file a cert email into the QC cert library ────────────────────────────────
 function linkOf(t){ const f=FLAGS[t.key]; return (f&&f.link)||null; }
@@ -1151,6 +1188,10 @@ onAuthStateChanged(auth,(user)=>{
         renderList(); renderNavCounts();
         maybeOpenDeep();
         if(CURRENT){ renderFlagPills(); renderAssignee(); }
+      });
+      onValue(ref(db,'mail/muted'),snap=>{
+        MUTED=snap.val()||{};
+        renderList(); renderNavCounts(); renderMuteBtn();
       });
       onValue(ref(db,'.info/connected'),snap=>{
         if(!snap.val()) setLive('err','Offline');

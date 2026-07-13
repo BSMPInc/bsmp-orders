@@ -180,12 +180,11 @@ async function gmailBatch(env, mailbox, paths) {
 }
 
 // ── /threads: recent mail from every box (or full-history search), deduped ──
-// The default inbox view skips Gmail's promotional/social/forum categories;
-// an explicit search (q) still looks through EVERYTHING.
+// EVERYTHING except spam/trash comes through — the app's shared mute list
+// (mail/muted) is what keeps unwanted senders out of view, not Gmail's
+// category guesses (which were hiding real customer mail).
 async function listThreads(env, mailboxes, q, tokens) {
-  const query = q
-    ? q + ' -in:spam -in:trash'
-    : '-in:spam -in:trash -category:promotions -category:social -category:forums';
+  const query = (q ? q + ' ' : '') + '-in:spam -in:trash';
   const paging = tokens && Object.keys(tokens).length > 0;
   const next = {};
   const perBox = await Promise.all(mailboxes.map(async (box) => {
