@@ -561,6 +561,7 @@ async function api(path, opts){
 let NEXT={};       // per-mailbox Gmail page tokens for "Load older"
 let _loadingOlder=false;
 let _searchQ='';   // non-empty → the list shows a full-history Gmail search
+let _lastQ='';     // what the last completed /threads load searched for
 window.searchAll=()=>{ _searchQ=($('search').value||'').trim(); loadThreads(true, _searchQ); };
 window.searchInput=()=>{
   // clearing the box automatically leaves search mode and reloads the inbox
@@ -573,7 +574,19 @@ window.loadThreads=async (manual, q)=>{
   try{
     setLive('busy', q?'Searching all mail…':'Checking mail…'); if(btn) btn.disabled=true;
     const data=await api('/threads'+(q?('?q='+encodeURIComponent(q)):''));
-    THREADS=(data.threads||[]).sort((a,b)=>b.date-a.date);
+    const incoming=data.threads||[];
+    // search results replace the list; so does the first load back from a
+    // search (clean inbox again — flagged finds live on via their snapshot)
+    if(q || _lastQ){ THREADS=incoming.slice(); }
+    else{
+      // merge, never wipe — a background refresh only brings the newest page,
+      // and replacing the list made "Load older" and search finds vanish
+      const byKey=new Map(THREADS.map(t=>[t.key,t]));
+      incoming.forEach(t=>{ const old=byKey.get(t.key); if(old&&old.messages) t.messages=old.messages; byKey.set(t.key,t); });
+      THREADS=[...byKey.values()];
+    }
+    THREADS.sort((a,b)=>b.date-a.date);
+    _lastQ=q;
     NEXT=data.next||{};
     $('connect-banner').style.display='none';
     setLive('ok','Live');
@@ -610,6 +623,16 @@ const NAV_META={
 };
 function flagOf(t){ const f=FLAGS[t.key]; return (f&&f.flag)||''; }
 function assignOf(t){ const f=FLAGS[t.key]; return (f&&f.assignee)||''; }
+// Flagged conversations are pinned: the snapshot saved with the flag keeps them
+// on screen even when Gmail's normal listing no longer returns them
+// (older than the loaded pages, or category-filtered mail found via search).
+function ghostThreads(){
+  const have=new Set(THREADS.map(t=>t.key));
+  return Object.entries(FLAGS)
+    .filter(([k,v])=>v&&(v.flag||v.assignee)&&v.meta&&!have.has(k))
+    .map(([k,v])=>Object.assign({key:k},v.meta));
+}
+function allThreads(){ return THREADS.concat(ghostThreads()).sort((a,b)=>b.date-a.date); }
 
 window.go=(page)=>{
   navPage=page;
@@ -638,7 +661,7 @@ function renderBoxPick(){
 }
 function visibleThreads(){
   const m=NAV_META[navPage]||NAV_META.inbox;
-  let list=THREADS.filter(m[2]);
+  let list=(_searchQ?THREADS:allThreads()).filter(m[2]);
   if(boxFilter) list=list.filter(t=>(t.mailboxes||[]).includes(boxFilter));
   if(chipFilter!=='all'){
     if(chipFilter==='none') list=list.filter(t=>!flagOf(t));
@@ -654,7 +677,7 @@ window.renderList=()=>{
   renderBoxPick();
   // filter chips with live counts (within the current nav page + mailbox pick)
   const m=NAV_META[navPage]||NAV_META.inbox;
-  let base=THREADS.filter(m[2]);
+  let base=(_searchQ?THREADS:allThreads()).filter(m[2]);
   if(boxFilter) base=base.filter(t=>(t.mailboxes||[]).includes(boxFilter));
   const counts={all:base.length, none:base.filter(t=>!flagOf(t)).length};
   FLAG_DEFS.forEach(f=>counts[f.k]=base.filter(t=>flagOf(t)===f.k).length);
@@ -707,7 +730,7 @@ function loadMoreHtml(){
 window.setChip=(k)=>{ chipFilter=k; renderList(); };
 function renderNavCounts(){
   const un=THREADS.filter(t=>t.unread).length;
-  const rf=THREADS.filter(t=>flagOf(t)==='rfq').length;
+  const rf=allThreads().filter(t=>flagOf(t)==='rfq').length;
   const set=(id,n)=>{ const el=$(id); if(el){ el.style.display=n?'':'none'; el.textContent=n; } };
   set('n-inbox',un); set('n-rfq',rf);
 }
@@ -791,7 +814,7 @@ function msgBodyHtml(m){
   return `<div class="body">${esc(m.bodyText||m.snippet||'')}</div>`;
 }
 window.openThread=async (key)=>{
-  const t=THREADS.find(x=>x.key===key); if(!t) return;
+  const t=THREADS.find(x=>x.key===key)||ghostThreads().find(x=>x.key===key); if(!t) return;
   CURRENT=t;
   placeConvo();
   if(isWide()){ $('read-pane').scrollTop=0; renderList(); }
@@ -824,10 +847,17 @@ function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
   $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')"><i class="ti ti-${f.icon}"></i></span>`).join('');
 }
+function threadSnapshot(t){
+  return {subject:t.subject||'', fromName:t.fromName||'', fromEmail:t.fromEmail||'',
+    snippet:t.snippet||'', date:t.date||0, unread:false, hasAttach:!!t.hasAttach,
+    mailboxes:t.mailboxes||[], ids:t.ids||{}};
+}
 function applyFlag(key,k){
   const cur=(FLAGS[key]&&FLAGS[key].flag)||'';
   const next=(cur===k)?'':k;
   const rec=Object.assign({}, FLAGS[key]||{}, {flag:next, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
+  const t=THREADS.find(x=>x.key===key);
+  if(t) rec.meta=threadSnapshot(t);
   FLAGS[key]=rec;
   if(CURRENT&&CURRENT.key===key) renderFlagPills();
   renderList(); renderNavCounts();
@@ -848,6 +878,8 @@ window.cycleAssign=()=>{
   const i=people.findIndex(x=>x.k===cur);
   const next=people[(i+1)%people.length];
   const rec=Object.assign({}, FLAGS[CURRENT.key]||{}, {assignee:next.k, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
+  const ct=THREADS.find(x=>x.key===CURRENT.key);
+  if(ct) rec.meta=threadSnapshot(ct);
   FLAGS[CURRENT.key]=rec; renderAssignee(); renderList();
   set(ref(db,'mail/threads/'+CURRENT.key), rec).catch(()=>{});
 };
