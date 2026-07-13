@@ -121,7 +121,7 @@ body.sb-pinned .dock{left:var(--sb)}
 
 /* thread list */
 .card{background:var(--card);border:1px solid var(--border);box-shadow:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06)}
-.row{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:0 12px;align-items:flex-start;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer}
 .row:last-child{border-bottom:none}
 .row:hover{background:var(--accent-soft)}
 .row .who{width:168px;flex:none}
@@ -167,7 +167,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .spill.on-cert{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .spill.on-invoice{background:#f1ece1;border-color:#7a6236;color:#7a6236}
 /* flag pills inside each list row — set a flag without opening the email */
-.rowflags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
+.rowflags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px;flex:0 0 100%}
 .rowflags .spill{padding:3px 6px}
 .rowflags .spill i{font-size:13px}
 .msg{padding:15px 16px;border-bottom:1px solid var(--border)}
@@ -257,7 +257,7 @@ body.sb-pinned .dock{left:var(--sb)}
   .pane-list .row .who .fr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
   .pane-list .row .who .co{display:none}
   .pane-list .row .mid{margin-top:1px}
-  .pane-list .row .rowflags{gap:3px;margin-bottom:3px}
+  .pane-list .row .rowflags{gap:3px;margin-bottom:3px;padding-right:96px}
   .pane-list .row .rowflags .spill{padding:2px 5px}
   .pane-list .row .rowflags .spill i{font-size:12px}
   .pane-list .row .sj{font-size:12.5px;flex-wrap:nowrap;min-width:0}
@@ -686,10 +686,10 @@ window.renderList=()=>{
     const mbx = boxes.length>1 ? `<span class="mbx both">BOTH</span>` : `<span class="mbx">${esc(boxTag(boxes[0]||''))}</span>`;
     const pills=FLAG_DEFS.map(x=>`<span class="spill${f===x.k?' on-'+x.k:''}" title="${x.label}" onclick="setFlagRow(event,'${esc(t.key)}','${x.k}')"><i class="ti ti-${x.icon}"></i></span>`).join('');
     return `<div class="row${t.unread?' unread':''}${(CURRENT&&CURRENT.key===t.key)?' sel':''}" onclick="openThread('${esc(t.key)}')">
+      <div class="rowflags">${pills}</div>
       <span class="${t.unread?'udot':'rdot'}"></span>
       <div class="who"><div class="fr">${esc(t.fromName||t.fromEmail||'—')}</div><div class="co">${esc(t.fromName?t.fromEmail:'')}</div></div>
       <div class="mid">
-        <div class="rowflags">${pills}</div>
         <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
         <div class="sn">${esc(t.snippet||'')}</div>
         <div class="meta">${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
