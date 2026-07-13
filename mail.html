@@ -188,6 +188,9 @@ body.sb-pinned .dock{left:var(--sb)}
 .msg .mh .e{font-size:12px;color:var(--text3)}
 .msg .mh .d{margin-left:auto;font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums}
 .msg .body{font-size:13.5px;color:var(--text);max-width:70ch;white-space:pre-wrap;word-break:break-word}
+.qtoggle{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:3px 10px;font-size:11.5px;font-weight:700;color:var(--text3);background:var(--bg);border:1px solid var(--border);cursor:pointer;user-select:none}
+.qtoggle:hover{border-color:var(--border2);color:var(--text)}
+.qtoggle i{font-size:14px}
 .msg-html{width:100%;border:none;display:block;background:#fff;min-height:60px}
 .att{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;background:var(--bg);border:1px solid var(--border);margin-top:8px;margin-right:6px}
 .att.clickable{cursor:pointer}
@@ -886,12 +889,56 @@ window.avDownload=()=>{
 };
 window.closeAtt=()=>{ $('att-modal').style.display='none'; };
 const MSG_HTML_WRAP = '<base target="_blank"><style>body{font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;font-size:13.5px;color:#23262b;margin:0;line-height:1.5;word-break:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style>';
-function msgBodyHtml(m){
-  if(m.bodyHtml){
-    const doc=(MSG_HTML_WRAP+m.bodyHtml).replace(/"/g,'&quot;');
-    return `<iframe class="msg-html" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcdoc="${doc}" onload="try{this.style.height=Math.min(this.contentDocument.documentElement.scrollHeight+24,3200)+'px'}catch(e){this.style.height='500px'}"></iframe>`;
+// ── quoted-history trimming: every reply drags the whole chain along; hide it
+//    behind a per-message toggle (the earlier messages are shown above anyway).
+//    The hiding is parent-controlled CSS — no scripts ever run inside mail HTML.
+const QUOTE_HIDE_CSS='<style>blockquote,div.gmail_quote,div.yahoo_quoted,div.moz-cite-prefix,#divRplyFwdMsg,#divRplyFwdMsg~*,div[id^="appendonsend"],div[id^="appendonsend"]~*{display:none!important}</style>';
+const QUOTE_MARK=/<blockquote|class="?gmail_quote|class="?yahoo_quoted|class="?moz-cite-prefix|id="?divRplyFwdMsg|id="?appendonsend|-{2,}\s*Original Message/i;
+function htmlHasTrimmableQuote(h){
+  const m=QUOTE_MARK.exec(h||''); if(!m) return false;
+  // only collapse when there's real content before the quote — otherwise the
+  // message IS the quote (forwards) and collapsing would blank it out
+  const before=(h.slice(0,m.index)||'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').trim();
+  return before.length>=5;
+}
+function textQuoteSplit(txt){
+  const lines=(txt||'').split('\n');
+  for(let i=1;i<lines.length;i++){
+    const L=lines[i], T=L.trim();
+    if(/^\s*>/.test(L)
+      || /^On .{4,120} wrote:$/.test(T)
+      || /^-{2,}\s*(Original|Forwarded) Message\s*-{2,}/i.test(T)
+      || /^_{8,}$/.test(T)
+      || (/^From:\s/.test(T) && lines.slice(i+1,i+4).some(x=>/^(Sent|To|Subject|Date):\s/.test(x.trim()))))
+      return {main:lines.slice(0,i).join('\n').replace(/\s+$/,''), rest:lines.slice(i).join('\n')};
   }
-  return `<div class="body">${esc(m.bodyText||m.snippet||'')}</div>`;
+  return {main:txt, rest:''};
+}
+let _msgQuoteOpen={};
+window.toggleQuote=(i)=>{ _msgQuoteOpen[i]=!_msgQuoteOpen[i]; renderMsgs(); };
+function msgBodyHtml(m,i){
+  const open=!!_msgQuoteOpen[i];
+  const chip=`<div class="qtoggle" onclick="toggleQuote(${i})"><i class="ti ti-dots"></i> ${open?'Hide quoted history':'Show quoted history'}</div>`;
+  if(m.bodyHtml){
+    const collapsible=htmlHasTrimmableQuote(m.bodyHtml);
+    const doc=((collapsible&&!open?QUOTE_HIDE_CSS:'')+MSG_HTML_WRAP+m.bodyHtml).replace(/"/g,'&quot;');
+    return `<iframe class="msg-html" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcdoc="${doc}" onload="try{this.style.height=Math.min(this.contentDocument.documentElement.scrollHeight+24,3200)+'px'}catch(e){this.style.height='500px'}"></iframe>${collapsible?chip:''}`;
+  }
+  const s=textQuoteSplit(m.bodyText||m.snippet||'');
+  if(!s.rest) return `<div class="body">${esc(s.main)}</div>`;
+  return `<div class="body">${esc(open?(m.bodyText||m.snippet||''):s.main)}</div>${chip}`;
+}
+function renderMsgs(){
+  const t=CURRENT; if(!t||!t.messages) return;
+  const box=(t.mailboxes||[])[0];
+  $('cv-msgs').innerHTML=t.messages.map((m,i)=>`
+      <div class="msg">
+        <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
+        ${msgBodyHtml(m,i)}
+        ${(m.attachments||[]).map(a=>a.id
+          ? `<span class="att clickable" title="Click to view" data-box="${esc(box)}" data-msg="${esc(m.id)}" data-att="${esc(a.id)}" data-mime="${esc(a.mime||'')}" data-name="${esc(a.filename)}" onclick="attClick(this,false)"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}<i class="ti ti-download att-dl" title="Download" onclick="event.stopPropagation();attClick(this.parentElement,true)"></i></span>`
+          : `<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
+      </div>`).join('');
 }
 window.openThread=async (key)=>{
   const t=THREADS.find(x=>x.key===key)||ghostThreads().find(x=>x.key===key); if(!t) return;
@@ -906,19 +953,13 @@ window.openThread=async (key)=>{
   collapseReply(); $('reply-body').value='';
   window._outAtt.reply=[]; renderOutAtts('reply');
   $('cv-msgs').innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Loading conversation…</div>';
+  _msgQuoteOpen={};
   try{
     const box=(t.mailboxes||[])[0], gid=t.ids&&t.ids[box];
     const data=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(gid));
     if(CURRENT!==t) return;
     t.messages=data.messages||[];
-    $('cv-msgs').innerHTML=t.messages.map(m=>`
-      <div class="msg">
-        <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
-        ${msgBodyHtml(m)}
-        ${(m.attachments||[]).map(a=>a.id
-          ? `<span class="att clickable" title="Click to view" data-box="${esc(box)}" data-msg="${esc(m.id)}" data-att="${esc(a.id)}" data-mime="${esc(a.mime||'')}" data-name="${esc(a.filename)}" onclick="attClick(this,false)"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}<i class="ti ti-download att-dl" title="Download" onclick="event.stopPropagation();attClick(this.parentElement,true)"></i></span>`
-          : `<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
-      </div>`).join('');
+    renderMsgs();
     if(t.unread){ t.unread=false; renderList(); renderNavCounts(); api('/read',{method:'POST',body:JSON.stringify({ids:t.ids||{}})}).catch(()=>{}); }
   }catch(e){
     $('cv-msgs').innerHTML=`<div class="empty"><i class="ti ti-plug-connected-x"></i>${e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':esc(e.message)}</div>`;
