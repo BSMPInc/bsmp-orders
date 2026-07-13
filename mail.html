@@ -646,6 +646,7 @@ window.loadThreads=async (manual, q)=>{
     NEXT=data.next||{};
     $('connect-banner').style.display='none';
     setLive('ok','Live');
+    backfillFlagMeta();
     renderList(); renderNavCounts();
     maybeOpenDeep();
     if(manual) toast('Mail refreshed');
@@ -664,6 +665,7 @@ window.loadOlder=async ()=>{
     (data.threads||[]).forEach(t=>{ if(!seen.has(t.key)) THREADS.push(t); });
     THREADS.sort((a,b)=>b.date-a.date);
     NEXT=data.next||{};
+    backfillFlagMeta();
   }catch(e){ toast(e.message,true); }
   _loadingOlder=false;
   renderList(); renderNavCounts();
@@ -719,10 +721,32 @@ function assignOf(t){ const f=FLAGS[t.key]; return (f&&f.assignee)||''; }
 function ghostThreads(){
   const have=new Set(THREADS.map(t=>t.key));
   return Object.entries(FLAGS)
-    .filter(([k,v])=>v&&(v.flag||v.assignee)&&v.meta&&!have.has(k))
-    .map(([k,v])=>Object.assign({key:k},v.meta));
+    .filter(([k,v])=>v&&(v.flag||v.assignee)&&!have.has(k))
+    .map(([k,v])=>{
+      if(v.meta) return Object.assign({key:k},v.meta);
+      // legacy flag saved before snapshots existed — keep it visible & counted
+      // (a bare stub) instead of vanishing; it heals into a full card the next
+      // time its email loads (see backfillFlagMeta)
+      return {key:k, subject:'Flagged email — will fill in when it next loads',
+        fromName:'', fromEmail:'', snippet:'Saved before the latest update. Search for it above and open it once to restore the details.',
+        date:Number(v.at)||0, mailboxes:[], ids:{}, _stub:true};
+    });
 }
 function allThreads(){ return THREADS.concat(ghostThreads()).sort((a,b)=>b.date-a.date); }
+// Heal legacy flags: when a flagged email is present in the loaded list but its
+// flag record has no snapshot yet, write one. Idempotent — the resulting
+// mail/threads write re-fires the listener, which finds meta already set and
+// stops. This permanently fixes flags that used to vanish out of the window.
+function backfillFlagMeta(){
+  (THREADS||[]).forEach(t=>{
+    const f=FLAGS[t.key];
+    if(f && (f.flag||f.assignee) && !f.meta && t.subject!==undefined){
+      const meta=threadSnapshot(t);
+      f.meta=meta;   // update locally now so the view heals immediately
+      update(ref(db,'mail/threads/'+t.key), {meta}).catch(()=>{});
+    }
+  });
+}
 
 window.go=(page)=>{
   navPage=page;
@@ -1035,6 +1059,7 @@ function renderMsgs(){
 }
 window.openThread=async (key)=>{
   const t=THREADS.find(x=>x.key===key)||ghostThreads().find(x=>x.key===key); if(!t) return;
+  if(t._stub){ toast('This flag was saved before the latest update — search for the email above and open it once to restore its details.',true); return; }
   CURRENT=t;
   placeConvo();
   if(isWide()){ $('read-pane').scrollTop=0; renderList(); }
@@ -1319,6 +1344,7 @@ onAuthStateChanged(auth,(user)=>{
       });
       onValue(ref(db,'mail/threads'),snap=>{
         FLAGS=snap.val()||{};
+        backfillFlagMeta();
         renderList(); renderNavCounts();
         maybeOpenDeep();
         if(CURRENT){ renderFlagPills(); renderAssignee(); }
