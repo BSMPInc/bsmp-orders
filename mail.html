@@ -138,6 +138,30 @@ body.sb-pinned .dock{left:var(--sb)}
 .row .dt{font-size:11.5px;color:var(--text3);font-variant-numeric:tabular-nums;white-space:nowrap}
 .mutebtn{cursor:pointer;color:var(--text3);font-size:14px;line-height:1;opacity:.45;padding:2px}
 .mutebtn:hover{opacity:1;color:var(--red)}
+/* address book */
+.ct-grid{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+.ct-row{display:flex;align-items:center;gap:12px;padding:11px 14px;background:#fff}
+.ct-row:hover{background:var(--accent-soft)}
+.ct-av{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.ct-main{flex:1;min-width:0}
+.ct-nm{font-weight:700;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-sub{font-size:12px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ct-em{font-size:12.5px;color:var(--accent);font-weight:600}
+.ct-acts{display:flex;gap:4px;flex:none}
+.ct-acts .icon-btn{width:30px;height:30px;font-size:15px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#fff;color:var(--text3);cursor:pointer}
+.ct-acts .icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.ct-form{max-width:520px}
+.ct-form label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin:10px 0 4px}
+.ct-form input{width:100%;height:36px;padding:0 11px;border:1px solid var(--border2);background:#fff;outline:none;font-size:13px}
+.ct-form input:focus{border-color:var(--accent)}
+.savedchip{color:#1f7d57!important}
+/* compose To autocomplete */
+.ac-wrap{position:relative}
+.ac-list{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--border2);border-top:none;max-height:220px;overflow-y:auto;box-shadow:0 8px 20px rgba(16,24,40,.12)}
+.ac-opt{padding:8px 11px;cursor:pointer;font-size:12.5px;display:flex;flex-direction:column;gap:1px}
+.ac-opt:hover,.ac-opt.on{background:var(--accent-soft)}
+.ac-opt .ao-nm{font-weight:700}
+.ac-opt .ao-em{color:var(--text3);font-size:11.5px}
 .udot{width:8px;height:8px;border-radius:50%;background:var(--spark);flex:none;margin-top:6px}
 .rdot{width:8px;flex:none}
 .loadmore{padding:12px;text-align:center;font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:7px}
@@ -348,6 +372,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="nav-item" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span class="nav-label">Waiting on customer</span></div>
       <div class="nav-sec">Records</div>
       <div class="nav-item" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span class="nav-label">Certs &amp; invoices</span></div>
+      <div class="nav-item" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span class="nav-label">Contacts</span></div>
       <div class="nav-sec">Setup</div>
       <div class="nav-item" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span class="nav-label">Settings</span></div>
     </div>
@@ -398,6 +423,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <span id="qc-file-slot"></span>
         <span class="sp"></span>
         <button class="btn sm" id="assignee-btn" title="Assigned to — click to change" onclick="cycleAssign()"></button>
+        <button class="btn sm" id="contact-btn" style="display:none" onclick="saveSenderContact()"></button>
         <button class="btn sm" id="mute-btn" style="display:none" onclick="toggleMute()"></button>
       </div>
       <div class="page-head">
@@ -440,6 +466,9 @@ body.sb-pinned .dock{left:var(--sb)}
       <button class="btn primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save settings</button>
       <span class="hint" id="set-status" style="margin-left:10px"></span>
     </div>
+
+    <!-- ============ CONTACTS ============ -->
+    <div class="content" id="v-contacts" style="display:none"></div>
   </main>
 </div>
 
@@ -450,6 +479,7 @@ body.sb-pinned .dock{left:var(--sb)}
   <button class="dock-tab" data-page="quoted" onclick="go('quoted')"><span class="qsent-ico"><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span><span>Quoted</span></button>
   <button class="dock-tab" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span>Waiting</span></button>
   <button class="dock-tab" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span>Certs</span></button>
+  <button class="dock-tab" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span>Contacts</span></button>
   <button class="dock-tab" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
   <div class="dock-switch">
     <span class="lbl">Switch app</span>
@@ -471,7 +501,7 @@ body.sb-pinned .dock{left:var(--sb)}
     <label>From</label>
     <select id="cp-from"></select>
     <label>To</label>
-    <input id="cp-to" type="text" placeholder="customer@example.com">
+    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — pick from contacts" autocomplete="off" oninput="acInput()" onkeydown="acKey(event)"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
     <label>Subject</label>
     <input id="cp-subject" type="text" placeholder="Subject">
     <label>Message</label>
@@ -570,6 +600,7 @@ const FLAG_DEFS=[
 let SETTINGS={proxyUrl:'', mailboxes:['info@bertsmp.com']};
 let FLAGS={};                 // mail/threads/<key> → {flag, assignee, by, at}
 let MUTED={};                 // mail/muted/<emailKey> → {email, name, by, at} — shared hide list
+let CONTACTS={};              // mail/contacts/<emailKey> → {name, email, company, phone, notes, by, at}
 let THREADS=[];               // from the proxy: {key, subject, fromName, fromEmail, snippet, date, unread, hasAttach, mailboxes:[…], gmail:{…per-box thread ids…}}
 let CURRENT=null;             // open thread (with .messages once loaded)
 let navPage='inbox', chipFilter='all';
@@ -714,6 +745,122 @@ function renderMuteBtn(){
   b.title=m?'Show this sender’s emails again':'Hide every email from this sender';
   b.innerHTML='<i class="ti ti-volume'+(m?'':'-off')+'"></i> '+(m?'Unmute sender':'Mute sender');
 }
+// ── contacts / address book (shared, mail/contacts/<emailKey>) ───────────────
+function contactList(){
+  return Object.values(CONTACTS).filter(c=>c&&c.email)
+    .sort((a,b)=>(a.name||a.email||'').toLowerCase().localeCompare((b.name||b.email||'').toLowerCase()));
+}
+function contactInitials(c){
+  const s=(c.name||c.email||'?').trim();
+  const parts=s.split(/\s+/);
+  return ((parts[0]||'?')[0]+(parts.length>1?(parts[parts.length-1][0]||''):'')).toUpperCase();
+}
+let _ctEdit=null;   // null = list, {} = new, {existing} = editing
+function renderContacts(){
+  const el=$('v-contacts'); if(!el) return;
+  if(_ctEdit){ el.innerHTML=contactFormHtml(_ctEdit); const f=$('ctf-name'); if(f) setTimeout(()=>f.focus(),30); return; }
+  const q=(_ctSearch||'').toLowerCase();
+  let list=contactList();
+  if(q) list=list.filter(c=>[c.name,c.email,c.company,c.phone].filter(Boolean).join(' ').toLowerCase().includes(q));
+  const rows=list.map(c=>`<div class="ct-row">
+    <div class="ct-av">${esc(contactInitials(c))}</div>
+    <div class="ct-main">
+      <div class="ct-nm">${esc(c.name||c.email)}${c.company?` <span style="color:var(--text3);font-weight:600">· ${esc(c.company)}</span>`:''}</div>
+      <div class="ct-sub"><span class="ct-em">${esc(c.email)}</span>${c.phone?` · ${esc(c.phone)}`:''}</div>
+    </div>
+    <div class="ct-acts">
+      <span class="icon-btn" title="Email this contact" onclick="composeTo('${esc(c.email)}')"><i class="ti ti-mail"></i></span>
+      <span class="icon-btn" title="Edit" onclick="editContact('${esc(mkey(c.email))}')"><i class="ti ti-pencil"></i></span>
+      <span class="icon-btn" title="Delete" onclick="deleteContact('${esc(mkey(c.email))}','${esc((c.name||c.email).replace(/'/g,"’"))}')"><i class="ti ti-trash"></i></span>
+    </div></div>`).join('');
+  el.innerHTML=`<div class="page-head"><h2>Contacts</h2><p>Shared address book — everyone in the shop sees the same list.</p></div>
+    <div class="toolbar" style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <button class="btn primary" onclick="newContact()"><i class="ti ti-user-plus"></i> Add contact</button>
+      <input class="in" id="ct-search" style="max-width:320px;height:36px;padding:0 11px;border:1px solid var(--border2)" placeholder="Search name, email, company…" value="${esc(_ctSearch||'')}" oninput="ctSearch(this.value)">
+      <span style="margin-left:auto;font-weight:800;color:var(--text2)">${list.length} contact${list.length!==1?'s':''}</span>
+    </div>
+    <div class="card" style="padding:0">${list.length?`<div class="ct-grid">${rows}</div>`:`<div class="empty"><i class="ti ti-address-book" style="font-size:30px;opacity:.5;display:block;margin-bottom:8px"></i>${(contactList().length?'No contacts match that search.':'No contacts saved yet — add one, or open an email and hit “Save contact”.')}</div>`}</div>`;
+}
+let _ctSearch='';
+window.ctSearch=(v)=>{ _ctSearch=v; const el=$('v-contacts'); // re-render list only, keep focus
+  renderContacts(); const s=$('ct-search'); if(s){ s.focus(); s.setSelectionRange(s.value.length,s.value.length); } };
+function contactFormHtml(c){
+  const isNew=!c.email;
+  return `<div class="page-head"><h2>${isNew?'Add contact':'Edit contact'}</h2></div>
+  <div class="card ct-form">
+    <label>Name</label><input id="ctf-name" value="${esc(c.name||'')}" placeholder="Jane Machinist">
+    <label>Email</label><input id="ctf-email" value="${esc(c.email||'')}" placeholder="jane@customer.com"${isNew?'':' readonly style="background:var(--bg);color:var(--text3)"'}>
+    <label>Company</label><input id="ctf-company" value="${esc(c.company||'')}" placeholder="Acme Aerospace">
+    <label>Phone</label><input id="ctf-phone" value="${esc(c.phone||'')}" placeholder="805-555-0100">
+    <label>Notes</label><input id="ctf-notes" value="${esc(c.notes||'')}" placeholder="Buyer for the bracket program">
+    <div class="toolbar" style="margin-top:14px;display:flex;gap:8px">
+      <button class="btn primary" onclick="saveContactForm()"><i class="ti ti-check"></i> Save</button>
+      <button class="btn" onclick="_ctEdit=null;renderContacts()">Cancel</button>
+    </div>
+  </div>`;
+}
+window.newContact=()=>{ _ctEdit={}; renderContacts(); };
+window.editContact=(k)=>{ _ctEdit=Object.assign({}, CONTACTS[k]||{}); renderContacts(); };
+window.saveContactForm=()=>{
+  const email=($('ctf-email').value||'').trim();
+  if(!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Enter a valid email address.',true); return; }
+  saveContact({email, name:($('ctf-name').value||'').trim(), company:($('ctf-company').value||'').trim(),
+    phone:($('ctf-phone').value||'').trim(), notes:($('ctf-notes').value||'').trim()});
+  _ctEdit=null; renderContacts();
+};
+function saveContact(c){
+  const k=mkey(c.email); if(!k) return;
+  const rec=Object.assign({}, CONTACTS[k]||{}, c, {by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
+  CONTACTS[k]=rec;
+  set(ref(db,'mail/contacts/'+k), rec).catch(()=>toast('Could not save the contact — check the mail rule is published.',true));
+  toast('Saved '+(c.name||c.email)+' to contacts.');
+  renderContactBtn();
+}
+window.deleteContact=(k,label)=>{
+  if(!confirm('Delete '+label+' from contacts?')) return;
+  delete CONTACTS[k];
+  remove(ref(db,'mail/contacts/'+k)).catch(()=>toast('Could not delete — check the mail rule.',true));
+  renderContacts(); renderContactBtn();
+};
+window.composeTo=(email)=>{ openCompose(); $('cp-to').value=email; setTimeout(()=>$('cp-subject').focus(),40); };
+// save-the-sender button shown on an open conversation
+function renderContactBtn(){
+  const b=$('contact-btn'); if(!b) return;
+  if(!CURRENT||!CURRENT.fromEmail){ b.style.display='none'; return; }
+  const saved=!!CONTACTS[mkey(CURRENT.fromEmail)];
+  b.style.display='';
+  b.className='btn sm'+(saved?' ':'');
+  b.title=saved?'Already in contacts — click to edit':'Save this sender to the address book';
+  b.innerHTML=saved?'<i class="ti ti-user-check savedchip"></i> In contacts':'<i class="ti ti-user-plus"></i> Save contact';
+}
+window.saveSenderContact=()=>{
+  if(!CURRENT||!CURRENT.fromEmail) return;
+  const k=mkey(CURRENT.fromEmail);
+  if(CONTACTS[k]){ go('contacts'); _ctEdit=Object.assign({},CONTACTS[k]); renderContacts(); return; }
+  saveContact({email:CURRENT.fromEmail, name:CURRENT.fromName||''});
+};
+// ── compose "To" autocomplete from contacts ──────────────────────────────────
+let _acItems=[], _acIdx=-1;
+window.acInput=()=>{
+  const q=($('cp-to').value||'').toLowerCase().trim();
+  const box=$('cp-ac');
+  if(!q){ box.style.display='none'; _acItems=[]; return; }
+  _acItems=contactList().filter(c=>[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0,8);
+  _acIdx=-1;
+  if(!_acItems.length){ box.style.display='none'; return; }
+  box.innerHTML=_acItems.map((c,i)=>`<div class="ac-opt" data-i="${i}" onmousedown="acPick(${i})"><span class="ao-nm">${esc(c.name||c.email)}</span><span class="ao-em">${esc(c.email)}${c.company?' · '+esc(c.company):''}</span></div>`).join('');
+  box.style.display='';
+};
+window.acPick=(i)=>{ const c=_acItems[i]; if(!c) return; $('cp-to').value=c.email; $('cp-ac').style.display='none'; _acItems=[]; $('cp-subject').focus(); };
+window.acKey=(e)=>{
+  const box=$('cp-ac'); if(box.style.display==='none'||!_acItems.length) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); _acIdx=Math.min(_acIdx+1,_acItems.length-1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); _acIdx=Math.max(_acIdx-1,0); }
+  else if(e.key==='Enter'){ if(_acIdx>=0){ e.preventDefault(); acPick(_acIdx); } return; }
+  else if(e.key==='Escape'){ box.style.display='none'; return; }
+  else return;
+  [...box.children].forEach((el,i)=>el.classList.toggle('on',i===_acIdx));
+};
 function flagOf(t){ const f=FLAGS[t.key]; return (f&&f.flag)||''; }
 function assignOf(t){ const f=FLAGS[t.key]; return (f&&f.assignee)||''; }
 // Flagged conversations are pinned: the snapshot saved with the flag keeps them
@@ -762,9 +909,12 @@ window.go=(page)=>{
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   document.querySelectorAll('.dock-tab').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   backToList();
-  $('v-list').style.display = page==='settings'?'none':'';
+  const full = page==='settings'||page==='contacts';
+  $('v-list').style.display = full?'none':'';
   $('v-settings').style.display = page==='settings'?'':'none';
+  $('v-contacts').style.display = page==='contacts'?'':'none';
   if(page==='settings'){ $('tb-t').textContent='Settings'; $('tb-s').textContent='Mail connection'; renderSettings(); return; }
+  if(page==='contacts'){ $('tb-t').textContent='Contacts'; $('tb-s').textContent='Shared shop address book'; _ctEdit=null; renderContacts(); return; }
   const m=NAV_META[page]||NAV_META.inbox;
   $('tb-t').textContent=m[0]; $('tb-s').textContent=m[1];
   chipFilter='all';
@@ -879,19 +1029,20 @@ function fmtWhen(ms){
 function isWide(){ return window.matchMedia('(min-width:1000px)').matches; }
 function placeConvo(){
   const convo=$('v-convo'), rp=$('read-pane');
+  const fullPage = navPage==='settings'||navPage==='contacts';   // own full-screen views
   if(isWide()){
     if(convo.parentElement!==rp) rp.appendChild(convo);
     convo.classList.add('embedded');
     convo.style.display = CURRENT ? '' : 'none';
     $('read-empty').style.display = CURRENT ? 'none' : '';
-    if(navPage!=='settings') $('v-list').style.display='';
+    if(!fullPage) $('v-list').style.display='';
   } else {
     const main=document.querySelector('main');
     if(convo.parentElement===rp) main.appendChild(convo);
     convo.classList.remove('embedded');
     $('read-empty').style.display = '';
-    if(CURRENT && navPage!=='settings'){ $('v-list').style.display='none'; convo.style.display=''; }
-    else { convo.style.display='none'; if(navPage!=='settings') $('v-list').style.display=''; }
+    if(CURRENT && !fullPage){ $('v-list').style.display='none'; convo.style.display=''; }
+    else { convo.style.display='none'; if(!fullPage) $('v-list').style.display=''; }
   }
 }
 window.addEventListener('resize', placeConvo);
@@ -1094,7 +1245,7 @@ window.openThread=async (key)=>{
 function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
   $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')">${flagIcon(f)}</span>`).join('');
-  renderQcFile(); renderMuteBtn();
+  renderQcFile(); renderMuteBtn(); renderContactBtn();
 }
 // ── file a cert email into the QC cert library ────────────────────────────────
 function linkOf(t){ const f=FLAGS[t.key]; return (f&&f.link)||null; }
@@ -1283,6 +1434,7 @@ window.sendReply=async ()=>{
 window.openCompose=()=>{
   $('cp-from').innerHTML=SETTINGS.mailboxes.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
   $('cp-to').value=''; $('cp-subject').value=''; $('cp-body').value='';
+  $('cp-ac').style.display='none'; _acItems=[];
   window._outAtt.compose=[]; renderOutAtts('compose');
   $('compose-modal').style.display='flex';
   setTimeout(()=>$('cp-to').focus(),30);
@@ -1364,6 +1516,11 @@ onAuthStateChanged(auth,(user)=>{
       onValue(ref(db,'mail/muted'),snap=>{
         MUTED=snap.val()||{};
         renderList(); renderNavCounts(); renderMuteBtn();
+      });
+      onValue(ref(db,'mail/contacts'),snap=>{
+        CONTACTS=snap.val()||{};
+        if(navPage==='contacts') renderContacts();
+        renderContactBtn();
       });
       onValue(ref(db,'.info/connected'),snap=>{
         if(!snap.val()) setLive('err','Offline');
