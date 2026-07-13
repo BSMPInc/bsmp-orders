@@ -2134,6 +2134,42 @@ function startDataListeners(){
   startDurationsListener();
   startJobCounterListener();
   startVendorsListener();
+  startConnectionWatch();
+}
+
+// ── reconnect nudge ──────────────────────────────────────────────────────────
+// If this device drops offline for a real gap (spotty shop wifi, an iPad that
+// went to sleep) and then reconnects, suggest a reload — the live data resyncs
+// on its own, but a reload also pulls the latest app version and clears any
+// stale state from the offline stretch.
+let _connSeen=null, _offlineSince=0;
+function startConnectionWatch(){
+  onValue(ref(db,'.info/connected'), (snap)=>{
+    const up = snap.val()===true;
+    if(_connSeen===null){ _connSeen=up; return; }     // ignore the very first reading
+    if(!up && _connSeen){ _offlineSince=Date.now(); }  // just went offline
+    else if(up && !_connSeen){                          // just came back online
+      const gap = _offlineSince ? (Date.now()-_offlineSince) : 0;
+      _offlineSince=0;
+      if(gap > 20000) showReconnectNudge(gap);          // only after a real (>20s) gap
+    }
+    _connSeen=up;
+  });
+}
+function showReconnectNudge(gap){
+  if(document.getElementById('reconnect-nudge')) return;
+  const mins=Math.round(gap/60000);
+  const howLong = mins>=1 ? (mins+' minute'+(mins!==1?'s':'')) : 'a bit';
+  const el=document.createElement('div');
+  el.id='reconnect-nudge';
+  el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9998;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 32px);background:#8a5c00;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:13.5px;font-weight:600';
+  el.innerHTML='<i class="ti ti-wifi-off" style="font-size:18px;flex:none"></i>'
+    +'<span style="line-height:1.35">This device was offline for '+howLong+'. Reload to make sure you’re seeing the latest orders.</span>'
+    +'<button id="rn-reload" style="flex:none;background:#fff;color:#8a5c00;border:none;border-radius:8px;padding:7px 13px;font-weight:800;font-size:12.5px;cursor:pointer;font-family:inherit">Reload</button>'
+    +'<button id="rn-dismiss" title="Dismiss" style="flex:none;background:transparent;border:none;color:#fff;opacity:.8;cursor:pointer;font-size:18px;line-height:1;padding:2px 4px">×</button>';
+  document.body.appendChild(el);
+  el.querySelector('#rn-reload').onclick=()=>location.reload();
+  el.querySelector('#rn-dismiss').onclick=()=>el.remove();
 }
 
 function setSyncStatus(s) {
