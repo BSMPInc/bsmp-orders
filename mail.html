@@ -646,9 +646,10 @@ window.loadThreads=async (manual, q)=>{
     NEXT=data.next||{};
     $('connect-banner').style.display='none';
     setLive('ok','Live');
-    backfillFlagMeta();
-    renderList(); renderNavCounts();
-    maybeOpenDeep();
+    // the fetch succeeded — from here on, a render/backfill bug must NEVER be
+    // reported as a connection outage
+    try{ backfillFlagMeta(); renderList(); renderNavCounts(); maybeOpenDeep(); }
+    catch(e){ console.warn('post-load render error', e); }
     if(manual) toast('Mail refreshed');
   }catch(e){
     if(e.notConnected){ $('connect-banner').style.display='flex'; setLive('err','Not connected'); }
@@ -733,14 +734,20 @@ function allThreads(){ return THREADS.concat(ghostThreads()).sort((a,b)=>b.date-
 // mail/threads write re-fires the listener, which finds meta already set and
 // stops. This permanently fixes flags that used to vanish out of the window.
 function backfillFlagMeta(){
-  (THREADS||[]).forEach(t=>{
-    const f=FLAGS[t.key];
-    if(f && (f.flag||f.assignee) && !f.meta && t.subject!==undefined){
-      const meta=threadSnapshot(t);
-      f.meta=meta;   // update locally now so the view heals immediately
-      update(ref(db,'mail/threads/'+t.key), {meta}).catch(()=>{});
-    }
-  });
+  // Bulletproof: healing is a nice-to-have and must NEVER be able to break mail
+  // loading. Firebase update() throws *synchronously* on a malformed value (which
+  // .catch can't catch), so guard the whole thing and every write individually.
+  try{
+    (THREADS||[]).forEach(t=>{
+      if(!t || t.subject===undefined) return;
+      const f=FLAGS[t.key];
+      if(f && (f.flag||f.assignee) && !f.meta){
+        const meta=threadSnapshot(t);
+        f.meta=meta;   // update locally now so the view heals immediately
+        try{ update(ref(db,'mail/threads/'+t.key), {meta}); }catch(e){ /* bad value / path — skip */ }
+      }
+    });
+  }catch(e){ console.warn('flag backfill skipped', e); }
 }
 
 window.go=(page)=>{
