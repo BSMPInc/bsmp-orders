@@ -15,8 +15,9 @@
       GET  /threads                     merged, deduped thread list, both boxes
       GET  /thread?box=…&id=…           full messages of one thread
       POST /read   {ids:{box:threadId}} clear UNREAD in every box that has it
-      POST /send   reply: {replyAs, box, id, ids, body}
-                   new:   {replyAs, to, subject, body}
+      POST /send   reply: {replyAs, box, id, ids, body, attachments?}
+                   new:   {replyAs, to, subject, body, attachments?}
+                   attachments: [{name, mime, data(base64)}] — ~10 MB total
 */
 
 const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send';
@@ -266,9 +267,30 @@ async function sendMail(env, mailboxes, p) {
   }
   if (!to) throw new Error('no recipient');
 
-  const body = { raw: btoa(unescape(encodeURIComponent(
-    `From: ${from}\r\nTo: ${to}\r\nSubject: ${encodeHeader(subject)}\r\n${headers}MIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${p.body || ''}`
-  ))).replace(/\+/g, '-').replace(/\//g, '_') };
+  const atts = (Array.isArray(p.attachments) ? p.attachments : []).filter(a => a && a.data && a.name);
+  const attBytes = atts.reduce((s, a) => s + String(a.data).length * 0.75, 0);
+  if (attBytes > 16 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~10 MB total');
+
+  const top = `From: ${from}\r\nTo: ${to}\r\nSubject: ${encodeHeader(subject)}\r\n${headers}MIME-Version: 1.0\r\n`;
+  const utf8 = (s) => unescape(encodeURIComponent(s));   // text → binary string for btoa
+  let bin;   // full MIME message as a binary string
+  if (atts.length) {
+    const bnd = 'mime_bsmp_' + Math.random().toString(36).slice(2);
+    bin = utf8(top + `Content-Type: multipart/mixed; boundary="${bnd}"\r\n\r\n` +
+      `--${bnd}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${p.body || ''}`);
+    for (const a of atts) {
+      const name = encodeHeader(String(a.name || 'file').replace(/["\r\n]/g, '').slice(0, 180));
+      const type = String(a.mime || 'application/octet-stream').replace(/[\r\n"]/g, '');
+      // base64 payload is already ASCII — append it untouched (utf8() over
+      // megabytes of it would burn the worker's CPU budget for nothing)
+      const b64 = String(a.data).replace(/[^A-Za-z0-9+/=]/g, '').replace(/(.{76})/g, '$1\r\n');
+      bin += `\r\n\r\n--${bnd}\r\n` + utf8(`Content-Type: ${type}; name="${name}"\r\nContent-Disposition: attachment; filename="${name}"\r\nContent-Transfer-Encoding: base64\r\n\r\n`) + b64;
+    }
+    bin += `\r\n--${bnd}--`;
+  } else {
+    bin = utf8(top + `Content-Type: text/plain; charset=UTF-8\r\n\r\n${p.body || ''}`);
+  }
+  const body = { raw: btoa(bin).replace(/\+/g, '-').replace(/\//g, '_') };
   if (threadId) body.threadId = threadId;
   const sent = await gmail(env, from, 'messages/send', 'POST', body);
   return { ok: true, id: sent.id };
