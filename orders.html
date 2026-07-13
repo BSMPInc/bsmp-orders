@@ -2015,7 +2015,7 @@ body.sb-pinned .dock{left:var(--sb)}
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, onValue, set, remove, get } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getDatabase, ref, onValue, set, remove, get, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
@@ -2162,8 +2162,11 @@ function autosavePill(state){
 function saveDB() {
   setSyncStatus('saving'); autosavePill('saving'); clearTimeout(saveTimeout);
   saveTimeout=setTimeout(()=>{
+    // update() writes each order but NEVER deletes children this device doesn't
+    // have — so a stale/just-reconnected device can no longer wipe out orders
+    // added elsewhere. (Deletes go through deleteDB()'s per-id remove.)
     const o={}; orders.forEach(r=>o[r.id]=r);
-    set(ordersRef,o).then(()=>{ setSyncStatus('live'); autosavePill('saved'); })
+    update(ordersRef,o).then(()=>{ setSyncStatus('live'); autosavePill('saved'); })
                     .catch(()=>{ setSyncStatus('error'); autosavePill('error'); });
   },400);
 }
@@ -3817,7 +3820,7 @@ function sigColor(p){ if(!p) return '#9aa1ad'; const s=String(p.id||p.name||'');
 function startTeamListener(){
   onValue(teamRef, (snap)=>{ const d=snap.val(); team = d?Object.values(d):[]; renderTeam(); refreshActivePage(); });
 }
-function saveTeamDB(){ const o={}; team.forEach(p=>o[p.id]=p); autosavePill('saving'); set(ref(db,'team'),o).then(()=>autosavePill('saved')).catch(()=>autosavePill('error')); }
+function saveTeamDB(){ const o={}; team.forEach(p=>o[p.id]=p); autosavePill('saving'); update(ref(db,'team'),o).then(()=>autosavePill('saved')).catch(()=>autosavePill('error')); }
 function personById(id){ return team.find(p=>p.id===id)||null; }
 function personInitials(name){ return (name||'').trim().split(/\s+/).map(w=>w[0]||'').slice(0,2).join('').toUpperCase()||'?'; }
 function personChip(id, withName=true){
@@ -3903,6 +3906,7 @@ window.deletePerson = (id)=>{
   // unassign from any steps
   orders.forEach(o=>{ (o.schedule&&o.schedule.steps||[]).forEach(s=>{ if(s.assignee===id) delete s.assignee; }); });
   team=team.filter(x=>x.id!==id);
+  remove(ref(db,'team/'+id)).catch(()=>{});   // explicit delete — saveTeamDB now uses update() and won't remove members
   saveTeamDB(); saveDB(); renderTeam(); refreshActivePage();
 };
 
