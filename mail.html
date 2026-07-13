@@ -357,6 +357,7 @@ body.sb-pinned .dock{left:var(--sb)}
       </div>
       <div class="convo-top">
         <span class="statuspick" id="statuspick"></span>
+        <span id="qc-file-slot"></span>
         <span class="sp"></span>
         <button class="btn sm" id="assignee-btn" title="Assigned to — click to change" onclick="cycleAssign()"></button>
       </div>
@@ -460,6 +461,7 @@ body.sb-pinned .dock{left:var(--sb)}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, ref, onValue, set, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
@@ -473,6 +475,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
+const storage = getStorage(app);
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
 
 // Mail is an office tool — operators get the managers-only lock (same as quote/apar).
@@ -526,6 +529,14 @@ let THREADS=[];               // from the proxy: {key, subject, fromName, fromEm
 let CURRENT=null;             // open thread (with .messages once loaded)
 let navPage='inbox', chipFilter='all';
 let _pollTimer=null;
+// mail.html?thread=<key> (links from other apps) → open that conversation
+// as soon as it's available, from the live list or a flag snapshot
+let _deepThread=new URLSearchParams(location.search).get('thread')||'';
+function maybeOpenDeep(){
+  if(!_deepThread) return;
+  const k=_deepThread;
+  if(THREADS.some(t=>t.key===k)||ghostThreads().some(t=>t.key===k)){ _deepThread=''; openThread(k); }
+}
 
 function setLive(state, txt){
   const c = state==='ok'?'#1f7d57': state==='busy'?'#ba7517': state==='err'?'#a32d2d':'#8a93a0';
@@ -591,6 +602,7 @@ window.loadThreads=async (manual, q)=>{
     $('connect-banner').style.display='none';
     setLive('ok','Live');
     renderList(); renderNavCounts();
+    maybeOpenDeep();
     if(manual) toast('Mail refreshed');
   }catch(e){
     if(e.notConnected){ $('connect-banner').style.display='flex'; setLive('err','Not connected'); }
@@ -704,6 +716,7 @@ window.renderList=()=>{
   const people=assigneeList();
   rows.innerHTML=searchBar+list.map(t=>{
     const f=flagOf(t);
+    const lk=linkOf(t);
     const a=assignOf(t); const p=people.find(x=>x.k===a);
     const boxes=t.mailboxes||[];
     const mbx = boxes.length>1 ? `<span class="mbx both">BOTH</span>` : `<span class="mbx">${esc(boxTag(boxes[0]||''))}</span>`;
@@ -715,7 +728,7 @@ window.renderList=()=>{
       <div class="mid">
         <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
         <div class="sn">${esc(t.snippet||'')}</div>
-        <div class="meta">${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
+        <div class="meta">${(lk&&lk.app==='qc')?`<span class="badge iconly cert" title="Filed in QC — click to open" onclick="event.stopPropagation();location.href='qc.html?cert=${encodeURIComponent(lk.id)}'"><i class="ti ti-license"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
       </div>
       <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
     </div>`;
@@ -846,7 +859,66 @@ window.openThread=async (key)=>{
 function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
   $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')"><i class="ti ti-${f.icon}"></i></span>`).join('');
+  renderQcFile();
 }
+// ── file a cert email into the QC cert library ────────────────────────────────
+function linkOf(t){ const f=FLAGS[t.key]; return (f&&f.link)||null; }
+function renderQcFile(){
+  const slot=$('qc-file-slot'); if(!slot) return;
+  if(!CURRENT){ slot.innerHTML=''; return; }
+  const lk=linkOf(CURRENT);
+  if(lk&&lk.app==='qc'){
+    slot.innerHTML=`<a class="btn sm" href="qc.html?cert=${encodeURIComponent(lk.id)}" title="Open this cert in the QC app" style="text-decoration:none"><i class="ti ti-license"></i> Filed in QC — open</a>`;
+    return;
+  }
+  if(flagOf(CURRENT)==='cert'){
+    slot.innerHTML=`<button class="btn sm" id="qc-file-btn" onclick="fileCertToQC()" title="Copy the attachments into the QC cert library"><i class="ti ti-license"></i> File cert to QC</button>`;
+    return;
+  }
+  slot.innerHTML='';
+}
+window.fileCertToQC=async ()=>{
+  const t=CURRENT; if(!t) return;
+  if(!t.messages){ toast('Give the conversation a second to finish loading, then try again.',true); return; }
+  const box=(t.mailboxes||[])[0];
+  const atts=[];
+  t.messages.forEach(m=>(m.attachments||[]).forEach(a=>{
+    if(a.id) atts.push({box, msg:m.id, att:a.id, mime:a.mime||'application/octet-stream', name:a.filename||'cert'});
+  }));
+  if(!atts.length){ toast('This email has no attachments to file.',true); return; }
+  const btn=$('qc-file-btn');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 nt-spin"></i> Filing…'; }
+  try{
+    const files=[];
+    for(const a of atts){
+      const blob=await fetchAttBlob(a);
+      const safe=(a.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
+      const path='qc/certs/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
+      const task=uploadBytesResumable(sRef(storage,path), blob, {contentType:a.mime});
+      await task;
+      files.push({name:a.name, url:await getDownloadURL(task.snapshot.ref), type:a.mime});
+    }
+    // record shaped exactly like the QC app's own "Add cert" save
+    const id='cert_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
+    const d=new Date(Number(t.date||Date.now()));
+    const certDate=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const rec={ id, createdAt:Date.now(), addedBy:(auth.currentUser&&auth.currentUser.email)||'',
+      material:'', spec:'', heatLot:'', supplier:t.fromName||t.fromEmail||'', mill:'', certNo:'',
+      certDate, size:'', qty:'', po:'', country:'', itar:false,
+      files, file:files[0]||null, linkedOrders:[], invoice:null,
+      mailKey:t.key, mailSubject:t.subject||'' };
+    await set(ref(db,'qc/certs/'+id), rec);
+    const frec=Object.assign({}, FLAGS[t.key]||{}, {
+      flag:(FLAGS[t.key]&&FLAGS[t.key].flag)||'cert',
+      link:{app:'qc', id, label:'QC cert'}, meta:threadSnapshot(t),
+      by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
+    FLAGS[t.key]=frec;
+    await set(ref(db,'mail/threads/'+t.key), frec);
+    renderList();
+    toast('Filed to QC — '+files.length+' file'+(files.length!==1?'s':'')+' now in the cert library. Open it there to add heat/lot and link jobs.');
+  }catch(e){ toast('Could not file the cert: '+((e&&e.message)||e), true); }
+  renderQcFile();
+};
 function threadSnapshot(t){
   return {subject:t.subject||'', fromName:t.fromName||'', fromEmail:t.fromEmail||'',
     snippet:t.snippet||'', date:t.date||0, unread:false, hasAttach:!!t.hasAttach,
@@ -977,6 +1049,7 @@ onAuthStateChanged(auth,(user)=>{
       onValue(ref(db,'mail/threads'),snap=>{
         FLAGS=snap.val()||{};
         renderList(); renderNavCounts();
+        maybeOpenDeep();
         if(CURRENT){ renderFlagPills(); renderAssignee(); }
       });
       onValue(ref(db,'.info/connected'),snap=>{

@@ -564,7 +564,9 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 window.QC_USER=null; window.QC_ROLE='manager';
 let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={};
 let DRAW_FILTER='', DRAW_FOLDER=null;   // DRAW_FOLDER: null = folder view, ''=Unfiled, else customer name
-let page='inspections';
+// qc.html?cert=<id> (links from the mail app) → open the cert library on that cert
+let _deepCert=new URLSearchParams(location.search).get('cert')||'';
+let page=_deepCert?'certs':'inspections';
 let editId=null;
 let _pendingFiles={};
 let CERT_FILTER='';
@@ -664,6 +666,15 @@ function render(){
   else if(page==='certs') c.innerHTML=viewCerts();
   else if(page==='drawings') c.innerHTML=viewDrawings();
   else if(page==='settings') c.innerHTML=viewSettings();
+  if(_deepCert && page==='certs'){
+    const tr=document.getElementById('certrow-'+_deepCert);
+    if(tr){
+      _deepCert='';
+      tr.scrollIntoView({block:'center'});
+      tr.style.transition='background 1.4s'; tr.style.background='#fff3c4';
+      setTimeout(()=>{ tr.style.background=''; },1600);
+    }
+  }
 }
 
 /* ---------- settings (AI connection — same browser storage the Quote app uses) ---------- */
@@ -2359,7 +2370,7 @@ function viewCerts(){
     const sstr=[c.material,c.spec,c.size,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
     const hasFile=nFiles>0||!!(inv.file&&inv.file.url);
     const matCell=hasFile?`<b class="cert-open" onclick="qcViewCert('${c.id}')" title="${t('View cert')}">${esc(c.material||'—')}</b>`:`<b>${esc(c.material||'—')}</b>`;
-    return `<tr data-s="${esc(sstr)}">
+    return `<tr id="certrow-${esc(c.id)}" data-s="${esc(sstr)}">
     <td>${matCell}<div class="muted" style="font-size:12px">${esc(c.spec||'')}</div></td>
     <td>${esc(c.size||'—')}</td>
     <td>${esc(c.heatLot||'—')}${dup?` <span class="badge warn" title="${t('Duplicate heat/lot')}"><i class="ti ti-alert-triangle"></i></span>`:''}${c.itar?` <span class="badge flag" title="ITAR">ITAR</span>`:''}</td>
@@ -2368,6 +2379,7 @@ function viewCerts(){
     <td>${linked.length?`<span class="cert-open" onclick="qcOrderSheet('${c.id}')" title="${t('View / print full order details')}">${linked.map(l=>`<span class="badge neutral">${esc(l)}</span>`).join(' ')} <i class="ti ti-printer" style="opacity:.55"></i></span>`:'<span class="muted">—</span>'}</td>
     <td>${invCell}</td>
     <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:`<button class="icon-btn" onclick="qcAttachCertFile('${c.id}')" title="${t('Attach cert file')}"><i class="ti ti-paperclip"></i></button>`}
+        ${c.mailKey?`<a class="icon-btn mgr-only" style="text-decoration:none" title="${t('Open the email this cert came from')}" href="mail.html?thread=${encodeURIComponent(c.mailKey)}"><i class="ti ti-mail"></i></a>`:''}
         <span class="icon-btn mgr-only" title="${t('Link orders')}" onclick="window.qcEditCertLinks('${c.id}')"><i class="ti ti-link"></i></span>
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
   </tr>`;}).join('');
