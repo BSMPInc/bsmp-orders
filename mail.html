@@ -108,6 +108,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:2px 8px;white-space:nowrap;text-transform:uppercase}
 .badge.iconly{padding:3px 7px;font-size:13px;line-height:1}
 .badge.iconly i{font-size:14px}
+.badge.attention{background:#fdeae2;color:#c04a1d}
 .badge.rfq{background:var(--amber-soft);color:var(--amber)}
 .badge.quoted{background:var(--blue-soft);color:var(--blue)}
 .badge.waiting{background:var(--purple-soft);color:var(--purple)}
@@ -159,6 +160,14 @@ body.sb-pinned .dock{left:var(--sb)}
 .spill{padding:6px 9px;font-size:15px;line-height:1;background:#fff;border:1px solid var(--border);color:var(--text3);cursor:pointer;display:inline-flex;align-items:center}
 .spill i{font-size:15px}
 .spill:hover{border-color:var(--border2);color:var(--text)}
+/* "quote sent" composite icon — a $ riding a diagonal send arrow */
+.qsent-ico{position:relative;display:inline-block;width:1em;height:1em;line-height:1;vertical-align:-.12em}
+.qsent-ico i.qs-d{position:absolute;left:-.05em;bottom:-.06em;font-size:.78em!important}
+.qsent-ico i.qs-a{position:absolute;right:-.14em;top:-.16em;font-size:.6em!important}
+.rowflags .spill .qsent-ico{font-size:13px}
+.nav-item .qsent-ico{font-size:18px;flex:none;width:18px;opacity:.9}
+.dock-tab .qsent-ico{font-size:19px}
+.spill.on-attention{background:#fdeae2;border-color:#c04a1d;color:#c04a1d}
 .spill.on-rfq{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
 .spill.on-quoted{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
 .spill.on-won{background:var(--green-soft);border-color:var(--green);color:var(--green)}
@@ -268,6 +277,7 @@ body.sb-pinned .dock{left:var(--sb)}
   .pane-list .row .rowflags{gap:3px;margin-bottom:3px;padding-right:96px}
   .pane-list .row .rowflags .spill{padding:2px 5px}
   .pane-list .row .rowflags .spill i{font-size:12px}
+  .pane-list .row .rowflags .spill .qsent-ico{font-size:12px}
   .pane-list .row .sj{font-size:12.5px;flex-wrap:nowrap;min-width:0}
   .pane-list .row .sj .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pane-list .row .sn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;margin-top:1px;padding-right:52px}
@@ -313,8 +323,8 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="nav">
       <div class="nav-sec">Mail</div>
       <div class="nav-item active" data-page="inbox" onclick="go('inbox')"><i class="ti ti-mail"></i><span class="nav-label">Shop Inbox</span><span class="n" id="n-inbox" style="display:none"></span></div>
-      <div class="nav-item" data-page="rfq" onclick="go('rfq')"><i class="ti ti-flag"></i><span class="nav-label">RFQs</span><span class="n" id="n-rfq" style="display:none"></span></div>
-      <div class="nav-item" data-page="quoted" onclick="go('quoted')"><i class="ti ti-send"></i><span class="nav-label">Quotes submitted</span></div>
+      <div class="nav-item" data-page="rfq" onclick="go('rfq')"><i class="ti ti-message-dollar"></i><span class="nav-label">RFQs</span><span class="n" id="n-rfq" style="display:none"></span></div>
+      <div class="nav-item" data-page="quoted" onclick="go('quoted')"><span class="qsent-ico"><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span><span class="nav-label">Quotes submitted</span></div>
       <div class="nav-item" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span class="nav-label">Waiting on customer</span></div>
       <div class="nav-sec">Records</div>
       <div class="nav-item" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span class="nav-label">Certs &amp; invoices</span></div>
@@ -415,8 +425,8 @@ body.sb-pinned .dock{left:var(--sb)}
 <!-- dock -->
 <div class="dock" id="mail-dock">
   <button class="dock-tab active" data-page="inbox" onclick="go('inbox')"><i class="ti ti-mail"></i><span>Inbox</span></button>
-  <button class="dock-tab" data-page="rfq" onclick="go('rfq')"><i class="ti ti-flag"></i><span>RFQs</span></button>
-  <button class="dock-tab" data-page="quoted" onclick="go('quoted')"><i class="ti ti-send"></i><span>Quoted</span></button>
+  <button class="dock-tab" data-page="rfq" onclick="go('rfq')"><i class="ti ti-message-dollar"></i><span>RFQs</span></button>
+  <button class="dock-tab" data-page="quoted" onclick="go('quoted')"><span class="qsent-ico"><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span><span>Quoted</span></button>
   <button class="dock-tab" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span>Waiting</span></button>
   <button class="dock-tab" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span>Certs</span></button>
   <button class="dock-tab" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
@@ -527,8 +537,9 @@ function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast s
 
 // ── state ─────────────────────────────────────────────────────────────────────
 const FLAG_DEFS=[
-  {k:'rfq',     label:'RFQ',             icon:'flag'},
-  {k:'quoted',  label:'Quote submitted', icon:'send'},
+  {k:'attention',label:'Needs attention', icon:'alert-triangle'},
+  {k:'rfq',     label:'RFQ',             icon:'message-dollar'},
+  {k:'quoted',  label:'Quote submitted', icon:'currency-dollar', ico:'qsent'},
   {k:'waiting', label:'Waiting on customer', icon:'clock'},
   {k:'won',     label:'Won',             icon:'trophy'},
   {k:'lost',    label:'Lost',            icon:'circle-x'},
@@ -645,6 +656,13 @@ const NAV_META={
   waiting:['Waiting on customer','The ball is in their court', t=>flagOf(t)==='waiting'],
   certs:['Certs & invoices','Paperwork that files itself', t=>['cert','invoice'].includes(flagOf(t))],
 };
+// flag icon markup — 'qsent' is a composite (no single glyph exists for
+// "dollar inside a diagonal send arrow"): a $ riding an up-right arrow
+function flagIcon(f,px){
+  const sz=px?(' style="font-size:'+px+'px"'):'';
+  if(f.ico==='qsent') return '<span class="qsent-ico"'+sz+'><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span>';
+  return '<i class="ti ti-'+f.icon+'"'+sz+'></i>';
+}
 function flagOf(t){ const f=FLAGS[t.key]; return (f&&f.flag)||''; }
 function assignOf(t){ const f=FLAGS[t.key]; return (f&&f.assignee)||''; }
 // Flagged conversations are pinned: the snapshot saved with the flag keeps them
@@ -708,7 +726,7 @@ window.renderList=()=>{
   $('fchips').innerHTML =
     `<span class="fchip${chipFilter==='all'?' on':''}" onclick="setChip('all')">All <span class="n">${counts.all}</span></span>`+
     FLAG_DEFS.filter(f=>counts[f.k]>0||chipFilter===f.k).map(f=>
-      `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')"><i class="ti ti-${f.icon}" style="font-size:14px"></i>${f.label==='Waiting on customer'?'Waiting':f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
+      `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')">${flagIcon(f,14)}${f.label==='Waiting on customer'?'Waiting':f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
     `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`;
 
   const list=visibleThreads();
@@ -732,7 +750,7 @@ window.renderList=()=>{
     const a=assignOf(t); const p=people.find(x=>x.k===a);
     const boxes=t.mailboxes||[];
     const mbx = boxes.length>1 ? `<span class="mbx both">BOTH</span>` : `<span class="mbx">${esc(boxTag(boxes[0]||''))}</span>`;
-    const pills=FLAG_DEFS.map(x=>`<span class="spill${f===x.k?' on-'+x.k:''}" title="${x.label}" onclick="setFlagRow(event,'${esc(t.key)}','${x.k}')"><i class="ti ti-${x.icon}"></i></span>`).join('');
+    const pills=FLAG_DEFS.map(x=>`<span class="spill${f===x.k?' on-'+x.k:''}" title="${x.label}" onclick="setFlagRow(event,'${esc(t.key)}','${x.k}')">${flagIcon(x)}</span>`).join('');
     return `<div class="row${t.unread?' unread':''}${(CURRENT&&CURRENT.key===t.key)?' sel':''}" onclick="openThread('${esc(t.key)}')">
       <div class="rowflags">${pills}</div>
       <span class="${t.unread?'udot':'rdot'}"></span>
@@ -871,7 +889,7 @@ window.openThread=async (key)=>{
 };
 function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
-  $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')"><i class="ti ti-${f.icon}"></i></span>`).join('');
+  $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')">${flagIcon(f)}</span>`).join('');
   renderQcFile();
 }
 // ── file a cert email into the QC cert library ────────────────────────────────
