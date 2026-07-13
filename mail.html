@@ -199,12 +199,12 @@ body.sb-pinned .dock{left:var(--sb)}
 .att-dl:hover{opacity:1}
 /* gmail-style attachment cards in the conversation */
 .attcards{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;align-items:flex-start}
-.attcard{width:200px;max-width:100%;border:1px solid var(--border);background:#fff;cursor:pointer}
+.attcard{width:146px;max-width:100%;border:1px solid var(--border);background:#fff;cursor:pointer}
 .attcard:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(16,24,40,.10)}
 .attcard.slim{width:auto;max-width:260px}
 .attcard.slim .foot{border-top:none}
-.attcard .thumb{height:104px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.attcard .thumb i{font-size:26px;opacity:.7}
+.attcard .thumb{height:74px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.attcard .thumb i{font-size:22px;opacity:.7}
 .attcard .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .attcard .foot{display:flex;align-items:center;gap:7px;padding:7px 9px;border-top:1px solid var(--border)}
 .attcard .foot i{font-size:15px;flex:none}
@@ -935,6 +935,9 @@ window.toggleQuote=(i)=>{ _msgQuoteOpen[i]=!_msgQuoteOpen[i]; renderMsgs(); };
 // and swapped into the message iframes so they render like Gmail does
 let _cidCache={};
 function cidRefd(m,a){ return !!(a.cid && (m.bodyHtml||'').indexOf(a.cid)>=0); }
+// signature junk = an image shown inside the body (cid-referenced) OR any
+// image the sender marked inline — either way it's not a real attachment
+function sigJunk(m,a){ return cidRefd(m,a) || (!!a.inline && (a.mime||'').toLowerCase().startsWith('image/')); }
 function hydrateCids(){
   const t=CURRENT; if(!t||!t.messages) return;
   const box=(t.mailboxes||[])[0];
@@ -1019,7 +1022,7 @@ function renderMsgs(){
   const t=CURRENT; if(!t||!t.messages) return;
   const box=(t.mailboxes||[])[0];
   $('cv-msgs').innerHTML=t.messages.map((m,i)=>{
-    const atts=(m.attachments||[]).filter(a=>!cidRefd(m,a));
+    const atts=(m.attachments||[]).filter(a=>!sigJunk(m,a));
     return `
       <div class="msg">
         <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
@@ -1099,7 +1102,7 @@ window.startQuoteFromEmail=async ()=>{
   let atts=[];
   (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{
     const mime=(a.mime||'').toLowerCase(), name=a.filename||'';
-    if(a.id && !cidRefd(m,a) && (mime.includes('pdf')||mime.startsWith('image/')||/\.(pdf|png|jpe?g|dxf)$/i.test(name)))
+    if(a.id && !sigJunk(m,a) && (mime.includes('pdf')||mime.startsWith('image/')||/\.(pdf|png|jpe?g|dxf)$/i.test(name)))
       atts.push({b:box, m:m.id, a:a.id, t:a.mime||'', n:name});
   }));
   atts=atts.slice(0,3);
@@ -1117,7 +1120,7 @@ window.fileCertToQC=async ()=>{
   const box=(t.mailboxes||[])[0];
   const atts=[];
   t.messages.forEach(m=>(m.attachments||[]).forEach(a=>{
-    if(a.id && !cidRefd(m,a)) atts.push({box, msg:m.id, att:a.id, mime:a.mime||'application/octet-stream', name:a.filename||'cert'});
+    if(a.id && !sigJunk(m,a)) atts.push({box, msg:m.id, att:a.id, mime:a.mime||'application/octet-stream', name:a.filename||'cert'});
   }));
   if(!atts.length){ toast('This email has no attachments to file.',true); return; }
   const btn=$('qc-file-btn');
