@@ -1970,8 +1970,9 @@ function _aliasVariantLabel(key){
 window.unmergeVendor=(variantKey)=>{
   if(!variantKey)return;
   delete vendorAliases[variantKey];
-  dbSet('apar/vendorAliases',vendorAliases,'unmerge vendor');
-  if(vendorAliasNames&&vendorAliasNames[variantKey]){ const nm=vendorAliasNames[variantKey]; delete vendorAliasNames[variantKey]; dbSet('apar/vendorAliasNames',vendorAliasNames,'unmerge name'); }
+  // remove just this key — don't rewrite the whole map (a stale copy would wipe other aliases)
+  dbRemove('apar/vendorAliases/'+variantKey,'unmerge vendor');
+  if(vendorAliasNames&&vendorAliasNames[variantKey]){ delete vendorAliasNames[variantKey]; dbRemove('apar/vendorAliasNames/'+variantKey,'unmerge name'); }
   logAudit('merge',{detail:`Unmerged "${_aliasVariantLabel(variantKey)}"`});
   closePay(); render();
 };
@@ -1989,8 +1990,9 @@ window.confirmMergeVendor=()=>{
   vendorAliasNames[srcKey]=_mergeSrc; // remember the real original name for unmerge display
   // Re-point any aliases that resolved to the source so chains collapse onto the new target.
   Object.keys(vendorAliases).forEach(k=>{ if(vendorKey(vendorAliases[k])===srcKey) vendorAliases[k]=tgtName; });
-  dbSet('apar/vendorAliases',vendorAliases,'merge vendor');
-  dbSet('apar/vendorAliasNames',vendorAliasNames,'merge vendor name');
+  // update() writes the changed keys but never deletes ones a stale device lacks
+  dbUpdate('apar/vendorAliases',vendorAliases,'merge vendor');
+  dbUpdate('apar/vendorAliasNames',vendorAliasNames,'merge vendor name');
   logAudit('merge',{party:tgtName,detail:`Merged "${_mergeSrc}" into "${tgtName}"`});
   closePay(); render();
 };
@@ -3902,14 +3904,14 @@ window.splitCombo=(id)=>{
   // id is 'apc_'+groupKey
   const gkey=id.replace(/^apc_/,'');
   if(!confirm('Split this combined PO into separate bills — one per order step? You can re-combine later.'))return;
-  apSplit[gkey]=true; dbSet('apar/apSplit',apSplit,'split combined PO');
+  apSplit[gkey]=true; dbUpdate('apar/apSplit',{[gkey]:true},'split combined PO');   // touch only this key
   logAudit('add',{detail:`Split combined PO into separate bills`});
   closePay(); render();
 };
 window.recombineCombo=(gkey)=>{
   if(!gkey)return;
   if(apSplit[gkey]){ delete apSplit[gkey]; }
-  dbSet('apar/apSplit',apSplit,'recombine PO');
+  dbUpdate('apar/apSplit',{[gkey]:null},'recombine PO');   // null deletes just this key, leaves the rest
   logAudit('add',{detail:`Re-combined PO steps into one bill`});
   closePay(); render();
 };
