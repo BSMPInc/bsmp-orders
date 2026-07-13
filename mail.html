@@ -166,6 +166,10 @@ body.sb-pinned .dock{left:var(--sb)}
 .spill.on-waiting{background:var(--purple-soft);border-color:var(--purple);color:var(--purple)}
 .spill.on-cert{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
 .spill.on-invoice{background:#f1ece1;border-color:#7a6236;color:#7a6236}
+/* flag pills inside each list row — set a flag without opening the email */
+.rowflags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px}
+.rowflags .spill{padding:3px 6px}
+.rowflags .spill i{font-size:13px}
 .msg{padding:15px 16px;border-bottom:1px solid var(--border)}
 .msg:last-child{border-bottom:none}
 .msg .mh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
@@ -253,6 +257,9 @@ body.sb-pinned .dock{left:var(--sb)}
   .pane-list .row .who .fr{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
   .pane-list .row .who .co{display:none}
   .pane-list .row .mid{margin-top:1px}
+  .pane-list .row .rowflags{gap:3px;margin-bottom:3px}
+  .pane-list .row .rowflags .spill{padding:2px 5px}
+  .pane-list .row .rowflags .spill i{font-size:12px}
   .pane-list .row .sj{font-size:12.5px;flex-wrap:nowrap;min-width:0}
   .pane-list .row .sj .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pane-list .row .sn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11.5px;margin-top:1px;padding-right:52px}
@@ -674,17 +681,18 @@ window.renderList=()=>{
   const people=assigneeList();
   rows.innerHTML=searchBar+list.map(t=>{
     const f=flagOf(t);
-    const fd=FLAG_DEFS.find(x=>x.k===f);
     const a=assignOf(t); const p=people.find(x=>x.k===a);
     const boxes=t.mailboxes||[];
     const mbx = boxes.length>1 ? `<span class="mbx both">BOTH</span>` : `<span class="mbx">${esc(boxTag(boxes[0]||''))}</span>`;
+    const pills=FLAG_DEFS.map(x=>`<span class="spill${f===x.k?' on-'+x.k:''}" title="${x.label}" onclick="setFlagRow(event,'${esc(t.key)}','${x.k}')"><i class="ti ti-${x.icon}"></i></span>`).join('');
     return `<div class="row${t.unread?' unread':''}${(CURRENT&&CURRENT.key===t.key)?' sel':''}" onclick="openThread('${esc(t.key)}')">
       <span class="${t.unread?'udot':'rdot'}"></span>
       <div class="who"><div class="fr">${esc(t.fromName||t.fromEmail||'—')}</div><div class="co">${esc(t.fromName?t.fromEmail:'')}</div></div>
       <div class="mid">
+        <div class="rowflags">${pills}</div>
         <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
         <div class="sn">${esc(t.snippet||'')}</div>
-        <div class="meta">${fd?`<span class="badge iconly ${fd.k}" title="${fd.label}"><i class="ti ti-${fd.icon}"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
+        <div class="meta">${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
       </div>
       <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
     </div>`;
@@ -816,14 +824,17 @@ function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
   $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')"><i class="ti ti-${f.icon}"></i></span>`).join('');
 }
-window.setFlag=(k)=>{
-  if(!CURRENT) return;
-  const cur=flagOf(CURRENT);
+function applyFlag(key,k){
+  const cur=(FLAGS[key]&&FLAGS[key].flag)||'';
   const next=(cur===k)?'':k;
-  const rec=Object.assign({}, FLAGS[CURRENT.key]||{}, {flag:next, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
-  FLAGS[CURRENT.key]=rec; renderFlagPills(); renderList(); renderNavCounts();
-  set(ref(db,'mail/threads/'+CURRENT.key), rec).catch(()=>toast('Could not save the flag — check the mail rule is published.',true));
-};
+  const rec=Object.assign({}, FLAGS[key]||{}, {flag:next, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()});
+  FLAGS[key]=rec;
+  if(CURRENT&&CURRENT.key===key) renderFlagPills();
+  renderList(); renderNavCounts();
+  set(ref(db,'mail/threads/'+key), rec).catch(()=>toast('Could not save the flag — check the mail rule is published.',true));
+}
+window.setFlag=(k)=>{ if(CURRENT) applyFlag(CURRENT.key,k); };
+window.setFlagRow=(ev,key,k)=>{ ev.stopPropagation(); applyFlag(key,k); };
 function renderAssignee(){
   const people=assigneeList();
   const a=CURRENT?assignOf(CURRENT):'';
