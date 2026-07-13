@@ -197,6 +197,21 @@ body.sb-pinned .dock{left:var(--sb)}
 .att.clickable:hover{border-color:var(--accent);color:var(--accent)}
 .att-dl{margin-left:4px;font-size:14px;opacity:.55;padding:2px}
 .att-dl:hover{opacity:1}
+/* gmail-style attachment cards in the conversation */
+.attcards{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;align-items:flex-start}
+.attcard{width:200px;max-width:100%;border:1px solid var(--border);background:#fff;cursor:pointer}
+.attcard:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(16,24,40,.10)}
+.attcard.slim{width:auto;max-width:260px}
+.attcard.slim .foot{border-top:none}
+.attcard .thumb{height:104px;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.attcard .thumb i{font-size:26px;opacity:.7}
+.attcard .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.attcard .foot{display:flex;align-items:center;gap:7px;padding:7px 9px;border-top:1px solid var(--border)}
+.attcard .foot i{font-size:15px;flex:none}
+.attcard .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700}
+.attcard .sz{font-size:11px;color:var(--text3);white-space:nowrap;flex:none}
+.attcard .dl{flex:none;font-size:15px;color:var(--text3);opacity:.6;padding:2px;cursor:pointer}
+.attcard .dl:hover{opacity:1;color:var(--accent)}
 /* outgoing attachments (reply box + compose modal) */
 .out-atts{display:flex;flex-wrap:wrap;gap:6px}
 .out-atts .att{margin:0}
@@ -962,18 +977,58 @@ function msgBodyHtml(m,i){
   if(!s.rest) return `<div class="body">${esc(s.main)}</div>`;
   return `<div class="body">${esc(open?(m.bodyText||m.snippet||''):s.main)}</div>${chip}`;
 }
+function attIcon(mime,name){
+  const m=(mime||'').toLowerCase(), n=(name||'').toLowerCase();
+  if(m.includes('pdf')||n.endsWith('.pdf')) return ['ti-file-type-pdf','#b3352b'];
+  if(m.startsWith('image/')||/\.(png|jpe?g|gif|bmp|webp|tiff?)$/.test(n)) return ['ti-photo','#1f7d57'];
+  if(m.includes('sheet')||m.includes('excel')||/\.(xlsx?|csv)$/.test(n)) return ['ti-table','#1a7f4b'];
+  if(m.includes('word')||/\.(docx?|rtf)$/.test(n)) return ['ti-file-text','#2457a0'];
+  if(/\.(dxf|dwg|step|stp|iges|igs|x_t)$/.test(n)) return ['ti-ruler-measure','#6a1f2e'];
+  if(m.includes('zip')||m.includes('compressed')||/\.(zip|rar|7z)$/.test(n)) return ['ti-file-zip','#7a6236'];
+  return ['ti-file','#5b6675'];
+}
+const fmtSize=(b)=>!b?'':(b>=1048576?((b/1048576).toFixed(1)+' MB'):(Math.max(1,Math.round(b/1024))+' KB'));
+function attCard(box,m,a){
+  const [ico,col]=attIcon(a.mime,a.filename);
+  const isImg=(a.mime||'').toLowerCase().startsWith('image/')||/\.(png|jpe?g|gif|bmp|webp)$/i.test(a.filename||'');
+  const foot=`<div class="foot"><i class="ti ${ico}" style="color:${col}"></i><span class="nm" title="${esc(a.filename)}">${esc(a.filename)}</span><span class="sz">${fmtSize(a.size)}</span>${a.id?`<i class="ti ti-download dl" title="Download" onclick="event.stopPropagation();attClick(this.closest('.attcard'),true)"></i>`:''}</div>`;
+  // images get a picture-preview card; everything else stays a slim one-liner
+  const inner=isImg?`<div class="thumb"><i class="ti ${ico}" style="color:${col}"></i></div>${foot}`:foot;
+  const cls='attcard'+(isImg?'':' slim');
+  if(!a.id) return `<div class="${cls}" style="cursor:default">${inner}</div>`;
+  return `<div class="${cls}" title="Click to view" data-box="${esc(box)}" data-msg="${esc(m.id)}" data-att="${esc(a.id)}" data-mime="${esc(a.mime||'')}" data-name="${esc(a.filename)}" onclick="attClick(this,false)">${inner}</div>`;
+}
+async function hydrateAttThumbs(){
+  const t=CURRENT; if(!t||!t.messages) return;
+  for(const card of [...document.querySelectorAll('#cv-msgs .attcard')]){
+    if(CURRENT!==t) return;   // thread changed mid-hydration
+    const d=card.dataset;
+    if(!d.att || !(d.mime||'').startsWith('image/')) continue;
+    const ck='thumb|'+d.msg+'|'+d.att;
+    try{
+      if(!_cidCache[ck]){
+        const blob=await fetchAttBlob({box:d.box, msg:d.msg, att:d.att, mime:d.mime, name:d.name});
+        _cidCache[ck]=URL.createObjectURL(blob);
+      }
+      const th=card.querySelector('.thumb');
+      if(th) th.innerHTML=`<img src="${_cidCache[ck]}" alt="">`;
+    }catch(e){ /* keep the type icon */ }
+  }
+}
 function renderMsgs(){
   const t=CURRENT; if(!t||!t.messages) return;
   const box=(t.mailboxes||[])[0];
-  $('cv-msgs').innerHTML=t.messages.map((m,i)=>`
+  $('cv-msgs').innerHTML=t.messages.map((m,i)=>{
+    const atts=(m.attachments||[]).filter(a=>!cidRefd(m,a));
+    return `
       <div class="msg">
         <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
         ${msgBodyHtml(m,i)}
-        ${(m.attachments||[]).filter(a=>!cidRefd(m,a)).map(a=>a.id
-          ? `<span class="att clickable" title="Click to view" data-box="${esc(box)}" data-msg="${esc(m.id)}" data-att="${esc(a.id)}" data-mime="${esc(a.mime||'')}" data-name="${esc(a.filename)}" onclick="attClick(this,false)"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}<i class="ti ti-download att-dl" title="Download" onclick="event.stopPropagation();attClick(this.parentElement,true)"></i></span>`
-          : `<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.filename)}${a.size?` · ${Math.round(a.size/1024)} KB`:''}</span>`).join('')}
-      </div>`).join('');
+        ${atts.length?`<div class="attcards">${atts.map(a=>attCard(box,m,a)).join('')}</div>`:''}
+      </div>`;
+  }).join('');
   hydrateCids();
+  hydrateAttThumbs();
 }
 window.openThread=async (key)=>{
   const t=THREADS.find(x=>x.key===key)||ghostThreads().find(x=>x.key===key); if(!t) return;
