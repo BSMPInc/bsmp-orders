@@ -4937,6 +4937,7 @@ function saveQuote(){
     id: Date.now(),
     date: new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),
     status: 'pending',
+    mailKey: window._fromMailKey||null,   // set when this quote was started from an RFQ email
     tier: currentTier || '',
     partNum: pn||'—',
     revision: document.getElementById('revision').value||'—',
@@ -5061,6 +5062,7 @@ function resetForm(){
   const th=document.getElementById('tier-hint'); if(th) th.innerHTML='';
   if(typeof renderTierButtons==='function') renderTierButtons();
   if(!confirm('Clear this quote and start a new one?')) return;
+  window._fromMailKey=null;   // a fresh quote is no longer tied to the RFQ email
   document.getElementById('partnum').value='';
   document.getElementById('revision').value='';
   document.getElementById('qty').value='1';
@@ -5152,6 +5154,7 @@ function renderHistory(){
         <td style="white-space:nowrap;text-align:right">
           <button class="btn btn-sm" onclick="reloadQuote(${q.id})">Load</button>
           <button class="btn btn-sm" title="Print quote" aria-label="Print quote" onclick="printQuoteFromHistory(${q.id})" style="margin-left:3px;padding:5px 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+          ${q.mailKey?`<a class="btn btn-sm" title="Open the RFQ email this quote came from" aria-label="Open source email" href="mail.html?thread=${encodeURIComponent(q.mailKey)}" style="margin-left:3px;padding:5px 7px;text-decoration:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></a>`:''}
           <button class="btn btn-sm btn-danger" title="Delete quote" aria-label="Delete quote" onclick="deleteQuote(${q.id})" style="margin-left:3px;padding:5px 8px">×</button>
         </td>
       </tr>`).join('')}
@@ -5305,6 +5308,23 @@ function renderHistoryStats(list){
   renderHistoryInsights(list);
 }
 
+// quote.html?quote=<id> (links from the mail app) → load that saved quote
+(function(){
+  let qid='';
+  try{ qid=new URLSearchParams(location.search).get('quote')||''; }catch(e){}
+  if(!qid) return;
+  const go=()=>{
+    const idn=Number(qid);
+    if(HISTORY.find(h=>h.id===idn)) reloadQuote(idn);
+    else {
+      showPanel('history');
+      showToast({title:'Quote not on this computer', sub:'Quote history is saved per computer — open this link on the machine the quote was made on.', type:'error', duration:8000});
+    }
+  };
+  if(document.readyState!=='loading') setTimeout(go,150);
+  else document.addEventListener('DOMContentLoaded',()=>setTimeout(go,150));
+})();
+
 function deleteQuote(id){
   HISTORY=HISTORY.filter(q=>q.id!==id);
   try{ if(window._qCloudRemoveQuote) window._qCloudRemoveQuote(id); }catch(e){}
@@ -5320,6 +5340,7 @@ function clearHistory(){
 function reloadQuote(id){
   const q=HISTORY.find(h=>h.id===id); if(!q) return;
   if(q.isAssembly){ loadAssemblyQuote(q); return; }   // assemblies reopen in their own panel
+  window._fromMailKey=q.mailKey||null;   // re-saving a reloaded quote keeps its RFQ-email link
   showPanel('quote');
   const sv=(id,val)=>{const el=document.getElementById(id); if(el && val!==undefined && val!==null && val!=='') el.value=val;};
 
@@ -8654,7 +8675,7 @@ window.syncOptCards=function(){
 <div id="toast-host" aria-live="polite"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-import { getDatabase, ref, set, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+import { getDatabase, ref, set, remove, onValue, get, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 import { getStorage, ref as sref, uploadString, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 const firebaseConfig = {
@@ -8724,6 +8745,7 @@ function quotePayload(q){
     hwLines:    (q.hwLines||[]).map(h=>({ desc:String(h.desc||''), q:String(h.q!=null?h.q:''), c:String(h.c!=null?h.c:'') })),
     notes: q.notes || '',
     drawingUrl: q.drawingUrl || '',
+    mailKey: q.mailKey || '',
     syncedAt: Date.now()
   };
 }
@@ -8731,7 +8753,27 @@ window._qCloudSyncQuote = async (q) => {
   if(!_qUser || !q || q.id==null) return;
   try{ setSync('busy','Syncing\u2026'); await _qPush(q); setSync('ok','Synced'); }
   catch(e){ setSync('err','Sync failed'); const c=$q('q-sync-chip'); if(c) c.title='Last sync error: '+((e&&e.message)||e); console.warn('quote sync failed', e); }
+  // quote came from an RFQ email \u2192 stamp the link back onto the mail thread
+  if(q.mailKey){
+    try{ await update(ref(db,'mail/threads/'+q.mailKey), {link:{app:'quote', id:q.id, label:'Quote'+(q.partNum&&q.partNum!=='\u2014'?(' '+q.partNum):'')}}); }
+    catch(e){ console.warn('mail link-back failed', e); }
+  }
 };
+// quote.html?fromMail=<key> (mail app's "Create quote from this email") \u2192
+// prefill the calculator from the email's flag snapshot
+async function _qFromMail(){
+  let key='';
+  try{ key=new URLSearchParams(location.search).get('fromMail')||''; }catch(e){}
+  if(!key || window._fromMailKey) return;
+  window._fromMailKey=key;
+  try{
+    const snap=await get(ref(db,'mail/threads/'+key));
+    const m=(snap.val()||{}).meta||{};
+    const cust=$q('customer'); if(cust && !cust.value) cust.value=m.fromName||m.fromEmail||'';
+    const notes=$q('notes'); if(notes && !notes.value && m.subject) notes.value='RFQ email: "'+m.subject+'"'+(m.fromEmail?(' \u2014 '+m.fromEmail):'');
+    if(typeof showToast==='function') showToast({title:'Started from RFQ email', sub:'Customer prefilled \u2014 saving this quote links it back to the email.', duration:6500});
+  }catch(e){ console.warn('fromMail prefill failed', e); }
+}
 window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
   try{ await remove(ref(db,'quotes/'+id)); _qSynced.delete(id); _qSaveSynced(); }catch(e){ console.warn('quote remove failed', e); }
@@ -8836,7 +8878,7 @@ onAuthStateChanged(auth, (user) => {
       return;   // no sync/backfill \u2014 the quote tool never loads for operators
     }
     hideMgrLock();
-    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen();
+    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); _qFromMail();
   }
   else { hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
 });

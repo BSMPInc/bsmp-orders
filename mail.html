@@ -728,7 +728,7 @@ window.renderList=()=>{
       <div class="mid">
         <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
         <div class="sn">${esc(t.snippet||'')}</div>
-        <div class="meta">${(lk&&lk.app==='qc')?`<span class="badge iconly cert" title="Filed in QC — click to open" onclick="event.stopPropagation();location.href='qc.html?cert=${encodeURIComponent(lk.id)}'"><i class="ti ti-license"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
+        <div class="meta">${(lk&&lk.app==='qc')?`<span class="badge iconly cert" title="Filed in QC — click to open" onclick="event.stopPropagation();location.href='qc.html?cert=${encodeURIComponent(lk.id)}'"><i class="ti ti-license"></i></span>`:''}${(lk&&lk.app==='quote')?`<span class="badge iconly quoted" title="${esc(lk.label||'Quote')} — click to open" onclick="event.stopPropagation();location.href='quote.html?quote=${encodeURIComponent(lk.id)}'"><i class="ti ti-calculator"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
       </div>
       <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}</div>
     </div>`;
@@ -871,12 +871,31 @@ function renderQcFile(){
     slot.innerHTML=`<a class="btn sm" href="qc.html?cert=${encodeURIComponent(lk.id)}" title="Open this cert in the QC app" style="text-decoration:none"><i class="ti ti-license"></i> Filed in QC — open</a>`;
     return;
   }
-  if(flagOf(CURRENT)==='cert'){
+  if(lk&&lk.app==='quote'){
+    slot.innerHTML=`<a class="btn sm" href="quote.html?quote=${encodeURIComponent(lk.id)}" title="Open ${esc(lk.label||'the quote')} in the Quote Tool" style="text-decoration:none"><i class="ti ti-calculator"></i> ${esc(lk.label||'Quote')} — open</a>`;
+    return;
+  }
+  const f=flagOf(CURRENT);
+  if(f==='cert'){
     slot.innerHTML=`<button class="btn sm" id="qc-file-btn" onclick="fileCertToQC()" title="Copy the attachments into the QC cert library"><i class="ti ti-license"></i> File cert to QC</button>`;
+    return;
+  }
+  if(f==='rfq'){
+    slot.innerHTML=`<button class="btn sm" onclick="startQuoteFromEmail()" title="Open the Quote Tool with this customer prefilled — saving the quote links it back here"><i class="ti ti-calculator"></i> Create quote from this email</button>`;
     return;
   }
   slot.innerHTML='';
 }
+window.startQuoteFromEmail=async ()=>{
+  const t=CURRENT; if(!t) return;
+  // make sure the snapshot is saved first — the quote tool prefills from it
+  const frec=Object.assign({}, FLAGS[t.key]||{}, {
+    flag:(FLAGS[t.key]&&FLAGS[t.key].flag)||'rfq', meta:threadSnapshot(t),
+    by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
+  FLAGS[t.key]=frec;
+  try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){}
+  location.href='quote.html?fromMail='+encodeURIComponent(t.key);
+};
 window.fileCertToQC=async ()=>{
   const t=CURRENT; if(!t) return;
   if(!t.messages){ toast('Give the conversation a second to finish loading, then try again.',true); return; }
