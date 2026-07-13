@@ -726,7 +726,14 @@ function ghostThreads(){
   // without a snapshot heal via backfillFlagMeta the moment their email loads.
   return Object.entries(FLAGS)
     .filter(([k,v])=>v&&(v.flag||v.assignee)&&v.meta&&!have.has(k))
-    .map(([k,v])=>Object.assign({key:k},v.meta));
+    .map(([k,v])=>{
+      const g=Object.assign({key:k}, v.meta);
+      // rebuild box→threadId map from the dot-free list stored in the snapshot
+      if(!g.ids || typeof g.ids!=='object'){
+        g.ids={}; (g.idList||[]).forEach(e=>{ if(e&&e.box) g.ids[e.box]=e.id; });
+      }
+      return g;
+    });
 }
 function allThreads(){ return THREADS.concat(ghostThreads()).sort((a,b)=>b.date-a.date); }
 // Heal legacy flags: when a flagged email is present in the loaded list but its
@@ -1183,9 +1190,13 @@ window.fileCertToQC=async ()=>{
   renderQcFile();
 };
 function threadSnapshot(t){
+  const ids=t.ids||{};
+  // store the box→threadId map as a LIST, not an object: Firebase keys can't
+  // contain "." and mailbox keys are email addresses (info@bertsmp.com)
+  const idList=Object.keys(ids).map(box=>({box:box, id:ids[box]||''}));
   return {subject:t.subject||'', fromName:t.fromName||'', fromEmail:t.fromEmail||'',
     snippet:t.snippet||'', date:t.date||0, unread:false, hasAttach:!!t.hasAttach,
-    mailboxes:t.mailboxes||[], ids:t.ids||{}};
+    mailboxes:t.mailboxes||[], idList:idList};
 }
 function applyFlag(key,k){
   const cur=(FLAGS[key]&&FLAGS[key].flag)||'';
