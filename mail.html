@@ -223,6 +223,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .att-dl:hover{opacity:1}
 /* gmail-style attachment cards in the conversation */
 .attcards{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;align-items:flex-start}
+.msg-tbls{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .attcard{width:146px;max-width:100%;border:1px solid var(--border);background:#fff;cursor:pointer}
 .attcard:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(16,24,40,.10)}
 .attcard.slim{width:auto;max-width:260px}
@@ -1297,12 +1298,15 @@ async function hydrateAttThumbs(){
 function renderMsgs(){
   const t=CURRENT; if(!t||!t.messages) return;
   const box=(t.mailboxes||[])[0];
+  _msgTables={};
   $('cv-msgs').innerHTML=t.messages.map((m,i)=>{
     const atts=(m.attachments||[]).filter(a=>!sigJunk(m,a));
+    const tbls=detectMsgTables(m); _msgTables[i]=tbls;
     return `
       <div class="msg">
         <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
         ${msgBodyHtml(m,i)}
+        ${tbls.length?`<div class="msg-tbls">${tbls.map((r,ti)=>`<button class="btn sm" title="Copy this table into the reply so you can fill it in and send it back" onclick="useMsgTable(${i},${ti})"><i class="ti ti-table"></i> Copy table to reply · ${r.length}×${r[0].length}</button>`).join('')}</div>`:''}
         ${atts.length?`<div class="attcards">${atts.map(a=>attCard(box,m,a)).join('')}</div>`:''}
       </div>`;
   }).join('');
@@ -1544,15 +1548,45 @@ window.dropTable=(ctx,i,ev)=>{ if(ev) ev.stopPropagation(); window._outTables[ct
 
 // ── table builder: a small grid you type into, sent as a real HTML table ──────
 let _tblCtx='compose', _tblIdx=-1, _tblGrid=[];
-window.openTable=(ctx,idx)=>{
-  _tblCtx=ctx; _tblIdx=(idx==null?-1:idx);
-  const ex=_tblIdx>=0 ? window._outTables[ctx][_tblIdx] : null;
-  _tblGrid=ex ? ex.rows.map(r=>r.slice()) : [['','',''],['','',''],['','','']];
-  $('tbl-title').value=ex?(ex.title||''):'';
-  $('tbl-header').checked=ex?!!ex.header:true;
+function _tblShow(ctx,idx,grid,title,header){
+  _tblCtx=ctx; _tblIdx=idx; _tblGrid=grid;
+  $('tbl-title').value=title||'';
+  $('tbl-header').checked=header!==false;
   tblHeaderChanged(); paintTblGrid();
   $('table-modal').style.display='flex';
   setTimeout(()=>{ const f=document.querySelector('#tbl-grid input'); if(f) f.focus(); },30);
+}
+window.openTable=(ctx,idx)=>{
+  const ex=(idx!=null)?window._outTables[ctx][idx]:null;
+  _tblShow(ctx, ex?idx:-1, ex?ex.rows.map(r=>r.slice()):[['','',''],['','',''],['','','']], ex?(ex.title||''):'', ex?!!ex.header:true);
+};
+// ── tables inside received mail → copy into the reply builder to fill in ──────
+let _msgTables={};   // message index → [rows,…] found in that message's HTML
+function detectMsgTables(m){
+  if(!m||!m.bodyHtml) return [];
+  const out=[];
+  try{
+    const doc=new DOMParser().parseFromString(m.bodyHtml,'text/html');
+    // ignore quoted history — same markers the collapse feature hides
+    doc.querySelectorAll('.gmail_quote,blockquote,#divRplyFwdMsg,#appendonsend').forEach(n=>n.remove());
+    doc.querySelectorAll('table').forEach(tb=>{
+      if(tb.querySelector('table')) return;   // wrappers around nested tables are layout, not data
+      let rows=[...tb.rows].map(tr=>[...tr.cells].map(td=>(td.textContent||'').replace(/\s+/g,' ').trim()))
+        .filter(r=>r.length&&r.some(c=>c));
+      if(rows.length<2||rows.length>30) return;
+      const w=Math.max(...rows.map(r=>r.length));
+      if(w<2||w>10) return;
+      if(rows.some(r=>r.some(c=>c.length>90))) return;   // paragraph-length cells = layout table
+      out.push(rows.map(r=>{ while(r.length<w) r.push(''); return r; }));
+    });
+  }catch(e){ /* bad HTML — just no button */ }
+  return out.slice(0,4);
+}
+window._detectTables=detectMsgTables;   // debug hook
+window.useMsgTable=(mi,ti)=>{
+  const rows=(_msgTables[mi]||[])[ti]; if(!rows) return;
+  expandReply();
+  _tblShow('reply',-1,rows.map(r=>r.slice()),'',true);
 };
 function paintTblGrid(){
   $('tbl-grid').innerHTML=_tblGrid.map((r,ri)=>'<tr>'+r.map((c,ci)=>
