@@ -424,7 +424,7 @@ body.sb-pinned .dock{left:var(--sb)}
         The app is ready, but it can't read the mailboxes until the Google setup is finished and the mail proxy address is saved in <span style="text-decoration:underline;cursor:pointer;font-weight:700" onclick="go('settings')">Settings</span>. Flags and this screen will come alive the moment that's done.</div>
       </div>
       <div class="toolbar">
-        <button class="btn primary" title="New email — keyboard: C" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
+        <button class="btn primary" title="New email — keyboard: Ctrl+M" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
         <span class="fchips" id="mbxpick" style="margin:0" title="Show one mailbox at a time"></span>
         <input class="search" id="search" placeholder="Search — Enter searches all mail history…" oninput="window.searchInput()" onkeydown="if(event.key==='Enter')window.searchAll()">
         <span class="hint" style="margin-left:auto" id="list-count"></span>
@@ -459,7 +459,7 @@ body.sb-pinned .dock{left:var(--sb)}
       </div>
       <div class="card">
         <div class="reply" id="reply-box">
-          <div class="reply-collapsed" title="Keyboard: R" onclick="expandReply()"><i class="ti ti-arrow-back-up"></i> Reply</div>
+          <div class="reply-collapsed" title="Keyboard: Ctrl+R" onclick="expandReply()"><i class="ti ti-arrow-back-up"></i> Reply</div>
           <div class="reply-row">
             <select id="reply-as" title="Sends through Gmail from this address — lands in its real Sent folder, threads correctly" onchange="renderSigHints()"></select>
             <button class="btn sm" id="reply-all-btn" title="Reply all — everyone on the email gets the reply, not just the sender" onclick="toggleReplyAll()"><i class="ti ti-users"></i></button>
@@ -501,7 +501,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="set-card">
         <h3><i class="ti ti-keyboard"></i> Keyboard shortcuts</h3>
         <div class="set-help" style="margin-top:0">
-          <b>R</b> — reply to the open conversation &nbsp;·&nbsp; <b>C</b> — new email &nbsp;·&nbsp; <b>A</b> — attach files (reply or new email, whichever is open) &nbsp;·&nbsp; <b>Ctrl+Enter</b> — send what you're typing &nbsp;·&nbsp; <b>Esc</b> — close a popup. Letter keys stay out of your way while you're typing.
+          <b>Ctrl+R</b> — reply to the open conversation &nbsp;·&nbsp; <b>Ctrl+M</b> — new email &nbsp;·&nbsp; <b>Ctrl+Shift+A</b> — attach files (reply or new email, whichever is open) &nbsp;·&nbsp; <b>Ctrl+Enter</b> — send what you're typing &nbsp;·&nbsp; <b>Esc</b> — close a popup. Ctrl+C and Ctrl+A still copy and select-all as normal; Ctrl+R goes back to being browser refresh when no conversation is open.
         </div>
       </div>
       <button class="btn primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save settings</button>
@@ -670,34 +670,38 @@ function showUndo(msg,opts){
 // a pending send would be lost if the tab closed mid-countdown — make the browser ask
 window.addEventListener('beforeunload',(e)=>{ if(_undoState&&_undoState.onTimeout){ e.preventDefault(); e.returnValue=''; } });
 
-// ── keyboard shortcuts: R reply · C compose · A attach · Ctrl+Enter send ──────
-function _typing(){ const e=document.activeElement; return !!(e&&(e.tagName==='INPUT'||e.tagName==='TEXTAREA'||e.tagName==='SELECT'||e.isContentEditable)); }
+// ── keyboard shortcuts: Ctrl+R reply · Ctrl+M compose · Ctrl+Shift+A attach ────
+// (Ctrl+C stays copy and Ctrl+A stays select-all — that's why M and Shift+A)
 document.addEventListener('keydown',(ev)=>{
   if($('login').style.display!=='none') return;   // signed out — nothing to do
   const composeOpen=$('compose-modal').style.display==='flex';
   const tableOpen=$('table-modal').style.display==='flex';
-  // Ctrl+Enter sends whichever composer you're typing in (works mid-typing)
+  // Ctrl+Enter sends whichever composer you're typing in
   if((ev.ctrlKey||ev.metaKey)&&ev.key==='Enter'){
     const id=document.activeElement&&document.activeElement.id;
     if(id==='reply-body'){ ev.preventDefault(); window.sendReply(); }
     else if(composeOpen&&['cp-body','cp-subject','cp-to'].includes(id)){ ev.preventDefault(); window.sendCompose(); }
     return;
   }
-  // Esc backs out of popups (also works mid-typing)
+  // Esc backs out of popups
   if(ev.key==='Escape'){
     if(tableOpen) window.closeTable();
     else if(composeOpen) window.closeCompose();
     return;
   }
-  if(ev.ctrlKey||ev.metaKey||ev.altKey||_typing()||tableOpen) return;
+  if(!(ev.ctrlKey||ev.metaKey)||ev.altKey||tableOpen) return;
   const k=(ev.key||'').toLowerCase();
-  if(k==='c'&&!composeOpen){ ev.preventDefault(); window.openCompose(); }
-  else if(k==='a'){
+  if(k==='r'&&!ev.shiftKey){
+    // only claim Ctrl+R when there's a conversation to reply to — otherwise
+    // the browser keeps its reload
+    if(CURRENT&&!composeOpen){ ev.preventDefault(); window.expandReply(); }
+  } else if(k==='m'&&!ev.shiftKey&&!composeOpen){
+    ev.preventDefault(); window.openCompose();
+  } else if(k==='a'&&ev.shiftKey){
     ev.preventDefault();
     if(composeOpen) window.pickAtt('compose');
     else if(CURRENT){ window.expandReply(); window.pickAtt('reply'); }
   }
-  else if(k==='r'&&!composeOpen&&CURRENT){ ev.preventDefault(); window.expandReply(); }
 });
 
 // ── state ─────────────────────────────────────────────────────────────────────
