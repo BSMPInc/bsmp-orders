@@ -22,6 +22,8 @@
                    tables: [{title?, header?, rows:[[cells…]]}] — appended after
                    the body (before the signature) as real HTML tables; the
                    plain-text alternative gets padded-column versions
+                   sigLogo: {data(base64), mime, width} — signature logo,
+                   embedded inline (cid) under the signature text
       POST /trash   {ids:{box:threadId}} move to Gmail trash in every box
       POST /untrash {ids:{box:threadId}} restore from trash (the undo)
 */
@@ -303,24 +305,34 @@ async function sendMail(env, mailboxes, p) {
   if (attBytes > 16 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~10 MB total');
 
   // optional tables: sent as structured rows, rendered as real HTML tables.
-  // With tables the email goes out multipart/alternative (plain + HTML) so
-  // old mail programs still get a readable padded-column text version.
+  // With tables (or a signature logo) the email goes out multipart/alternative
+  // (plain + HTML) so old mail programs still get a readable text version.
   const tables = (Array.isArray(p.tables) ? p.tables : []).filter(t => t && Array.isArray(t.rows))
     .map(t => ({ title: String(t.title || ''), header: !!t.header,
       rows: t.rows.slice(0, 30).map(r => (Array.isArray(r) ? r : [r]).slice(0, 10).map(c => String(c == null ? '' : c))) }))
     .filter(t => t.rows.length && t.rows.some(r => r.some(c => c.trim())));
+  // optional signature logo: small base64 image, embedded inline (cid) so it
+  // shows without the recipient clicking "load remote images"
+  const logo = (p.sigLogo && typeof p.sigLogo.data === 'string' && p.sigLogo.data.length < 700000
+      && /^image\//.test(p.sigLogo.mime || ''))
+    ? { data: p.sigLogo.data.replace(/[^A-Za-z0-9+/=]/g, ''),
+        mime: String(p.sigLogo.mime).replace(/[\r\n";]/g, ''),
+        width: Math.max(40, Math.min(600, parseInt(p.sigLogo.width) || 160)) }
+    : null;
+  const wantHtml = tables.length > 0 || !!logo;
   let main = p.body || '', sig = '';
-  if (tables.length) {   // tables go after the text but the signature stays last
+  if (wantHtml) {   // tables go after the text but the signature stays last
     const si = main.lastIndexOf('\n\n-- \n');
     if (si >= 0) { sig = main.slice(si); main = main.slice(0, si); }
     else if (/^-- \n/.test(main)) { sig = '\n\n' + main; main = ''; }
   }
-  const plain = tables.length
-    ? (main ? main + '\n\n' : '') + tables.map(tableText).join('\n\n') + sig
-    : main;
-  const html = tables.length
+  const mid = tables.map(tableText).join('\n\n');
+  const plain = wantHtml ? main + (mid ? (main ? '\n\n' : '') + mid : '') + sig : main;
+  const html = wantHtml
     ? '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">' +
-      textToHtml(main) + tables.map(tableHtml).join('') + textToHtml(sig) + '</div>'
+      textToHtml(main) + tables.map(tableHtml).join('') + textToHtml(sig) +
+      (logo ? `<div style="margin-top:10px"><img src="cid:bsmpsiglogo" width="${logo.width}" style="display:block;max-width:100%;height:auto;border:0" alt=""></div>` : '') +
+      '</div>'
     : '';
 
   const ccLine = cc.length ? `Cc: ${cc.join(', ')}\r\n` : '';
@@ -328,10 +340,21 @@ async function sendMail(env, mailboxes, p) {
   const utf8 = (s) => unescape(encodeURIComponent(s));   // text → binary string for btoa
   let cType = 'text/plain; charset=UTF-8', content = plain;
   if (html) {
+    // HTML side: plain text/html, or multipart/related when a logo is embedded
+    let htmlSection;
+    if (logo) {
+      const rel = 'rel_bsmp_' + Math.random().toString(36).slice(2);
+      const lb64 = logo.data.replace(/(.{76})/g, '$1\r\n');
+      htmlSection = `Content-Type: multipart/related; boundary="${rel}"\r\n\r\n` +
+        `--${rel}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n\r\n` +
+        `--${rel}\r\nContent-Type: ${logo.mime}\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <bsmpsiglogo>\r\nContent-Disposition: inline; filename="logo"\r\n\r\n${lb64}\r\n--${rel}--`;
+    } else {
+      htmlSection = `Content-Type: text/html; charset=UTF-8\r\n\r\n${html}`;
+    }
     const alt = 'alt_bsmp_' + Math.random().toString(36).slice(2);
     cType = `multipart/alternative; boundary="${alt}"`;
     content = `--${alt}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plain}\r\n\r\n` +
-              `--${alt}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n\r\n--${alt}--`;
+              `--${alt}\r\n${htmlSection}\r\n\r\n--${alt}--`;
   }
   let bin;   // full MIME message as a binary string
   if (atts.length) {

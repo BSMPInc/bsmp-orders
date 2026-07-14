@@ -287,6 +287,11 @@ body.sb-pinned .dock{left:var(--sb)}
 .set-card input:focus{border-color:var(--accent)}
 .set-card textarea{width:100%;min-height:88px;padding:8px 11px;border:1px solid var(--border2);background:#fff;outline:none;resize:vertical;font:inherit;font-size:13px;line-height:1.45}
 .set-card textarea:focus{border-color:var(--accent)}
+.sig-logo{margin:8px 0 14px}
+.sig-logo img{display:block;border:1px solid var(--border);background:#fff;padding:4px;margin-bottom:8px;max-width:100%}
+.sig-logo-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sig-logo-ctl input[type=range]{width:180px}
+.sig-logo-ctl span{font-size:12px;color:var(--text2);font-weight:700;min-width:86px}
 .set-card .rowline{display:flex;gap:8px;align-items:center}
 .set-help{font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5}
 
@@ -489,7 +494,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="set-card">
         <h3><i class="ti ti-signature"></i> Signatures</h3>
         <div id="set-sigs"></div>
-        <div class="set-help">Added automatically to the bottom of every email sent from that address — replies and new emails both. Leave one blank to send without a signature. Shared by the whole team, and separate from the signature set inside Gmail itself (Gmail's only applies to mail written at gmail.com).</div>
+        <div class="set-help">Added automatically to the bottom of every email sent from that address — replies and new emails both. Leave one blank to send without a signature. Add a logo and it's embedded inside the email under your signature text (never a blocked "load images" placeholder) at the width you set with the slider. Shared by the whole team, and separate from the signature set inside Gmail itself (Gmail's only applies to mail written at gmail.com).</div>
       </div>
       <button class="btn primary" onclick="saveSettings()"><i class="ti ti-check"></i> Save settings</button>
       <span class="hint" id="set-status" style="margin-left:10px"></span>
@@ -1483,7 +1488,11 @@ function renderReplyAs(){
   renderSigHints();
 }
 // ── signatures (shared, mail/signatures/<emailKey>) ───────────────────────────
-const sigOf=(addr)=>String(SIGS[mkey(addr)]||'').trim();
+// stored as a plain string (text only) or {text, logo:{data,mime,width}} — the
+// logo is embedded in outgoing HTML mail so customers never see a blocked image
+const sigRec=(addr)=>{ const v=SIGS[mkey(addr)]; return (v&&typeof v==='object')?v:{text:String(v||'')}; };
+const sigOf=(addr)=>String(sigRec(addr).text||'').trim();
+const sigLogoOf=(addr)=>{ const l=sigRec(addr).logo; return (l&&l.data)?{data:l.data, mime:l.mime||'image/png', width:l.width||160}:null; };
 // appended at send time with the standard "-- " delimiter; an attachment-only
 // email still gets the signature as its body so it doesn't go out blank
 function withSig(body,addr){
@@ -1635,7 +1644,7 @@ window.sendReply=()=>{
   if(!body && !atts.length && !tbls.length){ toast('Write a reply or attach a file first.',true); return; }
   const t=CURRENT, box=(t.mailboxes||[])[0];
   const payload={replyAs:$('reply-as').value, box, id:t.ids&&t.ids[box], ids:t.ids||{}, all:!!window._replyAll,
-    body:withSig(body,$('reply-as').value), tables:tbls.slice(),
+    body:withSig(body,$('reply-as').value), tables:tbls.slice(), sigLogo:sigLogoOf($('reply-as').value),
     attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
   // stash the draft so Undo (or a failed send) can put everything back
   const draft={body:$('reply-body').value, atts:atts.slice(), tbls:tbls.slice(), all:window._replyAll};
@@ -1678,7 +1687,7 @@ window.sendCompose=()=>{
   const atts=window._outAtt.compose, tbls=window._outTables.compose;
   if(!to||(!body&&!atts.length&&!tbls.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
   const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value), tables:tbls.slice(),
-    attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
+    sigLogo:sigLogoOf($('cp-from').value), attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
   const draft={from:$('cp-from').value, to:$('cp-to').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice(), tbls:tbls.slice()};
   const restore=()=>{
     openCompose();
@@ -1698,26 +1707,91 @@ window.sendCompose=()=>{
 function renderSettings(){
   // don't stomp on the user's typing — settings auto-save as they type
   const ae=document.activeElement && document.activeElement.id;
-  if(ae==='set-proxy'||ae==='set-boxes'||(ae&&ae.indexOf('set-sig-')===0)) return;
+  if(ae==='set-proxy'||ae==='set-boxes'||(ae&&ae.indexOf('set-sig')===0)) return;
   $('set-proxy').value=SETTINGS.proxyUrl||'';
   $('set-boxes').value=(SETTINGS.mailboxes||[]).join(', ');
   const boxes=SETTINGS.mailboxes||[];
-  $('set-sigs').innerHTML=boxes.map(a=>
-    `<label>${esc(a)}</label><textarea id="set-sig-${esc(mkey(a))}" data-addr="${esc(a)}" placeholder="Typed under a “-- ” line at the bottom of every email sent as ${esc(a)}" oninput="window._sigChanged(this)"></textarea>`).join('')
+  $('set-sigs').innerHTML=boxes.map(a=>{
+    const k=esc(mkey(a)), logo=sigLogoOf(a);
+    return `<label>${esc(a)}</label>
+    <textarea id="set-sig-${k}" data-addr="${esc(a)}" placeholder="Typed under a “-- ” line at the bottom of every email sent as ${esc(a)}" oninput="window._sigChanged(this)"></textarea>
+    <div class="sig-logo">
+      ${logo?`<img id="set-sigimg-${k}" src="data:${esc(logo.mime)};base64,${String(logo.data).replace(/[^A-Za-z0-9+/=]/g,'')}" style="width:${Math.max(40,Math.min(600,+logo.width||160))}px" alt="signature logo">
+        <div class="sig-logo-ctl">
+          <input type="range" id="set-sigsize-${k}" data-addr="${esc(a)}" min="60" max="320" step="4" value="${Math.max(40,Math.min(600,+logo.width||160))}" oninput="window._sigLogoSize(this)" title="Drag to size the logo in the email">
+          <span id="set-sigw-${k}">${Math.max(40,Math.min(600,+logo.width||160))}px wide</span>
+          <button class="btn sm" onclick="window._sigLogoRemove('${esc(a)}')"><i class="ti ti-x"></i> Remove logo</button>
+        </div>`
+      :`<button class="btn sm" onclick="document.getElementById('set-sigfile-${k}').click()"><i class="ti ti-photo-up"></i> Add a logo</button>`}
+      <input type="file" id="set-sigfile-${k}" data-addr="${esc(a)}" accept="image/*" style="display:none" onchange="window._sigLogoFile(this)">
+    </div>`;
+  }).join('')
     ||'<div class="set-help">Add a mailbox above first — each one gets its own signature.</div>';
-  boxes.forEach(a=>{ const el=document.getElementById('set-sig-'+mkey(a)); if(el) el.value=SIGS[mkey(a)]||''; });
+  boxes.forEach(a=>{ const el=document.getElementById('set-sig-'+mkey(a)); if(el) el.value=sigOf(a); });
 }
 let _sigTimers={};
+// per-address write — never set() the whole signatures node from memory.
+// Text-only signatures stay plain strings; a logo upgrades the record to
+// {text, logo:{data,mime,width}} (sigRec reads both shapes).
+function saveSig(addr, text, logo){
+  const k=mkey(addr); if(!k) return;
+  const val = logo ? {text:text||'', logo} : (text||'');
+  SIGS[k]=val;   // local first so the settings page repaints instantly
+  $('set-status').textContent='Saving…';
+  set(ref(db,'mail/signatures/'+k), val)
+    .then(()=>{ $('set-status').textContent='Saved ✓'; })
+    .catch(()=>{ $('set-status').textContent='Save failed'; toast('Could not save the signature — is the mail rule published?',true); });
+}
+// current textarea value if it's on screen, else what's saved
+function sigTextNow(addr){ const el=document.getElementById('set-sig-'+mkey(addr)); return el?el.value:sigOf(addr); }
 window._sigChanged=(el)=>{
-  const k=mkey(el.dataset.addr); if(!k) return;
+  const addr=el.dataset.addr, k=mkey(addr); if(!k) return;
   $('set-status').textContent='Saving…';
   clearTimeout(_sigTimers[k]);
-  _sigTimers[k]=setTimeout(()=>{
-    // per-address write — never set() the whole signatures node from memory
-    set(ref(db,'mail/signatures/'+k), el.value)
-      .then(()=>{ $('set-status').textContent='Saved ✓'; })
-      .catch(()=>{ $('set-status').textContent='Save failed'; toast('Could not save the signature — is the mail rule published?',true); });
-  },900);
+  _sigTimers[k]=setTimeout(()=>saveSig(addr, el.value, sigLogoOf(addr)), 900);
+};
+// logo upload: shrink to email size client-side so the record stays small
+function _readDataURL(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result)); r.onerror=()=>rej(new Error('could not read the file')); r.readAsDataURL(f); }); }
+function _loadImg(src){ return new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>rej(new Error('that file doesn’t look like an image')); i.src=src; }); }
+async function processLogo(f){
+  const img=await _loadImg(await _readDataURL(f));
+  const maxW=640, sc=Math.min(1, maxW/(img.naturalWidth||1));   // 2× the largest display size — stays sharp
+  const cv=document.createElement('canvas');
+  cv.width=Math.max(1,Math.round(img.naturalWidth*sc)); cv.height=Math.max(1,Math.round(img.naturalHeight*sc));
+  const cx=cv.getContext('2d'); cx.drawImage(img,0,0,cv.width,cv.height);
+  let mime=f.type==='image/jpeg'?'image/jpeg':'image/png';
+  let out=cv.toDataURL(mime,0.85);
+  if(out.length>260000){   // too heavy — flatten onto white and go JPEG
+    cx.globalCompositeOperation='destination-over'; cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height);
+    mime='image/jpeg'; out=cv.toDataURL(mime,0.72);
+  }
+  if(out.length>260000) throw new Error('That image is too big even after shrinking — use a simpler logo file.');
+  return {data:out.split(',')[1], mime};
+}
+window._sigLogoFile=async (input)=>{
+  const addr=input.dataset.addr, f=input.files&&input.files[0];
+  input.value='';
+  if(!addr||!f) return;
+  if(!/^image\//.test(f.type||'')){ toast('Pick an image file — PNG or JPG.',true); return; }
+  try{
+    const logo=await processLogo(f); logo.width=160;
+    saveSig(addr, sigTextNow(addr), logo);
+    renderSettings(); toast('Logo added — drag the slider to size it.');
+  }catch(e){ toast(e.message,true); }
+};
+window._sigLogoSize=(el)=>{
+  const addr=el.dataset.addr, k=mkey(addr), w=+el.value||160;
+  const img=document.getElementById('set-sigimg-'+k); if(img) img.style.width=w+'px';
+  const lbl=document.getElementById('set-sigw-'+k); if(lbl) lbl.textContent=w+'px wide';
+  clearTimeout(_sigTimers['w_'+k]);
+  _sigTimers['w_'+k]=setTimeout(()=>{
+    const logo=sigLogoOf(addr); if(!logo) return;
+    logo.width=w; saveSig(addr, sigTextNow(addr), logo);
+  },600);
+};
+window._sigLogoRemove=(addr)=>{
+  saveSig(addr, sigTextNow(addr), null);
+  renderSettings(); toast('Logo removed.');
 };
 let _setTimer=null;
 window._setChanged=()=>{
