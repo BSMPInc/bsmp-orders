@@ -260,6 +260,8 @@ body.sb-pinned .dock{left:var(--sb)}
 .reply .reply-row{display:none}
 .reply.open .reply-collapsed{display:none}
 .reply.open .reply-row{display:flex;align-items:flex-start;gap:8px;padding:10px 12px}
+.reply #reply-sig-hint{display:none}
+.reply.open #reply-sig-hint{display:block;padding:0 12px 10px}
 .reply-row select{height:38px;border:1px solid var(--border2);background:#fff;padding:0 8px;font-size:12.5px;flex:none;max-width:190px}
 .reply-row textarea{flex:1;min-width:0;height:38px;min-height:38px;max-height:220px;padding:8px 11px;border:1px solid var(--border2);background:#fff;resize:none;outline:none;font-size:13.5px;line-height:1.45;overflow-y:auto}
 .reply-row textarea:focus{border-color:var(--accent)}
@@ -452,7 +454,7 @@ body.sb-pinned .dock{left:var(--sb)}
             <span class="hint" id="reply-hint"></span>
           </div>
           <div class="out-atts" id="reply-atts"></div>
-          <div class="hint" id="reply-sig-hint" style="margin:2px 0 0"></div>
+          <div class="hint" id="reply-sig-hint"></div>
         </div>
         <div id="cv-msgs"></div>
         
@@ -1472,11 +1474,21 @@ function replyAllRecipients(){
   });
   return out;
 }
+// who a normal (non-reply-all) reply goes to — the last outside sender,
+// or whoever we originally wrote to if the whole thread is ours
+function replyToRecipient(){
+  const msgs=(CURRENT&&CURRENT.messages)||[];
+  for(let i=msgs.length-1;i>=0;i--){ if(msgs[i]&&msgs[i].fromEmail&&!ownAddr(msgs[i].fromEmail)) return msgs[i].fromEmail; }
+  const last=msgs[msgs.length-1];
+  if(last) return ((last.to)||[]).find(a=>!ownAddr(a))||'';
+  return (CURRENT&&!ownAddr(CURRENT.fromEmail)&&CURRENT.fromEmail)||'';   // messages still loading
+}
 window.renderSigHints=function(){
   const r=$('reply-sig-hint');
   if(r){
     const a=$('reply-as').value, bits=[];
-    if(window._replyAll){ const rec=replyAllRecipients(); bits.push(rec.length?('Reply all → '+rec.join(', ')):'Reply all is on.'); }
+    if(window._replyAll){ const rec=replyAllRecipients(); bits.push(rec.length?('To everyone: '+rec.join(', ')):'Reply all is on.'); }
+    else{ const to=replyToRecipient(); if(to) bits.push('To: '+to); }
     if(sigOf(a)) bits.push('Your '+a+' signature is added when it sends.');
     r.textContent=bits.join('  ·  ');
   }
