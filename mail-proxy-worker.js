@@ -210,10 +210,11 @@ async function listThreads(env, mailboxes, q, tokens) {
     const list = await gmail(env, box, 'threads?maxResults=100&q=' + encodeURIComponent(query) + pt);
     if (list.nextPageToken) next[box] = list.nextPageToken;
     const metas = await gmailBatch(env, box, (list.threads || []).map(t =>
-      `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`));
+      `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`));
     return { box, threads: metas.filter(Boolean) };
   }));
 
+  const ours = (a) => mailboxes.some(mb => mb.toLowerCase() === (a || '').toLowerCase());
   const merged = new Map();
   for (const { box, threads } of perBox) {
     for (const t of threads) {
@@ -223,7 +224,18 @@ async function listThreads(env, mailboxes, q, tokens) {
       const h = (m, n) => ((m.payload && m.payload.headers || []).find(x => x.name.toLowerCase() === n.toLowerCase()) || {}).value || '';
       const mid = h(first, 'Message-ID') || (box + ':' + t.id);
       const key = mid.replace(/[.#$\/\[\]\s<>]/g, '_').slice(0, 200);
-      const from = parseAddr(h(last, 'From'));
+      // the card shows the OTHER party — replying must not flip the sender
+      // column to our own address. Walk back to the newest outside sender;
+      // if the whole thread is ours, show who we wrote to.
+      let from = null;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const f = parseAddr(h(msgs[i], 'From'));
+        if (f.email && !ours(f.email)) { from = f; break; }
+      }
+      if (!from) {
+        const toA = (h(last, 'To') || '').split(',').map(s => parseAddr(s)).find(x => x.email && !ours(x.email));
+        from = toA ? { name: 'To: ' + (toA.name || toA.email), email: toA.email } : parseAddr(h(last, 'From'));
+      }
       const entry = merged.get(key) || {
         key, subject: h(first, 'Subject'), fromName: from.name, fromEmail: from.email,
         snippet: decodeEntities(last.snippet || ''), date: Number(last.internalDate || 0),

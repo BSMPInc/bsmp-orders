@@ -1686,6 +1686,7 @@ window.sendCompose=()=>{
   const to=($('cp-to').value||'').trim(), subject=($('cp-subject').value||'').trim(), body=($('cp-body').value||'').trim();
   const atts=window._outAtt.compose, tbls=window._outTables.compose;
   if(!to||(!body&&!atts.length&&!tbls.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
+  if(!subject && !confirm('Send without a subject? It will show as "(no subject)".')) { $('cp-subject').focus(); return; }
   const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value), tables:tbls.slice(),
     sigLogo:sigLogoOf($('cp-from').value), attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
   const draft={from:$('cp-from').value, to:$('cp-to').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice(), tbls:tbls.slice()};
