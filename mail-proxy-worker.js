@@ -250,11 +250,20 @@ async function sendMail(env, mailboxes, p) {
   let to = p.to, subject = p.subject || '', headers = '', threadId = null;
 
   if (p.box && p.id) {  // reply — pull headers from the original thread
-    const t = await gmail(env, p.box, `threads/${encodeURIComponent(p.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`);
+    const t = await gmail(env, p.box, `threads/${encodeURIComponent(p.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`);
     const msgs = t.messages || [];
     const last = msgs[msgs.length - 1];
     const h = (m, n) => ((m.payload && m.payload.headers || []).find(x => x.name.toLowerCase() === n.toLowerCase()) || {}).value || '';
-    const replyTo = h(last, 'Reply-To') || h(last, 'From');
+    // reply to the other party, not ourselves — if the last message in the
+    // thread is our own, walk back to the most recent outside sender
+    const ours = (a) => mailboxes.some(mb => mb.toLowerCase() === (a || '').toLowerCase());
+    let replyTo = '';
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const fromAddr = parseAddr(h(msgs[i], 'From')).email;
+      if (fromAddr && !ours(fromAddr)) { replyTo = h(msgs[i], 'Reply-To') || h(msgs[i], 'From'); break; }
+    }
+    // whole thread is ours (we wrote first, no answer yet) — reply to whoever we wrote to
+    if (!replyTo) replyTo = splitAddrs(h(last, 'To')).find(a => !ours(a)) || '';
     to = to || parseAddr(replyTo).email;
     subject = subject || h(msgs[0], 'Subject');
     if (!/^re:/i.test(subject)) subject = 'Re: ' + subject;
