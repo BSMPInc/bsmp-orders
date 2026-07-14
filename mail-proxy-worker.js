@@ -15,10 +15,13 @@
       GET  /threads                     merged, deduped thread list, both boxes
       GET  /thread?box=…&id=…           full messages of one thread
       POST /read   {ids:{box:threadId}} clear UNREAD in every box that has it
-      POST /send   reply: {replyAs, box, id, ids, body, all?, attachments?}
-                   new:   {replyAs, to, subject, body, attachments?}
+      POST /send   reply: {replyAs, box, id, ids, body, all?, attachments?, tables?}
+                   new:   {replyAs, to, subject, body, attachments?, tables?}
                    all: reply-all — cc everyone on the email except our boxes
                    attachments: [{name, mime, data(base64)}] — ~10 MB total
+                   tables: [{title?, header?, rows:[[cells…]]}] — appended after
+                   the body (before the signature) as real HTML tables; the
+                   plain-text alternative gets padded-column versions
       POST /trash   {ids:{box:threadId}} move to Gmail trash in every box
       POST /untrash {ids:{box:threadId}} restore from trash (the undo)
 */
@@ -299,14 +302,42 @@ async function sendMail(env, mailboxes, p) {
   const attBytes = atts.reduce((s, a) => s + String(a.data).length * 0.75, 0);
   if (attBytes > 16 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~10 MB total');
 
+  // optional tables: sent as structured rows, rendered as real HTML tables.
+  // With tables the email goes out multipart/alternative (plain + HTML) so
+  // old mail programs still get a readable padded-column text version.
+  const tables = (Array.isArray(p.tables) ? p.tables : []).filter(t => t && Array.isArray(t.rows))
+    .map(t => ({ title: String(t.title || ''), header: !!t.header,
+      rows: t.rows.slice(0, 30).map(r => (Array.isArray(r) ? r : [r]).slice(0, 10).map(c => String(c == null ? '' : c))) }))
+    .filter(t => t.rows.length && t.rows.some(r => r.some(c => c.trim())));
+  let main = p.body || '', sig = '';
+  if (tables.length) {   // tables go after the text but the signature stays last
+    const si = main.lastIndexOf('\n\n-- \n');
+    if (si >= 0) { sig = main.slice(si); main = main.slice(0, si); }
+    else if (/^-- \n/.test(main)) { sig = '\n\n' + main; main = ''; }
+  }
+  const plain = tables.length
+    ? (main ? main + '\n\n' : '') + tables.map(tableText).join('\n\n') + sig
+    : main;
+  const html = tables.length
+    ? '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">' +
+      textToHtml(main) + tables.map(tableHtml).join('') + textToHtml(sig) + '</div>'
+    : '';
+
   const ccLine = cc.length ? `Cc: ${cc.join(', ')}\r\n` : '';
   const top = `From: ${from}\r\nTo: ${to}\r\n${ccLine}Subject: ${encodeHeader(subject)}\r\n${headers}MIME-Version: 1.0\r\n`;
   const utf8 = (s) => unescape(encodeURIComponent(s));   // text → binary string for btoa
+  let cType = 'text/plain; charset=UTF-8', content = plain;
+  if (html) {
+    const alt = 'alt_bsmp_' + Math.random().toString(36).slice(2);
+    cType = `multipart/alternative; boundary="${alt}"`;
+    content = `--${alt}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${plain}\r\n\r\n` +
+              `--${alt}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n\r\n--${alt}--`;
+  }
   let bin;   // full MIME message as a binary string
   if (atts.length) {
     const bnd = 'mime_bsmp_' + Math.random().toString(36).slice(2);
     bin = utf8(top + `Content-Type: multipart/mixed; boundary="${bnd}"\r\n\r\n` +
-      `--${bnd}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${p.body || ''}`);
+      `--${bnd}\r\nContent-Type: ${cType}\r\n\r\n${content}`);
     for (const a of atts) {
       const name = encodeHeader(String(a.name || 'file').replace(/["\r\n]/g, '').slice(0, 180));
       const type = String(a.mime || 'application/octet-stream').replace(/[\r\n"]/g, '');
@@ -317,7 +348,7 @@ async function sendMail(env, mailboxes, p) {
     }
     bin += `\r\n--${bnd}--`;
   } else {
-    bin = utf8(top + `Content-Type: text/plain; charset=UTF-8\r\n\r\n${p.body || ''}`);
+    bin = utf8(top + `Content-Type: ${cType}\r\n\r\n${content}`);
   }
   const body = { raw: btoa(bin).replace(/\+/g, '-').replace(/\//g, '_') };
   if (threadId) body.threadId = threadId;
@@ -325,6 +356,27 @@ async function sendMail(env, mailboxes, p) {
   return { ok: true, id: sent.id };
 }
 function encodeHeader(s) { return /[^\x20-\x7e]/.test(s) ? '=?UTF-8?B?' + btoa(unescape(encodeURIComponent(s))) + '?=' : s; }
+
+// ── outgoing tables: one structured table → padded text + inline-styled HTML ──
+function escHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function textToHtml(s) { return s ? escHtml(s).replace(/\r?\n/g, '<br>') : ''; }
+function tableText(t) {
+  const w = [];
+  t.rows.forEach(r => r.forEach((c, i) => { w[i] = Math.max(w[i] || 0, c.length); }));
+  const line = (r) => r.map((c, i) => c.padEnd(w[i])).join('   ').trimEnd();
+  const out = t.rows.map(line);
+  if (t.header && out.length > 1) out.splice(1, 0, w.map(x => '-'.repeat(x)).join('   '));
+  return (t.title ? t.title + '\n' : '') + out.join('\n');
+}
+function tableHtml(t) {
+  const cell = 'border:1px solid #b9c0c9;padding:5px 10px;font-size:13px;text-align:left';
+  const rows = t.rows.map((r, i) => '<tr>' + r.map(c =>
+    (t.header && i === 0)
+      ? `<th style="${cell};background:#eef1f5">${escHtml(c)}</th>`
+      : `<td style="${cell}">${escHtml(c)}</td>`).join('') + '</tr>').join('');
+  return (t.title ? `<div style="font-weight:700;margin:14px 0 6px">${escHtml(t.title)}</div>` : '') +
+    `<table style="border-collapse:collapse;margin:8px 0 14px" cellspacing="0">${rows}</table>`;
+}
 
 // ── MIME helpers ─────────────────────────────────────────────────────────────
 function parseAddr(s) {

@@ -298,6 +298,14 @@ body.sb-pinned .dock{left:var(--sb)}
 .modal textarea{min-height:140px;resize:vertical}
 .modal input:focus,.modal textarea:focus{border-color:var(--accent)}
 
+/* table builder */
+.tbl-wrap{overflow-x:auto;margin-top:10px;border:1px solid var(--border);padding:1px}
+.tbl-edit{border-collapse:collapse;width:100%}
+.tbl-edit td{border:1px solid var(--border2);padding:0}
+.tbl-edit input{border:none;outline:none;padding:7px 9px;font:inherit;font-size:13px;min-width:80px;width:100%;background:#fff}
+.tbl-edit input:focus{background:#f2f7ff}
+.tbl-edit.hdr tr:first-child input{font-weight:700;background:#f4f6f9}
+
 /* login */
 #login{position:fixed;inset:0;background:var(--accent);display:flex;align-items:center;justify-content:center;z-index:200;padding:18px}
 .login-card{background:#fff;padding:34px 30px;max-width:360px;width:100%;border-bottom:3px solid var(--spark)}
@@ -449,6 +457,7 @@ body.sb-pinned .dock{left:var(--sb)}
             <button class="btn sm" id="reply-all-btn" title="Reply all — everyone on the email gets the reply, not just the sender" onclick="toggleReplyAll()"><i class="ti ti-users"></i></button>
             <textarea id="reply-body" rows="1" placeholder="Write your reply…" oninput="autoGrowReply(this)"></textarea>
             <button class="btn sm" title="Attach files" onclick="pickAtt('reply')"><i class="ti ti-paperclip"></i></button>
+            <button class="btn sm" title="Insert a table" onclick="openTable('reply')"><i class="ti ti-table"></i></button>
             <button class="btn primary" id="reply-send" onclick="sendReply()"><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg> Send</button>
             <button class="btn sm" title="Hide the reply box" onclick="collapseReply()"><i class="ti ti-x"></i></button>
             <span class="hint" id="reply-hint"></span>
@@ -527,9 +536,32 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="out-atts" id="cp-atts"></div>
     <div class="hint" id="cp-sig-hint" style="margin-top:6px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-      <button class="btn" onclick="pickAtt('compose')" style="margin-right:auto"><i class="ti ti-paperclip"></i> Attach files</button>
+      <button class="btn" onclick="pickAtt('compose')"><i class="ti ti-paperclip"></i> Attach files</button>
+      <button class="btn" onclick="openTable('compose')" style="margin-right:auto"><i class="ti ti-table"></i> Table</button>
       <button class="btn" onclick="closeCompose()">Cancel</button>
       <button class="btn primary" id="cp-send" onclick="sendCompose()"><i class="ti ti-send"></i> Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- table builder -->
+<div class="modal-bg" id="table-modal">
+  <div class="modal">
+    <h3><i class="ti ti-table"></i> Table</h3>
+    <label>Heading above the table (optional)</label>
+    <input id="tbl-title" type="text" placeholder="e.g. Pricing per quantity">
+    <div class="tbl-wrap"><table class="tbl-edit hdr" id="tbl-edit"><tbody id="tbl-grid"></tbody></table></div>
+    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn sm" title="Add a row" onclick="tblAddRow()"><i class="ti ti-row-insert-bottom"></i> Row</button>
+      <button class="btn sm" title="Remove the bottom row" onclick="tblDelRow()"><i class="ti ti-row-remove"></i></button>
+      <button class="btn sm" title="Add a column" onclick="tblAddCol()"><i class="ti ti-column-insert-right"></i> Column</button>
+      <button class="btn sm" title="Remove the right column" onclick="tblDelCol()"><i class="ti ti-column-remove"></i></button>
+      <label style="display:flex;align-items:center;gap:6px;margin:0 0 0 auto;font-size:12px;font-weight:700;width:auto"><input type="checkbox" id="tbl-header" checked onchange="tblHeaderChanged()" style="width:auto"> First row = headings</label>
+    </div>
+    <div class="set-help">The table is added at the end of the email (your signature stays last). Empty rows and columns are dropped.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="closeTable()">Cancel</button>
+      <button class="btn primary" onclick="saveTable()"><i class="ti ti-check"></i> Add to email</button>
     </div>
   </div>
 </div>
@@ -1289,7 +1321,7 @@ window.openThread=async (key)=>{
   renderFlagPills(); renderAssignee(); renderReplyAs();
   window._replyAll=false; renderReplyAllBtn();
   collapseReply(); $('reply-body').value='';
-  window._outAtt.reply=[]; renderOutAtts('reply');
+  window._outAtt.reply=[]; window._outTables.reply=[]; renderOutAtts('reply');
   $('cv-msgs').innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Loading conversation…</div>';
   _msgQuoteOpen={};
   try{
@@ -1499,12 +1531,51 @@ const renderSigHints=window.renderSigHints;
 // ── outgoing attachments (shared by the reply box and the compose modal) ──────
 const MAX_ATT_TOTAL=10*1024*1024;   // Gmail-safe cap per email
 window._outAtt={reply:[], compose:[]};
+window._outTables={reply:[], compose:[]};   // [{title, header, rows:[[cells]]}]
 window.renderOutAtts=(ctx)=>{
   const el=$(ctx==='reply'?'reply-atts':'cp-atts'); if(!el) return;
-  el.innerHTML=window._outAtt[ctx].map((a,i)=>
+  const tbls=(window._outTables[ctx]||[]).map((t,i)=>
+    `<span class="att" title="Click to edit the table" style="cursor:pointer" onclick="openTable('${ctx}',${i})"><i class="ti ti-table" style="font-size:14px"></i> ${esc(t.title||'Table')} · ${t.rows.length}×${t.rows[0].length} <i class="ti ti-x" title="Remove" onclick="dropTable('${ctx}',${i},event)"></i></span>`);
+  el.innerHTML=tbls.join('')+window._outAtt[ctx].map((a,i)=>
     `<span class="att"><i class="ti ti-paperclip" style="font-size:14px"></i> ${esc(a.name)} · ${Math.max(1,Math.round(a.size/1024))} KB <i class="ti ti-x" title="Remove" onclick="dropAtt('${ctx}',${i})"></i></span>`).join('');
 };
 window.dropAtt=(ctx,i)=>{ window._outAtt[ctx].splice(i,1); renderOutAtts(ctx); };
+window.dropTable=(ctx,i,ev)=>{ if(ev) ev.stopPropagation(); window._outTables[ctx].splice(i,1); renderOutAtts(ctx); };
+
+// ── table builder: a small grid you type into, sent as a real HTML table ──────
+let _tblCtx='compose', _tblIdx=-1, _tblGrid=[];
+window.openTable=(ctx,idx)=>{
+  _tblCtx=ctx; _tblIdx=(idx==null?-1:idx);
+  const ex=_tblIdx>=0 ? window._outTables[ctx][_tblIdx] : null;
+  _tblGrid=ex ? ex.rows.map(r=>r.slice()) : [['','',''],['','',''],['','','']];
+  $('tbl-title').value=ex?(ex.title||''):'';
+  $('tbl-header').checked=ex?!!ex.header:true;
+  tblHeaderChanged(); paintTblGrid();
+  $('table-modal').style.display='flex';
+  setTimeout(()=>{ const f=document.querySelector('#tbl-grid input'); if(f) f.focus(); },30);
+};
+function paintTblGrid(){
+  $('tbl-grid').innerHTML=_tblGrid.map((r,ri)=>'<tr>'+r.map((c,ci)=>
+    `<td><input value="${esc(c)}" data-r="${ri}" data-c="${ci}" oninput="window._tblCell(this)"></td>`).join('')+'</tr>').join('');
+}
+window._tblCell=(el)=>{ _tblGrid[+el.dataset.r][+el.dataset.c]=el.value; };
+window.tblHeaderChanged=()=>{ $('tbl-edit').classList.toggle('hdr', $('tbl-header').checked); };
+window.tblAddRow=()=>{ if(_tblGrid.length>=30){ toast('30 rows is the limit — keep tables small.',true); return; } _tblGrid.push(_tblGrid[0].map(()=>'')); paintTblGrid(); };
+window.tblDelRow=()=>{ if(_tblGrid.length>1){ _tblGrid.pop(); paintTblGrid(); } };
+window.tblAddCol=()=>{ if(_tblGrid[0].length>=10){ toast('10 columns is the limit — keep tables small.',true); return; } _tblGrid.forEach(r=>r.push('')); paintTblGrid(); };
+window.tblDelCol=()=>{ if(_tblGrid[0].length>1){ _tblGrid.forEach(r=>r.pop()); paintTblGrid(); } };
+window.closeTable=()=>{ $('table-modal').style.display='none'; };
+window.saveTable=()=>{
+  // drop rows and columns that are entirely empty
+  let rows=_tblGrid.map(r=>r.map(c=>String(c||'').trim())).filter(r=>r.some(c=>c));
+  if(!rows.length){ toast('Type something into the table first.',true); return; }
+  const keep=rows[0].map((_,ci)=>rows.some(r=>r[ci]));
+  rows=rows.map(r=>r.filter((_,ci)=>keep[ci]));
+  const rec={title:($('tbl-title').value||'').trim(), header:$('tbl-header').checked, rows};
+  if(_tblIdx>=0) window._outTables[_tblCtx][_tblIdx]=rec;
+  else window._outTables[_tblCtx].push(rec);
+  renderOutAtts(_tblCtx); closeTable();
+};
 window.pickAtt=(ctx)=>{
   const inp=document.createElement('input'); inp.type='file'; inp.multiple=true;
   inp.onchange=async ()=>{
@@ -1526,21 +1597,22 @@ window.autoGrowReply=(ta)=>{ ta.style.height='auto'; ta.style.height=Math.min(ta
 window.sendReply=()=>{
   if(!CURRENT) return;
   const body=($('reply-body').value||'').trim();
-  const atts=window._outAtt.reply;
-  if(!body && !atts.length){ toast('Write a reply or attach a file first.',true); return; }
+  const atts=window._outAtt.reply, tbls=window._outTables.reply;
+  if(!body && !atts.length && !tbls.length){ toast('Write a reply or attach a file first.',true); return; }
   const t=CURRENT, box=(t.mailboxes||[])[0];
   const payload={replyAs:$('reply-as').value, box, id:t.ids&&t.ids[box], ids:t.ids||{}, all:!!window._replyAll,
-    body:withSig(body,$('reply-as').value), attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
+    body:withSig(body,$('reply-as').value), tables:tbls.slice(),
+    attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
   // stash the draft so Undo (or a failed send) can put everything back
-  const draft={body:$('reply-body').value, atts:atts.slice(), all:window._replyAll};
+  const draft={body:$('reply-body').value, atts:atts.slice(), tbls:tbls.slice(), all:window._replyAll};
   const restore=()=>{
     if(CURRENT!==t) return false;
     expandReply(); $('reply-body').value=draft.body; autoGrowReply($('reply-body'));
-    window._outAtt.reply=draft.atts; renderOutAtts('reply');
+    window._outAtt.reply=draft.atts; window._outTables.reply=draft.tbls; renderOutAtts('reply');
     window._replyAll=draft.all; renderReplyAllBtn(); renderSigHints();
     return true;
   };
-  $('reply-body').value=''; window._outAtt.reply=[]; renderOutAtts('reply'); collapseReply();
+  $('reply-body').value=''; window._outAtt.reply=[]; window._outTables.reply=[]; renderOutAtts('reply'); collapseReply();
   window._replyAll=false; renderReplyAllBtn(); renderSigHints();
   showUndo('Sending'+(atts.length?' with '+atts.length+' attachment'+(atts.length!==1?'s':''):''),{countdown:true, secs:8,
     onUndo:()=>{ restore(); toast('Send canceled — your reply is back in the box.'); },
@@ -1561,7 +1633,7 @@ window.openCompose=()=>{
   $('cp-from').innerHTML=SETTINGS.mailboxes.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
   $('cp-to').value=''; $('cp-subject').value=''; $('cp-body').value='';
   $('cp-ac').style.display='none'; _acItems=[];
-  window._outAtt.compose=[]; renderOutAtts('compose');
+  window._outAtt.compose=[]; window._outTables.compose=[]; renderOutAtts('compose');
   renderSigHints();
   $('compose-modal').style.display='flex';
   setTimeout(()=>$('cp-to').focus(),30);
@@ -1569,17 +1641,17 @@ window.openCompose=()=>{
 window.closeCompose=()=>{ $('compose-modal').style.display='none'; };
 window.sendCompose=()=>{
   const to=($('cp-to').value||'').trim(), subject=($('cp-subject').value||'').trim(), body=($('cp-body').value||'').trim();
-  const atts=window._outAtt.compose;
-  if(!to||(!body&&!atts.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
-  const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value),
+  const atts=window._outAtt.compose, tbls=window._outTables.compose;
+  if(!to||(!body&&!atts.length&&!tbls.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
+  const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value), tables:tbls.slice(),
     attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
-  const draft={from:$('cp-from').value, to:$('cp-to').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice()};
+  const draft={from:$('cp-from').value, to:$('cp-to').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice(), tbls:tbls.slice()};
   const restore=()=>{
     openCompose();
     $('cp-from').value=draft.from; $('cp-to').value=draft.to; $('cp-subject').value=draft.subject; $('cp-body').value=draft.body;
-    window._outAtt.compose=draft.atts; renderOutAtts('compose'); renderSigHints();
+    window._outAtt.compose=draft.atts; window._outTables.compose=draft.tbls; renderOutAtts('compose'); renderSigHints();
   };
-  window._outAtt.compose=[]; renderOutAtts('compose'); closeCompose();
+  window._outAtt.compose=[]; window._outTables.compose=[]; renderOutAtts('compose'); closeCompose();
   showUndo('Sending'+(atts.length?' with '+atts.length+' attachment'+(atts.length!==1?'s':''):''),{countdown:true, secs:8,
     onUndo:()=>{ restore(); toast('Send canceled — your email is back in the composer.'); },
     onTimeout:async ()=>{
