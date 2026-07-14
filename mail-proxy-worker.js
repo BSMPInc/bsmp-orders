@@ -15,9 +15,12 @@
       GET  /threads                     merged, deduped thread list, both boxes
       GET  /thread?box=…&id=…           full messages of one thread
       POST /read   {ids:{box:threadId}} clear UNREAD in every box that has it
-      POST /send   reply: {replyAs, box, id, ids, body, attachments?}
+      POST /send   reply: {replyAs, box, id, ids, body, all?, attachments?}
                    new:   {replyAs, to, subject, body, attachments?}
+                   all: reply-all — cc everyone on the email except our boxes
                    attachments: [{name, mime, data(base64)}] — ~10 MB total
+      POST /trash   {ids:{box:threadId}} move to Gmail trash in every box
+      POST /untrash {ids:{box:threadId}} restore from trash (the undo)
 */
 
 const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send';
@@ -65,6 +68,15 @@ export default {
         await Promise.all(Object.entries(ids || {}).map(([box, tid]) =>
           mailboxes.includes(box)
             ? gmail(env, box, `threads/${encodeURIComponent(tid)}/modify`, 'POST', { removeLabelIds: ['UNREAD'] }).catch(() => null)
+            : null));
+        return json({ ok: true });
+      }
+      if ((url.pathname === '/trash' || url.pathname === '/untrash') && request.method === 'POST') {
+        const { ids } = await request.json();
+        const op = url.pathname.slice(1);   // Gmail's threads/<id>/trash | /untrash
+        await Promise.all(Object.entries(ids || {}).map(([box, tid]) =>
+          mailboxes.includes(box)
+            ? gmail(env, box, `threads/${encodeURIComponent(tid)}/${op}`, 'POST').catch(() => null)
             : null));
         return json({ ok: true });
       }
@@ -247,24 +259,32 @@ async function getThread(env, box, id) {
 // ── /send: reply into a thread, or brand-new mail ───────────────────────────
 async function sendMail(env, mailboxes, p) {
   const from = p.replyAs;
-  let to = p.to, subject = p.subject || '', headers = '', threadId = null;
+  const ours = (a) => mailboxes.some(mb => mb.toLowerCase() === (a || '').toLowerCase());
+  let to = p.to, subject = p.subject || '', headers = '', threadId = null, cc = [];
 
   if (p.box && p.id) {  // reply — pull headers from the original thread
-    const t = await gmail(env, p.box, `threads/${encodeURIComponent(p.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`);
+    const t = await gmail(env, p.box, `threads/${encodeURIComponent(p.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Reply-To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=References`);
     const msgs = t.messages || [];
     const last = msgs[msgs.length - 1];
     const h = (m, n) => ((m.payload && m.payload.headers || []).find(x => x.name.toLowerCase() === n.toLowerCase()) || {}).value || '';
     // reply to the other party, not ourselves — if the last message in the
     // thread is our own, walk back to the most recent outside sender
-    const ours = (a) => mailboxes.some(mb => mb.toLowerCase() === (a || '').toLowerCase());
-    let replyTo = '';
+    let src = null, replyTo = '';
     for (let i = msgs.length - 1; i >= 0; i--) {
       const fromAddr = parseAddr(h(msgs[i], 'From')).email;
-      if (fromAddr && !ours(fromAddr)) { replyTo = h(msgs[i], 'Reply-To') || h(msgs[i], 'From'); break; }
+      if (fromAddr && !ours(fromAddr)) { src = msgs[i]; replyTo = h(src, 'Reply-To') || h(src, 'From'); break; }
     }
     // whole thread is ours (we wrote first, no answer yet) — reply to whoever we wrote to
-    if (!replyTo) replyTo = splitAddrs(h(last, 'To')).find(a => !ours(a)) || '';
+    if (!replyTo) { src = last; replyTo = splitAddrs(h(last, 'To')).find(a => !ours(a)) || ''; }
     to = to || parseAddr(replyTo).email;
+    if (p.all && src) {  // reply-all: cc everyone else on that email, minus our own boxes
+      const seen = new Set([(to || '').toLowerCase()]);
+      for (const a of splitAddrs(h(src, 'To') + ',' + h(src, 'Cc'))) {
+        const l = a.toLowerCase();
+        if (!a || ours(a) || seen.has(l)) continue;
+        seen.add(l); cc.push(a);
+      }
+    }
     subject = subject || h(msgs[0], 'Subject');
     if (!/^re:/i.test(subject)) subject = 'Re: ' + subject;
     const lastMid = h(last, 'Message-ID');
@@ -279,7 +299,8 @@ async function sendMail(env, mailboxes, p) {
   const attBytes = atts.reduce((s, a) => s + String(a.data).length * 0.75, 0);
   if (attBytes > 16 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~10 MB total');
 
-  const top = `From: ${from}\r\nTo: ${to}\r\nSubject: ${encodeHeader(subject)}\r\n${headers}MIME-Version: 1.0\r\n`;
+  const ccLine = cc.length ? `Cc: ${cc.join(', ')}\r\n` : '';
+  const top = `From: ${from}\r\nTo: ${to}\r\n${ccLine}Subject: ${encodeHeader(subject)}\r\n${headers}MIME-Version: 1.0\r\n`;
   const utf8 = (s) => unescape(encodeURIComponent(s));   // text → binary string for btoa
   let bin;   // full MIME message as a binary string
   if (atts.length) {

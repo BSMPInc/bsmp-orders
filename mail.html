@@ -270,6 +270,12 @@ body.sb-pinned .dock{left:var(--sb)}
 .toast.show{opacity:1}
 .toast.err{background:var(--red)}
 
+/* undo bar — pending send countdown / just-deleted restore */
+.undo-bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#23262b;color:#fff;font-size:13px;font-weight:700;padding:10px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25);display:none;align-items:center;gap:14px;z-index:101;max-width:calc(100vw - 32px)}
+.undo-bar.show{display:flex}
+.undo-bar button{background:none;border:none;color:#8ecbff;font:inherit;font-weight:800;cursor:pointer;padding:0;letter-spacing:.02em}
+.undo-bar button:hover{text-decoration:underline}
+
 /* settings */
 .set-card{background:#fff;border:1px solid var(--border);padding:18px;max-width:640px;margin-bottom:16px}
 .set-card h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
@@ -427,6 +433,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <button class="btn sm" id="assignee-btn" title="Assigned to — click to change" onclick="cycleAssign()"></button>
         <button class="btn sm" id="contact-btn" style="display:none" onclick="saveSenderContact()"></button>
         <button class="btn sm" id="mute-btn" style="display:none" onclick="toggleMute()"></button>
+        <button class="btn sm" id="trash-btn" title="Delete this conversation — goes to Gmail's trash (kept 30 days), Undo brings it right back" onclick="trashThread()"><i class="ti ti-trash"></i> Delete</button>
       </div>
       <div class="page-head">
         <h2 id="cv-subject"></h2>
@@ -437,6 +444,7 @@ body.sb-pinned .dock{left:var(--sb)}
           <div class="reply-collapsed" onclick="expandReply()"><i class="ti ti-arrow-back-up"></i> Reply</div>
           <div class="reply-row">
             <select id="reply-as" title="Sends through Gmail from this address — lands in its real Sent folder, threads correctly" onchange="renderSigHints()"></select>
+            <button class="btn sm" id="reply-all-btn" title="Reply all — everyone on the email gets the reply, not just the sender" onclick="toggleReplyAll()"><i class="ti ti-users"></i></button>
             <textarea id="reply-body" rows="1" placeholder="Write your reply…" oninput="autoGrowReply(this)"></textarea>
             <button class="btn sm" title="Attach files" onclick="pickAtt('reply')"><i class="ti ti-paperclip"></i></button>
             <button class="btn primary" id="reply-send" onclick="sendReply()"><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg> Send</button>
@@ -538,6 +546,7 @@ body.sb-pinned .dock{left:var(--sb)}
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="undo-bar" id="undo-bar"><span id="undo-msg"></span><button onclick="window._undoNow()">Undo</button></div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -594,6 +603,24 @@ function $(id){ return document.getElementById(id); }
 const esc=(s)=>(s==null?'':String(s)).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 let toastTimer=null;
 function toast(m,err){ const t=$('toast'); t.textContent=m; t.className='toast show'+(err?' err':''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),3800); }
+// ── undo bar: one pending undoable action at a time ───────────────────────────
+// countdown mode (delayed send): onTimeout runs when the clock hits zero.
+// plain mode (delete): the action already happened, onUndo reverses it.
+let _undoState=null;
+function _undoDismiss(){ if(_undoState){ clearTimeout(_undoState.timer); clearInterval(_undoState.iv); _undoState=null; } $('undo-bar').classList.remove('show'); }
+window._undoNow=()=>{ const s=_undoState; if(!s) return; _undoDismiss(); if(s.onUndo) s.onUndo(); };
+window.flushUndo=()=>{ const s=_undoState; if(!s) return; _undoDismiss(); if(s.onTimeout) s.onTimeout(); };
+function showUndo(msg,opts){
+  window.flushUndo();   // starting a new undoable action commits the previous one
+  const secs=opts.secs||8, until=Date.now()+secs*1000;
+  const paint=()=>{ $('undo-msg').textContent = opts.countdown ? msg+' in '+Math.max(1,Math.ceil((until-Date.now())/1000))+'s…' : msg; };
+  _undoState={ onTimeout:opts.onTimeout||null, onUndo:opts.onUndo||null,
+    timer:setTimeout(()=>{ const s=_undoState; _undoDismiss(); if(s&&s.onTimeout) s.onTimeout(); }, secs*1000),
+    iv:opts.countdown?setInterval(paint,400):null };
+  paint(); $('undo-bar').classList.add('show');
+}
+// a pending send would be lost if the tab closed mid-countdown — make the browser ask
+window.addEventListener('beforeunload',(e)=>{ if(_undoState&&_undoState.onTimeout){ e.preventDefault(); e.returnValue=''; } });
 
 // ── state ─────────────────────────────────────────────────────────────────────
 const FLAG_DEFS=[
@@ -729,6 +756,27 @@ function flagIcon(f,px){
   if(f.ico==='qsent') return '<span class="qsent-ico"'+sz+'><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span>';
   return '<i class="ti ti-'+f.icon+'"'+sz+'></i>';
 }
+// ── delete: move the whole conversation to Gmail's trash (30-day safety net) ──
+window.trashThread=async ()=>{
+  const t=CURRENT; if(!t) return;
+  const ids=t.ids||{};
+  if(!Object.keys(ids).length){ toast('This conversation has no mailbox copy to delete.',true); return; }
+  const flagRec=FLAGS[t.key]||null;   // keep a copy so Undo can bring the flag back too
+  const btn=$('trash-btn'); if(btn) btn.disabled=true;
+  try{ await api('/trash',{method:'POST',body:JSON.stringify({ids})}); }
+  catch(e){ if(btn) btn.disabled=false; toast(e.notConnected?'Mail isn’t connected yet.':('Could not delete: '+e.message),true); return; }
+  if(btn) btn.disabled=false;
+  THREADS=THREADS.filter(x=>x.key!==t.key);
+  if(flagRec){ delete FLAGS[t.key]; remove(ref(db,'mail/threads/'+t.key)).catch(()=>{}); }
+  backToList(); renderNavCounts();
+  showUndo('Conversation deleted.',{secs:10,
+    onUndo:async ()=>{
+      try{ await api('/untrash',{method:'POST',body:JSON.stringify({ids})}); }
+      catch(e){ toast('Could not restore: '+e.message+' — it is still in Gmail’s trash.',true); return; }
+      if(flagRec){ FLAGS[t.key]=flagRec; set(ref(db,'mail/threads/'+t.key), flagRec).catch(()=>{}); }
+      toast('Restored ✓'); loadThreads(false);
+    }});
+};
 // ── mute list: hide every email from a sender, shared across the shop ────────
 const mkey=(e)=>(e||'').toLowerCase().replace(/[.#$\/\[\]]/g,'_');
 function mutedOf(t){ return !!MUTED[mkey(t.fromEmail)]; }
@@ -1237,6 +1285,7 @@ window.openThread=async (key)=>{
   const boxes=(t.mailboxes||[]).map(boxTag).join(' + ');
   $('cv-sub').innerHTML=`${esc(t.fromName||t.fromEmail||'')}${t.mailboxes&&t.mailboxes.length>1?' · arrived in <b>both</b> mailboxes · shown once':' · '+esc(boxes)}`;
   renderFlagPills(); renderAssignee(); renderReplyAs();
+  window._replyAll=false; renderReplyAllBtn();
   collapseReply(); $('reply-body').value='';
   window._outAtt.reply=[]; renderOutAtts('reply');
   $('cv-msgs').innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Loading conversation…</div>';
@@ -1246,7 +1295,7 @@ window.openThread=async (key)=>{
     const data=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(gid));
     if(CURRENT!==t) return;
     t.messages=data.messages||[];
-    renderMsgs();
+    renderMsgs(); renderSigHints();
     if(t.unread){ t.unread=false; renderList(); renderNavCounts(); api('/read',{method:'POST',body:JSON.stringify({ids:t.ids||{}})}).catch(()=>{}); }
   }catch(e){
     $('cv-msgs').innerHTML=`<div class="empty"><i class="ti ti-plug-connected-x"></i>${e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':esc(e.message)}</div>`;
@@ -1404,9 +1453,33 @@ function withSig(body,addr){
   if(!sig) return body;
   return body ? body+'\n\n-- \n'+sig : '-- \n'+sig;
 }
+// ── reply-all toggle ──────────────────────────────────────────────────────────
+window._replyAll=false;
+window.toggleReplyAll=()=>{ window._replyAll=!window._replyAll; renderReplyAllBtn(); renderSigHints(); };
+function renderReplyAllBtn(){ const b=$('reply-all-btn'); if(b) b.classList.toggle('primary', !!window._replyAll); }
+const ownAddr=(a)=>(SETTINGS.mailboxes||[]).some(mb=>mb.toLowerCase()===(a||'').toLowerCase());
+// preview only — the worker rebuilds this list from the real headers on send
+function replyAllRecipients(){
+  const msgs=(CURRENT&&CURRENT.messages)||[]; if(!msgs.length) return [];
+  let src=null;
+  for(let i=msgs.length-1;i>=0;i--){ if(msgs[i]&&!ownAddr(msgs[i].fromEmail)){ src=msgs[i]; break; } }
+  if(!src) src=msgs[msgs.length-1];
+  const out=[], seen=new Set();
+  [src.fromEmail].concat(src.to||[]).forEach(a=>{
+    const l=(a||'').toLowerCase();
+    if(!l||ownAddr(a)||seen.has(l)) return;
+    seen.add(l); out.push(a);
+  });
+  return out;
+}
 window.renderSigHints=function(){
   const r=$('reply-sig-hint');
-  if(r){ const a=$('reply-as').value; r.textContent=sigOf(a)?('Your '+a+' signature is added when it sends.'):''; }
+  if(r){
+    const a=$('reply-as').value, bits=[];
+    if(window._replyAll){ const rec=replyAllRecipients(); bits.push(rec.length?('Reply all → '+rec.join(', ')):'Reply all is on.'); }
+    if(sigOf(a)) bits.push('Your '+a+' signature is added when it sends.');
+    r.textContent=bits.join('  ·  ');
+  }
   const c=$('cp-sig-hint');
   if(c){ const a=$('cp-from').value; c.textContent=sigOf(a)?('Your '+a+' signature is added when it sends.'):''; }
 };
@@ -1438,23 +1511,37 @@ window.pickAtt=(ctx)=>{
 window.expandReply=()=>{ $('reply-box').classList.add('open'); setTimeout(()=>$('reply-body').focus(),30); };
 window.collapseReply=()=>{ $('reply-box').classList.remove('open'); const ta=$('reply-body'); if(ta) ta.style.height=''; };
 window.autoGrowReply=(ta)=>{ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight+2,220)+'px'; };
-window.sendReply=async ()=>{
+window.sendReply=()=>{
   if(!CURRENT) return;
   const body=($('reply-body').value||'').trim();
   const atts=window._outAtt.reply;
   if(!body && !atts.length){ toast('Write a reply or attach a file first.',true); return; }
-  const btn=$('reply-send'); btn.disabled=true;
-  $('reply-hint').textContent=atts.length?'Sending '+atts.length+' attachment'+(atts.length!==1?'s':'')+'…':'Sending…';
-  try{
-    const box=(CURRENT.mailboxes||[])[0];
-    await api('/send',{method:'POST',body:JSON.stringify({replyAs:$('reply-as').value, box, id:CURRENT.ids&&CURRENT.ids[box], ids:CURRENT.ids||{}, body:withSig(body,$('reply-as').value),
-      attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))})});
-    $('reply-body').value=''; $('reply-hint').textContent='';
-    window._outAtt.reply=[]; renderOutAtts('reply');
-    collapseReply();
-    toast('Sent ✓'); openThread(CURRENT.key);
-  }catch(e){ $('reply-hint').textContent=''; toast(e.notConnected?'Mail isn’t connected yet.':e.message,true); }
-  finally{ btn.disabled=false; }
+  const t=CURRENT, box=(t.mailboxes||[])[0];
+  const payload={replyAs:$('reply-as').value, box, id:t.ids&&t.ids[box], ids:t.ids||{}, all:!!window._replyAll,
+    body:withSig(body,$('reply-as').value), attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
+  // stash the draft so Undo (or a failed send) can put everything back
+  const draft={body:$('reply-body').value, atts:atts.slice(), all:window._replyAll};
+  const restore=()=>{
+    if(CURRENT!==t) return false;
+    expandReply(); $('reply-body').value=draft.body; autoGrowReply($('reply-body'));
+    window._outAtt.reply=draft.atts; renderOutAtts('reply');
+    window._replyAll=draft.all; renderReplyAllBtn(); renderSigHints();
+    return true;
+  };
+  $('reply-body').value=''; window._outAtt.reply=[]; renderOutAtts('reply'); collapseReply();
+  window._replyAll=false; renderReplyAllBtn(); renderSigHints();
+  showUndo('Sending'+(atts.length?' with '+atts.length+' attachment'+(atts.length!==1?'s':''):''),{countdown:true, secs:8,
+    onUndo:()=>{ restore(); toast('Send canceled — your reply is back in the box.'); },
+    onTimeout:async ()=>{
+      try{
+        await api('/send',{method:'POST',body:JSON.stringify(payload)});
+        toast('Sent ✓'); if(CURRENT===t) openThread(t.key); else loadThreads(false);
+      }catch(e){
+        toast(e.notConnected?'Mail isn’t connected yet.':('Send failed: '+e.message),true);
+        if(CURRENT!==t) await openThread(t.key).catch(()=>{});
+        restore();   // nothing typed is ever lost
+      }
+    }});
 };
 
 // ── compose ───────────────────────────────────────────────────────────────────
@@ -1468,19 +1555,25 @@ window.openCompose=()=>{
   setTimeout(()=>$('cp-to').focus(),30);
 };
 window.closeCompose=()=>{ $('compose-modal').style.display='none'; };
-window.sendCompose=async ()=>{
+window.sendCompose=()=>{
   const to=($('cp-to').value||'').trim(), subject=($('cp-subject').value||'').trim(), body=($('cp-body').value||'').trim();
   const atts=window._outAtt.compose;
   if(!to||(!body&&!atts.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
-  const btn=$('cp-send'); btn.disabled=true;
-  if(atts.length) btn.innerHTML='<i class="ti ti-loader-2 nt-spin"></i> Sending…';
-  try{
-    await api('/send',{method:'POST',body:JSON.stringify({replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value),
-      attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))})});
-    window._outAtt.compose=[]; renderOutAtts('compose');
-    closeCompose(); toast('Sent ✓'); loadThreads(false);
-  }catch(e){ toast(e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':e.message,true); }
-  finally{ btn.disabled=false; btn.innerHTML='<i class="ti ti-send"></i> Send'; }
+  const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value),
+    attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
+  const draft={from:$('cp-from').value, to:$('cp-to').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice()};
+  const restore=()=>{
+    openCompose();
+    $('cp-from').value=draft.from; $('cp-to').value=draft.to; $('cp-subject').value=draft.subject; $('cp-body').value=draft.body;
+    window._outAtt.compose=draft.atts; renderOutAtts('compose'); renderSigHints();
+  };
+  window._outAtt.compose=[]; renderOutAtts('compose'); closeCompose();
+  showUndo('Sending'+(atts.length?' with '+atts.length+' attachment'+(atts.length!==1?'s':''):''),{countdown:true, secs:8,
+    onUndo:()=>{ restore(); toast('Send canceled — your email is back in the composer.'); },
+    onTimeout:async ()=>{
+      try{ await api('/send',{method:'POST',body:JSON.stringify(payload)}); toast('Sent ✓'); loadThreads(false); }
+      catch(e){ toast(e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':('Send failed: '+e.message),true); restore(); }
+    }});
 };
 
 // ── settings ──────────────────────────────────────────────────────────────────
