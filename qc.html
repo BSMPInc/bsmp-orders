@@ -248,6 +248,22 @@ body.meas-open .fair-fs{padding-right:var(--measW,330px)}
 @media (max-width:900px){ .fair-top{grid-template-columns:1fr} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+/* ---- drawing check: customer drawing vs ours ---- */
+.dc-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+@media(max-width:760px){.dc-pair{grid-template-columns:1fr}}
+.dc-verdict{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:7px}
+.dc-chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
+.dc-chip{font-size:11px;font-weight:700;border:1px solid;padding:2px 9px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.dc-tblwrap{overflow-x:auto;border:1px solid var(--border)}
+table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
+.dc-tbl td{vertical-align:top}
+.dc-val{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;max-width:190px}
+.dc-math{font-size:11px;color:var(--text3);font-variant-numeric:tabular-nums;margin-top:3px;white-space:normal;max-width:230px}
+.dc-row.dc-mismatch td{background:#fdf1f1}
+.dc-row.dc-missing_mine td{background:#fbf6ea}
+.dc-row.dc-missing_cust td{background:#eff4f9}
+.dc-qs{margin-top:12px;padding:10px 12px;background:var(--amber-soft);border:1px solid #e3cf9b;font-size:12.5px;color:#5a400d}
+.dc-qs-h{font-weight:800;display:flex;align-items:center;gap:6px}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
 .seg{display:inline-flex;border:1px solid var(--border2)}
 .seg button{height:36px;padding:0 14px;background:#fff;border:none;border-right:1px solid var(--border2);cursor:pointer;font-weight:700;color:var(--text2)}
@@ -348,6 +364,7 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-item" id="nav-inspections" onclick="showPage('inspections')"><i class="ti ti-checklist"></i><span class="nav-label" data-t="Inspections">Inspections</span></div>
       <div class="nav-item" id="nav-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span class="nav-label" data-t="First Articles">First Articles</span></div>
       <div class="nav-item" id="nav-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span class="nav-label" data-t="Nonconformances">Nonconformances</span></div>
+      <div class="nav-item mgr-only" id="nav-drawcheck" onclick="showPage('drawcheck')"><i class="ti ti-file-diff"></i><span class="nav-label" data-t="Drawing Check">Drawing Check</span></div>
       <div class="nav-sec" data-t="Records">Records</div>
       <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
@@ -379,6 +396,7 @@ body.role-operator .mgr-only{display:none!important}
   <button class="dock-tab" id="dock-inspections" onclick="showPage('inspections')"><i class="ti ti-checklist"></i><span data-t="dock:inspections">Inspections</span></button>
   <button class="dock-tab" id="dock-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span data-t="dock:firstarticles">First Articles</span></button>
   <button class="dock-tab" id="dock-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span data-t="dock:ncr">NCRs</span></button>
+  <button class="dock-tab mgr-only" id="dock-drawcheck" onclick="showPage('drawcheck')"><i class="ti ti-file-diff"></i><span data-t="dock:drawcheck">Drawing Check</span></button>
   <button class="dock-tab mgr-only" id="dock-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span data-t="dock:materialcerts">Certs</span></button>
   <button class="dock-tab" id="dock-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span data-t="dock:settings">Settings</span></button>
   <div class="dock-switch">
@@ -562,7 +580,7 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 
 /* ---------- state ---------- */
 window.QC_USER=null; window.QC_ROLE='manager';
-let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={};
+let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={}, DRAWCHECKS={};
 let DRAW_FILTER='', DRAW_FOLDER=null;   // DRAW_FOLDER: null = folder view, ''=Unfiled, else customer name
 // qc.html?cert=<id> (links from the mail app) → open the cert library on that cert
 let _deepCert=new URLSearchParams(location.search).get('cert')||'';
@@ -603,6 +621,7 @@ window.qcOnData=(name,val)=>{
   else if(name==='quotes') QUOTES=val||{};
   else if(name==='audit') AUDIT=val||{};
   else if(name==='drawings') DRAWINGS=val||{};
+  else if(name==='drawingChecks') DRAWCHECKS=val||{};
   render();
 };
 window.qcOnAuth=(user,role)=>{
@@ -633,19 +652,20 @@ const META={
   fair:['First Article','First-article report'],
   ncr:['Nonconformances','Flagged parts and corrective action'],
   certs:['Material Certs','Mill & material certifications'],
+  drawcheck:['Drawing Check','Compare your model drawing to the customer’s before you cut'],
   drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks'],
   settings:['Settings','AI connection for this device']
 };
 window.showPage=(p)=>{
-  if(QC_ROLE==='operator' && p==='certs') p='inspections';
+  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck')) p='inspections';
   page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
   render();
 };
 function setActive(){
-  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',drawings:'nav-drawings',settings:'nav-settings'};
+  const navMap={selfcheck:'nav-selfcheck',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
-  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',settings:'dock-settings'};
+  const dockMap={selfcheck:'dock-selfcheck',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',drawcheck:'dock-drawcheck',settings:'dock-settings'};
   document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
   if(dockMap[page]&&$(dockMap[page])) $(dockMap[page]).classList.add('active');
   const m=META[page]||['Inspections','Quality control'];
@@ -664,6 +684,7 @@ function render(){
   else if(page==='fair') c.innerHTML=viewFair();
   else if(page==='ncr') c.innerHTML=viewNcr();
   else if(page==='certs') c.innerHTML=viewCerts();
+  else if(page==='drawcheck') c.innerHTML=viewDrawCheck();
   else if(page==='drawings') c.innerHTML=viewDrawings();
   else if(page==='settings') c.innerHTML=viewSettings();
   if(_deepCert && page==='certs'){
@@ -1180,6 +1201,271 @@ window.qcSaveSelf=async ()=>{
   }
   _scPhotoCheck=null; _scPhotoCheckFor=null;
   editId=null; page='inspections'; render();
+};
+
+/* =================== DRAWING CHECK ===================
+   Compare OUR drawing (made from our SolidWorks model) against the CUSTOMER's
+   drawing, before anything gets cut. Two jobs: catch where our model drifted
+   from their spec, and catch what their drawing never made clear.
+
+   Split of work — the AI only READS, the code JUDGES:
+     AI  → the exact text of each feature on each drawing, paired up.
+     code → nominal, delta, tolerance band, in/out — via the same engine the
+            first-article page uses (resolveTol/nominalOf), so callout tolerances
+            and the title-block defaults behave identically in both places.
+   That keeps the arithmetic deterministic and lets every row show its math,
+   and the raw drawing text is persisted alongside it. =================== */
+const DC_PROMPT='You are a senior sheet-metal detailer at a fabrication shop, reviewing a shop drawing before any parts are cut.\n\n'
++'You are given TWO drawings of the SAME part:\n(1) CUSTOMER DRAWING — the customer\'s drawing. This is the specification, the source of truth.\n(2) OUR DRAWING — a drawing our shop made from our own SolidWorks model, dimensioned to mirror the customer\'s.\n\n'
++'Find every place OUR drawing disagrees with, omits, or adds to the CUSTOMER drawing — and every place the CUSTOMER drawing is unclear.\n\n'
++'Return ONLY valid JSON, no markdown:\n'
++'{"custTitleBlock":{"stated":true,"frac":null,"p2":null,"p3":null,"ang":null},'
++'"rows":[{"feature":"short label","kind":"dim|angle|hole|thickness|material|finish|rev|part|qty|note","cust":"exact text on the customer drawing, or empty","mine":"exact text on our drawing, or empty","note":"short remark or empty"}],'
++'"questions":[{"topic":"short label","detail":"what is unclear on the CUSTOMER drawing and what to ask them"}],'
++'"summary":"one short sentence"}\n\n'
++'Rules:\n'
++'- "cust" and "mine" MUST be copied EXACTLY as written on that drawing — "2.500 ±.005", "Ø.250 THRU", "3/8", "16 GA CRS", "90°". Never rewrite, round, convert or invent a value. Use an empty string when that drawing does not state it; never guess.\n'
++'- One row per feature. Pair features by what they measure, not by wording: "OVERALL LENGTH" and "LG 12.000" are the same row.\n'
++'- ALWAYS include a row for each of these when either drawing states it: part number (kind "part"), revision ("rev"), material ("material"), thickness ("thickness"), finish ("finish"), quantity ("qty").\n'
++'- custTitleBlock = the CUSTOMER\'s "unless otherwise specified" default tolerances in decimal inches: frac = fractional, p2 = two-place decimal, p3 = three-place decimal, ang = angular in degrees. Use stated:false and nulls when their block is missing or unreadable. Never put our shop\'s defaults in it.\n'
++'- questions = anything on the CUSTOMER drawing a fabricator would have to stop and ask about: a missing dimension, a doubly-dimensioned or contradictory feature, an illegible value, an unclear datum, a hole with no size, an unclear finish or bend direction. This is the most valuable part of your answer — be thorough, but never invent a problem that is not there.\n'
++'- Do NOT judge pass/fail and do NOT compute any differences. Report only what each drawing says; our software does the arithmetic.';
+
+let _dcResult=null;    // last comparison on this page (unsaved)
+let _dcView=null;      // id of a saved check being viewed
+
+// nominal formatted the way the shop reads it — 3 places linear, 2 for angles.
+// Fractions land here already converted (3/8 → 0.375), which shows the conversion.
+function dcFmtNom(n,ang){ return ang?String(+n.toFixed(2)):n.toFixed(3); }
+function dcNorm(s){ return String(s||'').toLowerCase().replace(/[\s_.\-]/g,''); }
+// One row's verdict + the arithmetic behind it. The customer drawing is the spec,
+// so the tolerance band always comes from THEIR callout or THEIR title block.
+function dcJudge(row){
+  const custTxt=String(row.cust||'').trim(), mineTxt=String(row.mine||'').trim();
+  if(!custTxt && !mineTxt) return null;                               // nothing on either — drop the row
+  if(custTxt && !mineTxt) return {status:'missing_mine', math:''};
+  if(!custTxt && mineTxt) return {status:'missing_cust', math:''};
+  const cn=nominalOf(custTxt), mn=nominalOf(mineTxt);
+  if(!isFinite(cn)||!isFinite(mn)){                                   // material, finish, rev, notes
+    const same=dcNorm(custTxt)===dcNorm(mineTxt);
+    return {status:same?'match':'mismatch', math:same?t('Text match'):t('Text differs')};
+  }
+  const band=resolveTol(custTxt,'');                                  // ± on their callout, else their title block
+  const ang=isAngleReq(custTxt), u=ang?'°':'';
+  const d=mn-cn, ds=(d>=0?'+':'')+(ang?d.toFixed(2):d.toFixed(3));
+  let oot=false;
+  if(isFinite(band.pl)&&d>band.pl+1e-9) oot=true;
+  if(isFinite(band.mi)&&d<-band.mi-1e-9) oot=true;
+  const srcTxt=band.src==='title'?(' ('+t('title block')+')'):band.src==='callout'?(' ('+t('from callout')+')'):'';
+  const math=band.str
+    ? dcFmtNom(mn,ang)+u+' − '+dcFmtNom(cn,ang)+u+' = '+ds+u+' · '+band.str+srcTxt+' → '+(oot?t('outside'):t('within'))
+    : dcFmtNom(mn,ang)+u+' − '+dcFmtNom(cn,ang)+u+' = '+ds+u+' · '+t('no tolerance stated');
+  const status = oot ? 'mismatch' : (band.str ? 'match' : (Math.abs(d)<1e-9?'match':'mismatch'));
+  return {status, math, delta:+d.toFixed(4), band:band.str||'', bandSrc:band.src};
+}
+// Judge every row against the CUSTOMER's title-block defaults when their block is
+// legible, otherwise BSMP's standard block. _fairTolDefaults is what defaultTolBand
+// reads, so it's swapped in around the run and put back — the FAIR page owns it.
+function dcComputeRows(rows, tolDefaults){
+  const saved=_fairTolDefaults;
+  _fairTolDefaults=Object.assign({}, DEFAULT_TOL_DEFAULTS, tolDefaults||{});
+  try{
+    return (rows||[]).map(r=>{
+      const j=dcJudge(r); if(!j) return null;
+      return Object.assign({feature:r.feature||'', kind:r.kind||'dim', cust:String(r.cust||'').trim(), mine:String(r.mine||'').trim(), note:r.note||''}, j);
+    }).filter(Boolean);
+  } finally { _fairTolDefaults=saved; }
+}
+// Their block if they state one, else ours — reported to the user either way.
+function dcTolDefaults(tb){
+  const num=v=>(v!=null&&isFinite(parseFloat(v))&&parseFloat(v)>0)?parseFloat(v):null;
+  const out={}, has={};
+  if(tb&&tb.stated){ ['frac','p2','p3','ang'].forEach(k=>{ const n=num(tb[k]); if(n!=null){ out[k]=n; has[k]=true; } }); }
+  return {defaults:Object.assign({}, DEFAULT_TOL_DEFAULTS, out), fromCustomer:Object.keys(has).length>0};
+}
+const DC_STATUS={
+  mismatch:    {c:'var(--red)',   ic:'ti-alert-octagon',  l:'Does not match'},
+  missing_mine:{c:'var(--amber)', ic:'ti-help-circle',    l:'Not on your drawing'},
+  missing_cust:{c:'var(--blue)',  ic:'ti-message-circle', l:'Customer never states it'},
+  match:       {c:'var(--green)', ic:'ti-check',          l:'Matches'}
+};
+const DC_ORDER={mismatch:0, missing_mine:1, missing_cust:2, match:3};
+
+async function qcDrawCompare(){
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
+  const cust=(_pendingFiles['dccust']||[])[0], mine=(_pendingFiles['dcmine']||[])[0];
+  if(!cust){ qcToast(t('Add the customer drawing first.'),'err'); return; }
+  if(!mine){ qcToast(t('Add your drawing first.'),'err'); return; }
+  const btn=$('dc-run'), panel=$('dc-panel');
+  if(btn) btn.disabled=true;
+  if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('AI is reading both drawings — this takes a few seconds…')}</div>`; }
+  try{
+    const content=[
+      {type:'text',text:'CUSTOMER DRAWING (the specification):'},
+      aiContentBlock(await toBase64(cust), extFromFile(cust)),
+      {type:'text',text:'OUR DRAWING (made from our SolidWorks model):'},
+      aiContentBlock(await toBase64(mine), extFromFile(mine)),
+      {type:'text',text:DC_PROMPT}
+    ];
+    const res=await callAIJsonContent(content, 4000);
+    const tol=dcTolDefaults(res.custTitleBlock);
+    const rows=dcComputeRows(res.rows, tol.defaults).sort((a,b)=>(DC_ORDER[a.status]-DC_ORDER[b.status]));
+    const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail));
+    const bad=rows.filter(r=>r.status==='mismatch').length;
+    _dcResult={
+      ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'',
+      summary:res.summary||'', rows, questions,
+      tolDefaults:tol.defaults, tolFromCustomer:tol.fromCustomer,
+      custTitleBlock:res.custTitleBlock||null,          // raw, exactly as read
+      verdict:(bad||questions.length)?'review':'clear'
+    };
+    qcDrawRenderResult();
+  }catch(e){
+    console.error('drawing check failed', e);
+    if(panel) panel.innerHTML=`<div class="hint" style="color:var(--red)"><i class="ti ti-alert-triangle"></i> ${esc(t('Drawing check failed:')+' '+((e&&e.message)||e))}</div>`;
+  }finally{ if(btn) btn.disabled=false; }
+}
+window.qcDrawCompare=qcDrawCompare;
+
+function dcResultHtml(res, saved){
+  const counts={mismatch:0,missing_mine:0,missing_cust:0,match:0};
+  (res.rows||[]).forEach(r=>{ counts[r.status]=(counts[r.status]||0)+1; });
+  const chip=(k)=>counts[k]?`<span class="dc-chip" style="color:${DC_STATUS[k].c};border-color:${DC_STATUS[k].c}55;background:${DC_STATUS[k].c}14"><i class="ti ${DC_STATUS[k].ic}"></i> ${counts[k]} ${t(DC_STATUS[k].l)}</span>`:'';
+  const head=res.verdict==='clear'
+    ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-circle-check"></i> ${t('Your drawing matches the customer’s')}</div>`
+    : `<div class="dc-verdict" style="color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${t('Review before you cut')}</div>`;
+  const rows=(res.rows||[]).map(r=>{
+    const s=DC_STATUS[r.status]||DC_STATUS.match;
+    return `<tr class="dc-row dc-${esc(r.status)}">
+      <td><b>${esc(r.feature||'—')}</b>${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
+      <td class="dc-val">${esc(r.cust)||`<span class="muted">${t('— not stated —')}</span>`}</td>
+      <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}</td>
+      <td style="white-space:nowrap"><span style="color:${s.c};font-weight:700;font-size:12px"><i class="ti ${s.ic}"></i> ${t(s.l)}</span>
+        ${r.math?`<div class="dc-math">${esc(r.math)}</div>`:''}</td>
+    </tr>`;
+  }).join('');
+  const qs=(res.questions||[]).map(q=>`<li><b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}</li>`).join('');
+  const tolNote=res.tolFromCustomer
+    ? t('Differences are judged against the customer’s title-block tolerances, read off their drawing.')
+    : t('The customer’s title block could not be read, so differences are judged against BSMP’s standard block (frac ±1/16, .00 ±.020, .000 ±.005, angular ±1°).');
+  return `${head}
+    ${res.summary?`<div style="margin:2px 0 8px">${esc(res.summary)}</div>`:''}
+    <div class="dc-chips">${chip('mismatch')}${chip('missing_mine')}${chip('missing_cust')}${chip('match')}</div>
+    ${rows?`<div class="dc-tblwrap"><table class="tbl dc-tbl">
+      <thead><tr><th>${t('Feature')}</th><th>${t('Customer drawing')}</th><th>${t('Your drawing')}</th><th>${t('Check')}</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`:`<div class="empty">${t('AI did not read any comparable features — check that both files are the right drawings.')}</div>`}
+    ${qs?`<div class="dc-qs"><div class="dc-qs-h"><i class="ti ti-message-question"></i> ${t('Ask the customer')}</div>
+      <ul style="margin:6px 0 0;padding-left:18px">${qs}</ul></div>`:''}
+    <div class="hint" style="margin-top:8px">${esc(tolNote)}</div>
+    <div class="hint">${t('Advisory only — AI reads the drawings, the tolerance math is ours. You still own the final call.')}</div>
+    ${saved?'':`<div class="hint" style="margin-top:2px">${t('Values above are copied from each drawing exactly as written; saving keeps them with both files.')}</div>`}`;
+}
+function qcDrawRenderResult(){ const p=$('dc-panel'); if(!p||!_dcResult) return; p.style.display='block'; p.innerHTML=dcResultHtml(_dcResult,false); }
+
+function dcVerdictBadge(v){
+  return v==='clear'
+    ? `<span class="badge ok"><i class="ti ti-circle-check"></i> ${t('Clear')}</span>`
+    : `<span class="badge warn"><i class="ti ti-alert-triangle"></i> ${t('Review')}</span>`;
+}
+window.qcDrawCheckOpen=(id)=>{ _dcView=id; render(); };
+window.qcDrawCheckBack=()=>{ _dcView=null; render(); };
+window.qcDrawCheckNew=()=>{ _dcView=null; _dcResult=null; _pendingFiles['dccust']=[]; _pendingFiles['dcmine']=[]; render(); };
+window.qcDrawCheckDel=async (id)=>{
+  if(!confirm(t('Delete this drawing check?'))) return;
+  await dbRemove('qc/drawingChecks/'+id);
+  if(_dcView===id) _dcView=null;
+  render();
+};
+
+function viewDrawCheck(){
+  // ---- viewing a saved check ----
+  if(_dcView && DRAWCHECKS[_dcView]){
+    const r=DRAWCHECKS[_dcView];
+    const file=(f,lbl)=>f&&f.url?`<a class="btn sm" href="${esc(f.url)}" target="_blank"><i class="ti ti-file"></i> ${esc(lbl)}</a>`:'';
+    return `<div class="page-head"><h2>${t('Drawing check')}</h2><p>${esc([r.partNum,r.rev?('Rev '+r.rev):'',r.customer].filter(Boolean).join(' · '))} · ${fmtWhen(r.ranAt||r.createdAt)}</p></div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <button class="btn" onclick="qcDrawCheckBack()"><i class="ti ti-arrow-left"></i> ${t('Back')}</button>
+        ${file(r.custDrawing,t('Customer drawing'))}${file(r.myDrawing,t('Your drawing'))}
+        <button class="btn" style="margin-left:auto;color:var(--red)" onclick="qcDrawCheckDel('${esc(r.id)}')"><i class="ti ti-trash"></i> ${t('Delete')}</button>
+      </div>
+      <div class="card">${dcResultHtml(r,true)}
+        ${r.notes?`<div class="field" style="margin-top:10px"><label class="fl">${t('Notes')}</label><div>${esc(r.notes)}</div></div>`:''}
+        <div class="muted" style="font-size:11.5px;margin-top:8px">${t('Checked by')} ${esc((r.createdBy||'').split('@')[0])} · ${fmtWhen(r.createdAt)}</div>
+      </div>`;
+  }
+  // ---- new check ----
+  const list=vals(DRAWCHECKS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
+  const rows=list.map(r=>{
+    const bad=(r.rows||[]).filter(x=>x.status==='mismatch').length, qs=(r.questions||[]).length;
+    return `<tr class="click" onclick="qcDrawCheckOpen('${esc(r.id)}')">
+      <td><b>${esc(r.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc([r.customer,r.rev?('Rev '+r.rev):'',r.job].filter(Boolean).join(' · '))}</div></td>
+      <td>${dcVerdictBadge(r.verdict)}</td>
+      <td>${bad?`<span style="color:var(--red);font-weight:700">${bad}</span>`:'<span class="muted">0</span>'}</td>
+      <td>${qs?`<span style="color:var(--amber);font-weight:700">${qs}</span>`:'<span class="muted">0</span>'}</td>
+      <td class="muted" style="font-size:11.5px;white-space:nowrap">${esc((r.createdBy||'').split('@')[0])}<div>${fmtWhen(r.createdAt)}</div></td>
+    </tr>`;
+  }).join('');
+  return `<div class="page-head"><h2>${t('Drawing check')}</h2><p>${t('Upload the customer’s drawing and the one you made from your model — AI compares them feature by feature, and lists what to ask the customer.')}</p></div>
+  <div class="card">
+    <div class="field"><label class="fl">${t('Link to an order')}</label>
+      ${orderSearchHtml('dc','')}
+      <div class="hint">${t('Pick the order to auto-fill part / customer / job, or leave unlinked and type below.')}</div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="dc-part"></div>
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="dc-customer"></div>
+      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="dc-job"></div>
+      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="dc-rev"></div>
+    </div>
+    <div class="dc-pair">
+      <div class="field">
+        <label class="fl"><i class="ti ti-file-text" style="color:var(--blue)"></i> ${t('Customer drawing')}</label>
+        <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Upload')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('dccust',this)"></label>
+        <button class="btn sm" onclick="qcDrawPickOpen('dccust')"><i class="ti ti-books"></i> ${t('From library')}</button>
+        <div class="thumbs" id="files-dccust"></div>
+        <div class="hint">${t('Their drawing — the spec everything is judged against.')}</div>
+      </div>
+      <div class="field">
+        <label class="fl"><i class="ti ti-file-vector" style="color:var(--green)"></i> ${t('Your drawing')}</label>
+        <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Upload')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('dcmine',this)"></label>
+        <div class="thumbs" id="files-dcmine"></div>
+        <div class="hint">${t('The drawing off your SolidWorks model, dimensioned like theirs.')}</div>
+      </div>
+    </div>
+    <div class="field">
+      <button class="btn primary" id="dc-run" onclick="qcDrawCompare()"><i class="ti ti-sparkles"></i> ${t('Compare drawings (AI)')}</button>
+      <div id="dc-panel" style="display:${_dcResult?'block':'none'};margin-top:10px">${_dcResult?dcResultHtml(_dcResult,false):''}</div>
+    </div>
+    <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="dc-notes"></textarea></div>
+    <div class="toolbar" style="margin:4px 0 0">
+      <button class="btn primary" onclick="window.qcSaveDrawCheck()"><i class="ti ti-device-floppy"></i> ${t('Save check')}</button>
+      <button class="btn" onclick="qcDrawCheckNew()">${t('Clear')}</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;margin-top:14px">
+    ${list.length?`<table class="tbl"><thead><tr><th>${t('Part #')}</th><th>${t('Result')}</th><th>${t('Mismatches')}</th><th>${t('Questions')}</th><th>${t('Checked')}</th></tr></thead><tbody>${rows}</tbody></table>`
+      :`<div class="empty">${t('No drawing checks yet — compare a pair above and save it here.')}</div>`}
+  </div>`;
+}
+window.qcSaveDrawCheck=async ()=>{
+  if(!_dcResult){ qcToast(t('Run the comparison first, then save it.'),'err'); return; }
+  const part=gv('dc-part'), cust=gv('dc-customer');
+  if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
+  const id=newId('dchk');
+  const cf=await uploadPending('dccust','drawingChecks');
+  const mf=await uploadPending('dcmine','drawingChecks');
+  const rec=Object.assign({}, _dcResult, {
+    id, createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'', orderId:gv('dc-order'),
+    partNum:part, customer:cust, job:gv('dc-job'), rev:gv('dc-rev'), notes:gv('dc-notes'),
+    custDrawing:cf[0]||null, myDrawing:mf[0]||null
+  });
+  await dbSet('qc/drawingChecks/'+id, rec);
+  try{ await qcLogAudit([{ drawCheckId:id, partNum:part, field:'drawcheck', action:'ai-drawing-check', verdict:rec.verdict||'',
+    note:(rec.summary||'')+' · '+(rec.rows||[]).filter(r=>r.status==='mismatch').length+' mismatch, '+(rec.questions||[]).length+' question(s)' }]); }
+  catch(e){ console.error('audit log failed', e); }
+  _dcResult=null; _dcView=id;
+  qcToast(t('Drawing check saved.'),'ok');
+  render();
 };
 
 /* =================== DRAWING LIBRARY =================== */
@@ -3004,6 +3290,7 @@ function startListeners(){
   onValue(ref(db,'qc/certs'),       s=> window.qcOnData('certs', s.val()||{}));
   onValue(ref(db,'qc/audit'),       s=> window.qcOnData('audit', s.val()||{}));
   onValue(ref(db,'qc/drawings'),    s=> window.qcOnData('drawings', s.val()||{}));
+  onValue(ref(db,'qc/drawingChecks'), s=> window.qcOnData('drawingChecks', s.val()||{}));
   onValue(ref(db,'orders'),         s=> window.qcOnData('orders', s.val()||{}));
   onValue(ref(db,'quotes'),         s=> window.qcOnData('quotes', s.val()||{}));
   startConnectionWatch();
