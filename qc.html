@@ -262,6 +262,23 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .dc-row.dc-mismatch td{background:#fdf1f1}
 .dc-row.dc-missing_mine td{background:#fbf6ea}
 .dc-row.dc-missing_cust td{background:#eff4f9}
+/* signed-off rows go quiet but never disappear — the finding stays on the record.
+   These come after the tints above so they win on equal specificity. */
+.dc-row.dc-accepted td{background:#f3f7f3}
+.dc-row.dc-accepted .dc-st{opacity:.5;text-decoration:line-through}
+.dc-st{font-weight:700;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.dc-okchip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--green);background:var(--green-soft);padding:1px 6px;margin-left:5px;white-space:nowrap}
+.dc-acc{margin-top:6px}
+.dc-accbox{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap}
+.dc-accbox input{width:14px;height:14px;margin:0;accent-color:var(--green);cursor:pointer}
+.dc-accnote{display:block;width:100%;min-width:170px;max-width:230px;margin-top:4px;font-size:11.5px;padding:4px 7px;border:1px solid var(--border);background:#fff;outline:none}
+.dc-accnote:focus{border-color:var(--accent)}
+.dc-accby{font-size:10.5px;color:var(--text3);margin-top:3px}
+.dc-qs li{margin-bottom:9px}
+.dc-qs li:last-child{margin-bottom:0}
+.dc-qs li.dc-qdone{opacity:.62}
+.dc-qs li.dc-qdone>b{text-decoration:line-through}
+.dc-qs .dc-accnote{max-width:340px}
 .dc-qs{margin-top:12px;padding:10px 12px;background:var(--amber-soft);border:1px solid #e3cf9b;font-size:12.5px;color:#5a400d}
 .dc-qs-h{font-weight:800;display:flex;align-items:center;gap:6px}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
@@ -1291,6 +1308,63 @@ const DC_STATUS={
 };
 const DC_ORDER={mismatch:0, missing_mine:1, missing_cust:2, match:3};
 
+/* ---- accepting a difference ----
+   AI finds real differences and false positives, and some real differences are
+   simply fine (a radius we added that they never called out). So each non-match
+   row and each question can be signed off. Accepting is a RECORD, not a delete:
+   the row keeps its finding and its math, and gains who/when/why. Only once
+   nothing is left open does the check stop saying "Review". */
+const dcIsDeviation=(r)=>r&&r.status&&r.status!=='match';
+function dcRecomputeVerdict(res){
+  const rows=res.rows||[], qs=res.questions||[];
+  const openRows=rows.filter(r=>dcIsDeviation(r)&&!r.accepted).length;
+  const openQs=qs.filter(q=>!q.resolved).length;
+  const acc=rows.filter(r=>dcIsDeviation(r)&&r.accepted).length + qs.filter(q=>q.resolved).length;
+  res.openCount=openRows+openQs; res.acceptedCount=acc;
+  res.verdict = res.openCount ? 'review' : (acc ? 'accepted' : 'clear');
+  return res;
+}
+// live panel (before save) vs a saved record — same controls, different home
+function dcResOf(where){ return where==='live' ? _dcResult : DRAWCHECKS[where]; }
+async function dcPersist(where,res,audit){
+  if(where==='live'){ qcDrawRenderResult(); return; }
+  const rec=Object.assign({}, res, {updatedAt:Date.now()});
+  await dbSet('qc/drawingChecks/'+where, rec);   // per-id write, never the whole collection
+  if(audit){
+    try{ await qcLogAudit([Object.assign({drawCheckId:where, partNum:rec.partNum||'', field:'drawcheck', verdict:rec.verdict||''}, audit)]); }
+    catch(e){ console.error('audit log failed', e); }
+  }
+}
+window.dcAccept=async (where,i,on)=>{
+  const res=dcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
+  r.accepted=!!on;
+  if(on){ r.acceptBy=(QC_USER&&QC_USER.email)||''; r.acceptAt=Date.now(); }
+  else { delete r.acceptBy; delete r.acceptAt; delete r.acceptNote; }
+  dcRecomputeVerdict(res);
+  await dcPersist(where,res,{action:on?'deviation-accepted':'deviation-reopened', note:(r.feature||'')+(r.acceptNote?(' — '+r.acceptNote):'')});
+  if(where!=='live') render();
+};
+// note edits save on blur, never on keystroke — a re-render mid-typing would steal focus
+window.dcAcceptNote=async (where,i,val)=>{
+  const res=dcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
+  r.acceptNote=String(val||'').trim();
+  if(where!=='live') await dcPersist(where,res,null);
+};
+window.dcQResolve=async (where,i,on)=>{
+  const res=dcResOf(where); const q=res&&res.questions&&res.questions[i]; if(!q) return;
+  q.resolved=!!on;
+  if(on){ q.resolvedBy=(QC_USER&&QC_USER.email)||''; q.resolvedAt=Date.now(); }
+  else { delete q.resolvedBy; delete q.resolvedAt; delete q.answer; }
+  dcRecomputeVerdict(res);
+  await dcPersist(where,res,{action:on?'question-answered':'question-reopened', note:(q.topic||'')+(q.answer?(' — '+q.answer):'')});
+  if(where!=='live') render();
+};
+window.dcQAnswer=async (where,i,val)=>{
+  const res=dcResOf(where); const q=res&&res.questions&&res.questions[i]; if(!q) return;
+  q.answer=String(val||'').trim();
+  if(where!=='live') await dcPersist(where,res,null);
+};
+
 async function qcDrawCompare(){
   if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
   const cust=(_pendingFiles['dccust']||[])[0], mine=(_pendingFiles['dcmine']||[])[0];
@@ -1311,14 +1385,12 @@ async function qcDrawCompare(){
     const tol=dcTolDefaults(res.custTitleBlock);
     const rows=dcComputeRows(res.rows, tol.defaults).sort((a,b)=>(DC_ORDER[a.status]-DC_ORDER[b.status]));
     const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail));
-    const bad=rows.filter(r=>r.status==='mismatch').length;
-    _dcResult={
+    _dcResult=dcRecomputeVerdict({
       ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'',
       summary:res.summary||'', rows, questions,
       tolDefaults:tol.defaults, tolFromCustomer:tol.fromCustomer,
-      custTitleBlock:res.custTitleBlock||null,          // raw, exactly as read
-      verdict:(bad||questions.length)?'review':'clear'
-    };
+      custTitleBlock:res.custTitleBlock||null           // raw, exactly as read
+    });
     qcDrawRenderResult();
   }catch(e){
     console.error('drawing check failed', e);
@@ -1327,30 +1399,51 @@ async function qcDrawCompare(){
 }
 window.qcDrawCompare=qcDrawCompare;
 
-function dcResultHtml(res, saved){
+function dcResultHtml(res, where){
   const counts={mismatch:0,missing_mine:0,missing_cust:0,match:0};
   (res.rows||[]).forEach(r=>{ counts[r.status]=(counts[r.status]||0)+1; });
   const chip=(k)=>counts[k]?`<span class="dc-chip" style="color:${DC_STATUS[k].c};border-color:${DC_STATUS[k].c}55;background:${DC_STATUS[k].c}14"><i class="ti ${DC_STATUS[k].ic}"></i> ${counts[k]} ${t(DC_STATUS[k].l)}</span>`:'';
+  const acc=res.acceptedCount||0;
+  const accChip=acc?`<span class="dc-chip" style="color:var(--green);border-color:var(--green)55;background:var(--green)14"><i class="ti ti-writing-sign"></i> ${acc} ${t('signed off')}</span>`:'';
   const head=res.verdict==='clear'
     ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-circle-check"></i> ${t('Your drawing matches the customer’s')}</div>`
-    : `<div class="dc-verdict" style="color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${t('Review before you cut')}</div>`;
-  const rows=(res.rows||[]).map(r=>{
+    : res.verdict==='accepted'
+    ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-writing-sign"></i> ${t('Reviewed — every difference signed off')}</div>`
+    : `<div class="dc-verdict" style="color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${t('Review before you cut')}${res.openCount?` <span class="muted" style="font-weight:600">· ${res.openCount} ${t('open')}</span>`:''}</div>`;
+  const rows=(res.rows||[]).map((r,i)=>{
     const s=DC_STATUS[r.status]||DC_STATUS.match;
-    return `<tr class="dc-row dc-${esc(r.status)}">
+    const dev=dcIsDeviation(r);
+    // the finding and its math never disappear on accept — they just stop being open
+    const acceptUi = !dev ? '' : `<div class="dc-acc">
+      <label class="dc-accbox"><input type="checkbox" ${r.accepted?'checked':''} onchange="dcAccept('${esc(where)}',${i},this.checked)"> ${t('Acceptable')}</label>
+      ${r.accepted?`<input class="dc-accnote" value="${esc(r.acceptNote||'')}" placeholder="${esc(t('Why — e.g. AI misread it / my call'))}" onchange="dcAcceptNote('${esc(where)}',${i},this.value)">
+        <div class="dc-accby">${t('Signed off by')} ${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+fmtWhen(r.acceptAt):''}</div>`:''}
+    </div>`;
+    return `<tr class="dc-row dc-${esc(r.status)}${r.accepted?' dc-accepted':''}">
       <td><b>${esc(r.feature||'—')}</b>${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
       <td class="dc-val">${esc(r.cust)||`<span class="muted">${t('— not stated —')}</span>`}</td>
       <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}</td>
-      <td style="white-space:nowrap"><span style="color:${s.c};font-weight:700;font-size:12px"><i class="ti ${s.ic}"></i> ${t(s.l)}</span>
-        ${r.math?`<div class="dc-math">${esc(r.math)}</div>`:''}</td>
+      <td>
+        <span class="dc-st" style="color:${s.c}"><i class="ti ${s.ic}"></i> ${t(s.l)}</span>
+        ${r.accepted?`<span class="dc-okchip"><i class="ti ti-check"></i> ${t('Accepted')}</span>`:''}
+        ${r.math?`<div class="dc-math">${esc(r.math)}</div>`:''}
+        ${acceptUi}
+      </td>
     </tr>`;
   }).join('');
-  const qs=(res.questions||[]).map(q=>`<li><b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}</li>`).join('');
+  const qs=(res.questions||[]).map((q,i)=>`<li class="${q.resolved?'dc-qdone':''}">
+    <b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
+    <div class="dc-acc">
+      <label class="dc-accbox"><input type="checkbox" ${q.resolved?'checked':''} onchange="dcQResolve('${esc(where)}',${i},this.checked)"> ${t('Answered / not an issue')}</label>
+      ${q.resolved?`<input class="dc-accnote" value="${esc(q.answer||'')}" placeholder="${esc(t('What they said, or why it’s fine'))}" onchange="dcQAnswer('${esc(where)}',${i},this.value)">
+        <div class="dc-accby">${esc((q.resolvedBy||'').split('@')[0])}${q.resolvedAt?' · '+fmtWhen(q.resolvedAt):''}</div>`:''}
+    </div></li>`).join('');
   const tolNote=res.tolFromCustomer
     ? t('Differences are judged against the customer’s title-block tolerances, read off their drawing.')
     : t('The customer’s title block could not be read, so differences are judged against BSMP’s standard block (frac ±1/16, .00 ±.020, .000 ±.005, angular ±1°).');
   return `${head}
     ${res.summary?`<div style="margin:2px 0 8px">${esc(res.summary)}</div>`:''}
-    <div class="dc-chips">${chip('mismatch')}${chip('missing_mine')}${chip('missing_cust')}${chip('match')}</div>
+    <div class="dc-chips">${chip('mismatch')}${chip('missing_mine')}${chip('missing_cust')}${chip('match')}${accChip}</div>
     ${rows?`<div class="dc-tblwrap"><table class="tbl dc-tbl">
       <thead><tr><th>${t('Feature')}</th><th>${t('Customer drawing')}</th><th>${t('Your drawing')}</th><th>${t('Check')}</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`:`<div class="empty">${t('AI did not read any comparable features — check that both files are the right drawings.')}</div>`}
@@ -1358,14 +1451,16 @@ function dcResultHtml(res, saved){
       <ul style="margin:6px 0 0;padding-left:18px">${qs}</ul></div>`:''}
     <div class="hint" style="margin-top:8px">${esc(tolNote)}</div>
     <div class="hint">${t('Advisory only — AI reads the drawings, the tolerance math is ours. You still own the final call.')}</div>
-    ${saved?'':`<div class="hint" style="margin-top:2px">${t('Values above are copied from each drawing exactly as written; saving keeps them with both files.')}</div>`}`;
+    <div class="hint">${t('Ticking Acceptable never hides a finding — the row and its math stay on the record with your name against them.')}</div>
+    ${where!=='live'?'':`<div class="hint" style="margin-top:2px">${t('Values above are copied from each drawing exactly as written; saving keeps them with both files.')}</div>`}`;
 }
-function qcDrawRenderResult(){ const p=$('dc-panel'); if(!p||!_dcResult) return; p.style.display='block'; p.innerHTML=dcResultHtml(_dcResult,false); }
+function qcDrawRenderResult(){ const p=$('dc-panel'); if(!p||!_dcResult) return; p.style.display='block'; p.innerHTML=dcResultHtml(_dcResult,'live'); }
 
-function dcVerdictBadge(v){
-  return v==='clear'
-    ? `<span class="badge ok"><i class="ti ti-circle-check"></i> ${t('Clear')}</span>`
-    : `<span class="badge warn"><i class="ti ti-alert-triangle"></i> ${t('Review')}</span>`;
+function dcVerdictBadge(r){
+  const v=(r&&r.verdict)||'review', open=(r&&r.openCount)||0, acc=(r&&r.acceptedCount)||0;
+  if(v==='clear') return `<span class="badge ok"><i class="ti ti-circle-check"></i> ${t('Clear')}</span>`;
+  if(v==='accepted') return `<span class="badge ok"><i class="ti ti-writing-sign"></i> ${t('Reviewed')}${acc?' · '+acc:''}</span>`;
+  return `<span class="badge warn"><i class="ti ti-alert-triangle"></i> ${t('Review')}${open?' · '+open:''}</span>`;
 }
 window.qcDrawCheckOpen=(id)=>{ _dcView=id; render(); };
 window.qcDrawCheckBack=()=>{ _dcView=null; render(); };
@@ -1388,7 +1483,7 @@ function viewDrawCheck(){
         ${file(r.custDrawing,t('Customer drawing'))}${file(r.myDrawing,t('Your drawing'))}
         <button class="btn" style="margin-left:auto;color:var(--red)" onclick="qcDrawCheckDel('${esc(r.id)}')"><i class="ti ti-trash"></i> ${t('Delete')}</button>
       </div>
-      <div class="card">${dcResultHtml(r,true)}
+      <div class="card">${dcResultHtml(r,r.id)}
         ${r.notes?`<div class="field" style="margin-top:10px"><label class="fl">${t('Notes')}</label><div>${esc(r.notes)}</div></div>`:''}
         <div class="muted" style="font-size:11.5px;margin-top:8px">${t('Checked by')} ${esc((r.createdBy||'').split('@')[0])} · ${fmtWhen(r.createdAt)}</div>
       </div>`;
@@ -1396,10 +1491,12 @@ function viewDrawCheck(){
   // ---- new check ----
   const list=vals(DRAWCHECKS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
   const rows=list.map(r=>{
-    const bad=(r.rows||[]).filter(x=>x.status==='mismatch').length, qs=(r.questions||[]).length;
+    // the list counts what's still OPEN — signed-off differences aren't outstanding work
+    const bad=(r.rows||[]).filter(x=>dcIsDeviation(x)&&!x.accepted).length;
+    const qs=(r.questions||[]).filter(q=>!q.resolved).length;
     return `<tr class="click" onclick="qcDrawCheckOpen('${esc(r.id)}')">
       <td><b>${esc(r.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc([r.customer,r.rev?('Rev '+r.rev):'',r.job].filter(Boolean).join(' · '))}</div></td>
-      <td>${dcVerdictBadge(r.verdict)}</td>
+      <td>${dcVerdictBadge(r)}</td>
       <td>${bad?`<span style="color:var(--red);font-weight:700">${bad}</span>`:'<span class="muted">0</span>'}</td>
       <td>${qs?`<span style="color:var(--amber);font-weight:700">${qs}</span>`:'<span class="muted">0</span>'}</td>
       <td class="muted" style="font-size:11.5px;white-space:nowrap">${esc((r.createdBy||'').split('@')[0])}<div>${fmtWhen(r.createdAt)}</div></td>
@@ -1434,7 +1531,7 @@ function viewDrawCheck(){
     </div>
     <div class="field">
       <button class="btn primary" id="dc-run" onclick="qcDrawCompare()"><i class="ti ti-sparkles"></i> ${t('Compare drawings (AI)')}</button>
-      <div id="dc-panel" style="display:${_dcResult?'block':'none'};margin-top:10px">${_dcResult?dcResultHtml(_dcResult,false):''}</div>
+      <div id="dc-panel" style="display:${_dcResult?'block':'none'};margin-top:10px">${_dcResult?dcResultHtml(_dcResult,'live'):''}</div>
     </div>
     <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="dc-notes"></textarea></div>
     <div class="toolbar" style="margin:4px 0 0">
@@ -1443,7 +1540,7 @@ function viewDrawCheck(){
     </div>
   </div>
   <div class="card" style="padding:0;margin-top:14px">
-    ${list.length?`<table class="tbl"><thead><tr><th>${t('Part #')}</th><th>${t('Result')}</th><th>${t('Mismatches')}</th><th>${t('Questions')}</th><th>${t('Checked')}</th></tr></thead><tbody>${rows}</tbody></table>`
+    ${list.length?`<table class="tbl"><thead><tr><th>${t('Part #')}</th><th>${t('Result')}</th><th>${t('Open')}</th><th>${t('Questions')}</th><th>${t('Checked')}</th></tr></thead><tbody>${rows}</tbody></table>`
       :`<div class="empty">${t('No drawing checks yet — compare a pair above and save it here.')}</div>`}
   </div>`;
 }
