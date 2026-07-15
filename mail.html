@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BSMP Mail</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23145a63%22/%3E%3Cg%20transform%3D%22translate%2832%2027%29%20scale%281.5%29%20translate%28-12%20-12%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%2218%22%20height%3D%2214%22%20rx%3D%222%22/%3E%3Cpath%20d%3D%22M3%207l9%206%209-6%22/%3E%3C/g%3E%3Crect%20x%3D%2211.5%22%20y%3D%2249%22%20width%3D%2241%22%20height%3D%224.5%22%20rx%3D%222.25%22%20fill%3D%22%23d42b2b%22/%3E%3C/svg%3E">
+<link rel="icon" id="favicon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%23145a63%22/%3E%3Cg%20transform%3D%22translate%2832%2027%29%20scale%281.5%29%20translate%28-12%20-12%29%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%2218%22%20height%3D%2214%22%20rx%3D%222%22/%3E%3Cpath%20d%3D%22M3%207l9%206%209-6%22/%3E%3C/g%3E%3Crect%20x%3D%2211.5%22%20y%3D%2249%22%20width%3D%2241%22%20height%3D%224.5%22%20rx%3D%222.25%22%20fill%3D%22%23d42b2b%22/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1266,6 +1266,47 @@ function renderNavCounts(){
   const rf=allThreads().filter(t=>flagOf(t)==='rfq' && !mutedOf(t)).length;
   const set=(id,n)=>{ const el=$(id); if(el){ el.style.display=n?'':'none'; el.textContent=n; } };
   set('n-inbox',un); set('n-rfq',rf);
+  paintBadge(un);
+}
+// ── unread badge on the favicon + tab title ───────────────────────────────────
+// The suite icon is redrawn on a canvas rather than loaded from the SVG data URI:
+// drawing an SVG image into a canvas taints it in some browsers, and a tainted
+// canvas can't produce the PNG the favicon needs. Same shapes, same colors as
+// the <link> icon in the head — keep them in step if the icon design changes.
+function drawMailIcon(g,n){
+  const round=(x,y,w,h,r)=>{ g.beginPath(); g.moveTo(x+r,y);
+    g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+    g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); };
+  g.clearRect(0,0,64,64);
+  round(0,0,64,64,14); g.fillStyle='#145a63'; g.fill();          // teal tile
+  g.strokeStyle='#fff'; g.lineWidth=3; g.lineJoin='round'; g.lineCap='round';
+  round(18.5,16.5,27,21,3); g.stroke();                          // envelope body
+  g.beginPath(); g.moveTo(18.5,19.5); g.lineTo(32,28.5); g.lineTo(45.5,19.5); g.stroke();  // flap
+  round(11.5,49,41,4.5,2.25); g.fillStyle='#d42b2b'; g.fill();   // red rule
+  if(!n) return;
+  // count bubble, top-right — white ring keeps it readable against the teal
+  const cx=45, cy=19, r=18;
+  g.beginPath(); g.arc(cx,cy,r,0,7); g.fillStyle='#fff'; g.fill();
+  g.beginPath(); g.arc(cx,cy,r-3,0,7); g.fillStyle='#d42b2b'; g.fill();
+  const txt=n>99?'99+':String(n);
+  g.fillStyle='#fff'; g.textAlign='center'; g.textBaseline='middle';
+  g.font='800 '+(txt.length>2?19:txt.length>1?25:29)+'px system-ui,-apple-system,"Segoe UI",sans-serif';
+  g.fillText(txt,cx,cy+1);
+}
+let _badgeAt=-1, _badgeCv=null;
+function paintBadge(n){
+  n=Number(n)||0;
+  document.title = n ? '('+n+') BSMP Mail' : 'BSMP Mail';
+  if(n===_badgeAt) return;   // redrawing every render would flicker the tab icon
+  _badgeAt=n;
+  try{
+    if(!_badgeCv){ _badgeCv=document.createElement('canvas'); _badgeCv.width=_badgeCv.height=64; }
+    const g=_badgeCv.getContext('2d');
+    drawMailIcon(g,n);
+    const link=$('favicon'); if(!link) return;
+    link.type='image/png';
+    link.href=_badgeCv.toDataURL('image/png');
+  }catch(e){ /* canvas unavailable — the title count still tells the story */ }
 }
 function fmtWhen(ms){
   if(!ms) return '';
