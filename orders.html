@@ -460,6 +460,54 @@ tr:hover .del-btn{opacity:1}
 /* pick which pooled items go on this PO; unticked rows stay pending for the next one */
 .npv-pick{width:16px;height:16px;margin:0;accent-color:#2563eb;cursor:pointer;flex-shrink:0}
 .npv-row.unpicked{opacity:.4}
+/* Need PO pipeline — section headers */
+.np-sec{display:flex;align-items:center;gap:10px;margin:22px 0 12px;max-width:980px}
+.np-sec:first-child{margin-top:0}
+.np-sec i{font-size:16px;color:var(--text3)}
+.np-sec .t{font-size:14px;font-weight:800;color:var(--text);white-space:nowrap}
+.np-sec .n{font-size:11.5px;font-weight:700;color:var(--text2);background:#eef2f8;border-radius:20px;padding:2px 10px}
+.np-sec .line{flex:1;height:1px;background:var(--border2)}
+.np-sec .hint{font-size:11.5px;color:var(--text3);white-space:nowrap}
+.np-secempty{max-width:980px;border:1.5px dashed var(--border2);border-radius:13px;padding:16px;text-align:center;font-size:12.5px;color:var(--text3);margin-bottom:14px}
+/* inline what-to-buy inputs on each pooled item card */
+.npv-inrow{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
+.npq-in{font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:#fff;min-width:0}
+.npq-item{flex:2 1 180px}
+.npq-qty{width:64px}
+.npq-detail{flex:3 1 220px}
+.npv-needby{font-size:11px;font-weight:700;color:var(--text2);background:#f3f5f9;border:1px solid var(--border2);border-radius:20px;padding:3px 10px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.npv-needby.late{color:var(--red);background:#fdecec;border-color:#f3c1c1}
+/* issued-PO cards (waiting to come back) */
+.pol-num{font-size:14px;font-weight:800;color:var(--text);background:#eef2f8;border-radius:8px;padding:3px 10px;white-space:nowrap}
+.pol-items{padding:6px 15px}
+.pol-item{display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid #f1f3f7;font-size:12.5px;flex-wrap:wrap}
+.pol-item:last-child{border-bottom:none}
+.pol-item .pt{font-weight:700;white-space:nowrap}
+.pol-item .sub{color:var(--text3);font-size:11.5px}
+.pol-item .it{color:var(--text2);min-width:0;flex:1}
+.pol-foot{display:flex;align-items:center;gap:12px;padding:10px 15px;background:#fafbfd;border-top:1px solid var(--border2);flex-wrap:wrap}
+.pol-ship{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--text2);white-space:nowrap}
+.pol-ship input{font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px}
+.pol-legacy{font-size:10px;font-weight:700;color:#BA7517;text-transform:uppercase;letter-spacing:.04em;background:#BA751714;border-radius:5px;padding:2px 7px;white-space:nowrap}
+/* recently received strip */
+.pod-row{display:flex;align-items:center;gap:12px;padding:9px 15px;border-bottom:1px solid #f1f3f7;font-size:12.5px;flex-wrap:wrap}
+.pod-row:last-child{border-bottom:none}
+.pod-inv{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:#185FA5;background:#e7f0fb;border-radius:20px;padding:3px 10px;text-decoration:none;white-space:nowrap}
+.pod-inv:hover{filter:brightness(.95)}
+/* make-PO / receive modals */
+.mkpo-field{margin-bottom:11px}
+.mkpo-field label{display:block;font-size:10.5px;font-weight:700;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.03em}
+.mkpo-field input,.mkpo-field select,.mkpo-field textarea{width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:#fff}
+.mkpo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mkpo-items{border:1px solid var(--border);border-radius:9px;padding:4px 11px;margin-bottom:11px;max-height:180px;overflow-y:auto}
+.mkpo-it{display:flex;gap:8px;align-items:baseline;padding:6px 0;border-bottom:1px solid #f1f3f7;font-size:12px;flex-wrap:wrap}
+.mkpo-it:last-child{border-bottom:none}
+.mkpo-it b{white-space:nowrap}
+.mkpo-it .sub{color:var(--text3)}
+.rcv-drop{border:1.5px dashed var(--border2);border-radius:10px;padding:16px;text-align:center;font-size:12.5px;color:var(--text2);cursor:pointer;background:#fafbfd;margin-bottom:11px}
+.rcv-drop:hover{border-color:#2563eb;color:#2563eb}
+.rcv-drop i{font-size:20px;display:block;margin-bottom:4px}
+.rcv-status{font-size:12px;color:var(--text2);min-height:16px;margin:-4px 0 10px}
 .np-ordqty{font-size:11.5px;font-weight:700;color:var(--text2);background:#eef2f8;border-radius:20px;padding:2px 10px;white-space:nowrap}
 .np-ordqty b{color:var(--text)}
 .np-empty i{font-size:34px;opacity:.5;display:block;margin-bottom:10px;color:var(--green)}
@@ -1320,15 +1368,8 @@ body.sb-pinned .dock{left:var(--sb)}
     <div id="gantt-view" style="display:none"></div>
   </div>
 
-  <!-- Need PO Page -->
+  <!-- Need PO Page — one pipeline: needs a PO → issued → received -->
   <div id="needpo-page" style="display:none">
-    <div class="np-toolbar">
-      <div class="view-toggle">
-        <button id="npv-order" onclick="setNeedPOView('order')"><i class="ti ti-clipboard-list"></i> By Order</button>
-        <button id="npv-vendor" onclick="setNeedPOView('vendor')"><i class="ti ti-truck-delivery"></i> Group for PO</button>
-      </div>
-      <span class="np-toolbar-hint" id="np-toolbar-hint"></span>
-    </div>
     <div id="needpo-body"></div>
   </div>
 
@@ -1604,6 +1645,20 @@ body.sb-pinned .dock{left:var(--sb)}
 <div class="modal-bg" id="io-detail-modal" style="display:none;z-index:68">
   <div class="modal" style="max-width:470px;padding:0;overflow:hidden">
     <div id="io-detail-body"></div>
+  </div>
+</div>
+
+<!-- Make-a-PO modal (Need PO page) -->
+<div class="modal-bg" id="mkpo-modal" style="display:none;z-index:70">
+  <div class="modal" style="max-width:540px">
+    <div id="mkpo-body"></div>
+  </div>
+</div>
+
+<!-- Receive-a-PO modal: mark received, attach the vendor invoice, AI reads it -->
+<div class="modal-bg" id="rcv-modal" style="display:none;z-index:70">
+  <div class="modal" style="max-width:540px">
+    <div id="rcv-body"></div>
   </div>
 </div>
 
@@ -2134,6 +2189,7 @@ function startDataListeners(){
   startDurationsListener();
   startJobCounterListener();
   startVendorsListener();
+  startPOsListener();
   startConnectionWatch();
 }
 
@@ -2256,7 +2312,8 @@ function updateNavBadges(){
   const active=orders.filter(r=>!r.archived);
   const set=(id,n)=>{const el=document.getElementById(id);if(!el)return;if(n>0){el.textContent=n;el.style.display='';}else{el.style.display='none';}};
   set('badge-ready', active.filter(r=>r.status==='Ready for Invoice').length);
-  set('badge-needpo', active.filter(r=>r.status==='Need Purchase Order').length);
+  // Need PO badge = items still waiting on a PO + POs out waiting to be received
+  set('badge-needpo', npPoolItems().length + npOpenPOs().length);
   // "Today" badge = jobs whose current step is behind schedule
   const behind=active.filter(r=>!['Completed','Invoiced'].includes(r.status) && jobHealth(r).state==='behind').length;
   const db=document.getElementById('badge-dispatch');
@@ -4512,7 +4569,7 @@ const PAGE_META = {
   team:     {title:'Team',           sub:'Your people and the processes each one runs'},
   trash:    {title:'Recently Deleted',sub:'Restore deleted orders or remove them for good'},
   schedule: {title:'Incoming / Outgoing', sub:'External steps — parts out to vendors and material/POs coming in'},
-  needpo:   {title:'Need PO',         sub:'Assign the vendor and our PO number for outside processes'},
+  needpo:   {title:'Need PO',         sub:'Make, track, and receive vendor POs — grouped by vendor'},
   issuedpos:{title:'Issued POs',      sub:'History of every purchase order assigned to a vendor'},
   cutlist:  {title:'Tube Cut List',   sub:'Optimize tube/bar cuts for maximum material utilization'},
   archive:  {title:'Archive',        sub:'Completed orders you have archived'},
@@ -4556,7 +4613,7 @@ window.showPage = (page) => {
   if(page==='inventory') renderInventory();
   if(page==='team') renderTeam();
   if(page==='schedule') renderSchedule();
-  if(page==='needpo'){ document.getElementById('npv-order')?.classList.toggle('active',needPOView==='order'); document.getElementById('npv-vendor')?.classList.toggle('active',needPOView==='vendor'); renderNeedPO(); }
+  if(page==='needpo'){ renderNeedPO(); }
   if(page==='issuedpos') renderIssuedPOs();
   if(page==='cutlist') clInit();
   if(page==='archive') renderArchive();
@@ -5882,205 +5939,341 @@ window._iodSend = (id,name)=>{ _iodSaveVendor(id,name); markSent(id,name); openS
 window._iodRecv = (id,name)=>{ _iodSaveVendor(id,name); markReceived(id,name); closeModal('io-detail-modal'); };
 window._iodUndo = (id,name)=>{ undoSent(id,name); openStepDetail(id,name); };
 
-// ── Need PO page: assign vendor + our PO# for outside steps ───────────────────
-let needPOView='order'; // 'order' | 'vendor'
-window.setNeedPOView=(v)=>{
-  needPOView=v;
-  document.getElementById('npv-order')?.classList.toggle('active',v==='order');
-  document.getElementById('npv-vendor')?.classList.toggle('active',v==='vendor');
-  const hint=document.getElementById('np-toolbar-hint');
-  if(hint) hint.textContent = v==='vendor'
-    ? 'Steps with the same vendor/process are pooled so you can see everything that belongs on one PO.'
-    : '';
-  renderNeedPO();
-};
-function renderNeedPO(){
-  if(needPOView==='vendor'){ renderNeedPOByVendor(); return; }
-  const host=document.getElementById('needpo-body'); if(!host) return;
-  const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order')
-    .sort((a,b)=>((a.priority==null?2:a.priority)-(b.priority==null?2:b.priority)) || (a.due||'').localeCompare(b.due||''));
-  const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  if(!list.length){
-    host.innerHTML=`<div class="np-empty"><i class="ti ti-checks"></i><div>No orders need a PO</div><span>Set an order's status to “Need Purchase Order” to assign its vendor &amp; PO here.</span></div>`;
-    return;
-  }
-  host.innerHTML = list.map(r=>{
-    const pr=(r.priority==null?2:r.priority);
-    const ext=enabledOrdered(ensureSchedule(r)).filter(s=>isExternal(s.name));
-    const sched=computeStepDates(r); // computed start/end per step, lead-time applied
-    const stepRows = ext.length ? ext.map((s,i)=>{
-      const col=PROCESS_COLORS[s.name]||'#888', k=extKind(s.name);
-      const has=!!(s.vendorPO&&s.vendorPO.trim());
-      const sd=sched.find(x=>x.name===s.name);
-      const needBy=sd?toISO(sd.start):'';
-      const backBy=sd?toISO(sd.end):'';
-      const today=toISO(new Date());
-      const lateToSend = needBy && !s.sentAt && needBy < today;
-      const dateLine = sd ? `<div class="np-step-dates">
-          <span class="np-dchip${lateToSend?' late':''}"><i class="ti ti-calendar-event"></i>${k.a==='order'?'Order by':'Send by'} <b>${fmtDate(needBy)}</b>${lateToSend?' · past due':''}</span>
-          <span class="np-darrow">→</span>
-          <span class="np-dchip soft"><i class="ti ti-calendar-due"></i>${k.b==='in'?'In by':'Back by'} <b>${fmtDate(backBy)}</b><span class="np-dlead">(${s.duration||defDur(s.name)}d lead)</span></span>
-          ${s.sentAt?`<span class="np-dchip sent"><i class="ti ti-circle-check"></i>Sent ${fmtDate(s.sentAt)}</span>`:`<span class="np-sendwrap"><input type="date" class="np-sentdate" id="np-sent-${r.id}-${i}" title="Record the date this actually went out — recalculates the back-by date"><button class="btn sm" onclick="window._npoMarkSent('${r.id}','${esc(s.name)}',${i})">Mark sent</button></span>`}
-        </div>` : '';
-      return `<div class="np-step">
-        <div class="np-step-top">
-          <span class="np-stepic" style="color:${col}">${procIcon(s.name,16)}</span>
-          <span class="np-stepname">${shortProc(s.name)}<span class="np-steptag">${k.group==='outsource'?'send out':'purchase'}</span></span>
-          ${vendorSelectHtml(s.vendor, `class="np-in" id="np-v-${r.id}-${i}" onchange="window._resolveVendorSel(this)"`)}
-          <input class="np-in" id="np-p-${r.id}-${i}" placeholder="Our PO #" value="${esc(s.vendorPO)}">
-          <button class="btn sm ${has?'':'blue'}" onclick="assignVendorPO('${r.id}','${esc(s.name)}',${i})">${has?'Update':'Assign'}</button>
-        </div>
-        ${dateLine}
-        <div class="np-step-mid">
-          <input class="np-in np-item" id="np-item-${r.id}-${i}" placeholder="${k.group==='outsource'?'Item(s) sent out — e.g. (15) brackets':'Item(s) to purchase — e.g. 14ga 304 sheet'}" value="${esc(s.itemsPurchased)}" onchange="assignVendorPO('${r.id}','${esc(s.name)}',${i})">
-          <input class="np-in np-qty" id="np-qty-${r.id}-${i}" type="number" min="0" placeholder="Qty" value="${esc(s.qtyNeeded)}" onchange="assignVendorPO('${r.id}','${esc(s.name)}',${i})">
-        </div>
-        <input class="np-in np-detail" id="np-d-${r.id}-${i}" placeholder="Process / details — e.g. Type II anodize, black per MIL-A-8625" value="${esc(s.detail)}" onchange="assignVendorPO('${r.id}','${esc(s.name)}',${i})">
-      </div>`;
-    }).join('') : `<div class="np-nosteps">No outside / purchasing steps enabled on this order yet. <button class="btn sm" onclick="openEditFromSchedule('${r.id}')">Open order to enable</button></div>`;
-    return `<div class="np-card">
-      <div class="np-head">
-        <span class="np-prio" style="background:${PRIORITY_COLOR[pr]}">${PRIORITY_LABEL[pr]}</span>
-        <span class="np-part">${esc(r.part)||esc(r.desc)||'—'}</span>
-        <span class="np-cust">${esc(r.customer)||''}${r.po?' · Cust PO '+esc(r.po):''}</span>
-        ${r.qty?`<span class="np-ordqty" title="Quantity required for this order">Order qty <b>${esc(r.qty)}</b></span>`:''}
-        ${r.due?`<span class="np-due">Due ${fmtDate(r.due)}</span>`:''}
-        <button class="btn sm green" style="margin-left:auto" onclick="npoComplete('${r.id}')" title="POs assigned — move out of Need PO"><i class="ti ti-check"></i> PO done → Confirmed</button>
-      </div>
-      <div class="np-steps">${stepRows}</div>
-    </div>`;
-  }).join('');
+// ══════════════ NEED PO — one pipeline: needs a PO → PO issued → received ══════════════
+// A PO is a first-class record in RTDB `pos/<id>`: one vendor + one process,
+// covering any number of order steps (items). Steps still get vendor/vendorPO/
+// sentAt stamped on them, so the schedule, dispatch boards, and the Issued POs
+// log all keep reading the same fields they always did.
+const posRef = ref(db,'pos');
+let POS = {};
+function startPOsListener(){
+  onValue(posRef,(snap)=>{
+    POS = snap.val()||{};
+    if(document.getElementById('needpo-page')?.style.display!=='none') renderNeedPO();
+    updateNavBadges&&updateNavBadges();
+  }, ()=>{});
+}
+function poRecList(){ return Object.values(POS).filter(p=>p&&p.po); }
+function savePOrec(rec){
+  POS[rec.id]=rec;   // local-first so the page repaints even if the rule isn't live yet
+  return set(ref(db,'pos/'+rec.id), rec).catch(()=>{
+    if(!window.__posRuleWarned){ window.__posRuleWarned=true;
+      alert('Could not save the PO record — the "pos" database rule isn\'t published in Firebase yet, so PO tracking won\'t stick between sessions. The order steps themselves still saved.'); }
+  });
 }
 
-// ── Need PO, grouped for purchasing: pools un-assigned steps so one PO can cover everything from a vendor ──
-function renderNeedPOByVendor(){
-  const host=document.getElementById('needpo-body'); if(!host) return;
-  const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
-  const list=orders.filter(r=>!r.archived && r.status==='Need Purchase Order');
-  // gather every external step still missing a PO number, tagged with its order context
+// The pool: every outside / purchasing step on a "Need Purchase Order" order
+// that doesn't have a PO yet. One entry per step = one selectable item card.
+function npPoolItems(){
   const items=[];
-  list.forEach(r=>{
+  orders.filter(r=>!r.archived && r.status==='Need Purchase Order').forEach(r=>{
     const ext=enabledOrdered(ensureSchedule(r)).filter(s=>isExternal(s.name));
     const sched=computeStepDates(r);
-    ext.forEach((s,i)=>{
-      if(s.vendorPO&&s.vendorPO.trim()) return; // already has a PO — not pending
+    ext.forEach(s=>{
+      if(s.vendorPO&&String(s.vendorPO).trim()) return;
       const sd=sched.find(x=>x.name===s.name);
-      items.push({
-        orderId:r.id, stepIdx:i, name:s.name, vendor:(s.vendor||'').trim(),
+      items.push({ orderId:r.id, name:s.name, vendor:(s.vendor||'').trim(),
         item:s.itemsPurchased||'', qty:s.qtyNeeded||'', ordQty:r.qty||'', detail:s.detail||'',
         customer:r.customer||'', job:r.job||'', part:r.part||r.desc||'', due:r.due||'',
-        sendBy:sd?toISO(sd.start):'', backBy:sd?toISO(sd.end):'',
-        priority:(r.priority==null?2:r.priority)
-      });
+        sendBy:sd?toISO(sd.start):'', backBy:sd?toISO(sd.end):'', lead:s.duration||defDur(s.name),
+        priority:(r.priority==null?2:r.priority) });
     });
   });
-  if(!items.length){
-    host.innerHTML=`<div class="np-empty"><i class="ti ti-checks"></i><div>Nothing waiting on a PO</div><span>Every outside step on “Need Purchase Order” orders already has a vendor PO assigned.</span></div>`;
-    return;
-  }
-  // bucket: vendor + process together — same vendor doing two different processes
-  // (e.g. Plating vs Anodize) needs two separate POs, so they stay in separate groups.
+  return items;
+}
+// Open POs = pos records not yet received, PLUS "loose" POs that were typed on
+// an order card or a board without coming through this page (grouped by
+// vendor + PO#) — so no outstanding PO can hide from this list.
+function npOpenPOs(){
+  const out=poRecList().filter(p=>p.status!=='received').map(p=>({rec:p, legacy:false}));
+  const covered=new Set(poRecList().map(p=>((p.vendor||'')+'|'+p.po).toLowerCase()));
   const buckets=new Map();
-  items.forEach(x=>{
+  orders.filter(r=>!r.archived).forEach(r=>{
+    ((r.schedule&&r.schedule.steps)||[]).forEach(s=>{
+      if(!s||!s.enabled||!isExternal(s.name)) return;
+      if(!(s.vendorPO&&String(s.vendorPO).trim())) return;
+      if(s.receivedAt||s.done) return;
+      const key=((s.vendor||'')+'|'+String(s.vendorPO).trim()).toLowerCase();
+      if(covered.has(key)) return;
+      if(!buckets.has(key)) buckets.set(key,{id:'', po:String(s.vendorPO).trim(), vendor:s.vendor||'', proc:s.name,
+        shipDate:s.sentAt||'', detail:s.detail||'', createdAt:s.poAt||'', status:'open', items:[]});
+      buckets.get(key).items.push({orderId:r.id, step:s.name, part:r.part||r.desc||'', customer:r.customer||'', job:r.job||'', item:s.itemsPurchased||'', qty:s.qtyNeeded||''});
+    });
+  });
+  [...buckets.values()].forEach(b=>out.push({rec:b, legacy:true}));
+  out.sort((a,b)=>String(a.rec.shipDate||'9999').localeCompare(String(b.rec.shipDate||'9999')));
+  return out;
+}
+
+function renderNeedPO(){
+  const host=document.getElementById('needpo-body'); if(!host) return;
+  const esc=esc2, today=toISO(new Date());
+  // ── 1 · needs a PO — vendor cards of selectable item cards ──
+  const pool=npPoolItems();
+  const buckets=new Map();
+  pool.forEach(x=>{
     const key = x.vendor ? ('v:'+x.vendor.toLowerCase()+'|'+x.name) : ('p:'+x.name);
-    if(!buckets.has(key)) buckets.set(key, {vendor:x.vendor, proc:x.name, rows:[]});
+    if(!buckets.has(key)) buckets.set(key,{vendor:x.vendor, proc:x.name, rows:[]});
     buckets.get(key).rows.push(x);
   });
   let groups=[...buckets.values()];
-  // vendor-named buckets first (most actionable), then by row count desc, then vendor/process name
-  groups.sort((a,b)=> (!!b.vendor-!!a.vendor) || (b.rows.length-a.rows.length) || (a.vendor||a.proc).localeCompare(b.vendor||b.proc));
-  host.innerHTML = groups.map((g,gi)=>{
-    const totalQty=g.rows.reduce((s,x)=>s+(Number(x.qty)||0),0);
-    const today=new Date(new Date().toDateString());
-    const procCol=PROCESS_COLORS[g.proc]||'#888';
-    const rowsHtml=g.rows.map((x,ri)=>{
-      const over = x.sendBy && new Date(x.sendBy+'T00:00:00')<today;
-      return `<div class="npv-row">
-        <input type="checkbox" class="npv-pick" data-gi="${gi}" data-ri="${ri}" checked onchange="window._npvPickChange(this)" title="On this PO — untick to leave it for a separate PO">
-        <span class="npv-main">
-          <span class="npv-l1">${esc(x.part)||'—'} <small>· ${esc(x.customer)}${x.job?' · '+esc(x.job):''}</small></span>
-          <span class="npv-l2">${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.detail?` — ${esc(x.detail)}`:''}</span>
-        </span>
-        <span class="npv-nums">
-          ${x.qty?`<span class="npv-num" title="Quantity going on this PO"><small>on po</small><b>×${esc(x.qty)}</b></span>`:''}
-          ${x.ordQty?`<span class="npv-num" title="Quantity the order requires"><small>order</small><b>${esc(x.ordQty)}</b></span>`:''}
-        </span>
-        <span class="npv-due${over?' over':''}" title="Send by / back by">${x.sendBy?fmtDate(x.sendBy):'—'}${x.backBy?' → '+fmtDate(x.backBy):''}</span>
+  groups.forEach(g=>g.rows.sort((a,b)=>(a.sendBy||'9999').localeCompare(b.sendBy||'9999')));
+  groups.sort((a,b)=>(a.rows[0].sendBy||'9999').localeCompare(b.rows[0].sendBy||'9999') || (a.vendor||a.proc).localeCompare(b.vendor||b.proc));
+  window._npGroups=groups;
+  const sec=(icon,title,n,hint)=>`<div class="np-sec"><i class="ti ti-${icon}"></i><span class="t">${title}</span><span class="n">${n}</span><span class="line"></span>${hint?`<span class="hint">${hint}</span>`:''}</div>`;
+  let html=sec('tag-plus','Needs a PO', pool.length+' item'+(pool.length!==1?'s':''), 'Tick what belongs together, then Make PO');
+  if(!groups.length){
+    html+=`<div class="np-secempty">Nothing waiting. Set an order's status to <b>Need Purchase Order</b> and its outside / purchasing steps land here.</div>`;
+  } else {
+    html+=groups.map((g,gi)=>{
+      const k=extKind(g.proc), procCol=PROCESS_COLORS[g.proc]||'#888';
+      const needBy=g.rows[0].sendBy||'';
+      const late=needBy&&needBy<today;
+      const rowsHtml=g.rows.map((x,ri)=>{
+        const over=x.sendBy&&x.sendBy<today;
+        return `<div class="npv-row">
+          <input type="checkbox" class="npv-pick" data-gi="${gi}" data-ri="${ri}" checked onchange="window._npPick(this)" title="Goes on this PO — untick to leave it for a separate PO">
+          <span class="npv-main">
+            <span class="npv-l1"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${PRIORITY_COLOR[x.priority]};margin-right:6px" title="${PRIORITY_LABEL[x.priority]}"></span>${esc(x.part)||'—'} <small>· ${esc(x.customer)}${x.job?' · '+esc(x.job):''}${x.due?' · due '+fmtDate(x.due):''}</small></span>
+            <span class="npv-inrow">
+              <input class="npq-in npq-item" placeholder="${k.group==='outsource'?'What goes out — e.g. (15) brackets':'What to buy — e.g. 14ga 304 sheet'}" value="${esc(x.item)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','itemsPurchased',this.value)">
+              <input class="npq-in npq-qty" type="number" min="0" placeholder="Qty" value="${esc(x.qty)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','qtyNeeded',this.value)">
+              <input class="npq-in npq-detail" placeholder="Process / spec — e.g. Type II anodize black" value="${esc(x.detail)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','detail',this.value)">
+            </span>
+          </span>
+          <span class="npv-nums">${x.ordQty?`<span class="npv-num" title="Quantity the order requires"><small>order</small><b>${esc(x.ordQty)}</b></span>`:''}</span>
+          <span class="npv-due${over?' over':''}" title="${k.a==='order'?'Order by':'Send by'} → ${k.b==='in'?'in by':'back by'}">${x.sendBy?fmtDate(x.sendBy):'—'}${x.backBy?' → '+fmtDate(x.backBy):''}</span>
+        </div>`;
+      }).join('');
+      return `<div class="npv-card">
+        <div class="npv-head">
+          <span class="npv-vendor"><i class="ti ti-${g.vendor?'truck-delivery':'help-circle'}"></i>${g.vendor?esc(g.vendor):shortProc(g.proc)}</span>
+          <span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(g.proc,12)} ${shortProc(g.proc)}</span>
+          ${g.vendor?'':'<span class="npv-noassign">choose vendor</span>'}
+          <span class="npv-count">${g.rows.length} item${g.rows.length!==1?'s':''}</span>
+          <span class="npv-needby${late?' late':''}" style="margin-left:auto" title="Earliest ${k.a==='order'?'order-by':'send-by'} date in this group"><i class="ti ti-calendar-event"></i>PO needed by <b>${needBy?fmtDate(needBy):'—'}</b>${late?' · past due':''}</span>
+        </div>
+        <div class="npv-rows">${rowsHtml}</div>
+        <div class="npv-po-row" style="justify-content:flex-end">
+          <button class="btn sm blue" id="npv-btn-${gi}" onclick="openMakePO(${gi})"><i class="ti ti-file-plus"></i> Make PO for selected (${g.rows.length})</button>
+        </div>
       </div>`;
     }).join('');
-    const noVendor=!g.vendor;
+  }
+  // ── 2 · PO issued — waiting to come back ──
+  const open=npOpenPOs();
+  window._npOpen=open;
+  html+=sec('truck-loading','PO issued — waiting', open.length, 'Mark received when it comes back — the vendor invoice attaches there');
+  if(!open.length){ html+=`<div class="np-secempty">No open POs right now.</div>`; }
+  else html+=open.map((o,oi)=>{
+    const p=o.rec, procCol=PROCESS_COLORS[p.proc]||'#888', kk=extKind(p.proc);
+    const backs=(p.items||[]).map(it=>{ const r=orders.find(x=>x.id===it.orderId); if(!r) return '';
+      const sd=computeStepDates(r).find(s=>s.name===it.step); return (sd&&sd.end)?toISO(sd.end):''; }).filter(Boolean).sort();
+    const backBy=backs.length?backs[backs.length-1]:'';
+    const itemsHtml=(p.items||[]).map(it=>`<div class="pol-item"><span class="pt">${esc(it.part)||'—'}</span><span class="sub">${esc(it.customer)}${it.job?' · '+esc(it.job):''}</span><span class="it">${esc(it.item)||''}${it.qty?` <b>×${esc(it.qty)}</b>`:''}</span></div>`).join('');
     return `<div class="npv-card">
       <div class="npv-head">
-        <span class="npv-vendor"><i class="ti ti-${noVendor?'help-circle':'truck-delivery'}"></i>${noVendor?shortProc(g.proc):esc(g.vendor)}</span>
-        <span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(g.proc,12)} ${shortProc(g.proc)}</span>
-        ${noVendor?`<span class="npv-noassign">choose vendor</span>`:''}
-        <span class="npv-count">${g.rows.length} item${g.rows.length!==1?'s':''}</span>
-        ${totalQty?`<span class="npv-qty">Total qty ${totalQty}</span>`:''}
+        <span class="pol-num">PO ${esc(p.po)}</span>
+        <span class="npv-vendor">${esc(p.vendor)||'—'}</span>
+        <span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(p.proc,12)} ${shortProc(p.proc)}</span>
+        ${o.legacy?'<span class="pol-legacy" title="Typed on the order card — tracked here all the same">from order card</span>':''}
+        <span class="npv-count">${(p.items||[]).length} item${(p.items||[]).length!==1?'s':''}</span>
+        ${backBy?`<span class="npv-needby" style="margin-left:auto"><i class="ti ti-calendar-due"></i>${kk.b==='in'?'In by':'Back by'} <b>${fmtDate(backBy)}</b></span>`:''}
       </div>
-      <div class="npv-rows">${rowsHtml}</div>
-      <div class="npv-po-row">
-        ${noVendor?vendorSelectHtml('', `id="npv-vend-${gi}" title="Vendor for this group" style="max-width:220px" onchange="window._resolveVendorSel(this)"`):''}
-        <input id="npv-po-${gi}" placeholder="Our PO # — goes on every ticked item above">
-        <button class="btn sm blue" id="npv-btn-${gi}" onclick="window._npvAssignAll(${gi})">Assign to selected (${g.rows.length})</button>
+      <div class="pol-items">${itemsHtml}</div>
+      <div class="pol-foot">
+        <span class="pol-ship"><i class="ti ti-calendar-share"></i>${kk.a==='order'?'Ordered':'Ship date'} <input type="date" value="${esc(p.shipDate||'')}" onchange="_polShip(${oi},this.value)" title="The day this went out / was placed — the ${kk.b==='in'?'in-by':'back-by'} date follows from it"></span>
+        <span style="flex:1"></span>
+        ${o.legacy?'':`<button class="btn sm" onclick="_polVoid(${oi})" title="Undo this PO — the items go back to the Needs-a-PO list"><i class="ti ti-arrow-back-up"></i> Void</button>`}
+        <button class="btn sm green" onclick="openReceivePO(${oi})"><i class="ti ti-package-import"></i> Received…</button>
       </div>
     </div>`;
   }).join('');
-  window._npvGroups = groups; // stash for the assign-all handler
+  // ── 3 · recently received ──
+  const done=poRecList().filter(p=>p.status==='received').sort((a,b)=>String(b.receivedAt||'').localeCompare(String(a.receivedAt||''))).slice(0,6);
+  html+=sec('circle-check','Received — recent', done.length, `Full history lives in <a href="#" onclick="showPage('issuedpos');return false" style="color:#185FA5">Issued POs</a>`);
+  if(!done.length){ html+=`<div class="np-secempty">Completed POs will collect here — invoice attached, info read by AI.</div>`; }
+  else html+=`<div class="npv-card"><div>${done.map(p=>`
+    <div class="pod-row">
+      <span class="pol-num">PO ${esc(p.po)}</span>
+      <b>${esc(p.vendor)||'—'}</b>
+      <span style="color:var(--text3)">received ${fmtDate(p.receivedAt)}</span>
+      ${p.invoiceInfo&&p.invoiceInfo.no?`<span style="color:var(--text2)">Inv ${esc(p.invoiceInfo.no)}${p.invoiceInfo.total?` · ${fmtMoney(p.invoiceInfo.total)}`:''}</span>`:''}
+      ${p.invoice&&p.invoice.url?`<a class="pod-inv" href="${esc(p.invoice.url)}" target="_blank" rel="noopener"><i class="ti ti-file-invoice"></i> Invoice</a>`:''}
+    </div>`).join('')}</div></div>`;
+  host.innerHTML=html;
 }
-// dim/undim a row as it's ticked on/off the PO, and keep the button count honest
-window._npvPickChange=(cb)=>{
+// tick/untick an item card; keep the Make-PO button count honest
+window._npPick=(cb)=>{
   const row=cb.closest('.npv-row'); if(row) row.classList.toggle('unpicked',!cb.checked);
   const gi=cb.dataset.gi;
   const n=[...document.querySelectorAll(`.npv-pick[data-gi="${gi}"]`)].filter(c=>c.checked).length;
   const btn=document.getElementById('npv-btn-'+gi);
-  if(btn) btn.textContent=`Assign to selected (${n})`;
+  if(btn) btn.innerHTML=`<i class="ti ti-file-plus"></i> Make PO for selected (${n})`;
 };
-window._npvAssignAll=(gi)=>{
-  const g=window._npvGroups && window._npvGroups[gi]; if(!g) return;
-  // only the ticked rows go on this PO — the rest stay pooled for the next one
-  const picks=[...document.querySelectorAll(`.npv-pick[data-gi="${gi}"]`)];
-  const rows=picks.length ? picks.filter(c=>c.checked).map(c=>g.rows[Number(c.dataset.ri)]).filter(Boolean) : g.rows;
-  if(!rows.length){ alert('Tick at least one item to put on this PO.'); return; }
-  const poEl=document.getElementById(`npv-po-${gi}`);
-  const po=(poEl&&poEl.value||'').trim();
-  if(!po){ alert('Enter the PO # first'); return; }
-  const vendEl=document.getElementById(`npv-vend-${gi}`);
-  const vendor = vendEl ? (vendEl.value||'').trim() : g.vendor;
-  if(!vendor){ alert('Enter a vendor for this group first'); return; }
-  rows.forEach(x=>{
-    const r=orders.find(o=>o.id===x.orderId); if(!r) return;
-    const s=_extStep(x.orderId, x.name); if(!s) return;
-    s.vendor=vendor; s.vendorPO=po;
-    if(!s.poAt) s.poAt=toISO(new Date());
-  });
-  saveDB(); invalidateSched(); render(); renderSchedule(); updateNavBadges();
-  renderNeedPOByVendor();
+// inline edits on an item card write straight to the step (no re-render mid-typing)
+window._npEdit=(id,name,field,val)=>{
+  const s=_extStep(id,name); if(!s) return;
+  if(field==='qtyNeeded') s.qtyNeeded=(val!==''?Number(val):'');
+  else s[field]=String(val||'').trim();
+  saveDB();
 };
 
-window.assignVendorPO=(id,name,i)=>{
-  const s=_extStep(id,name); if(!s) return;
-  const v=document.getElementById(`np-v-${id}-${i}`), p=document.getElementById(`np-p-${id}-${i}`), d=document.getElementById(`np-d-${id}-${i}`);
-  const it=document.getElementById(`np-item-${id}-${i}`), q=document.getElementById(`np-qty-${id}-${i}`);
-  s.vendor=(v&&v.value||'').trim(); s.vendorPO=(p&&p.value||'').trim(); s.detail=(d&&d.value||'').trim();
-  s.itemsPurchased=(it&&it.value||'').trim(); s.qtyNeeded=(q&&q.value!==''?Number(q.value):'');
-  if(s.vendorPO && !s.poAt) s.poAt=toISO(new Date()); if(!s.vendorPO) delete s.poAt;
-  saveDB(); invalidateSched(); render(); renderSchedule(); renderNeedPO(); updateNavBadges();
+// ── make a PO from the ticked items of one vendor group ──────────────────────
+window.openMakePO=(gi)=>{
+  const g=window._npGroups&&window._npGroups[gi]; if(!g) return;
+  const picks=[...document.querySelectorAll(`.npv-pick[data-gi="${gi}"]`)];
+  const rows=(picks.length?picks.filter(c=>c.checked).map(c=>g.rows[Number(c.dataset.ri)]):g.rows).filter(Boolean);
+  if(!rows.length){ alert('Tick at least one item to put on this PO.'); return; }
+  // pull the freshest inline-typed item/qty/detail off the steps
+  rows.forEach(x=>{ const s=_extStep(x.orderId,x.name); if(s){ x.item=s.itemsPurchased||''; x.qty=s.qtyNeeded||''; x.detail=s.detail||''; } });
+  window._mkpo={rows, proc:g.proc, vendor:g.vendor};
+  const k=extKind(g.proc), procCol=PROCESS_COLORS[g.proc]||'#888';
+  const today=toISO(new Date());
+  const needBy=rows.map(r=>r.sendBy).filter(Boolean).sort()[0]||today;
+  const ship=needBy<today?today:needBy;
+  const esc=esc2;
+  document.getElementById('mkpo-body').innerHTML=`
+    <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-file-plus"></i> Make PO ${g.vendor?'— '+esc(g.vendor):''}</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:13px"><span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(g.proc,12)} ${shortProc(g.proc)}</span> · ${rows.length} item${rows.length!==1?'s':''} on this PO</div>
+    <div class="mkpo-items">${rows.map(x=>`<div class="mkpo-it"><b>${esc(x.part)||'—'}</b><span class="sub">${esc(x.customer)}</span><span>${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.qty?` ×${esc(x.qty)}`:''}</span></div>`).join('')}</div>
+    ${g.vendor?'':`<div class="mkpo-field"><label>Vendor</label>${vendorSelectHtml('', 'id="mkpo-vendor" onchange="window._resolveVendorSel(this)"')}</div>`}
+    <div class="mkpo-grid">
+      <div class="mkpo-field"><label>Our PO #</label><input id="mkpo-po" placeholder="PO number"></div>
+      <div class="mkpo-field"><label>${k.a==='order'?'Order date — day it\'s placed':'Ship date — day it goes out'}</label><input id="mkpo-ship" type="date" value="${ship}"></div>
+    </div>
+    <div class="mkpo-field"><label>Process / notes for the PO</label><textarea id="mkpo-detail" rows="2" placeholder="e.g. Type II anodize, black per MIL-A-8625">${esc(rows.map(r=>r.detail).filter(Boolean)[0]||'')}</textarea></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="closeModal('mkpo-modal')">Cancel</button>
+      <button class="btn blue" onclick="_mkpoCreate()"><i class="ti ti-check"></i> Create PO</button>
+    </div>`;
+  document.getElementById('mkpo-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('mkpo-po')?.focus(),40);
 };
-window.npoComplete=(id)=>{
-  const r=orders.find(o=>o.id===id); if(!r) return;
-  r.status='Confirmed';
-  saveDB(); invalidateSched(); render(); renderSchedule(); renderNeedPO(); updateNavBadges();
+window._mkpoCreate=()=>{
+  const m=window._mkpo; if(!m||!m.rows.length) return;
+  const po=(document.getElementById('mkpo-po').value||'').trim();
+  if(!po){ alert('Enter the PO number.'); return; }
+  const vSel=document.getElementById('mkpo-vendor');
+  const vendor=vSel?(vSel.value||'').trim():(m.vendor||'');
+  if(!vendor||vendor==='__new__'){ alert('Choose the vendor for this PO.'); return; }
+  const ship=(document.getElementById('mkpo-ship').value||'')||toISO(new Date());
+  const detail=(document.getElementById('mkpo-detail').value||'').trim();
+  const today=toISO(new Date());
+  const items=[];
+  m.rows.forEach(x=>{
+    const s=_extStep(x.orderId,x.name); if(!s) return;
+    s.vendor=vendor; s.vendorPO=po; if(!s.poAt) s.poAt=today;
+    s.sentAt=ship; s.start=ship;   // anchor the lead time to the real ship/order date
+    if(detail&&!s.detail) s.detail=detail;
+    items.push({orderId:x.orderId, step:x.name, part:x.part, customer:x.customer, job:x.job, item:s.itemsPurchased||'', qty:s.qtyNeeded||''});
+  });
+  if(!items.length){ closeModal('mkpo-modal'); return; }
+  // the Need PO designation clears once every outside step on the order has its PO
+  [...new Set(m.rows.map(x=>x.orderId))].forEach(id=>{
+    const r=orders.find(o=>o.id===id); if(!r||r.status!=='Need Purchase Order') return;
+    const ext=enabledOrdered(ensureSchedule(r)).filter(s=>isExternal(s.name));
+    if(ext.every(s=>s.vendorPO&&String(s.vendorPO).trim())) r.status='Confirmed';
+  });
+  savePOrec({ id:'po_'+uid(), po, vendor, proc:m.proc, detail, shipDate:ship, items,
+    status:'open', createdAt:today, by:(auth.currentUser&&auth.currentUser.email)||'' });
+  saveDB(); invalidateSched(); closeModal('mkpo-modal');
+  renderNeedPO(); updateNavBadges(); render(); renderSchedule();
 };
-// Record the date a PO/step actually went out (or was placed). If it slipped past
-// the original need-by date, this becomes the new anchor: the lead time is re-applied
-// from this real date, which shifts the expected-back date on the Open Orders card
-// and the Incoming/Outgoing board — same mechanism as marking it sent from there.
-window._npoMarkSent=(id,name,i)=>{
-  const s=_extStep(id,name); if(!s) return;
-  const inp=document.getElementById(`np-sent-${id}-${i}`);
-  const t=(inp&&inp.value)||toISO(new Date());
-  s.sentAt=t; s.start=t;   // anchor lead-time to the actual send/order date
-  saveDB(); invalidateSched(); render(); renderSchedule(); renderNeedPO(); updateNavBadges();
+
+// ── open-PO actions: move the ship date, void, receive ────────────────────────
+window._polShip=(oi,val)=>{
+  const o=window._npOpen&&window._npOpen[oi]; if(!o||!val) return;
+  o.rec.shipDate=val;
+  (o.rec.items||[]).forEach(it=>{ const s=_extStep(it.orderId,it.step); if(s){ s.sentAt=val; s.start=val; } });
+  if(!o.legacy) savePOrec(o.rec);
+  saveDB(); invalidateSched(); renderNeedPO(); renderSchedule();
+};
+window._polVoid=(oi)=>{
+  const o=window._npOpen&&window._npOpen[oi]; if(!o||o.legacy) return;
+  if(!confirm('Void PO '+o.rec.po+'? The items go back to the Needs-a-PO list.')) return;
+  (o.rec.items||[]).forEach(it=>{
+    const s=_extStep(it.orderId,it.step); if(!s) return;
+    s.vendorPO=''; delete s.poAt; s.sentAt=null;
+    const r=orders.find(x=>x.id===it.orderId);
+    if(r&&r.status==='Confirmed') r.status='Need Purchase Order';   // back on the list
+  });
+  delete POS[o.rec.id];
+  remove(ref(db,'pos/'+o.rec.id)).catch(()=>{});
+  saveDB(); invalidateSched(); renderNeedPO(); updateNavBadges(); render(); renderSchedule();
+};
+window.openReceivePO=(oi)=>{
+  const o=window._npOpen&&window._npOpen[oi]; if(!o) return;
+  const p=o.rec, esc=esc2, kk=extKind(p.proc);
+  window._rcv={open:o, invoice:null, ai:false};
+  document.getElementById('rcv-body').innerHTML=`
+    <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-package-import"></i> Receive PO ${esc(p.po)}</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:13px">${esc(p.vendor)||'—'} · ${shortProc(p.proc)} · marks all ${(p.items||[]).length} item${(p.items||[]).length!==1?'s':''} ${kk.b==='in'?'in':'received'} and completes the step${(p.items||[]).length!==1?'s':''}</div>
+    <div class="mkpo-field"><label>Date received</label><input id="rcv-date" type="date" value="${toISO(new Date())}"></div>
+    <div class="rcv-drop" onclick="document.getElementById('rcv-file').click()"><i class="ti ti-file-invoice"></i><b>Attach the vendor invoice</b> — PDF or photo. AI reads the invoice #, date, and total; you check them.</div>
+    <input type="file" id="rcv-file" accept="application/pdf,image/*" style="display:none" onchange="_rcvFile(this)">
+    <div class="rcv-status" id="rcv-status"></div>
+    <div class="mkpo-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="mkpo-field"><label>Invoice #</label><input id="rcv-inv" placeholder="—"></div>
+      <div class="mkpo-field"><label>Invoice date</label><input id="rcv-invdate" type="date"></div>
+      <div class="mkpo-field"><label>Invoice total</label><input id="rcv-total" type="number" step="0.01" min="0" placeholder="$"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="closeModal('rcv-modal')">Cancel</button>
+      <button class="btn green" id="rcv-done" onclick="_rcvComplete()"><i class="ti ti-check"></i> Mark received — complete PO</button>
+    </div>`;
+  document.getElementById('rcv-modal').style.display='flex';
+};
+window._rcvFile=async (input)=>{
+  const file=input.files[0]; if(!file) return;
+  const st=document.getElementById('rcv-status'), rcv=window._rcv; if(!rcv) return;
+  const p=rcv.open.rec;
+  try{
+    st.textContent='Uploading invoice…';
+    const path=`vendorInvoices/${String(p.po).replace(/[^\w.\-]/g,'_')}_${Date.now()}/${file.name.replace(/[^\w.\-]/g,'_')}`;
+    const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type});
+    task.on('state_changed', s=>{ st.textContent='Uploading invoice… '+Math.round((s.bytesTransferred/s.totalBytes)*100)+'%'; });
+    await task;
+    const url=await getDownloadURL(task.snapshot.ref);
+    rcv.invoice={url, path, name:file.name, ctype:file.type};
+    st.textContent='Invoice attached ✓ — reading it with AI…';
+  }catch(err){ st.textContent='Upload failed: '+err.message; return; }
+  // AI extraction — same worker the customer-PO importer uses; every field stays editable
+  try{
+    const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
+    const block=file.type.startsWith('image/')?{type:'image',source:{type:'base64',media_type:file.type,data:b64}}:{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}};
+    const prompt='This is a vendor invoice sent TO Bert\'s Sheet Metal Products for purchased material or outside processing (our PO '+p.po+', vendor '+(p.vendor||'unknown')+'). Return ONLY JSON: {"invoice_no":"","invoice_date":"YYYY-MM-DD","total":0,"po_ref":"","vendor":""}. total = the invoice grand total as a number. po_ref = our PO number if printed on the invoice. Empty string / 0 when missing. No markdown.';
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:500,messages:[{role:'user',content:[block,{type:'text',text:prompt}]}]})});
+    const data=await resp.json();
+    const text=(data.content||[]).map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
+    const j=JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}')+1));
+    if(j.invoice_no) document.getElementById('rcv-inv').value=j.invoice_no;
+    if(j.invoice_date) document.getElementById('rcv-invdate').value=j.invoice_date;
+    if(j.total) document.getElementById('rcv-total').value=j.total;
+    rcv.ai=true;
+    const mismatch=j.po_ref&&String(j.po_ref).replace(/\D/g,'')!==String(p.po).replace(/\D/g,'');
+    st.textContent='AI read the invoice — check the fields below.'+(mismatch?' ⚠ It references PO '+j.po_ref+', not '+p.po+' — double-check it\'s the right invoice.':'');
+  }catch(err){ st.textContent='Invoice attached ✓ — AI couldn\'t read it ('+err.message+'). Type the fields by hand.'; }
+};
+window._rcvComplete=()=>{
+  const rcv=window._rcv; if(!rcv) return;
+  const o=rcv.open; let p=o.rec;
+  const t=(document.getElementById('rcv-date').value)||toISO(new Date());
+  if(o.legacy){ p=Object.assign({}, p, {id:'po_'+uid()}); }   // loose POs become real records on receipt
+  p.status='received'; p.receivedAt=t; p.receivedBy=(auth.currentUser&&auth.currentUser.email)||'';
+  if(rcv.invoice) p.invoice=rcv.invoice;
+  p.invoiceInfo={ no:(document.getElementById('rcv-inv').value||'').trim(),
+    date:document.getElementById('rcv-invdate').value||'',
+    total:parseFloat(document.getElementById('rcv-total').value)||null,
+    extracted:rcv.ai?'ai':'manual' };
+  (p.items||[]).forEach(it=>{
+    const s=_extStep(it.orderId,it.step); if(!s) return;
+    s.receivedAt=t; s.done=true; s.doneAt=t;   // received completes the external step
+    const r=orders.find(x=>x.id===it.orderId); if(r) autoAdvanceStatus(r);
+  });
+  savePOrec(p);
+  saveDB(); invalidateSched(); closeModal('rcv-modal');
+  renderNeedPO(); updateNavBadges(); render(); renderSchedule();
 };
 
 // ── Issued POs page: history/log of every vendor PO assigned ──────────────────
