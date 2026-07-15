@@ -768,6 +768,48 @@ async function api(path, opts){
   return r.json();
 }
 
+// ── instant inbox: the last thread list is cached on this machine and painted
+// immediately on open; the real load then merges in behind it ─────────────────
+const MAIL_CACHE_KEY='bsmpMailInbox_v1';
+function saveInboxCache(){
+  try{
+    if(_searchQ||_lastQ) return;   // never cache a search view
+    const slim=THREADS.slice().sort((a,b)=>b.date-a.date).slice(0,150)
+      .map(t=>{ const c=Object.assign({},t); delete c.messages; delete c._msgsAt; return c; });
+    localStorage.setItem(MAIL_CACHE_KEY, JSON.stringify({v:1, email:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now(), threads:slim}));
+  }catch(e){ /* storage full/blocked — instant open just won't happen */ }
+}
+function restoreInboxCache(){
+  try{
+    const c=JSON.parse(localStorage.getItem(MAIL_CACHE_KEY)||'null');
+    if(!c||c.v!==1||!Array.isArray(c.threads)||!c.threads.length) return false;
+    if((c.email||'')!==((auth.currentUser&&auth.currentUser.email)||'')) return false;
+    if(Date.now()-(c.at||0) > 7*24*3600e3) return false;   // a week stale — start clean
+    THREADS=c.threads;
+    renderList(); renderNavCounts();
+    return true;
+  }catch(e){ return false; }
+}
+// ── prefetch: quietly pull the newest unread conversations after a load, so
+// the click you're most likely to make opens instantly ────────────────────────
+let _prefetching=false;
+async function prefetchThreads(){
+  if(_prefetching||_searchQ) return; _prefetching=true;
+  try{
+    const cands=THREADS
+      .filter(t=>!t.messages && t.ids && Object.keys(t.ids).length && !mutedOf(t))
+      .sort((a,b)=>((b.unread?1:0)-(a.unread?1:0))||(b.date-a.date)).slice(0,4);
+    for(const t of cands){
+      if(CURRENT&&CURRENT.key===t.key) continue;
+      const box=(t.mailboxes||[])[0], gid=t.ids[box]; if(!gid) continue;
+      try{
+        const data=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(gid));
+        if(!t.messages){ t.messages=data.messages||[]; t._msgsAt=Date.now(); }
+      }catch(e){ break; }   // connection hiccup — stop quietly, opening still works the slow way
+    }
+  }finally{ _prefetching=false; }
+}
+
 let NEXT={};       // per-mailbox Gmail page tokens for "Load older"
 let _loadingOlder=false;
 let _searchQ='';   // non-empty → the list shows a full-history Gmail search
@@ -804,6 +846,8 @@ window.loadThreads=async (manual, q)=>{
     // reported as a connection outage
     try{ backfillFlagMeta(); renderList(); renderNavCounts(); maybeOpenDeep(); }
     catch(e){ console.warn('post-load render error', e); }
+    saveInboxCache();
+    setTimeout(prefetchThreads, 400);   // warm the top unread conversations
     if(manual) toast('Mail refreshed');
   }catch(e){
     if(e.notConnected){ $('connect-banner').style.display='flex'; setLive('err','Not connected'); }
@@ -853,6 +897,7 @@ window.trashThread=async ()=>{
   catch(e){ if(btn) btn.disabled=false; toast(e.notConnected?'Mail isn’t connected yet.':('Could not delete: '+e.message),true); return; }
   if(btn) btn.disabled=false;
   THREADS=THREADS.filter(x=>x.key!==t.key);
+  saveInboxCache();   // so it doesn't reappear from the instant-open cache
   if(flagRec){ delete FLAGS[t.key]; remove(ref(db,'mail/threads/'+t.key)).catch(()=>{}); }
   _draftClear('reply',t.key);
   backToList(); renderNavCounts();
@@ -1387,17 +1432,27 @@ window.openThread=async (key)=>{
     renderOutAtts('reply'); expandReply();
     setTimeout(()=>autoGrowReply($('reply-body')),40);
   }
-  $('cv-msgs').innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Loading conversation…</div>';
   _msgQuoteOpen={};
+  // already have this conversation (read earlier or prefetched)? show it now
+  // and refresh behind it — only re-render if something actually changed
+  const cachedShown=Array.isArray(t.messages)&&t.messages.length>0;
+  if(cachedShown){ renderMsgs(); renderSigHints(); }
+  else $('cv-msgs').innerHTML='<div class="empty"><i class="ti ti-loader-2"></i>Loading conversation…</div>';
+  const markRead=()=>{ if(t.unread){ t.unread=false; renderList(); renderNavCounts(); api('/read',{method:'POST',body:JSON.stringify({ids:t.ids||{}})}).catch(()=>{}); } };
+  if(cachedShown) markRead();   // content is on screen — it's been read
   try{
     const box=(t.mailboxes||[])[0], gid=t.ids&&t.ids[box];
     const data=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(gid));
     if(CURRENT!==t) return;
-    t.messages=data.messages||[];
-    renderMsgs(); renderSigHints();
-    if(t.unread){ t.unread=false; renderList(); renderNavCounts(); api('/read',{method:'POST',body:JSON.stringify({ids:t.ids||{}})}).catch(()=>{}); }
+    const fresh=data.messages||[];
+    const unchanged=cachedShown && fresh.length===t.messages.length && fresh.every((m,i)=>m.id===t.messages[i].id);
+    t.messages=fresh; t._msgsAt=Date.now();
+    if(!unchanged){ renderMsgs(); renderSigHints(); }
+    markRead();
   }catch(e){
-    $('cv-msgs').innerHTML=`<div class="empty"><i class="ti ti-plug-connected-x"></i>${e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':esc(e.message)}</div>`;
+    if(CURRENT!==t) return;
+    if(!cachedShown) $('cv-msgs').innerHTML=`<div class="empty"><i class="ti ti-plug-connected-x"></i>${e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':esc(e.message)}</div>`;
+    // cached copy is on screen — keep reading; the next poll will catch up
   }
 };
 function renderFlagPills(){
@@ -1942,6 +1997,7 @@ onAuthStateChanged(auth,(user)=>{
         SETTINGS.proxyUrl=s.proxyUrl||'';
         SETTINGS.mailboxes=(s.mailboxes&&s.mailboxes.length)?s.mailboxes:['info@bertsmp.com'];
         if(document.getElementById('v-settings').style.display!=='none') renderSettings();
+        if(!THREADS.length) restoreInboxCache();   // paint the last-seen inbox instantly
         loadThreads(false); startPolling();
       });
       onValue(ref(db,'mail/threads'),snap=>{
