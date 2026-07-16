@@ -800,6 +800,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       </div>
       <div class="field"><label>Cost per sheet ($)</label>
         <input id="costsheet" type="number" value="0" step="0.01" onchange="calculate()">
+        <!-- filled by the shared price book — always says which vendor quote it came
+             from and, when the price had to be converted, the arithmetic that did it -->
+        <div id="costsheet-src" style="display:none;font-size:11px;color:var(--text3);margin-top:4px;line-height:1.35"></div>
       </div>
       <div class="field"><label>Sheet size</label>
         <select id="sheetsize" onchange="onSheetSizeChange()">
@@ -2075,8 +2078,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 <!-- ===== MATERIAL PRICES PANEL ===== -->
 <div class="panel" id="panel-prices">
   <div class="page-header">
-    <h2>Material Price Index</h2>
-    <p>Upload vendor quotes — AI extracts prices and auto-fills your quotes</p>
+    <h2>Material Prices</h2>
+    <p>The shared price book — the same one the Mail app saves into. Drop a vendor quote here, or hit <b>Save prices</b> on a vendor email. Prices auto-fill your quotes.</p>
   </div>
 
   <!-- Upload -->
@@ -2100,12 +2103,19 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
     <!-- Extracted items preview -->
     <div id="price-extracted-preview" style="display:none;margin-top:14px">
-      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Extracted line items — review before saving</div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Extracted line items — check each one against the quote before saving</div>
+      <!-- vendor and date belong to the whole quote, not to each line -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <div class="field" style="margin:0;flex:1;min-width:160px"><label style="font-size:10px">Vendor</label>
+          <input type="text" id="pi-vendor-all" placeholder="Who quoted this"></div>
+        <div class="field" style="margin:0;width:150px"><label style="font-size:10px">Quote date</label>
+          <input type="date" id="pi-date-all"></div>
+      </div>
       <div id="price-extracted-rows"></div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="savePriceItems()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/></svg>
-          Save to index
+          Save to the price book
         </button>
       </div>
     </div>
@@ -2122,9 +2132,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <div style="display:flex;gap:8px;align-items:center">
         <div class="search-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="price-search" placeholder="Search material or vendor…" style="width:200px" oninput="renderPriceIndex()" placeholder="Search material or vendor… (leave blank to show all)">
+          <input type="text" id="price-search" placeholder="e.g. 304 16ga · galv 48x120 · 2x2x.125" style="width:240px" oninput="renderPriceIndex()">
         </div>
-        <button class="btn btn-sm btn-danger" onclick="clearPriceIndex()">Clear all</button>
       </div>
     </div>
     <div id="price-index-body"></div>
@@ -3692,18 +3701,7 @@ function onMaterialTypeChange() {
 function onThicknessChange() {
   const val = document.getElementById('material-thickness').value;
   document.getElementById('material').value = val;
-  // Auto-fill sheet cost from price index
-  const ss = document.getElementById('sheetsize').value;
-  const indexPrice = getPriceFromIndex(val, ss);
-  if (indexPrice !== null) {
-    const cpsEl = document.getElementById('costsheet');
-    if (cpsEl) {
-      cpsEl.value = indexPrice.toFixed(2);
-      cpsEl.style.background = '#f0fdf4';
-      cpsEl.style.borderColor = '#86efac';
-      setTimeout(() => { cpsEl.style.background=''; cpsEl.style.borderColor=''; }, 3000);
-    }
-  }
+  applyIndexPrice(val);
   onMaterialChange();
 }
 
@@ -3726,35 +3724,13 @@ function syncMaterialSelects(matVal) {
     onMaterialTypeChange();
     thkSel.value = matVal;
     document.getElementById('material').value = matVal;
-    // Auto-fill sheet cost from price index after syncing
-    const ss = document.getElementById('sheetsize').value;
-    const indexPrice = getPriceFromIndex(matVal, ss);
-    if (indexPrice !== null) {
-      const cpsEl = document.getElementById('costsheet');
-      if (cpsEl) {
-        cpsEl.value = indexPrice.toFixed(2);
-        cpsEl.style.background = '#f0fdf4';
-        cpsEl.style.borderColor = '#86efac';
-        setTimeout(() => { cpsEl.style.background=''; cpsEl.style.borderColor=''; }, 3000);
-      }
-    }
+    applyIndexPrice(matVal);
   }
 }
 
 function onMaterialChange(){
   const mat = document.getElementById('material').value;
-  // Auto-fill sheet cost from price index
-  const ss = document.getElementById('sheetsize').value;
-  const indexPrice = getPriceFromIndex(mat, ss);
-  if (indexPrice !== null) {
-    const cpsEl = document.getElementById('costsheet');
-    if (cpsEl) {
-      cpsEl.value = indexPrice.toFixed(2);
-      cpsEl.style.background = '#f0fdf4';
-      cpsEl.style.borderColor = '#86efac';
-      setTimeout(() => { cpsEl.style.background=''; cpsEl.style.borderColor=''; }, 3000);
-    }
-  }
+  applyIndexPrice(mat);
   const info = document.getElementById('cut-info');
   if(LASER_SPEEDS[mat]){
     info.style.display='block';
@@ -3782,6 +3758,10 @@ function onSheetSizeChange(){
   const v=document.getElementById('sheetsize').value;
   const row=document.getElementById('custom-sheet-row');
   if(row) row.style.display = v==='custom'?'block':'none';
+  // cost per sheet depends on the size of the sheet — a per-lb price for a
+  // 48×120 is a different number on a 48×144
+  const mat=document.getElementById('material');
+  if(mat && mat.value) applyIndexPrice(mat.value);
   calculate();
 }
 
@@ -6529,7 +6509,387 @@ function saveAssembly() {
 
 
 // ===================== MATERIAL PRICE INDEX =====================
-let PRICE_INDEX = JSON.parse(localStorage.getItem('bsmp_prices') || '[]');
+// ── shared material price book ───────────────────────────────────────────────
+// This page used to keep its own price list in this browser (bsmp_prices →
+// PRICE_INDEX, still read below so old backups keep working). That list lived on
+// one computer, so a price captured in the office was invisible here; it matched
+// materials by text, so "304 S/S 16GA" and "T304 2B .060" never met; and its
+// gauge table said 16ga = .060 for every metal, which is right for none of them.
+// Prices now live once, shared, at mail/materialPrices in Firebase — captured
+// either from a vendor email (Mail app → Save prices) or from a PDF dropped on
+// this page. The old local list is left alone: it still rides along in backups,
+// it just doesn't price quotes any more.
+//
+// EVERYTHING DOWN TO "end shared price core" IS COPIED VERBATIM FROM mail.html.
+// Keep the two in sync — a density, a gauge table or a match rule changed in one
+// has to change in the other.
+//__SHARED_PRICE_CORE__
+// vvv GENERATED — copied from mail.html by scratchpad/sync_core.py. Do not edit here. vvv
+const MAT_FAMILIES=[
+  {k:'crs',       label:'CRS (cold rolled)', g:'steel',     d:.2836, al:'crs cold rolled cr 1008 1010 a1008 steel'},
+  {k:'hrs',       label:'HRS (hot rolled)',  g:'steel',     d:.2836, al:'hrs hot rolled hr a36 1018 hrpo p&o pickled steel plate'},
+  {k:'galv',      label:'Galvanized',        g:'galv',      d:.284,  al:'galv galvanized g90 g60 hdg zinc steel'},
+  {k:'galvanneal',label:'Galvanneal',        g:'galv',      d:.284,  al:'galvanneal a60 a40 satin coat steel'},
+  {k:'ss304',     label:'304 Stainless',     g:'stainless', d:.29,   al:'304 t304 304l 2b ss stainless'},
+  {k:'ss316',     label:'316 Stainless',     g:'stainless', d:.29,   al:'316 t316 316l ss stainless'},
+  {k:'ss430',     label:'430 Stainless',     g:'stainless', d:.28,   al:'430 ss stainless'},
+  {k:'al5052',    label:'5052 Aluminum',     g:'aluminum',  d:.0968, al:'5052 h32 aluminum alum al'},
+  {k:'al6061',    label:'6061 Aluminum',     g:'aluminum',  d:.0975, al:'6061 t6 aluminum alum al'},
+  {k:'al3003',    label:'3003 Aluminum',     g:'aluminum',  d:.0986, al:'3003 aluminum alum al'},
+  {k:'copper',    label:'Copper',            g:null,        d:.323,  al:'copper cu c110'},
+  {k:'brass',     label:'Brass',             g:null,        d:.307,  al:'brass c260'},
+  {k:'other',     label:'Other',             g:null,        d:null,  al:''},
+];
+const matFam=(k)=>MAT_FAMILIES.find(f=>f.k===k)||MAT_FAMILIES[MAT_FAMILIES.length-1];
+// gauge → decimal inches. THE TABLES DIFFER BY METAL — 16 ga is .0598 in steel,
+// .0635 galvanized, .0625 stainless, .0508 aluminum. That mismatch is exactly
+// why searching raw email text for a thickness never worked.
+const GAUGE_IN={
+  steel:    {3:.2391,4:.2242,5:.2092,6:.1943,7:.1793,8:.1644,9:.1495,10:.1345,11:.1196,12:.1046,13:.0897,14:.0747,15:.0673,16:.0598,17:.0538,18:.0478,19:.0418,20:.0359,21:.0329,22:.0299,23:.0269,24:.0239,25:.0209,26:.0179,28:.0149,30:.012},
+  galv:     {8:.1681,9:.1532,10:.1382,11:.1233,12:.1084,13:.0934,14:.0785,15:.071,16:.0635,17:.0575,18:.0516,19:.0456,20:.0396,21:.0366,22:.0336,23:.0306,24:.0276,25:.0247,26:.0217,28:.0187,30:.0157},
+  stainless:{7:.1875,8:.1719,9:.1563,10:.1406,11:.125,12:.1094,13:.0938,14:.0781,15:.0703,16:.0625,17:.0563,18:.05,19:.0438,20:.0375,21:.0344,22:.0313,23:.0281,24:.025,26:.0188,28:.0156,30:.0125},
+  aluminum: {6:.162,7:.1443,8:.1285,9:.1144,10:.1019,11:.0907,12:.0808,13:.072,14:.0641,15:.0571,16:.0508,17:.0453,18:.0403,19:.0359,20:.032,21:.0285,22:.0253,23:.0226,24:.0201,26:.0159,28:.0126,30:.01},
+};
+const UOMS=[['lb','per lb'],['cwt','per cwt'],['sheet','per sheet'],['sqft','per sq ft'],['ft','per ft'],['each','each']];
+// Tube and bar don't fit the sheet identity (family + thickness). A tube is
+// shape + outside size + WALL + spec, and it's bought by the foot — so it gets
+// its own fields and its own comparison unit ($/ft), never the sheet size box.
+const TUBE_UOMS=UOMS.filter(u=>['ft','lb','cwt','each'].includes(u[0]));
+const TUBE_SHAPES=[
+  {k:'square-tube',label:'Square tube',hollow:true, ph:['side'],          al:'square tube hss tubing'},
+  {k:'rect-tube',  label:'Rect tube',  hollow:true, ph:['A','B'],         al:'rectangular rect tube hss tubing'},
+  {k:'round-tube', label:'Round tube', hollow:true, ph:['OD'],            al:'round tube tubing pipe dom seamless erw od'},
+  {k:'square-bar', label:'Square bar', hollow:false,ph:['side'],          al:'square bar solid'},
+  {k:'flat-bar',   label:'Flat bar',   hollow:false,ph:['width','thk'],   al:'flat bar strip rectangular solid'},
+  {k:'round-bar',  label:'Round bar',  hollow:false,ph:['dia'],           al:'round bar rod solid dia'},
+];
+const tubeShape=(k)=>TUBE_SHAPES.find(s=>s.k===k)||TUBE_SHAPES[0];
+const isTube=(r)=>!!r&&r.form==='tube';        // records saved before tubing have no form → sheet
+const fmtN=(n)=>String(Number(n));
+function parseSize(s){ const m=/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i.exec(s||''); return m?{w:parseFloat(m[1]),l:parseFloat(m[2])}:null; }
+// how the shop says it: 2×2×.125 · Ø1.5×.120 · 2×1×.120
+function tubeLabel(r){
+  const s=tubeShape(r.shape), a=Number(r.odIn)||0, b=Number(r.bIn)||0, w=Number(r.wallIn)||0;
+  if(!a) return '';
+  let d=s.ph.length>1?(fmtN(a)+'×'+(b?fmtN(b):'?')):(s.k.indexOf('round')===0?'Ø'+fmtN(a):fmtN(a)+'×'+fmtN(a));
+  if(s.hollow&&w) d+='×'+fmtN(w);
+  return d;
+}
+// metal in one cross-section, in², and the arithmetic behind it. Same formulas
+// the Quote Tool uses for bar stock, so both apps weigh a tube the same way.
+function tubeXsec(r){
+  const s=tubeShape(r.shape), a=Number(r.odIn)||0, b=Number(r.bIn)||0, w=Number(r.wallIn)||0;
+  if(!a) return null;
+  const rnd=(v)=>v.toFixed(3);
+  if(s.hollow&&!w) return null;
+  switch(s.k){
+    case 'round-tube':{ const id=a-2*w; if(id<=0) return null; const x=Math.PI/4*(a*a-id*id);
+      return {a:x, math:'Ø'+fmtN(a)+' OD − 2 × '+fmtN(w)+' wall = Ø'+rnd(id)+' ID → π/4 × ('+fmtN(a)+'² − '+rnd(id)+'²) = '+rnd(x)+' in² of metal'}; }
+    case 'square-tube':{ const id=a-2*w; if(id<=0) return null; const x=a*a-id*id;
+      return {a:x, math:fmtN(a)+'×'+fmtN(a)+' − '+rnd(id)+'×'+rnd(id)+' hole = '+rnd(x)+' in² of metal (square corners — ignores corner radius)'}; }
+    case 'rect-tube':{ if(!b) return null; const ia=a-2*w, ib=b-2*w; if(ia<=0||ib<=0) return null; const x=a*b-ia*ib;
+      return {a:x, math:fmtN(a)+'×'+fmtN(b)+' − '+rnd(ia)+'×'+rnd(ib)+' hole = '+rnd(x)+' in² of metal (square corners — ignores corner radius)'}; }
+    case 'round-bar':{ const x=Math.PI/4*a*a; return {a:x, math:'π/4 × Ø'+fmtN(a)+'² = '+rnd(x)+' in² solid'}; }
+    case 'square-bar':{ const x=a*a; return {a:x, math:fmtN(a)+'×'+fmtN(a)+' = '+rnd(x)+' in² solid'}; }
+    case 'flat-bar':{ if(!b) return null; const x=a*b; return {a:x, math:fmtN(a)+'×'+fmtN(b)+' = '+rnd(x)+' in² solid'}; }
+  }
+  return null;
+}
+// Tube is bought by the foot, so $/ft is the number that compares two vendors.
+// $/lb rides along underneath (it's how sheet compares, and how the mill prices
+// it). Owner rule: show the work — every step lands in the math string.
+function tubeCalc(r){
+  const f=matFam(r.family), p=Number(r.price)||0;
+  if(!p) return null;
+  const x=tubeXsec(r), d=f.d;
+  const lbPerFt=(x&&d)?x.a*12*d:null;
+  const steps=[];
+  if(lbPerFt) steps.push(x.math+' × 12 in × '+d+' lb/in³ = '+lbPerFt.toFixed(2)+' lb per ft');
+  const len=Number(r.lengthFt)||0;
+  let perFt=null, perLb=null;
+  if(r.uom==='ft'){ perFt=p; steps.push('quoted $'+p.toFixed(2)+' per ft'); }
+  else if(r.uom==='each'&&len>0){ perFt=p/len; steps.push('$'+p.toFixed(2)+' per '+fmtN(len)+' ft length ÷ '+fmtN(len)+' ft = $'+perFt.toFixed(3)+' per ft'); }
+  else if(r.uom==='lb'){ perLb=p; if(lbPerFt){ perFt=p*lbPerFt; steps.push('$'+p.toFixed(3)+'/lb × '+lbPerFt.toFixed(2)+' lb per ft = $'+perFt.toFixed(3)+' per ft'); } }
+  else if(r.uom==='cwt'){ perLb=p/100; steps.push('$'+p.toFixed(2)+' per cwt ÷ 100 lb = $'+perLb.toFixed(4)+' per lb');
+    if(lbPerFt){ perFt=perLb*lbPerFt; steps.push('$'+perLb.toFixed(4)+'/lb × '+lbPerFt.toFixed(2)+' lb per ft = $'+perFt.toFixed(3)+' per ft'); } }
+  if(perLb==null&&perFt!=null&&lbPerFt){ perLb=perFt/lbPerFt; steps.push('$'+perFt.toFixed(3)+' per ft ÷ '+lbPerFt.toFixed(2)+' lb per ft = $'+perLb.toFixed(3)+' per lb'); }
+  if(perFt==null&&perLb==null) return null;
+  return {perFt, perLb, lbPerFt, math:steps.join(' → ')};
+}
+// per-lb equivalent + the arithmetic behind it (owner rule: every auto-calc
+// shows its work — the math string is stored and shown as a tooltip)
+function perLbCalc(rec){
+  const f=matFam(rec.family), p=Number(rec.price)||0;
+  if(!p) return null;
+  if(rec.uom==='lb')  return {v:p, math:'quoted per lb'};
+  if(rec.uom==='cwt') return {v:p/100, math:'$'+p.toFixed(2)+' per cwt ÷ 100 lb = $'+(p/100).toFixed(3)+'/lb'};
+  const t=Number(rec.thicknessIn)||0, sz=parseSize(rec.size), d=f.d;
+  if(!t||!d) return null;
+  if(rec.uom==='sqft'){
+    const w=144*t*d;
+    return {v:p/w, math:'144 in² × '+t+' in × '+d+' lb/in³ = '+w.toFixed(2)+' lb per sq ft → $'+p.toFixed(2)+' ÷ '+w.toFixed(2)+' lb = $'+(p/w).toFixed(3)+'/lb'};
+  }
+  if((rec.uom==='sheet'||rec.uom==='each')&&sz){
+    const w=sz.w*sz.l*t*d;
+    if(w<=0) return null;
+    return {v:p/w, math:sz.w+' in × '+sz.l+' in × '+t+' in × '+d+' lb/in³ = '+w.toFixed(1)+' lb per sheet → $'+p.toFixed(2)+' ÷ '+w.toFixed(1)+' lb = $'+(p/w).toFixed(3)+'/lb'};
+  }
+  return null;
+}
+// The extraction prompt and the reply parser live here, in the shared core, so
+// a price captured from a vendor EMAIL (this app) and one captured from a vendor
+// PDF (the Quote Tool's Materials page) come out as the same record.
+// opts: {source:'email'|'file', hasDoc:bool, text:string}
+function mpExtractPrompt(opts){
+  const o=opts||{};
+  const lede = o.source==='file'
+    ? 'You are reading a material vendor’s price quote document'
+    : 'You are reading an email conversation'+(o.hasDoc?' (and the attached PDF quote)':'');
+  return lede+' from a metal supplier to a sheet-metal fabrication shop. Extract every material price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
++'Every item has: {"form":"sheet" or "tube","family":"one of crs|hrs|galv|galvanneal|ss304|ss316|ss430|al5052|al6061|al3003|copper|brass|other","desc":"the vendor’s own wording for the material","price":number,"uom":"lb|cwt|sheet|sqft|ft|each","qty":the quantity this price needs (a break quantity) or null,"raw":"the exact line copied from the source"}\n\n'
++'A FLAT SHEET, PLATE or COIL is form "sheet" and adds: {"thickness_in":decimal inches or null,"gauge":gauge number or null,"size":"e.g. 48x120, or null"}\n\n'
++'TUBE, PIPE or BAR STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
++'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, with the break quantity in qty ("1-9 $92, 10+ $88" → two items, qty 1 and qty 10) and the vendor’s wording kept in desc. A plain price with no break = qty null.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".'
++(o.text?('\n\nEMAIL (newest message first):\n'+o.text):'');
+}
+// AI's JSON → editable rows. Anything the model gets creative with lands on a
+// safe default; the person checks every row before it saves either way.
+function mpNormalizeItems(items){
+  return (items||[]).filter(x=>x&&Number(x.price)>0).map(x=>{
+    const tube=String(x.form||'').toLowerCase()==='tube';
+    return { form:tube?'tube':'sheet', family:matFam(x.family).k, desc:String(x.desc||''),
+      thicknessIn:(!tube&&x.thickness_in!=null)?Number(x.thickness_in):null,
+      gauge:x.gauge!=null?Number(x.gauge):null,
+      size:(!tube&&x.size)?String(x.size):'',
+      shape:tube?tubeShape(x.shape).k:'',
+      odIn:(tube&&x.od_in!=null)?Number(x.od_in):null,
+      bIn:(tube&&x.b_in!=null)?Number(x.b_in):null,
+      wallIn:(tube&&x.wall_in!=null)?Number(x.wall_in):null,
+      spec:tube?String(x.spec||''):'',
+      lengthFt:(tube&&x.length_ft!=null)?Number(x.length_ft):null,
+      price:Number(x.price)||0,
+      uom:['lb','cwt','sheet','sqft','ft','each'].includes(x.uom)?x.uom:(tube?'ft':'each'),
+      qty:(x.qty!=null&&Number(x.qty)>0)?Number(x.qty):null,
+      raw:String(x.raw||'') };
+  });
+}
+// AI's reply text → the JSON array inside it (models like to wrap it in prose)
+function mpParseItems(raw){
+  let clean=String(raw||'').replace(/```json/gi,'').replace(/```/g,'').trim();
+  const fa=clean.indexOf('['), la=clean.lastIndexOf(']');
+  if(fa<0||la<=fa) throw new Error('no price list in the reply');
+  const items=JSON.parse(clean.slice(fa,la+1).replace(/,\s*}/g,'}').replace(/,\s*]/g,']'));
+  if(!Array.isArray(items)) throw new Error('unexpected reply shape');
+  return items;
+}
+// One shared price record, ready to write to mail/materialPrices/<id>.
+// src carries where it came from: {vendor, vendorEmail, emailDate, mailKey,
+// subject, fileName} — an email or an uploaded PDF, but always something.
+let _mpSeq=0;   // saving 8 rows in one go takes < 1 ms — the clock alone won't keep ids apart
+function mpRecord(x, src, byEmail){
+  const tube=x.form==='tube', c=tube?tubeCalc(x):perLbCalc(x);
+  const s=src||{};
+  return { id:'mp_'+Date.now().toString(36)+'_'+(_mpSeq++)+'_'+Math.floor(Math.random()*1e4),
+    form:tube?'tube':'sheet', family:x.family, familyLabel:matFam(x.family).label, desc:x.desc||'',
+    thicknessIn:tube?null:(x.thicknessIn||null), gauge:x.gauge||null, size:tube?'':(x.size||''),
+    shape:tube?x.shape:'', odIn:tube?(x.odIn||null):null, bIn:tube?(x.bIn||null):null,
+    wallIn:tube?(x.wallIn||null):null, spec:tube?(x.spec||''):'', lengthFt:tube?(x.lengthFt||null):null,
+    price:Number(x.price)||0, uom:x.uom, qty:(Number(x.qty)>0)?Number(x.qty):null,
+    pricePerFt:(tube&&c&&c.perFt!=null)?Number(c.perFt.toFixed(4)):null,
+    pricePerLb:tube?((c&&c.perLb!=null)?Number(c.perLb.toFixed(4)):null):(c?Number(c.v.toFixed(4)):null),
+    lbPerFt:(tube&&c&&c.lbPerFt)?Number(c.lbPerFt.toFixed(4)):null,
+    math:c?c.math:'', raw:x.raw||'',
+    vendor:s.vendor||'', vendorEmail:s.vendorEmail||'', emailDate:s.emailDate||Date.now(),
+    mailKey:s.mailKey||'', subject:s.subject||'', fileName:s.fileName||'',
+    by:byEmail||'', at:Date.now() };
+}
+function priceMatch(p,tokens){
+  const f=matFam(p.family), tube=isTube(p), s=tube?tubeShape(p.shape):null;
+  const hay=(f.label+' '+f.al+' '+(p.desc||'')+' '+(p.vendor||'')+' '+(p.size||'')+' '+(p.raw||'')
+    +(tube?' '+s.label+' '+s.al+' '+(p.spec||'')+' '+tubeLabel(p):'')).toLowerCase();
+  // the record's own thickness number: a sheet's thickness, a tube's wall
+  const thk=tube?p.wallIn:p.thicknessIn;
+  // outside dims as [big,small] so a "2x1" search finds a 1x2 record
+  const dims=tube&&p.odIn?[Number(p.odIn),Number(p.bIn||p.odIn)].sort((a,b)=>b-a):null;
+  const near=(a,b,tol)=>a!=null&&b!=null&&Math.abs(a-b)<=tol;
+  const gaMatch=(g)=>{
+    if(p.gauge===g) return true;
+    const gt=f.g?GAUGE_IN[f.g]:null;
+    if(gt&&gt[g]&&near(thk,gt[g],.004)) return true;
+    if(!gt&&thk){ for(const k in GAUGE_IN){ if(GAUGE_IN[k][g]&&near(thk,GAUGE_IN[k][g],.004)) return true; } }
+    return false;
+  };
+  return tokens.every(tk=>{
+    const gm=/^#?(\d{1,2})ga(uge)?\.?$/.exec(tk)||/^ga\.?(\d{1,2})$/.exec(tk);
+    if(gm) return gaMatch(Number(gm[1]))||hay.includes(tk);
+    if(/^0?\.\d+$/.test(tk)) return near(thk,parseFloat(tk),.006)||hay.includes(tk);
+    // OD / wall called out by name — "1.5od", "od1.5", ".120wall", "wall.120"
+    const om=/^od(\d*\.?\d+)$/.exec(tk)||/^(\d*\.?\d+)od$/.exec(tk);
+    if(om) return (tube&&near(Number(p.odIn),parseFloat(om[1]),.01))||hay.includes(tk);
+    const wm=/^wall(\d*\.?\d+)$/.exec(tk)||/^(\d*\.?\d+)wall$/.exec(tk);
+    if(wm) return (tube&&near(Number(p.wallIn),parseFloat(wm[1]),.004))||hay.includes(tk);
+    // a tube said out loud: "2x2x.125" or "2x1x14ga" (wall part optional)
+    const tm=/^(\d*\.?\d+)[x×](\d*\.?\d+)(?:[x×](#?\d*\.?\d+)(ga)?)?$/.exec(tk);
+    if(tm){
+      const a=parseFloat(tm[1]), b=parseFloat(tm[2]);
+      if(dims&&near(dims[0],Math.max(a,b),.01)&&near(dims[1],Math.min(a,b),.01)){
+        if(!tm[3]) return true;
+        const w=parseFloat(String(tm[3]).replace('#',''));
+        if(tm[4]||w>=3) return gaMatch(w);            // a whole number here is a wall gauge, not inches
+        if(near(Number(p.wallIn),w,.004)) return true;
+      }
+      if(!tube&&!tm[3]){ const sz=parseSize(p.size); if(sz&&sz.w===a&&sz.l===b) return true; }
+      return hay.includes(tk);
+    }
+    return hay.includes(tk);
+  });
+}
+// "16 ga" / "1.5 od" / ".120 wall" are one idea each — glue them before splitting
+function mpTokens(s){
+  return (s||'').toLowerCase()
+    .replace(/(\d)\s+(ga(uge)?)\b/g,'$1ga')
+    .replace(/(\d)\s*"?\s+(od|wall)\b/g,'$1$2')
+    .replace(/\b(od|wall)\s+(\.?\d)/g,'$1$2')
+    .split(/[\s,]+/).filter(Boolean);
+}
+// ── end shared price core ────────────────────────────────────────────────────
+
+let MPRICES = {};                     // id → shared price record, live from Firebase
+window._qOnPrices = (obj) => {        // the Firebase module script pushes updates in here
+  MPRICES = obj || {};
+  const panel = document.getElementById('panel-prices');
+  if (panel && panel.classList.contains('active')) renderPriceIndex();
+  // The book arriving (or someone else saving a price) shouldn't stomp on a cost
+  // that's already on the quote — a number you typed is a decision, not a
+  // placeholder. Only an untouched box gets filled.
+  const mat = document.getElementById('material');
+  const cps = document.getElementById('costsheet');
+  if (mat && mat.value && cps && !(parseFloat(cps.value) > 0)) applyIndexPrice(mat.value);
+};
+const mpList = () => Object.values(MPRICES)
+  .filter(p => p && p.price)
+  .sort((a,b) => (b.emailDate||b.at||0) - (a.emailDate||a.at||0));
+
+// The quote form says "0.104 thk CRS"; the price book says family + decimal.
+// Most specific wins — a bare "stainless" with no number is 304 here, because
+// that's what the shop means when it doesn't say.
+function qFamilyOf(str){
+  const s = ' ' + (str||'').toLowerCase() + ' ';
+  if (/\b(304|t304|304l)\b/.test(s)) return 'ss304';
+  if (/\b(316|t316|316l)\b/.test(s)) return 'ss316';
+  if (/\b430\b/.test(s)) return 'ss430';
+  if (/\b5052\b/.test(s)) return 'al5052';
+  if (/\b6061\b/.test(s)) return 'al6061';
+  if (/\b3003\b/.test(s)) return 'al3003';
+  if (/galvanneal|\ba60\b|satin coat/.test(s)) return 'galvanneal';
+  if (/galv|\bg90\b|\bg60\b|hdg/.test(s)) return 'galv';
+  if (/\bcrs\b|cold roll|\b1008\b|\b1010\b|\b1018\b/.test(s)) return 'crs';
+  if (/\bhrs\b|hot roll|\ba36\b|hrpo|pickled/.test(s)) return 'hrs';
+  if (/copper|\bc110\b/.test(s)) return 'copper';
+  if (/brass|\bc260\b/.test(s)) return 'brass';
+  if (/stainless|\bss\b/.test(s)) return 'ss304';
+  if (/alum|\balu\b/.test(s)) return 'al5052';
+  if (/steel/.test(s)) return 'crs';
+  return null;
+}
+// thickness out of that same string — a gauge resolves through THIS metal's table
+function qThickOf(str, famKey){
+  const s = (str||'').toLowerCase();
+  const g = /(\d{1,2})\s*ga\b/.exec(s);
+  if (g) {
+    const f = matFam(famKey);
+    const t = f.g ? GAUGE_IN[f.g][Number(g[1])] : null;
+    if (t) return t;
+  }
+  const d = /(\d*\.\d+)/.exec(s);
+  return d ? parseFloat(d[1]) : 0;
+}
+// the sheet size the quote is actually using (the Custom… option has its own boxes)
+function qSheetSize(){
+  const sel = (document.getElementById('sheetsize')||{}).value || '48x120';
+  if (sel === 'custom') return {
+    w: parseFloat((document.getElementById('custom-sheet-w')||{}).value) || 48,
+    l: parseFloat((document.getElementById('custom-sheet-l')||{}).value) || 120
+  };
+  return parseSize(sel) || {w:48, l:120};
+}
+// What one sheet THIS size costs, from a record quoted however the vendor quoted
+// it. Per sheet, per sq ft, per lb and per cwt all convert — the record carries
+// the unit, and we know the size and the metal's density. Shows its work.
+function qSheetCost(rec, wIn, lIn, thkIn){
+  const f = matFam(rec.family), d = f.d, p = Number(rec.price)||0;
+  if (!p || !wIn || !lIn) return null;
+  const sz = parseSize(rec.size);
+  const sameSize = sz && Math.abs(sz.w-wIn) <= .51 && Math.abs(sz.l-lIn) <= .51;
+  if (rec.uom === 'sheet' && sameSize)
+    return {v:p, math:'vendor quoted $'+p.toFixed(2)+' for a '+fmtN(sz.w)+'×'+fmtN(sz.l)+' sheet'};
+  if (rec.uom === 'sqft') {
+    const sqft = wIn*lIn/144;
+    return {v:p*sqft, math:'$'+p.toFixed(2)+'/sq ft × ('+fmtN(wIn)+' × '+fmtN(lIn)+' ÷ 144 = '+sqft.toFixed(1)+' sq ft) = $'+(p*sqft).toFixed(2)+' per sheet'};
+  }
+  const perLb = rec.pricePerLb != null ? Number(rec.pricePerLb)
+    : (rec.uom === 'lb' ? p : (rec.uom === 'cwt' ? p/100 : null));
+  if (perLb != null && d && thkIn > 0) {
+    const lb = wIn*lIn*thkIn*d;
+    return {v:perLb*lb, math:fmtN(wIn)+' × '+fmtN(lIn)+' × '+fmtN(thkIn)+' in × '+d+' lb/in³ = '+lb.toFixed(1)+' lb → $'+perLb.toFixed(3)+'/lb × '+lb.toFixed(1)+' lb = $'+(perLb*lb).toFixed(2)+' per sheet'};
+  }
+  return null;  // a per-each price with no size tells us nothing about this sheet
+}
+// Best shared price for a material + sheet size, or null. Wrong thickness is not
+// a near miss — it's a different material, so it never matches.
+function qBestPrice(materialStr){
+  const fam = qFamilyOf(materialStr);
+  if (!fam) return null;
+  const thk = qThickOf(materialStr, fam);
+  if (!thk) return null;
+  const size = qSheetSize();
+  const cands = mpList().map(p => {
+    if (isTube(p) || p.family !== fam) return null;
+    const f = matFam(p.family);
+    const pt = p.thicknessIn || (p.gauge && f.g ? GAUGE_IN[f.g][p.gauge] : null);
+    if (!pt || Math.abs(pt-thk) > .006) return null;
+    const c = qSheetCost(p, size.w, size.l, thk);
+    if (!c || !(c.v > 0)) return null;
+    const sz = parseSize(p.size);
+    let score = 100 - Math.abs(pt-thk)*1000;
+    // a quote for this exact sheet size beats one we had to convert
+    if (p.uom === 'sheet' && sz && Math.abs(sz.w-size.w) <= .51 && Math.abs(sz.l-size.l) <= .51) score += 10;
+    // and a one-off price beats a "at 100+" break, which we'd be lucky to get
+    if (!p.qty || p.qty <= 1) score += 3;
+    return {p, c, score, at:(p.emailDate||p.at||0)};
+  }).filter(Boolean).sort((a,b) => (b.score-a.score) || (b.at-a.at));
+  return cands[0] || null;
+}
+// One place that fills the cost box, so all three callers behave the same and
+// the box always says where its number came from.
+function applyIndexPrice(materialStr){
+  const cpsEl = document.getElementById('costsheet');
+  const src = document.getElementById('costsheet-src');
+  const hit = qBestPrice(materialStr);
+  if (!hit) {
+    if (src) { src.style.display = 'none'; src.textContent = ''; }
+    return null;
+  }
+  if (cpsEl) {
+    cpsEl.value = hit.c.v.toFixed(2);
+    cpsEl.style.background = '#f0fdf4';
+    cpsEl.style.borderColor = '#86efac';
+    setTimeout(() => { cpsEl.style.background=''; cpsEl.style.borderColor=''; }, 3000);
+  }
+  if (src) {
+    const p = hit.p;
+    const when = p.emailDate || p.at;
+    const bits = [p.vendor || 'a saved price'];
+    if (when) bits.push(new Date(Number(when)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}));
+    if (p.qty > 1) bits.push('at ' + fmtN(p.qty) + '+');
+    src.innerHTML = 'From the price book — <b>' + qEsc(bits.join(' · ')) + '</b><br>' + qEsc(hit.c.math);
+    src.style.display = '';
+  }
+  return hit.c.v;
+}
+const qEsc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+let PRICE_INDEX = JSON.parse(localStorage.getItem('bsmp_prices') || '[]');   // legacy, backups only
 let pendingPriceItems = [];
 
 function handlePriceFile(file) {
@@ -6549,31 +6909,24 @@ function handlePriceFile(file) {
       ? {type:'image', source:{type:'base64', media_type:mediaType, data:b64}}
       : {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}};
 
-    const promptText = 'You are reading a material vendor price quote for a metal fabrication shop. Extract every line item — each unique material with its price. Return ONLY valid JSON array, no markdown:\n[{"vendor":"company name or null","quote_date":"date as MM/DD/YY or null","material_type":"sheet or bar","material_grade":"e.g. 1008 CRS or 6061 Aluminum","thickness_or_size":"e.g. 0.104 or 1.0 OD or 2x1x0.125 tube","sheet_size":"e.g. 48x120 or null for bar","quantity":0,"unit":"per sheet, per bar, per foot, per pound","price":0.00,"notes":"any relevant notes or null"}]\n\nImportant: extract ALL line items you can find. For sheet metal look for thickness + size + price. For bar stock look for size/shape + price. Prices should be numbers only.';
-
+    // same prompt the Mail app uses — a price off a PDF and a price off an email
+    // have to come out identical, or the book stops being one book
     return callAnthropic({
       model: 'claude-sonnet-4-6',
-      max_tokens: 2000,
-      messages: [{role:'user', content:[contentBlock, {type:'text', text:promptText}]}]
+      max_tokens: 3000,
+      messages: [{role:'user', content:[contentBlock, {type:'text', text:mpExtractPrompt({source:'file', hasDoc:true})}]}]
     });
   }).then(r => r.json()).then(data => {
     if (data.error) throw new Error(data.error.message);
-    const raw = data.content.map(c => c.text||'').join('');
-    let items;
-    try {
-      let clean = raw.replace(/```json/gi,'').replace(/```/g,'').trim();
-      const fa = clean.indexOf('['), la = clean.lastIndexOf(']');
-      if (fa >= 0 && la > fa) clean = clean.slice(fa, la+1);
-      clean = clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
-      items = JSON.parse(clean);
-      if (!Array.isArray(items)) throw new Error('Not an array');
-    } catch(e) {
-      throw new Error('Could not parse response: ' + e.message);
-    }
-    if (!items.length) throw new Error('No price items found in this document');
+    const items = mpNormalizeItems(mpParseItems(data.content.map(c => c.text||'').join('')));
+    if (!items.length) throw new Error('No priced lines found in this document');
     pendingPriceItems = items.map((item, i) => ({...item, _id: Date.now() + i}));
+    // the vendor's name is on the quote, not on each line — guess it from the
+    // file name and let the person fix it
+    const vEl = document.getElementById('pi-vendor-all');
+    if (vEl && !vEl.value) vEl.value = (file.name||'').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim();
     renderExtractedPreview(pendingPriceItems);
-    setPriceStatus('success', `Found ${items.length} price item${items.length!==1?'s':''}. Review below and save.`);
+    setPriceStatus('success', `Found ${items.length} price${items.length!==1?'s':''}. Check each line against the quote, then save.`);
   }).catch(e => {
     setPriceStatus('error', 'Analysis failed: ' + e.message);
   });
@@ -6587,82 +6940,143 @@ function setPriceStatus(type, msg) {
   document.getElementById('price-ai-msg').textContent = msg;
 }
 
+// The same normalized fields the Mail app captures — one row per price, with the
+// form (sheet or tube) deciding which boxes a row shows.
 function renderExtractedPreview(items) {
   const container = document.getElementById('price-extracted-rows');
-  const fmt = v => v ? '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
-  container.innerHTML = `
-    <table class="ops-table" style="margin-bottom:8px">
-      <thead><tr>
-        <th>Vendor</th><th>Date</th><th>Type</th><th>Grade</th>
-        <th>Size</th><th>Sheet size</th><th style="text-align:right">Qty</th><th>Unit</th><th style="text-align:right">Price</th><th></th>
-      </tr></thead>
-      <tbody>${items.map(item => `
-        <tr>
-          <td><input type="text" value="${item.vendor||''}" id="pi-vendor-${item._id}" style="font-size:12px;min-width:100px"></td>
-          <td><input type="text" value="${item.quote_date||''}" id="pi-date-${item._id}" style="font-size:12px;width:80px"></td>
-          <td><select id="pi-type-${item._id}" style="font-size:12px">
-            <option value="sheet"${item.material_type==='sheet'?' selected':''}>Sheet</option>
-            <option value="bar"${item.material_type==='bar'?' selected':''}>Bar</option>
-          </select></td>
-          <td><input type="text" value="${item.material_grade||''}" id="pi-grade-${item._id}" style="font-size:12px;min-width:120px"></td>
-          <td><input type="text" value="${item.thickness_or_size||''}" id="pi-size-${item._id}" style="font-size:12px;width:100px"></td>
-          <td><input type="text" value="${item.sheet_size||''}" id="pi-sheet-${item._id}" style="font-size:12px;width:80px"></td>
-          <td class="num"><input type="number" value="${item.quantity||0}" id="pi-qty-${item._id}" min="0" step="1" style="font-size:12px;width:60px;text-align:right"></td>
-          <td><input type="text" value="${item.unit||'per sheet'}" id="pi-unit-${item._id}" style="font-size:12px;width:80px"></td>
-          <td class="num"><input type="number" value="${item.price||0}" id="pi-price-${item._id}" step="0.01" style="font-size:13px;width:80px;text-align:right"></td>
-          <td><button class="del-btn" onclick="removePendingItem(${item._id})">×</button></td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+  const nv = v => v != null ? v : '';
+  container.innerHTML = items.map((item, i) => {
+    const tube = item.form === 'tube', s = tubeShape(item.shape);
+    const uoms = tube ? TUBE_UOMS : UOMS;
+    const dims = tube ? `
+        <select id="pi-shape-${i}" onchange="piShape(${i})" style="font-size:12px;width:118px">${TUBE_SHAPES.map(o=>`<option value="${o.k}"${o.k===item.shape?' selected':''}>${qEsc(o.label)}</option>`).join('')}</select>
+        <input type="text" id="pi-od-${i}" value="${nv(item.odIn)}" placeholder="${qEsc(s.ph[0])}" title="Outside size in decimal inches" style="font-size:12px;width:64px" oninput="piTouched(${i})">
+        ${s.ph.length>1?`<input type="text" id="pi-b-${i}" value="${nv(item.bIn)}" placeholder="${qEsc(s.ph[1])}" style="font-size:12px;width:64px" oninput="piTouched(${i})">`:''}
+        ${s.hollow?`<input type="text" id="pi-wall-${i}" value="${nv(item.wallIn)}" placeholder="wall" style="font-size:12px;width:64px" oninput="piTouched(${i})">
+        <input type="text" id="pi-ga-${i}" value="${nv(item.gauge)}" placeholder="ga" title="Wall gauge — fills the wall decimal from the right table for this metal" style="font-size:12px;width:52px" onchange="piGa(${i})">`:''}
+        <input type="text" id="pi-spec-${i}" value="${qEsc(item.spec||'')}" placeholder="A500" title="Spec or grade" style="font-size:12px;width:74px" oninput="piTouched(${i})">`
+    : `
+        <input type="text" id="pi-thk-${i}" value="${nv(item.thicknessIn)}" placeholder="thk (in)" style="font-size:12px;width:72px" oninput="piTouched(${i})">
+        <input type="text" id="pi-ga-${i}" value="${nv(item.gauge)}" placeholder="ga" style="font-size:12px;width:52px" onchange="piGa(${i})">
+        <input type="text" id="pi-size-${i}" value="${qEsc(item.size||'')}" placeholder="48x120" style="font-size:12px;width:88px" oninput="piTouched(${i})">`;
+    return `
+      <div style="border:1px solid var(--border);background:var(--surface);padding:8px 9px;margin-bottom:7px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+          <select id="pi-form-${i}" onchange="piForm(${i})" title="Sheet is bought by weight; tube and bar are bought by the foot" style="font-size:12px;width:108px">
+            <option value="sheet"${tube?'':' selected'}>Sheet / plate</option>
+            <option value="tube"${tube?' selected':''}>Tube / bar</option>
+          </select>
+          <select id="pi-fam-${i}" onchange="piGa(${i})" style="font-size:12px;width:160px">${MAT_FAMILIES.map(f=>`<option value="${f.k}"${f.k===item.family?' selected':''}>${qEsc(f.label)}</option>`).join('')}</select>
+          <input type="text" id="pi-desc-${i}" value="${qEsc(item.desc||'')}" placeholder="Vendor’s wording" style="font-size:12px;flex:1;min-width:150px" oninput="piTouched(${i})">
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${dims}
+          <input type="text" id="pi-price-${i}" value="${item.price||''}" placeholder="$" style="font-size:13px;width:80px" oninput="piTouched(${i})">
+          <select id="pi-uom-${i}" onchange="piTouched(${i})" style="font-size:12px;width:100px">${uoms.map(u=>`<option value="${u[0]}"${u[0]===item.uom?' selected':''}>${u[1]}</option>`).join('')}</select>
+          <input type="text" id="pi-qty-${i}" value="${nv(item.qty)}" placeholder="qty" title="Quantity break this price needs, if the vendor gave one" style="font-size:12px;width:58px" oninput="piTouched(${i})">
+          ${tube?`<input type="text" id="pi-len-${i}" value="${nv(item.lengthFt)}" placeholder="stick ft" title="Length of one stick in feet — only needed when the price is per stick" style="font-size:12px;width:74px" oninput="piTouched(${i})">`:''}
+          <button class="del-btn" onclick="removePendingItem(${i})" title="Remove this line">×</button>
+        </div>
+        <div id="pi-math-${i}" style="font-size:11px;color:#166534;margin-top:5px"></div>
+        ${item.raw?`<div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:3px" title="${qEsc(item.raw)}">“${qEsc(item.raw)}”</div>`:''}
+      </div>`;
+  }).join('');
   document.getElementById('price-extracted-preview').style.display = 'block';
+  items.forEach((x, i) => piTouched(i));
 }
 
-function removePendingItem(id) {
-  pendingPriceItems = pendingPriceItems.filter(i => i._id !== id);
+// read one row back out of its boxes — mirrors the Mail app's mpRowData()
+function piRowData(i) {
+  const v = id => { const el = document.getElementById(id+'-'+i); return el ? el.value : ''; };
+  const num = id => parseFloat(v(id)) || null;
+  const base = { form:v('pi-form')||'sheet', family:v('pi-fam')||'other', desc:(v('pi-desc')||'').trim(),
+    gauge:num('pi-ga'), price:parseFloat(String(v('pi-price')).replace(/[$,]/g,''))||0,
+    uom:v('pi-uom')||'each', qty:num('pi-qty'), raw:(pendingPriceItems[i]||{}).raw||'', _id:(pendingPriceItems[i]||{})._id };
+  if (base.form === 'tube') return Object.assign(base, { thicknessIn:null, size:'',
+    shape:v('pi-shape')||'square-tube', odIn:num('pi-od'), bIn:num('pi-b'),
+    wallIn:num('pi-wall'), spec:(v('pi-spec')||'').trim(), lengthFt:num('pi-len') });
+  return Object.assign(base, { thicknessIn:num('pi-thk'), size:(v('pi-size')||'').trim(),
+    shape:'', odIn:null, bIn:null, wallIn:null, spec:'', lengthFt:null });
+}
+function piSync(){ pendingPriceItems = pendingPriceItems.map((x, i) => Object.assign({}, x, piRowData(i))); }
+function piTouched(i) {
+  const el = document.getElementById('pi-math-'+i);
+  if (!el) return;
+  const r = piRowData(i);
+  if (r.form === 'tube') {
+    const c = tubeCalc(r);
+    el.textContent = c ? ((c.perFt!=null?'≈ $'+c.perFt.toFixed(3)+'/ft':'') + (c.perFt!=null&&c.perLb!=null?' · ':'') + (c.perLb!=null?'≈ $'+c.perLb.toFixed(3)+'/lb':'') + ' — ' + c.math) : '';
+    return;
+  }
+  const c = perLbCalc(r);
+  el.textContent = c ? ('≈ $'+c.v.toFixed(3)+'/lb — '+c.math) : '';
+}
+function piForm(i) {
+  piSync();
+  const x = pendingPriceItems[i];
+  if (x.form === 'tube') { if(!x.shape) x.shape='square-tube'; if(!TUBE_UOMS.some(u=>u[0]===x.uom)) x.uom='ft'; }
+  else if (x.uom === 'ft') x.uom = 'sheet';
+  renderExtractedPreview(pendingPriceItems);
+}
+function piShape(i){ piSync(); renderExtractedPreview(pendingPriceItems); }
+function piGa(i) {
+  const f = matFam((document.getElementById('pi-fam-'+i)||{}).value);
+  const g = parseFloat((document.getElementById('pi-ga-'+i)||{}).value);
+  const tEl = ((document.getElementById('pi-form-'+i)||{}).value === 'tube')
+    ? document.getElementById('pi-wall-'+i) : document.getElementById('pi-thk-'+i);
+  if (f.g && g && GAUGE_IN[f.g][g] && tEl && !tEl.value) tEl.value = GAUGE_IN[f.g][g];
+  piTouched(i);
+}
+
+function removePendingItem(i) {
+  piSync();
+  pendingPriceItems.splice(i, 1);
   renderExtractedPreview(pendingPriceItems);
 }
 
-function savePriceItems() {
-  const saved = [];
-  pendingPriceItems.forEach(item => {
-    const id = item._id;
-    const entry = {
-      id: Date.now() + Math.random(),
-      saved_date: new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),
-      vendor: document.getElementById('pi-vendor-'+id)?.value || '',
-      quote_date: document.getElementById('pi-date-'+id)?.value || '',
-      material_type: document.getElementById('pi-type-'+id)?.value || 'sheet',
-      material_grade: document.getElementById('pi-grade-'+id)?.value || '',
-      thickness_or_size: document.getElementById('pi-size-'+id)?.value || '',
-      sheet_size: document.getElementById('pi-sheet-'+id)?.value || '',
-      quantity: parseFloat(document.getElementById('pi-qty-'+id)?.value)||0,
-      unit: document.getElementById('pi-unit-'+id)?.value || 'per sheet',
-      price: parseFloat(document.getElementById('pi-price-'+id)?.value)||0,
-    };
-    if (entry.material_grade && entry.price > 0) saved.push(entry);
-  });
-
-  PRICE_INDEX = [...saved, ...PRICE_INDEX];
-  localStorage.setItem('bsmp_prices', JSON.stringify(PRICE_INDEX));
-  document.getElementById('price-extracted-preview').style.display = 'none';
-  pendingPriceItems = [];
-  document.getElementById('price-file-input').value = '';
-  renderPriceIndex();
-  setPriceStatus('success', `Saved ${saved.length} price item${saved.length!==1?'s':''} to index.`);
+// Saves into the SHARED book — one write per record, same as the Mail app.
+async function savePriceItems() {
+  piSync();
+  if (!window._qSavePrice || !window._qPricesReady) {
+    setPriceStatus('error', 'Not connected — sign in before saving prices.');
+    return;
+  }
+  const vendor = (document.getElementById('pi-vendor-all')||{}).value || '';
+  const qd = (document.getElementById('pi-date-all')||{}).value || '';
+  const emailDate = qd ? new Date(qd+'T12:00:00').getTime() : Date.now();
+  const fileName = ((document.getElementById('price-file-input')||{}).files||[])[0]?.name || '';
+  const rows = pendingPriceItems.filter(x => Number(x.price) > 0);
+  if (!rows.length) { setPriceStatus('error', 'Nothing to save — every line needs a price.'); return; }
+  setPriceStatus('loading', 'Saving to the shared price book…');
+  try {
+    for (const x of rows) {
+      const rec = mpRecord(x, {vendor, emailDate, fileName}, (window._qUserEmail && window._qUserEmail()) || '');
+      await window._qSavePrice(rec);
+      MPRICES[rec.id] = rec;
+    }
+    document.getElementById('price-extracted-preview').style.display = 'none';
+    pendingPriceItems = [];
+    document.getElementById('price-file-input').value = '';
+    renderPriceIndex();
+    setPriceStatus('success', `Saved ${rows.length} price${rows.length!==1?'s':''} — the Mail app sees them too.`);
+  } catch(e) {
+    setPriceStatus('error', 'Could not save: ' + ((e&&e.message)||e));
+  }
 }
 
 function renderPriceInsights(){
-  const list = PRICE_INDEX;
+  const list = mpList();
   const set=(id,t)=>{const e=document.getElementById(id); if(e) e.textContent=t;};
   const vendors=new Set();
   const fam={Aluminum:0,Stainless:0,Steel:0,Other:0};
-  const famOf=g=>{ g=(g||'').toLowerCase();
-    if(/alum|6061|5052|2024|3003|\balu/.test(g)) return 'Aluminum';
-    if(/stainless|\bss\b|304|316|321|17-4|15-5/.test(g)) return 'Stainless';
-    if(/crs|cold roll|hot roll|\bhr\b|a36|1018|1008|steel|galv/.test(g)) return 'Steel';
+  // the record already knows its family — no more guessing from vendor wording
+  const famOf=k=>{
+    if(/^al/.test(k)) return 'Aluminum';
+    if(/^ss/.test(k)) return 'Stainless';
+    if(/^(crs|hrs|galv|galvanneal)$/.test(k)) return 'Steel';
     return 'Other';
   };
-  list.forEach(p=>{ if(p.vendor) vendors.add(p.vendor); fam[famOf(p.material_grade)]++; });
+  list.forEach(p=>{ if(p.vendor) vendors.add(p.vendor); fam[famOf(p.family)]++; });
   set('pi-total', list.length);
   set('pi-total-sub', vendors.size+' vendor'+(vendors.size!==1?'s':''));
   const segs=[
@@ -6685,160 +7099,72 @@ function renderPriceInsights(){
 }
 
 function renderPriceIndex() {
-  const search = (document.getElementById('price-search')?.value||'').toLowerCase();
-  const filtered = search
-    ? PRICE_INDEX.filter(p =>
-        (p.material_grade||'').toLowerCase().includes(search) ||
-        (p.vendor||'').toLowerCase().includes(search) ||
-        (p.thickness_or_size||'').toLowerCase().includes(search)
-      )
-    : [...PRICE_INDEX]; // show all when no search
   const body = document.getElementById('price-index-body');
+  if (!body) return;
   renderPriceInsights();
-  if (!filtered.length) {
-    body.innerHTML = '<div class="empty-state"><h3>No prices saved yet</h3><p>Upload a vendor quote to get started.</p></div>';
+  if (!window._qPricesReady) {
+    body.innerHTML = '<div class="empty-state"><h3>Sign in to see the price book</h3><p>Material prices are shared with the Mail app, so they load once you’re signed in.</p></div>';
     return;
   }
-  const fmt = v => '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // same search language as the Mail app: "304 16ga", "2x2x.125 a500", "1.5 od"
+  const tokens = mpTokens((document.getElementById('price-search')||{}).value || '');
+  let list = mpList();
+  if (tokens.length) list = list.filter(p => priceMatch(p, tokens));
+  if (!list.length) {
+    body.innerHTML = mpList().length
+      ? '<div class="empty-state"><h3>Nothing matches that search</h3><p>Try a metal and a thickness — e.g. <b>304 16ga</b>, <b>galv 48x120</b>, or <b>2x2x.125</b> for tube.</p></div>'
+      : '<div class="empty-state"><h3>No prices saved yet</h3><p>Drop a vendor quote PDF above, or open a vendor email in the Mail app and hit <b>Save prices</b>.</p></div>';
+    return;
+  }
+  const money = v => '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const dt = ms => new Date(Number(ms)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
   body.innerHTML = `<table class="history-table">
     <thead><tr>
-      <th>Vendor</th><th>Quote date</th><th>Type</th><th>Grade</th>
-      <th>Size</th><th>Sheet size</th><th style="text-align:right">Qty</th><th style="text-align:right">Price</th><th>Unit</th><th></th>
+      <th>Vendor</th><th>Date</th><th>Material</th><th>Thk / Wall</th><th>Size</th>
+      <th style="text-align:right">Qty</th><th style="text-align:right">Price</th>
+      <th style="text-align:right">≈ $/ft</th><th style="text-align:right">≈ $/lb</th><th></th>
     </tr></thead>
-    <tbody>${filtered.map(p => `
+    <tbody>${list.map(p => {
+      const tube = isTube(p), s = tube ? tubeShape(p.shape) : null;
+      const thk = tube ? p.wallIn : p.thicknessIn;
+      const kind = tube ? [s.label.toLowerCase(), p.spec||''].filter(Boolean).join(' · ') : '';
+      const unit = (UOMS.find(u => u[0] === p.uom) || ['',''])[1];
+      const mathAttr = p.math ? ` title="${qEsc(p.math)}" style="cursor:help"` : '';
+      return `
       <tr>
-        <td style="font-weight:600">${p.vendor||'—'}</td>
-        <td style="font-size:12px;color:var(--text2)">${p.quote_date||p.saved_date||'—'}</td>
-        <td><span class="badge ${p.material_type==='bar'?'badge-green':'badge-navy'}">${p.material_type}</span></td>
-        <td style="font-size:13px">${p.material_grade||'—'}</td>
-        <td style="font-size:12px;font-family:'DM Mono',monospace">${p.thickness_or_size||'—'}</td>
-        <td style="font-size:12px;color:var(--text2)">${p.sheet_size||'—'}</td>
-        <td class="num" style="font-size:12px;color:var(--text2)">${p.quantity||'—'}</td>
-        <td class="num" style="font-weight:600;font-family:'DM Mono',monospace">${fmt(p.price)}</td>
-        <td style="font-size:12px;color:var(--text2)">${p.unit||'—'}</td>
-        <td><button class="btn btn-sm btn-danger" onclick="deletePriceItem('${p.id}')">×</button></td>
-      </tr>`).join('')}
+        <td style="font-weight:600">${qEsc(p.vendor||'—')}</td>
+        <td style="font-size:12px;color:var(--text2)">${qEsc(dt(p.emailDate||p.at))}</td>
+        <td style="font-size:13px">${qEsc(p.familyLabel||matFam(p.family).label)}
+          <div style="font-size:11px;color:var(--text3)" ${p.raw?`title="${qEsc(p.raw)}"`:''}>${kind?`<span style="color:var(--accent)">${qEsc(kind)}</span>${p.desc?' — ':''}`:''}${qEsc(p.desc||'')}</div></td>
+        <td style="font-size:12px;font-family:'DM Mono',monospace">${thk?qEsc(String(thk)):''}${thk&&p.gauge?' / ':''}${p.gauge?qEsc(p.gauge+' ga'):''}</td>
+        <td style="font-size:12px;font-family:'DM Mono',monospace">${qEsc(tube?tubeLabel(p):(p.size||'—'))}</td>
+        <td class="num" style="font-size:12px;color:var(--text2)">${p.qty?qEsc(fmtN(p.qty)+'+'):'—'}</td>
+        <td class="num" style="font-weight:600;font-family:'DM Mono',monospace">${money(p.price)}
+          <div style="font-size:11px;color:var(--text3);font-weight:400">${qEsc(unit)}</div></td>
+        <td class="num" style="font-family:'DM Mono',monospace"${mathAttr}>${p.pricePerFt?money(p.pricePerFt):'—'}</td>
+        <td class="num" style="font-family:'DM Mono',monospace"${mathAttr}>${p.pricePerLb?money(p.pricePerLb):'—'}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deletePriceItem('${qEsc(p.id)}')" title="Delete this price for everyone">×</button></td>
+      </tr>`;
+    }).join('')}
     </tbody>
   </table>`;
 }
 
+// Deleting here deletes it for everyone — this is the shared book, not a local
+// copy. One id at a time, never a whole-collection write.
 function deletePriceItem(id) {
-  PRICE_INDEX = PRICE_INDEX.filter(p => String(p.id) !== String(id));
-  localStorage.setItem('bsmp_prices', JSON.stringify(PRICE_INDEX));
+  const p = MPRICES[id];
+  if (!p) return;
+  const what = [p.vendor, p.familyLabel || matFam(p.family).label, p.desc].filter(Boolean).join(' — ');
+  if (!confirm('Delete this price for everyone?\n\n' + what + '\n\nThe Mail app shares this price book.')) return;
+  delete MPRICES[id];
   renderPriceIndex();
+  if (window._qDeletePrice) window._qDeletePrice(id).catch(() => alert('Could not delete — check your connection.'));
 }
 
-function clearPriceIndex() {
-  if (!confirm('Delete all saved prices? This cannot be undone.')) return;
-  PRICE_INDEX = [];
-  localStorage.setItem('bsmp_prices', '[]');
-  renderPriceIndex();
-}
-
-// Called from calculate() to auto-fill sheet cost from most recent matching price
-function getPriceFromIndex(material, sheetSize) {
-  if (!PRICE_INDEX.length || !material) return null;
-  console.log('[PriceIndex] Looking for:', material, '| Index has', PRICE_INDEX.length, 'entries');
-  console.log('[PriceIndex] First 3 entries:', JSON.stringify(PRICE_INDEX.slice(0,3).map(p=>({grade:p.material_grade,thk:p.thickness_or_size,price:p.price}))));
-  const mat = material.toLowerCase();
-
-  // Extract thickness from material string e.g. "0.104 thk CRS" → "0.104"
-  const thkMatch = mat.match(/(\.?\d+\.?\d*)/);
-  const matThk = thkMatch ? parseFloat(thkMatch[1]) : 0;
-
-  // Determine metal family
-  const isCRS = mat.includes('crs') || mat.includes('1008') || mat.includes('1018');
-  const isSS304 = mat.includes('304');
-  const isSS316 = mat.includes('316');
-  const isSS = mat.includes(' ss') || mat.includes('stainless') || isSS304 || isSS316;
-  const is5052 = mat.includes('5052');
-  const is6061 = mat.includes('6061');
-  const is2024 = mat.includes('2024');
-  const isAlu = mat.includes('alu') || mat.includes('aluminum') || is5052 || is6061 || is2024;
-
-  // Score each price index entry
-  const scored = PRICE_INDEX
-    .filter(p => p.material_type === 'sheet' && p.price > 0)
-    .map(p => {
-      const grade = (p.material_grade||'').toLowerCase();
-      const pThk = parseFloat((p.thickness_or_size||'').match(/(\.?\d+\.?\d*)/)?.[1]||'0');
-      let score = 0;
-
-      // Metal family match
-      const pCRS = grade.includes('crs')||grade.includes('1008')||grade.includes('1018')||grade.includes('cold roll');
-      const pSS304 = grade.includes('304');
-      const pSS316 = grade.includes('316');
-      const pSS = grade.includes('ss')||grade.includes('stainless')||pSS304||pSS316;
-      const pAlu = grade.includes('alu')||grade.includes('aluminum')||grade.includes('5052')||grade.includes('6061')||grade.includes('2024');
-
-      if (isCRS && pCRS) score += 10;
-      else if (isSS304 && pSS304) score += 12;
-      else if (isSS316 && pSS316) score += 12;
-      else if (isSS && pSS) score += 8;
-      else if (is5052 && grade.includes('5052')) score += 12;
-      else if (is6061 && grade.includes('6061')) score += 12;
-      else if (is2024 && grade.includes('2024')) score += 12;
-      else if (isAlu && pAlu) score += 8;
-      else return null; // no family match at all
-
-      // Thickness match — handle decimals and gauge strings
-      // Gauge to decimal lookup
-      const gaugeMap = {'20ga':0.035,'18ga':0.048,'16ga':0.060,'14ga':0.074,'13ga':0.090,
-        '12ga':0.104,'11ga':0.118,'10ga':0.134,'7ga':0.187,
-        '20':0.035,'18':0.048,'16':0.060,'14':0.074,'13':0.090,
-        '12':0.104,'11':0.118,'10':0.134,'7':0.187};
-      const pThkStr = (p.thickness_or_size||'').toLowerCase().trim();
-      let pThkDecimal;
-      // If the size string mentions a gauge (e.g. "11ga", "11 ga", "16 gauge"),
-      // ALWAYS resolve via the gauge table — never treat "11" as 11 inches.
-      const gaugeStrMatch = pThkStr.match(/(\d+)\s*ga/);
-      if (gaugeStrMatch) {
-        pThkDecimal = gaugeMap[gaugeStrMatch[1]] || 0;
-      } else if (pThk && pThk >= 0.001 && pThk < 1) {
-        // A plausible decimal-inch thickness (e.g. 0.118, .060)
-        pThkDecimal = pThk;
-      } else {
-        // Bare number with no "ga" and not a fraction of an inch — try gauge table,
-        // else fall back to whatever parsed.
-        pThkDecimal = gaugeMap[pThkStr.replace(/[^0-9]/g,'')] || (pThk < 1 ? pThk : 0);
-      }
-      if (matThk > 0 && pThkDecimal > 0) {
-        const diff = Math.abs(matThk - pThkDecimal);
-        if (diff < 0.001) score += 8;       // exact match
-        else if (diff < 0.005) score += 5;  // very close
-        else if (diff < 0.015) score += 2;  // close
-        else score -= 5;                     // wrong thickness — heavily penalized
-      } else if (matThk > 0 && pThkDecimal === 0) {
-        score -= 1; // can't compare, slight penalty
-      }
-
-      return {p, score};
-    })
-    .filter(Boolean)
-    .sort((a,b) => b.score - a.score);
-
-  console.log('[PriceIndex] Top matches:', scored.slice(0,3).map(s=>({grade:s.p.material_grade,thk:s.p.thickness_or_size,score:s.score,price:s.p.price})));
-  if (!scored.length || scored[0].score < 5) {
-    console.log('[PriceIndex] No match found (best score:', scored[0]?.score, ')');
-    return null;
-  }
-  console.log('[PriceIndex] Match found:', scored[0].p.material_grade, scored[0].p.thickness_or_size, '$'+scored[0].p.price);
-  return scored[0].p.price;
-}
-
-function getBarPriceFromIndex(grade, sizeStr) {
-  if (!PRICE_INDEX.length) return null;
-  const matches = PRICE_INDEX.filter(p => {
-    if (p.material_type !== 'bar') return false;
-    const gradeMatch = (p.material_grade||'').toLowerCase().includes((grade||'').toLowerCase().split(' ')[0]);
-    const sizeMatch = !sizeStr || (p.thickness_or_size||'').includes(sizeStr.split(' ')[0]);
-    return gradeMatch;
-  });
-  return matches.length ? matches[0].price : null;
-}
-
-
-
+// Sheet cost auto-fill now lives in applyIndexPrice()/qBestPrice() up in the
+// shared price book section. The old getPriceFromIndex() matched vendor text
+// with one gauge table for every metal; getBarPriceFromIndex() was never called.
 
 // ===================== BAR STOCK CALCULATOR =====================
 let matMode = 'sheet';
@@ -7407,64 +7733,53 @@ function getMatBreakPrice(sheetsNeeded){
   return match ? match.price : tiers[tiers.length-1].price; // fallback to lowest tier
 }
 
+// Pull quantity breaks for the selected material out of the shared price book.
+// A vendor's break quantity becomes a tier; the price is what a sheet of the
+// size this quote uses actually costs at that break, converted if the vendor
+// quoted by weight.
 function loadPriceBreaksFromIndex(){
   const mat = document.getElementById('material').value;
   if(!mat){ alert('Select a material first.'); return; }
-  if(!PRICE_INDEX.length){ alert('No prices in the Material Price Index yet. Upload a vendor quote first.'); return; }
-
-  const normMat = mat.toLowerCase();
-  const isCRS = normMat.includes('crs');
-  const isSS304 = normMat.includes('304');
-  const isSS316 = normMat.includes('316');
-  const is5052 = normMat.includes('5052');
-  const is6061 = normMat.includes('6061');
-  const is2024 = normMat.includes('2024');
-  const matThk = parseFloat(normMat.match(/[\d.]+/)?.[0]||'0');
-
-  // Find all matching entries sorted by quantity
-  const matches = PRICE_INDEX.filter(p => {
-    if(p.material_type !== 'sheet' || !p.price) return false;
-    const g = (p.material_grade||'').toLowerCase();
-    const familyMatch =
-      (isCRS && (g.includes('crs')||g.includes('1008')||g.includes('1018')||g.includes('cold roll'))) ||
-      (isSS304 && g.includes('304')) ||
-      (isSS316 && g.includes('316')) ||
-      (is5052 && g.includes('5052')) ||
-      (is6061 && g.includes('6061')) ||
-      (is2024 && g.includes('2024'));
-    if(!familyMatch) return false;
-    // Check thickness matches
-    const pThkStr = (p.thickness_or_size||'').toLowerCase();
-    const gaugeMap = {'20ga':0.035,'18ga':0.048,'16ga':0.060,'14ga':0.074,'13ga':0.090,'12ga':0.104,'11ga':0.118,'10ga':0.134,'7ga':0.187};
-    let pThk = parseFloat(pThkStr.replace(/[^0-9.]/g,''))||0;
-    if(!pThk || pThk > 2) pThk = gaugeMap[pThkStr.replace(/[^0-9ga]/g,'')] || 0;
-    return matThk > 0 && pThk > 0 && Math.abs(pThk - matThk) < 0.005;
-  }).sort((a,b) => (a.quantity||0) - (b.quantity||0));
-
-  if(!matches.length){
-    alert('No matching prices found in index for this material and thickness. You can enter tiers manually.');
+  if(!window._qPricesReady){ alert('The shared price book hasn’t loaded yet — make sure you’re signed in, then try again.'); return; }
+  const fam = qFamilyOf(mat);
+  const thk = fam ? qThickOf(mat, fam) : 0;
+  if(!fam || !thk){
+    alert('Could not work out the metal and thickness from “'+mat+'”. Enter the tiers by hand.');
     if(!document.getElementById('matbreaks-enabled').checked) toggleMatBreaks();
     return;
   }
+  const size = qSheetSize();
+  const hits = mpList().map(p => {
+    if(isTube(p) || p.family !== fam) return null;
+    const f = matFam(p.family);
+    const pt = p.thicknessIn || (p.gauge && f.g ? GAUGE_IN[f.g][p.gauge] : null);
+    if(!pt || Math.abs(pt-thk) > .006) return null;
+    const c = qSheetCost(p, size.w, size.l, thk);
+    if(!c || !(c.v > 0)) return null;
+    return {min:(p.qty > 0 ? p.qty : 1), price:c.v, vendor:p.vendor||'?'};
+  }).filter(Boolean);
 
-  // Clear existing rows and populate from index
+  if(!hits.length){
+    alert('No prices in the book for '+matFam(fam).label+' at '+thk+'". You can enter the tiers by hand.');
+    if(!document.getElementById('matbreaks-enabled').checked) toggleMatBreaks();
+    return;
+  }
+  // two vendors can quote the same break — keep the cheaper one
+  const byMin = {};
+  hits.forEach(h => { if(!byMin[h.min] || h.price < byMin[h.min].price) byMin[h.min] = h; });
+  const tiers = Object.values(byMin).sort((a,b) => a.min - b.min);
+
   document.getElementById('matbreaks-rows').innerHTML = '';
   matBreakRowCount = 0;
   if(!document.getElementById('matbreaks-enabled').checked) toggleMatBreaks();
-  else {
-    // Already enabled, just clear rows
-    document.getElementById('matbreaks-rows').innerHTML = '';
-    matBreakRowCount = 0;
-  }
+  document.getElementById('matbreaks-rows').innerHTML = '';
+  matBreakRowCount = 0;
+  tiers.forEach(t => addMatBreakRow(t.min, t.price.toFixed(2)));
 
-  matches.forEach(p => {
-    addMatBreakRow(p.quantity||1, p.price);
-  });
-
-  // Update label to show loaded count
-  document.getElementById('matbreaks-active-price').style.display = 'block';
-  document.getElementById('matbreaks-active-price').textContent =
-    `Loaded ${matches.length} price tier${matches.length!==1?'s':''} from index (${matches.map(p=>(p.quantity||'?')+'qty @ $'+p.price).join(', ')})`;
+  const note = document.getElementById('matbreaks-active-price');
+  note.style.display = 'block';
+  note.textContent = 'Loaded '+tiers.length+' tier'+(tiers.length!==1?'s':'')+' from the price book ('
+    + tiers.map(t => t.min+'+ @ $'+t.price.toFixed(2)+' ' + t.vendor).join(', ') + ')';
   calculate();
 }
 
@@ -8702,6 +9017,28 @@ window._qUploadDrawing = async (id, dataUrl, ext) => {
   return await getDownloadURL(r);
 };
 setPersistence(auth, browserLocalPersistence).catch(()=>{});
+
+// ── shared material price book ───────────────────────────────────────────────
+// Lives at mail/materialPrices — the Mail app writes it from vendor emails, this
+// page writes it from vendor PDFs, both read it. The main script isn't a module,
+// so the bridge goes through window.
+window._qPricesReady = false;
+window._qUserEmail = () => (_qUser && _qUser.email) || '';
+window._qSavePrice = (rec) => set(ref(db,'mail/materialPrices/'+rec.id), rec);
+window._qDeletePrice = (id) => remove(ref(db,'mail/materialPrices/'+id));
+let _qPricesBound = false;
+function _qListenPrices(){
+  if(_qPricesBound) return;
+  _qPricesBound = true;
+  onValue(ref(db,'mail/materialPrices'), snap => {
+    window._qPricesReady = true;
+    if(window._qOnPrices) window._qOnPrices(snap.val() || {});
+  }, err => {
+    console.warn('price book read failed', err);
+    window._qPricesReady = false;
+  });
+}
+
 let _qUser = null;
 let _qSynced = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_quote_synced')||'[]')); }catch(e){ return new Set(); } })();
 function _qSaveSynced(){ try{ localStorage.setItem('bsmp_quote_synced', JSON.stringify([..._qSynced])); }catch(e){} }
@@ -8939,9 +9276,13 @@ onAuthStateChanged(auth, (user) => {
       return;   // no sync/backfill \u2014 the quote tool never loads for operators
     }
     hideMgrLock();
-    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); _qFromMail(); _qFromMailAtt();
+    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); _qFromMail(); _qFromMailAtt(); _qListenPrices();
   }
-  else { hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out'); }
+  else {
+    hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out');
+    window._qPricesReady = false;
+    if(window._qOnPrices) window._qOnPrices({});
+  }
 });
 document.addEventListener('keydown', (e) => {
   const ov=$q('q-login');

@@ -332,7 +332,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .mp-item .mp-form{width:112px;flex:none}
 .mp-item .mp-desc{flex:1;min-width:160px}
 .mp-item .mp-thk{width:76px}.mp-item .mp-ga{width:56px}.mp-item .mp-size{width:92px}.mp-item .mp-price{width:86px}.mp-item .mp-uom{width:104px;flex:none}
-.mp-item .mp-shape{width:120px;flex:none}.mp-item .mp-dim{width:66px}.mp-item .mp-spec{width:78px}.mp-item .mp-len{width:80px}
+.mp-item .mp-shape{width:120px;flex:none}.mp-item .mp-dim{width:66px}.mp-item .mp-spec{width:78px}.mp-item .mp-len{width:80px}.mp-item .mp-qty{width:62px}
 .mp-x{width:32px;height:32px;border:1px solid var(--border);background:#fff;color:var(--text3);font-size:14px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .mp-x:hover{border-color:var(--red);color:var(--red)}
 .mp-math{font-size:11.5px;color:var(--green);margin-top:5px;font-variant-numeric:tabular-nums}
@@ -1802,6 +1802,73 @@ function perLbCalc(rec){
   }
   return null;
 }
+// The extraction prompt and the reply parser live here, in the shared core, so
+// a price captured from a vendor EMAIL (this app) and one captured from a vendor
+// PDF (the Quote Tool's Materials page) come out as the same record.
+// opts: {source:'email'|'file', hasDoc:bool, text:string}
+function mpExtractPrompt(opts){
+  const o=opts||{};
+  const lede = o.source==='file'
+    ? 'You are reading a material vendor’s price quote document'
+    : 'You are reading an email conversation'+(o.hasDoc?' (and the attached PDF quote)':'');
+  return lede+' from a metal supplier to a sheet-metal fabrication shop. Extract every material price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
++'Every item has: {"form":"sheet" or "tube","family":"one of crs|hrs|galv|galvanneal|ss304|ss316|ss430|al5052|al6061|al3003|copper|brass|other","desc":"the vendor’s own wording for the material","price":number,"uom":"lb|cwt|sheet|sqft|ft|each","qty":the quantity this price needs (a break quantity) or null,"raw":"the exact line copied from the source"}\n\n'
++'A FLAT SHEET, PLATE or COIL is form "sheet" and adds: {"thickness_in":decimal inches or null,"gauge":gauge number or null,"size":"e.g. 48x120, or null"}\n\n'
++'TUBE, PIPE or BAR STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
++'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, with the break quantity in qty ("1-9 $92, 10+ $88" → two items, qty 1 and qty 10) and the vendor’s wording kept in desc. A plain price with no break = qty null.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".'
++(o.text?('\n\nEMAIL (newest message first):\n'+o.text):'');
+}
+// AI's JSON → editable rows. Anything the model gets creative with lands on a
+// safe default; the person checks every row before it saves either way.
+function mpNormalizeItems(items){
+  return (items||[]).filter(x=>x&&Number(x.price)>0).map(x=>{
+    const tube=String(x.form||'').toLowerCase()==='tube';
+    return { form:tube?'tube':'sheet', family:matFam(x.family).k, desc:String(x.desc||''),
+      thicknessIn:(!tube&&x.thickness_in!=null)?Number(x.thickness_in):null,
+      gauge:x.gauge!=null?Number(x.gauge):null,
+      size:(!tube&&x.size)?String(x.size):'',
+      shape:tube?tubeShape(x.shape).k:'',
+      odIn:(tube&&x.od_in!=null)?Number(x.od_in):null,
+      bIn:(tube&&x.b_in!=null)?Number(x.b_in):null,
+      wallIn:(tube&&x.wall_in!=null)?Number(x.wall_in):null,
+      spec:tube?String(x.spec||''):'',
+      lengthFt:(tube&&x.length_ft!=null)?Number(x.length_ft):null,
+      price:Number(x.price)||0,
+      uom:['lb','cwt','sheet','sqft','ft','each'].includes(x.uom)?x.uom:(tube?'ft':'each'),
+      qty:(x.qty!=null&&Number(x.qty)>0)?Number(x.qty):null,
+      raw:String(x.raw||'') };
+  });
+}
+// AI's reply text → the JSON array inside it (models like to wrap it in prose)
+function mpParseItems(raw){
+  let clean=String(raw||'').replace(/```json/gi,'').replace(/```/g,'').trim();
+  const fa=clean.indexOf('['), la=clean.lastIndexOf(']');
+  if(fa<0||la<=fa) throw new Error('no price list in the reply');
+  const items=JSON.parse(clean.slice(fa,la+1).replace(/,\s*}/g,'}').replace(/,\s*]/g,']'));
+  if(!Array.isArray(items)) throw new Error('unexpected reply shape');
+  return items;
+}
+// One shared price record, ready to write to mail/materialPrices/<id>.
+// src carries where it came from: {vendor, vendorEmail, emailDate, mailKey,
+// subject, fileName} — an email or an uploaded PDF, but always something.
+let _mpSeq=0;   // saving 8 rows in one go takes < 1 ms — the clock alone won't keep ids apart
+function mpRecord(x, src, byEmail){
+  const tube=x.form==='tube', c=tube?tubeCalc(x):perLbCalc(x);
+  const s=src||{};
+  return { id:'mp_'+Date.now().toString(36)+'_'+(_mpSeq++)+'_'+Math.floor(Math.random()*1e4),
+    form:tube?'tube':'sheet', family:x.family, familyLabel:matFam(x.family).label, desc:x.desc||'',
+    thicknessIn:tube?null:(x.thicknessIn||null), gauge:x.gauge||null, size:tube?'':(x.size||''),
+    shape:tube?x.shape:'', odIn:tube?(x.odIn||null):null, bIn:tube?(x.bIn||null):null,
+    wallIn:tube?(x.wallIn||null):null, spec:tube?(x.spec||''):'', lengthFt:tube?(x.lengthFt||null):null,
+    price:Number(x.price)||0, uom:x.uom, qty:(Number(x.qty)>0)?Number(x.qty):null,
+    pricePerFt:(tube&&c&&c.perFt!=null)?Number(c.perFt.toFixed(4)):null,
+    pricePerLb:tube?((c&&c.perLb!=null)?Number(c.perLb.toFixed(4)):null):(c?Number(c.v.toFixed(4)):null),
+    lbPerFt:(tube&&c&&c.lbPerFt)?Number(c.lbPerFt.toFixed(4)):null,
+    math:c?c.math:'', raw:x.raw||'',
+    vendor:s.vendor||'', vendorEmail:s.vendorEmail||'', emailDate:s.emailDate||Date.now(),
+    mailKey:s.mailKey||'', subject:s.subject||'', fileName:s.fileName||'',
+    by:byEmail||'', at:Date.now() };
+}
 // AI connection — the same one the Quote Tool uses (shared localStorage keys,
 // set up once per computer in the Quote Tool's settings). Proxy keeps the API
 // key server-side; the direct-key fallback matches the rest of the suite.
@@ -1876,36 +1943,11 @@ async function runPriceAI(t){
       try{ content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:await blobB64(await fetchAttBlob(p))}}); }
       catch(e){ /* attachment fetch failed — the email text still goes */ }
     }
-    content.push({type:'text', text:
-'You are reading an email conversation'+(content.length?' (and the attached PDF quote)':'')+' from a metal supplier to a sheet-metal fabrication shop. Extract every material price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
-+'Every item has: {"form":"sheet" or "tube","family":"one of crs|hrs|galv|galvanneal|ss304|ss316|ss430|al5052|al6061|al3003|copper|brass|other","desc":"the vendor’s own wording for the material","price":number,"uom":"lb|cwt|sheet|sqft|ft|each","raw":"the exact line copied from the source"}\n\n'
-+'A FLAT SHEET, PLATE or COIL is form "sheet" and adds: {"thickness_in":decimal inches or null,"gauge":gauge number or null,"size":"e.g. 48x120, or null"}\n\n'
-+'TUBE, PIPE or BAR STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
-+'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, note the qty inside desc.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".\n\nEMAIL (newest message first):\n'+text});
+    content.push({type:'text', text:mpExtractPrompt({source:'email', hasDoc:content.length>0, text})});
     const r=await aiCall({model:'claude-sonnet-4-6', max_tokens:3000, messages:[{role:'user', content}]});
     const data=await r.json();
     if(data.error) throw new Error(data.error.message||'AI error');
-    let raw=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
-    const fa=raw.indexOf('['), la=raw.lastIndexOf(']');
-    if(fa<0||la<=fa) throw new Error('no price list in the reply');
-    const items=JSON.parse(raw.slice(fa,la+1).replace(/,\s*}/g,'}').replace(/,\s*]/g,']'));
-    if(!Array.isArray(items)) throw new Error('unexpected reply shape');
-    _mpItems=items.filter(x=>x&&Number(x.price)>0).map(x=>{
-      const tube=String(x.form||'').toLowerCase()==='tube';
-      return { form:tube?'tube':'sheet', family:matFam(x.family).k, desc:String(x.desc||''),
-        thicknessIn:(!tube&&x.thickness_in!=null)?Number(x.thickness_in):null,
-        gauge:x.gauge!=null?Number(x.gauge):null,
-        size:(!tube&&x.size)?String(x.size):'',
-        shape:tube?tubeShape(x.shape).k:'',
-        odIn:(tube&&x.od_in!=null)?Number(x.od_in):null,
-        bIn:(tube&&x.b_in!=null)?Number(x.b_in):null,
-        wallIn:(tube&&x.wall_in!=null)?Number(x.wall_in):null,
-        spec:tube?String(x.spec||''):'',
-        lengthFt:(tube&&x.length_ft!=null)?Number(x.length_ft):null,
-        price:Number(x.price)||0,
-        uom:['lb','cwt','sheet','sqft','ft','each'].includes(x.uom)?x.uom:(tube?'ft':'each'),
-        raw:String(x.raw||'') };
-    });
+    _mpItems=mpNormalizeItems(mpParseItems((data.content||[]).map(c=>c.text||'').join('')));
     renderMpRows();
     if(_mpItems.length) mpStatus(_mpItems.length+' price'+(_mpItems.length!==1?'s':'')+' found — check each row against the email before saving.');
     else { mpStatus('AI didn’t find prices in this conversation — if they’re in an Excel attachment it can’t read that; add the lines by hand.'); mpAddRow(); }
@@ -1920,7 +1962,7 @@ function mpRowData(i){
   const num=(id)=>parseFloat(v(id))||null;
   const base={ form:v('mp-form')||'sheet', family:v('mp-fam')||'other', desc:(v('mp-desc')||'').trim(),
     gauge:num('mp-ga'), price:parseFloat(String(v('mp-price')).replace(/[$,]/g,''))||0,
-    uom:v('mp-uom')||'each', raw:(_mpItems[i]&&_mpItems[i].raw)||'' };
+    uom:v('mp-uom')||'each', qty:num('mp-qty'), raw:(_mpItems[i]&&_mpItems[i].raw)||'' };
   // the two forms carry different fields — the unused half is cleared, never left
   // half-filled from whichever form the row used to be
   if(base.form==='tube') return Object.assign(base,{ thicknessIn:null, size:'',
@@ -1930,7 +1972,7 @@ function mpRowData(i){
     shape:'', odIn:null, bIn:null, wallIn:null, spec:'', lengthFt:null });
 }
 function mpSync(){ _mpItems=_mpItems.map((x,i)=>Object.assign({},x,mpRowData(i))); }
-window.mpAddRow=()=>{ mpSync(); _mpItems.push({form:'sheet',family:'crs',desc:'',thicknessIn:null,gauge:null,size:'',price:0,uom:'sheet',raw:''}); renderMpRows(); };
+window.mpAddRow=()=>{ mpSync(); _mpItems.push({form:'sheet',family:'crs',desc:'',thicknessIn:null,gauge:null,size:'',price:0,uom:'sheet',qty:null,raw:''}); renderMpRows(); };
 window.mpDelRow=(i)=>{ mpSync(); _mpItems.splice(i,1); renderMpRows(); };
 window.mpTouched=(i)=>{
   const el=$('mp-math-'+i); if(!el) return;
@@ -1988,6 +2030,7 @@ function renderMpRows(){
         ${dims}
         <input class="mp-price" id="mp-price-${i}" value="${x.price||''}" placeholder="$" oninput="mpTouched(${i})">
         <select class="mp-uom" id="mp-uom-${i}" onchange="mpTouched(${i})">${uoms.map(u=>`<option value="${u[0]}"${u[0]===x.uom?' selected':''}>${u[1]}</option>`).join('')}</select>
+        <input class="mp-qty" id="mp-qty-${i}" value="${nv(x.qty)}" placeholder="qty" title="Quantity break this price applies to, if the vendor gave one — the Quote Tool reads these as price tiers. Blank for a plain price." oninput="mpTouched(${i})">
         ${tube?`<input class="mp-len" id="mp-len-${i}" value="${nv(x.lengthFt)}" placeholder="stick ft" title="Length of one stick in feet — only needed when the price is per stick" oninput="mpTouched(${i})">`:''}
         <button class="mp-x" title="Remove this line" onclick="mpDelRow(${i})"><i class="ti ti-trash"></i></button>
       </div>
@@ -2007,25 +2050,12 @@ window.savePrices=async ()=>{
   if(!rows.length){ toast('Nothing to save — every line needs at least a price.',true); return; }
   $('mp-save').disabled=true;
   try{
-    let n=0;
     for(const x of rows){
-      const tube=x.form==='tube', c=tube?tubeCalc(x):perLbCalc(x);
-      const id='mp_'+Date.now().toString(36)+'_'+(n++)+'_'+Math.floor(Math.random()*1e4);
+      const rec=mpRecord(x, {vendor, vendorEmail, emailDate, mailKey:t.key, subject:t.subject||''},
+        (auth.currentUser&&auth.currentUser.email)||'');
       // one write per record — never a whole-collection set()
-      const rec={ id, form:tube?'tube':'sheet', family:x.family, familyLabel:matFam(x.family).label, desc:x.desc||'',
-        thicknessIn:tube?null:(x.thicknessIn||null), gauge:x.gauge||null, size:tube?'':(x.size||''),
-        shape:tube?x.shape:'', odIn:tube?(x.odIn||null):null, bIn:tube?(x.bIn||null):null,
-        wallIn:tube?(x.wallIn||null):null, spec:tube?(x.spec||''):'', lengthFt:tube?(x.lengthFt||null):null,
-        price:Number(x.price)||0, uom:x.uom,
-        pricePerFt:(tube&&c&&c.perFt!=null)?Number(c.perFt.toFixed(4)):null,
-        pricePerLb:tube?((c&&c.perLb!=null)?Number(c.perLb.toFixed(4)):null):(c?Number(c.v.toFixed(4)):null),
-        lbPerFt:(tube&&c&&c.lbPerFt)?Number(c.lbPerFt.toFixed(4)):null,
-        math:c?c.math:'',
-        raw:x.raw||'', vendor, vendorEmail, emailDate,
-        mailKey:t.key, subject:t.subject||'',
-        by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() };
-      await set(ref(db,'mail/materialPrices/'+id), rec);
-      PRICES[id]=rec;
+      await set(ref(db,'mail/materialPrices/'+rec.id), rec);
+      PRICES[rec.id]=rec;
     }
     window.closePriceCapture();
     renderPriceBtn();
@@ -2081,6 +2111,14 @@ function priceMatch(p,tokens){
     return hay.includes(tk);
   });
 }
+// "16 ga" / "1.5 od" / ".120 wall" are one idea each — glue them before splitting
+function mpTokens(s){
+  return (s||'').toLowerCase()
+    .replace(/(\d)\s+(ga(uge)?)\b/g,'$1ga')
+    .replace(/(\d)\s*"?\s+(od|wall)\b/g,'$1$2')
+    .replace(/\b(od|wall)\s+(\.?\d)/g,'$1$2')
+    .split(/[\s,]+/).filter(Boolean);
+}
 function renderPrices(){
   const el=$('v-prices'); if(!el) return;
   el.innerHTML=`
@@ -2096,12 +2134,7 @@ function renderPrices(){
 }
 function renderPriceTable(){
   const wrap=$('mp-table'); if(!wrap) return;
-  // "16 ga" / "1.5 od" / ".120 wall" are one idea each — glue them before splitting
-  const tokens=(_mpSearch||'').toLowerCase()
-    .replace(/(\d)\s+(ga(uge)?)\b/g,'$1ga')
-    .replace(/(\d)\s*"?\s+(od|wall)\b/g,'$1$2')
-    .replace(/\b(od|wall)\s+(\.?\d)/g,'$1$2')
-    .split(/[\s,]+/).filter(Boolean);
+  const tokens=mpTokens(_mpSearch);
   let list=priceList();
   if(tokens.length) list=list.filter(p=>priceMatch(p,tokens));
   const cEl=$('mp-count'); if(cEl) cEl.textContent=list.length+' price'+(list.length!==1?'s':'')+(tokens.length?' matched':' saved');
@@ -2119,7 +2152,7 @@ function renderPriceTable(){
         <td class="mp-mat"><b>${esc(p.familyLabel||matFam(p.family).label)}</b><div class="d" ${p.raw?`title="${esc(p.raw)}"`:''}>${kind?`<span style="color:var(--accent)">${esc(kind)}</span>${p.desc?' — ':''}`:''}${esc(p.desc||'')}</div></td>
         <td class="num">${thk?esc(String(thk)):''}${thk&&p.gauge?' / ':''}${p.gauge?esc(p.gauge+' ga'):''}</td>
         <td class="num">${esc(tube?tubeLabel(p):(p.size||''))}</td>
-        <td class="num"><b>$${Number(p.price).toLocaleString('en-US',{minimumFractionDigits:2})}</b> <span style="color:var(--text3)">${esc(u)}</span>${tube&&p.uom==='each'&&p.lengthFt?`<div style="color:var(--text3)">${esc(fmtN(p.lengthFt))} ft length</div>`:''}</td>
+        <td class="num"><b>$${Number(p.price).toLocaleString('en-US',{minimumFractionDigits:2})}</b> <span style="color:var(--text3)">${esc(u)}</span>${p.qty?`<div style="color:var(--text3)">at ${esc(fmtN(p.qty))}+</div>`:''}${tube&&p.uom==='each'&&p.lengthFt?`<div style="color:var(--text3)">${esc(fmtN(p.lengthFt))} ft length</div>`:''}</td>
         <td class="num" ${math}>${p.pricePerFt?('<b>$'+Number(p.pricePerFt).toFixed(3)+'</b>'):'—'}</td>
         <td class="num" ${math}>${p.pricePerLb?('$'+Number(p.pricePerLb).toFixed(3)):'—'}</td>
         <td>${esc(p.vendor||'')}</td>
