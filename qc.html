@@ -267,10 +267,16 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .dc-row.dc-accepted td{background:#f3f7f3}
 .dc-row.dc-accepted .dc-st{opacity:.5;text-decoration:line-through}
 .dc-st{font-weight:700;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
-.dc-okchip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--green);background:var(--green-soft);padding:1px 6px;margin-left:5px;white-space:nowrap}
+.dc-okchip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:1px 6px;margin-left:5px;white-space:nowrap}
+.dc-okchip.real{color:var(--green);background:var(--green-soft)}
+.dc-okchip.noise{color:var(--text3);background:var(--border)}
 .dc-acc{margin-top:6px}
-.dc-accbox{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap}
-.dc-accbox input{width:14px;height:14px;margin:0;accent-color:var(--green);cursor:pointer}
+.dc-asks{font-size:11px;font-weight:700;color:var(--text3);margin-bottom:3px}
+.dc-whys{display:flex;flex-wrap:wrap;gap:4px;max-width:240px}
+.dc-whybtn{font-size:11px;font-weight:700;padding:3px 8px;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;white-space:nowrap;font-family:inherit}
+.dc-whybtn:hover{border-color:var(--green);color:var(--green);background:var(--green-soft)}
+.dc-why{font-size:11.5px;font-weight:800;color:var(--green);display:flex;align-items:center;gap:5px}
+.dc-undo{color:var(--accent);cursor:pointer;font-weight:700;text-decoration:underline}
 .dc-accnote{display:block;width:100%;min-width:170px;max-width:230px;margin-top:4px;font-size:11.5px;padding:4px 7px;border:1px solid var(--border);background:#fff;outline:none}
 .dc-accnote:focus{border-color:var(--accent)}
 .dc-accby{font-size:10.5px;color:var(--text3);margin-top:3px}
@@ -1315,12 +1321,41 @@ const DC_ORDER={mismatch:0, missing_mine:1, missing_cust:2, match:3};
    the row keeps its finding and its math, and gains who/when/why. Only once
    nothing is left open does the check stop saying "Review". */
 const dcIsDeviation=(r)=>r&&r.status&&r.status!=='match';
+// Why a difference was let through. The reason is the whole value of the record —
+// "accepted by info" tells you nothing next year, "customer confirmed" tells you
+// everything. So it is not an optional note: picking a reason IS how you sign off,
+// which makes a blank one impossible without adding a nag or a validation step.
+// 'real' separates a genuine deviation we own from AI noise — if a part comes back
+// wrong, the real ones are what you re-read first.
+const DC_WHY=[
+  {k:'misread',   l:'AI misread it',        hint:'Not a real difference — the AI read one of the drawings wrong', real:false},
+  {k:'mycall',    l:'Our call — it’s fine', hint:'A real difference, and we are choosing to build it this way',   real:true},
+  {k:'confirmed', l:'Customer confirmed',   hint:'A real difference the customer has approved',                   real:true},
+  {k:'other',     l:'Other…',               hint:'Type your own reason',                                          real:true}
+];
+// NB: the lookups are *Def, never the same name as a window.* click handler.
+// This script is a classic <script>, so a top-level const shadows the matching
+// window property inside inline onclick attributes — a same-named lookup would
+// silently swallow every click on that button.
+const dcWhyDef=(k)=>DC_WHY.find(w=>w.k===k)||null;
+// Questions get the same treatment — an answer, or an explicit "not an issue".
+const DC_QWHY=[
+  {k:'answered', l:'Customer answered…', ask:true},
+  {k:'notissue', l:'Not an issue',       ask:false}
+];
+const dcQWhyDef=(k)=>DC_QWHY.find(w=>w.k===k)||null;
+// signed off ONLY with a reason — the roll-up is where the rule is really enforced,
+// so a record that somehow lands without one still reads as open, never as cleared
+const dcSignedOff=(r)=>!!(r&&r.accepted&&r.acceptWhy);
+const dcQDone=(q)=>!!(q&&q.resolved&&q.qWhy);
 function dcRecomputeVerdict(res){
   const rows=res.rows||[], qs=res.questions||[];
-  const openRows=rows.filter(r=>dcIsDeviation(r)&&!r.accepted).length;
-  const openQs=qs.filter(q=>!q.resolved).length;
-  const acc=rows.filter(r=>dcIsDeviation(r)&&r.accepted).length + qs.filter(q=>q.resolved).length;
+  const openRows=rows.filter(r=>dcIsDeviation(r)&&!dcSignedOff(r)).length;
+  const openQs=qs.filter(q=>!dcQDone(q)).length;
+  const acc=rows.filter(r=>dcIsDeviation(r)&&dcSignedOff(r)).length + qs.filter(q=>dcQDone(q)).length;
   res.openCount=openRows+openQs; res.acceptedCount=acc;
+  // real deviations we knowingly let through — the ones worth re-reading later
+  res.realDeviations=rows.filter(r=>dcIsDeviation(r)&&dcSignedOff(r)&&(dcWhyDef(r.acceptWhy)||{}).real).length;
   res.verdict = res.openCount ? 'review' : (acc ? 'accepted' : 'clear');
   return res;
 }
@@ -1335,28 +1370,57 @@ async function dcPersist(where,res,audit){
     catch(e){ console.error('audit log failed', e); }
   }
 }
-window.dcAccept=async (where,i,on)=>{
+// Picking a reason is the sign-off — there is no accept-then-explain path, so a
+// signed-off row can never be missing its explanation. "Other…" asks for the text
+// and does nothing at all if it comes back empty.
+window.dcAcceptWhy=async (where,i,why)=>{
   const res=dcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
-  r.accepted=!!on;
-  if(on){ r.acceptBy=(QC_USER&&QC_USER.email)||''; r.acceptAt=Date.now(); }
-  else { delete r.acceptBy; delete r.acceptAt; delete r.acceptNote; }
+  const w=dcWhyDef(why); if(!w) return;
+  let note='';
+  if(why==='other'){
+    note=(prompt(t('Why is this difference acceptable?'))||'').trim();
+    if(!note) return;                      // no explanation → no sign-off
+  }
+  r.accepted=true; r.acceptWhy=why; r.acceptNote=note||r.acceptNote||'';
+  r.acceptBy=(QC_USER&&QC_USER.email)||''; r.acceptAt=Date.now();
   dcRecomputeVerdict(res);
-  await dcPersist(where,res,{action:on?'deviation-accepted':'deviation-reopened', note:(r.feature||'')+(r.acceptNote?(' — '+r.acceptNote):'')});
+  await dcPersist(where,res,{action:'deviation-accepted', note:(r.feature||'')+' — '+t(w.l)+(r.acceptNote?(': '+r.acceptNote):'')});
   if(where!=='live') render();
 };
-// note edits save on blur, never on keystroke — a re-render mid-typing would steal focus
+window.dcReopen=async (where,i)=>{
+  const res=dcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
+  const was=r.acceptWhy;
+  delete r.accepted; delete r.acceptWhy; delete r.acceptNote; delete r.acceptBy; delete r.acceptAt;
+  dcRecomputeVerdict(res);
+  await dcPersist(where,res,{action:'deviation-reopened', note:(r.feature||'')+(was?(' — was: '+t((dcWhyDef(was)||{}).l||was)):'')});
+  if(where!=='live') render();
+};
+// extra detail on top of the reason — saves on blur, never on keystroke, since a
+// re-render mid-typing would steal focus
 window.dcAcceptNote=async (where,i,val)=>{
   const res=dcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
   r.acceptNote=String(val||'').trim();
   if(where!=='live') await dcPersist(where,res,null);
 };
-window.dcQResolve=async (where,i,on)=>{
+window.dcQWhy=async (where,i,why)=>{
   const res=dcResOf(where); const q=res&&res.questions&&res.questions[i]; if(!q) return;
-  q.resolved=!!on;
-  if(on){ q.resolvedBy=(QC_USER&&QC_USER.email)||''; q.resolvedAt=Date.now(); }
-  else { delete q.resolvedBy; delete q.resolvedAt; delete q.answer; }
+  const w=dcQWhyDef(why); if(!w) return;
+  let ans='';
+  if(w.ask){
+    ans=(prompt(t('What did the customer say?'))||'').trim();
+    if(!ans) return;                       // no answer → the question stays open
+  }
+  q.resolved=true; q.qWhy=why; q.answer=ans||q.answer||'';
+  q.resolvedBy=(QC_USER&&QC_USER.email)||''; q.resolvedAt=Date.now();
   dcRecomputeVerdict(res);
-  await dcPersist(where,res,{action:on?'question-answered':'question-reopened', note:(q.topic||'')+(q.answer?(' — '+q.answer):'')});
+  await dcPersist(where,res,{action:'question-answered', note:(q.topic||'')+' — '+t(w.l)+(q.answer?(': '+q.answer):'')});
+  if(where!=='live') render();
+};
+window.dcQReopen=async (where,i)=>{
+  const res=dcResOf(where); const q=res&&res.questions&&res.questions[i]; if(!q) return;
+  delete q.resolved; delete q.qWhy; delete q.answer; delete q.resolvedBy; delete q.resolvedAt;
+  dcRecomputeVerdict(res);
+  await dcPersist(where,res,{action:'question-reopened', note:q.topic||''});
   if(where!=='live') render();
 };
 window.dcQAnswer=async (where,i,val)=>{
@@ -1403,41 +1467,54 @@ function dcResultHtml(res, where){
   const counts={mismatch:0,missing_mine:0,missing_cust:0,match:0};
   (res.rows||[]).forEach(r=>{ counts[r.status]=(counts[r.status]||0)+1; });
   const chip=(k)=>counts[k]?`<span class="dc-chip" style="color:${DC_STATUS[k].c};border-color:${DC_STATUS[k].c}55;background:${DC_STATUS[k].c}14"><i class="ti ${DC_STATUS[k].ic}"></i> ${counts[k]} ${t(DC_STATUS[k].l)}</span>`:'';
-  const acc=res.acceptedCount||0;
+  const acc=res.acceptedCount||0, real=res.realDeviations||0;
   const accChip=acc?`<span class="dc-chip" style="color:var(--green);border-color:var(--green)55;background:var(--green)14"><i class="ti ti-writing-sign"></i> ${acc} ${t('signed off')}</span>`:'';
+  // once everything is signed off, the line that matters is how many REAL differences
+  // were knowingly let through — not how many rows got ticked
+  const realNote=real?` <span class="muted" style="font-weight:600">· ${real} ${t(real===1?'real difference accepted':'real differences accepted')}</span>`:'';
   const head=res.verdict==='clear'
     ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-circle-check"></i> ${t('Your drawing matches the customer’s')}</div>`
     : res.verdict==='accepted'
-    ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-writing-sign"></i> ${t('Reviewed — every difference signed off')}</div>`
+    ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-writing-sign"></i> ${t('Reviewed — every difference signed off')}${realNote}</div>`
     : `<div class="dc-verdict" style="color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${t('Review before you cut')}${res.openCount?` <span class="muted" style="font-weight:600">· ${res.openCount} ${t('open')}</span>`:''}</div>`;
   const rows=(res.rows||[]).map((r,i)=>{
     const s=DC_STATUS[r.status]||DC_STATUS.match;
-    const dev=dcIsDeviation(r);
-    // the finding and its math never disappear on accept — they just stop being open
-    const acceptUi = !dev ? '' : `<div class="dc-acc">
-      <label class="dc-accbox"><input type="checkbox" ${r.accepted?'checked':''} onchange="dcAccept('${esc(where)}',${i},this.checked)"> ${t('Acceptable')}</label>
-      ${r.accepted?`<input class="dc-accnote" value="${esc(r.acceptNote||'')}" placeholder="${esc(t('Why — e.g. AI misread it / my call'))}" onchange="dcAcceptNote('${esc(where)}',${i},this.value)">
-        <div class="dc-accby">${t('Signed off by')} ${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+fmtWhen(r.acceptAt):''}</div>`:''}
-    </div>`;
-    return `<tr class="dc-row dc-${esc(r.status)}${r.accepted?' dc-accepted':''}">
+    const dev=dcIsDeviation(r), done=dcSignedOff(r), w=done?dcWhyDef(r.acceptWhy):null;
+    // the finding and its math never disappear on sign-off — they just stop being open
+    const acceptUi = !dev ? '' : (done
+      ? `<div class="dc-acc">
+          <div class="dc-why"><i class="ti ti-writing-sign"></i> ${esc(t((w&&w.l)||r.acceptWhy))}</div>
+          <input class="dc-accnote" value="${esc(r.acceptNote||'')}" placeholder="${esc(t('Add detail (optional)'))}" onchange="dcAcceptNote('${esc(where)}',${i},this.value)">
+          <div class="dc-accby">${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+fmtWhen(r.acceptAt):''} · <a class="dc-undo" onclick="dcReopen('${esc(where)}',${i})">${t('Reopen')}</a></div>
+        </div>`
+      : `<div class="dc-acc">
+          <div class="dc-asks">${t('Acceptable? Say why:')}</div>
+          <div class="dc-whys">${DC_WHY.map(x=>`<button class="dc-whybtn" title="${esc(t(x.hint))}" onclick="dcAcceptWhy('${esc(where)}',${i},'${x.k}')">${esc(t(x.l))}</button>`).join('')}</div>
+        </div>`);
+    return `<tr class="dc-row dc-${esc(r.status)}${done?' dc-accepted':''}">
       <td><b>${esc(r.feature||'—')}</b>${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
       <td class="dc-val">${esc(r.cust)||`<span class="muted">${t('— not stated —')}</span>`}</td>
       <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}</td>
       <td>
         <span class="dc-st" style="color:${s.c}"><i class="ti ${s.ic}"></i> ${t(s.l)}</span>
-        ${r.accepted?`<span class="dc-okchip"><i class="ti ti-check"></i> ${t('Accepted')}</span>`:''}
+        ${done?`<span class="dc-okchip ${(w&&w.real)?'real':'noise'}"><i class="ti ti-check"></i> ${(w&&w.real)?t('Accepted'):t('Not real')}</span>`:''}
         ${r.math?`<div class="dc-math">${esc(r.math)}</div>`:''}
         ${acceptUi}
       </td>
     </tr>`;
   }).join('');
-  const qs=(res.questions||[]).map((q,i)=>`<li class="${q.resolved?'dc-qdone':''}">
-    <b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
-    <div class="dc-acc">
-      <label class="dc-accbox"><input type="checkbox" ${q.resolved?'checked':''} onchange="dcQResolve('${esc(where)}',${i},this.checked)"> ${t('Answered / not an issue')}</label>
-      ${q.resolved?`<input class="dc-accnote" value="${esc(q.answer||'')}" placeholder="${esc(t('What they said, or why it’s fine'))}" onchange="dcQAnswer('${esc(where)}',${i},this.value)">
-        <div class="dc-accby">${esc((q.resolvedBy||'').split('@')[0])}${q.resolvedAt?' · '+fmtWhen(q.resolvedAt):''}</div>`:''}
-    </div></li>`).join('');
+  const qs=(res.questions||[]).map((q,i)=>{
+    const qdone=dcQDone(q), qw=qdone?dcQWhyDef(q.qWhy):null;
+    return `<li class="${qdone?'dc-qdone':''}">
+      <b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
+      <div class="dc-acc">
+        ${qdone
+          ? `<div class="dc-why"><i class="ti ti-writing-sign"></i> ${esc(t((qw&&qw.l)||q.qWhy).replace('…',''))}</div>
+             <input class="dc-accnote" value="${esc(q.answer||'')}" placeholder="${esc(t('Add detail (optional)'))}" onchange="dcQAnswer('${esc(where)}',${i},this.value)">
+             <div class="dc-accby">${esc((q.resolvedBy||'').split('@')[0])}${q.resolvedAt?' · '+fmtWhen(q.resolvedAt):''} · <a class="dc-undo" onclick="dcQReopen('${esc(where)}',${i})">${t('Reopen')}</a></div>`
+          : `<div class="dc-whys">${DC_QWHY.map(x=>`<button class="dc-whybtn" onclick="dcQWhy('${esc(where)}',${i},'${x.k}')">${esc(t(x.l))}</button>`).join('')}</div>`}
+      </div></li>`;
+  }).join('');
   const tolNote=res.tolFromCustomer
     ? t('Differences are judged against the customer’s title-block tolerances, read off their drawing.')
     : t('The customer’s title block could not be read, so differences are judged against BSMP’s standard block (frac ±1/16, .00 ±.020, .000 ±.005, angular ±1°).');
@@ -1451,7 +1528,7 @@ function dcResultHtml(res, where){
       <ul style="margin:6px 0 0;padding-left:18px">${qs}</ul></div>`:''}
     <div class="hint" style="margin-top:8px">${esc(tolNote)}</div>
     <div class="hint">${t('Advisory only — AI reads the drawings, the tolerance math is ours. You still own the final call.')}</div>
-    <div class="hint">${t('Ticking Acceptable never hides a finding — the row and its math stay on the record with your name against them.')}</div>
+    <div class="hint">${t('Signing a difference off never hides it — the finding, its math, your reason and your name all stay on the record.')}</div>
     ${where!=='live'?'':`<div class="hint" style="margin-top:2px">${t('Values above are copied from each drawing exactly as written; saving keeps them with both files.')}</div>`}`;
 }
 function qcDrawRenderResult(){ const p=$('dc-panel'); if(!p||!_dcResult) return; p.style.display='block'; p.innerHTML=dcResultHtml(_dcResult,'live'); }
@@ -1492,8 +1569,8 @@ function viewDrawCheck(){
   const list=vals(DRAWCHECKS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
   const rows=list.map(r=>{
     // the list counts what's still OPEN — signed-off differences aren't outstanding work
-    const bad=(r.rows||[]).filter(x=>dcIsDeviation(x)&&!x.accepted).length;
-    const qs=(r.questions||[]).filter(q=>!q.resolved).length;
+    const bad=(r.rows||[]).filter(x=>dcIsDeviation(x)&&!dcSignedOff(x)).length;
+    const qs=(r.questions||[]).filter(q=>!dcQDone(q)).length;
     return `<tr class="click" onclick="qcDrawCheckOpen('${esc(r.id)}')">
       <td><b>${esc(r.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc([r.customer,r.rev?('Rev '+r.rev):'',r.job].filter(Boolean).join(' · '))}</div></td>
       <td>${dcVerdictBadge(r)}</td>
