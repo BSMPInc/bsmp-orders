@@ -205,6 +205,20 @@ body.sb-pinned .dock{left:var(--sb)}
 .rowflags{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:5px;flex:0 0 100%}
 .rowflags .spill{padding:3px 6px}
 .rowflags .spill i{font-size:13px}
+/* team-notes: per-row pill, toolbar button badge, and the note bubbles in the popup */
+.note-pill{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--text3);background:#fff;border:1px solid var(--border2);padding:2px 6px;cursor:pointer;line-height:1.5}
+.note-pill i{font-size:13px}
+.note-pill:hover{color:var(--accent);border-color:var(--accent)}
+.note-pill.has{color:var(--accent);background:var(--accent-soft);border-color:var(--accent)}
+.notes-btn.has{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.notes-btn .nbadge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;margin-left:4px;font-size:10.5px;font-weight:800;color:#fff;background:var(--accent)}
+.chat-note{background:#fff;border:1px solid var(--border);padding:8px 11px}
+.chat-note.mine{background:var(--accent-soft);border-color:var(--accent)}
+.chat-meta{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--text3);margin-bottom:3px}
+.chat-meta b{color:var(--text2);font-size:11px}
+.chat-del{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:0 2px;font-size:13px}
+.chat-del:hover{color:var(--red)}
+.chat-text{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word}
 .msg{padding:15px 16px;border-bottom:1px solid var(--border)}
 .msg:last-child{border-bottom:none}
 .msg .mh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
@@ -486,6 +500,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <span class="statuspick" id="statuspick"></span>
         <span id="qc-file-slot"></span>
         <span class="sp"></span>
+        <button class="btn sm notes-btn" id="notes-btn" style="display:none" title="Team notes — everyone can read and add" onclick="openNotes()"></button>
         <button class="btn sm" id="assignee-btn" title="Assigned to — click to change" onclick="cycleAssign()"></button>
         <button class="btn sm" id="contact-btn" style="display:none" onclick="saveSenderContact()"></button>
         <button class="btn sm" id="price-btn" style="display:none" onclick="openPriceCapture()"></button>
@@ -655,6 +670,26 @@ body.sb-pinned .dock{left:var(--sb)}
   </div>
 </div>
 
+<div class="modal-bg" id="note-modal" style="align-items:center;justify-content:center;z-index:88" onclick="if(event.target===this)closeNotes()">
+  <div class="modal" style="max-width:440px;padding:0;display:flex;flex-direction:column;max-height:82vh">
+    <div style="padding:15px 18px 12px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:9px">
+        <i class="ti ti-messages" style="font-size:19px;color:var(--accent)"></i>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:800">Team notes</div>
+          <div id="note-sub" style="font-size:11.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+        </div>
+        <button class="btn sm" onclick="closeNotes()" title="Close"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+    <div id="note-thread" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:130px;background:var(--bg)"></div>
+    <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <input id="note-input" type="text" placeholder="Write a note for the team…" maxlength="500" onkeydown="if(event.key==='Enter')sendNote()" style="flex:1;min-width:0;font-size:14px;padding:10px 12px;border:1px solid var(--border2);font-family:inherit;outline:none">
+      <button class="btn sm" onclick="sendNote()" title="Add note"><i class="ti ti-send"></i></button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <div class="undo-bar" id="undo-bar"><span id="undo-msg"></span><button onclick="window._undoNow()">Undo</button></div>
 
@@ -788,6 +823,8 @@ let MUTED={};                 // mail/muted/<emailKey> → {email, name, by, at}
 let CONTACTS={};              // mail/contacts/<emailKey> → {name, email, company, phone, notes, by, at}
 let SIGS={};                  // mail/signatures/<emailKey> → plain-text signature, appended on send
 let PRICES={};                // mail/materialPrices/<id> → shared material price book, saved out of vendor emails
+let NOTES={};                 // mail/notes/<threadKey>/<noteId> → {id, uid, by, at, text} — shared team notes per conversation
+let _noteTarget=null;         // {key, label} while the notes popup is open
 let THREADS=[];               // from the proxy: {key, subject, fromName, fromEmail, snippet, date, unread, hasAttach, mailboxes:[…], gmail:{…per-box thread ids…}}
 let CURRENT=null;             // open thread (with .messages once loaded)
 let navPage='inbox', chipFilter='all';
@@ -1252,7 +1289,7 @@ window.renderList=()=>{
       <div class="mid">
         <div class="sj"><span class="t">${esc(t.subject||'(no subject)')}</span>${DRAFTS.reply[t.key]?'<span class="draftTag" title="You have an unsent reply saved on this conversation">DRAFT</span>':''}${t.hasAttach?'<i class="ti ti-paperclip" style="color:var(--text3);font-size:14px"></i>':''}</div>
         <div class="sn">${esc(t.snippet||'')}</div>
-        <div class="meta">${(lk&&lk.app==='qc')?`<span class="badge iconly cert" title="Filed in QC — click to open" onclick="event.stopPropagation();location.href='qc.html?cert=${encodeURIComponent(lk.id)}'"><i class="ti ti-license"></i></span>`:''}${(lk&&lk.app==='quote')?`<span class="badge iconly quoted" title="${esc(lk.label||'Quote')} — click to open" onclick="event.stopPropagation();location.href='quote.html?quote=${encodeURIComponent(lk.id)}'"><i class="ti ti-calculator"></i></span>`:''}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
+        <div class="meta">${(lk&&lk.app==='qc')?`<span class="badge iconly cert" title="Filed in QC — click to open" onclick="event.stopPropagation();location.href='qc.html?cert=${encodeURIComponent(lk.id)}'"><i class="ti ti-license"></i></span>`:''}${(lk&&lk.app==='quote')?`<span class="badge iconly quoted" title="${esc(lk.label||'Quote')} — click to open" onclick="event.stopPropagation();location.href='quote.html?quote=${encodeURIComponent(lk.id)}'"><i class="ti ti-calculator"></i></span>`:''}${(()=>{const nc=noteCount(t.key);return `<span class="note-pill${nc?' has':''}" title="Team notes — everyone can read and add" onclick="openNotesRow(event,'${esc(t.key)}')"><i class="ti ti-message-circle-2"></i>${nc||''}</span>`;})()}${(p&&p.k)?`<span class="avatar" title="Assigned to ${esc(p.name)}"${p.color?` style="background:${p.color}"`:''}>${p.initial}</span>`:''}</div>
       </div>
       <div class="end"><span class="dt">${esc(fmtWhen(t.date))}</span>${mbx}<span class="mutebtn" title="${mutedOf(t)?'Unmute sender':'Mute sender — hide their emails'}" onclick="toggleMuteFor(event,'${esc(t.fromEmail||'')}','${esc((t.fromName||'').replace(/'/g,'’'))}')"><i class="ti ti-volume${mutedOf(t)?'':'-off'}"></i></span></div>
     </div>`;
@@ -1565,7 +1602,7 @@ window.openThread=async (key)=>{
 function renderFlagPills(){
   const cur=CURRENT?flagOf(CURRENT):'';
   $('statuspick').innerHTML=FLAG_DEFS.map(f=>`<span class="spill${cur===f.k?' on-'+f.k:''}" title="${f.label}" onclick="setFlag('${f.k}')">${flagIcon(f)}</span>`).join('');
-  renderQcFile(); renderMuteBtn(); renderContactBtn(); renderPriceBtn();
+  renderQcFile(); renderMuteBtn(); renderContactBtn(); renderPriceBtn(); renderNotesBtn();
 }
 // ── file a cert email into the QC cert library ────────────────────────────────
 function linkOf(t){ const f=FLAGS[t.key]; return (f&&f.link)||null; }
@@ -1682,6 +1719,83 @@ function applyFlag(key,k){
 }
 window.setFlag=(k)=>{ if(CURRENT) applyFlag(CURRENT.key,k); };
 window.setFlagRow=(ev,key,k)=>{ ev.stopPropagation(); applyFlag(key,k); };
+
+// ── Team notes: a short shared thread per conversation, like the Orders app ──
+// Stored at mail/notes/<threadKey>/<noteId>; every signed-in user can read and
+// add, and each note carries the author's uid so people can only delete their own.
+function noteEntries(key){
+  const t=NOTES[key]; if(!t) return [];
+  return Object.values(t).filter(Boolean).sort((a,b)=>(a.at||0)-(b.at||0));
+}
+function noteCount(key){ return noteEntries(key).length; }
+function noteAuthorName(e){
+  let local=(e.by||'').split('@')[0];
+  const stripped=local.replace(/^(operator|ops|ofc)[._-]+/i,'');   // ops.mike@ → "Mike"
+  if(stripped) local=stripped;
+  return local ? local.split(/[._-]+/).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') : 'Unknown';
+}
+function fmtNoteTime(ms){
+  if(!ms) return '';
+  const d=new Date(ms);
+  return d.toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'2-digit'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+}
+function renderNotesBtn(){
+  const btn=$('notes-btn'); if(!btn) return;
+  if(!CURRENT){ btn.style.display='none'; return; }
+  const n=noteCount(CURRENT.key);
+  btn.style.display='';
+  btn.classList.toggle('has', n>0);
+  btn.innerHTML=`<i class="ti ti-message-circle-2"></i> Notes${n?` <span class="nbadge">${n}</span>`:''}`;
+}
+window.openNotes=(key,label)=>{
+  key=key||(CURRENT&&CURRENT.key); if(!key) return;
+  if(!label){
+    const t=THREADS.find(x=>x.key===key)||CURRENT;
+    const f=(FLAGS[key]&&FLAGS[key].meta)||{};
+    label=(t&&(t.subject||t.fromName||t.fromEmail))||f.subject||f.fromName||f.fromEmail||'Conversation';
+  }
+  _noteTarget={key,label};
+  $('note-sub').textContent=label;
+  renderNoteThread();
+  $('note-modal').style.display='flex';
+  const inp=$('note-input'); inp.value='';
+  setTimeout(()=>inp.focus(),30);
+};
+window.openNotesRow=(ev,key)=>{ ev.stopPropagation(); openNotes(key); };
+window.closeNotes=()=>{ $('note-modal').style.display='none'; _noteTarget=null; };
+function renderNoteThread(){
+  const box=$('note-thread'); if(!box||!_noteTarget) return;
+  const list=noteEntries(_noteTarget.key);
+  const me=auth.currentUser?auth.currentUser.uid:'';
+  box.innerHTML = list.length ? list.map(e=>`
+    <div class="chat-note${e.uid===me?' mine':''}">
+      <div class="chat-meta"><b>${esc(noteAuthorName(e))}</b><span>${fmtNoteTime(e.at)}</span>
+        ${e.uid===me?`<button class="chat-del" title="Delete your note" onclick="window.delNote('${e.id}')"><i class="ti ti-trash"></i></button>`:''}
+      </div>
+      <div class="chat-text">${esc(e.text||'')}</div>
+    </div>`).join('')
+    : `<div style="text-align:center;color:var(--text3);font-size:12.5px;padding:26px 10px">No notes yet — write the first one so the team knows what’s going on with this email.</div>`;
+  box.scrollTop=box.scrollHeight;
+}
+window.sendNote=()=>{
+  if(!_noteTarget) return;
+  const inp=$('note-input');
+  const text=(inp.value||'').trim(); if(!text) return;
+  const u=auth.currentUser; if(!u){ toast('You must be signed in to write notes.',true); return; }
+  const e={id:'n_'+Date.now().toString(36)+Math.floor(Math.random()*1e4), uid:u.uid, by:u.email||'', at:Date.now(), text};
+  (NOTES[_noteTarget.key]=NOTES[_noteTarget.key]||{})[e.id]=e;   // optimistic — listener confirms
+  renderNoteThread(); renderNotesBtn(); renderList();
+  inp.value=''; inp.focus();
+  set(ref(db,'mail/notes/'+_noteTarget.key+'/'+e.id), e).catch(()=>toast('Could not save the note — check the mail rule is published.',true));
+};
+window.delNote=(id)=>{
+  if(!_noteTarget) return;
+  const t=NOTES[_noteTarget.key]||{}; const e=t[id];
+  const me=auth.currentUser?auth.currentUser.uid:'';
+  if(!e || e.uid!==me) return;         // only your own notes
+  delete t[id]; renderNoteThread(); renderNotesBtn(); renderList();
+  remove(ref(db,'mail/notes/'+_noteTarget.key+'/'+id)).catch(()=>{});
+};
 
 // ── material price book (mail/materialPrices/<id>) ────────────────────────────
 // Every vendor words the same material differently ("304 S/S 16GA 48X120",
@@ -2619,6 +2733,12 @@ onAuthStateChanged(auth,(user)=>{
       onValue(ref(db,'mail/muted'),snap=>{
         MUTED=snap.val()||{};
         renderList(); renderNavCounts(); renderMuteBtn();
+      });
+      onValue(ref(db,'mail/notes'),snap=>{
+        NOTES=snap.val()||{};
+        renderList();
+        if(_noteTarget) renderNoteThread();
+        if(CURRENT) renderNotesBtn();
       });
       onValue(ref(db,'mail/contacts'),snap=>{
         CONTACTS=snap.val()||{};
