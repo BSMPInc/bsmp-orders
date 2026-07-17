@@ -335,6 +335,14 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .bubble-canvas{position:absolute;inset:0;overflow:hidden;cursor:grab;touch-action:none;width:100%;height:100%}
 .bubble-canvas.grabbing{cursor:grabbing}
 .bubble-canvas.boxmode{cursor:crosshair}
+/* instant confirm card for a boxed dimension — floats over the workspace (and the
+   full-screen editor at z 9400) without blocking the canvas, so you can keep boxing */
+#qc-boxconfirm{position:fixed;right:18px;bottom:18px;z-index:9600;width:min(340px,calc(100vw - 24px));background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 14px 44px rgba(0,0,0,.35);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+#qc-boxconfirm .bc-head{font-weight:800;font-size:13px;display:flex;align-items:center;gap:6px}
+#qc-boxconfirm .bc-crop{max-width:100%;max-height:120px;object-fit:contain;border:1px solid var(--border);border-radius:8px;background:#fff;align-self:flex-start}
+#qc-boxconfirm .bc-warn{font-size:12px;color:var(--red)}
+#qc-boxconfirm .bc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#qc-boxconfirm .bc-btns{display:flex;gap:8px;margin-top:2px}
 .bubble-stage{position:absolute;top:0;left:0;transform-origin:0 0;line-height:0;user-select:none}
 .bubble-stage img{display:block;user-select:none;-webkit-user-drag:none}
 .balloon{position:absolute;transform:translate(-50%,-50%);min-width:10px;height:10px;padding:0 2px;border-radius:999px;border:1px solid #ff0000;background:#fff;color:#ff0000;font:700 5pt Arial,Helvetica,sans-serif;display:flex;align-items:center;justify-content:center;cursor:grab;box-shadow:0 0 0 1px #fff;line-height:1;touch-action:none}
@@ -509,6 +517,7 @@ const I18N = {
     'balloons — drag any to reposition':'globos — arrastra cualquiera para reubicar','Line up in margin':'Alinear al margen','Save ballooned drawing':'Guardar plano con globos','Run Auto-bubble first.':'Ejecuta Auto-globos primero.','Ballooned drawing saved — Save the report to keep it.':'Plano con globos guardado — guarda el reporte para conservarlo.',
     'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta','Default tolerances (title block)':'Tolerancias por defecto (cuadro de rótulo)','1 decimal (.X)':'1 decimal (.X)','2 decimals (.XX)':'2 decimales (.XX)','3 decimals (.XXX)':'3 decimales (.XXX)','Angles':'Ángulos','Fractional':'Fraccional','Angular':'Angular','Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.':'Se aplica cuando una característica no tiene su propio ± — se marcan con un * en la columna de tolerancia.','from callout':'del plano','title block':'cuadro de rótulo','No tolerance set — reading will not be checked':'Sin tolerancia — la lectura no se verificará',
     'Tap to place':'Tocar para colocar','Box a dimension':'Encuadrar una cota','Drag a box around one dimension — AI reads only what you boxed (most accurate).':'Dibuja un recuadro alrededor de una cota — la IA lee solo lo que encuadraste (lo más preciso).','reading…':'leyendo…','Could not read that box — try boxing a bit tighter.':'No se pudo leer ese recuadro — intenta encuadrar más ajustado.',
+    'Confirm dimension':'Confirmar cota','more waiting':'más en espera','AI could not read this box — type the value, or remove it and box tighter.':'La IA no pudo leer este recuadro — escribe el valor, o elimínalo y encuadra más ajustado.','Value':'Valor','Tolerance':'Tolerancia','Category':'Categoría','Confirm':'Confirmar','Remove balloon':'Eliminar globo',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
     // ncr
@@ -714,6 +723,7 @@ const META={
 };
 window.showPage=(p)=>{
   if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck')) p='inspections';
+  if(typeof qcBoxConfirmKill==='function') qcBoxConfirmKill();   // don't leave a confirm card floating over another page
   page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
   if(p==='selfcheck'){
     // "New Self-Check" always starts clean. Photos/AI results left over from an
@@ -2609,23 +2619,71 @@ async function cropRegion(box, pad){
 const CROP_PROMPT='This image is a small cropped region of a fabrication drawing showing ONE dimension or callout that an inspector boxed. Read it. Respond with ONLY valid JSON: {"value":"","tol":"","category":""}. value=the requirement exactly as printed (keep the \\u00d8 symbol for diameters, e.g. "\\u00d8.250", ".060", "2.500", "R.125", "90\\u00b0"). tol=the tolerance if shown right by it (e.g. "\\u00b1.005", "+.002/-.000") else "". category=EXACTLY one of: material, thickness, finish, major, bend, cutout_dia, cutout_linear. If several numbers are visible, pick the single main dimension callout and ignore zone/grid letters and any title-block text.';
 async function qcReadBox(b){
   if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); b.reading=false; qcWsRender(); return; }
+  let crop=null, readOk=false;
   try{
-    const crop=await cropRegion(b.box);
+    crop=await cropRegion(b.box);
     const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:400, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/png',data:crop.split(',')[1]}},{type:'text',text:CROP_PROMPT}]}] });
     const data=await resp.json(); if(data.error) throw new Error(data.error.message||'AI error');
     let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
     const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
     const d=JSON.parse(clean.replace(/,\s*}/g,'}'));
     b.value=d.value||''; b.tol=d.tol||''; b.category=d.category||b.category||'';
-  }catch(e){ console.warn('box read failed', e); qcToast(t('Could not read that box — try boxing a bit tighter.'),'err'); }
+    readOk=true;
+  }catch(e){ console.warn('box read failed', e); }
   b.reading=false;
   qcCharUpsertFromBubble(b);   // update just this row — never rebuild the list over typed results
   qcWsRender();
+  // pop the read straight up for a yes/fix — a misread shouldn't wait to be
+  // discovered later in the characteristics table
+  qcBoxConfirmShow(b, crop, readOk);
 }
+/* ---- instant confirm: each boxed dimension pops up as soon as AI reads it.
+   Non-blocking (the canvas stays usable, so you can keep boxing) and queued —
+   fast workers boxing ahead of the AI get one card at a time, in order. ---- */
+let _boxQ=[], _boxCur=null;
+function qcBoxConfirmShow(b,crop,ok){
+  _boxQ.push({b,crop,ok});
+  if(!_boxCur){ qcBoxConfirmNext(); return; }
+  // a card is already up — bump its "more waiting" count without re-rendering,
+  // so anything half-typed in the value/tol boxes survives
+  const qn=$('bc-qn'); if(qn) qn.textContent='· '+_boxQ.length+' '+t('more waiting');
+}
+function qcBoxConfirmKill(){ _boxQ=[]; _boxCur=null; const el=$('qc-boxconfirm'); if(el) el.remove(); }
+function qcBoxConfirmNext(){
+  _boxCur=_boxQ.shift()||null;
+  let el=$('qc-boxconfirm');
+  if(!_boxCur){ if(el) el.remove(); return; }
+  if(!el){ el=document.createElement('div'); el.id='qc-boxconfirm'; document.body.appendChild(el); }
+  const b=_boxCur.b, crop=_boxCur.crop, ok=_boxCur.ok;
+  const enter="if(event.key==='Enter')qcBoxConfirmOk()";
+  el.innerHTML=`<div class="bc-head"><i class="ti ti-crop"></i> ${t('Confirm dimension')} #${b.no} <span class="muted" id="bc-qn" style="font-weight:600">${_boxQ.length?('· '+_boxQ.length+' '+t('more waiting')):''}</span></div>
+    ${crop?`<img class="bc-crop" src="${crop}">`:''}
+    ${ok?'':`<div class="bc-warn"><i class="ti ti-alert-triangle"></i> ${t('AI could not read this box — type the value, or remove it and box tighter.')}</div>`}
+    <div class="bc-grid">
+      <div><label class="fl">${t('Value')}</label><input class="in" id="bc-val" value="${esc(b.value||'')}" onkeydown="${enter}"></div>
+      <div><label class="fl">${t('Tolerance')}</label><input class="in" id="bc-tol" value="${esc(b.tol||'')}" onkeydown="${enter}"></div>
+    </div>
+    <div><label class="fl">${t('Category')}</label><select class="in" id="bc-cat">${Object.keys(_catLabel).map(c=>`<option value="${c}" ${b.category===c?'selected':''}>${_catLabel[c]}</option>`).join('')}<option value="" ${!b.category?'selected':''}>—</option></select></div>
+    <div class="bc-btns">
+      <button class="btn sm primary" onclick="qcBoxConfirmOk()"><i class="ti ti-check"></i> ${t('Confirm')}</button>
+      <button class="btn sm" style="color:var(--red)" onclick="qcBoxConfirmRemove()"><i class="ti ti-trash"></i> ${t('Remove balloon')}</button>
+    </div>`;
+  if(!ok){ const v=$('bc-val'); if(v) v.focus(); }
+}
+window.qcBoxConfirmOk=()=>{
+  if(!_boxCur) return; const b=_boxCur.b;
+  b.value=(gv('bc-val')||'').trim(); b.tol=(gv('bc-tol')||'').trim(); b.category=gv('bc-cat')||'';
+  qcCharUpsertFromBubble(b); qcWsRender(); qcBoxConfirmNext();
+};
+window.qcBoxConfirmRemove=()=>{
+  if(!_boxCur) return; const b=_boxCur.b;
+  const i=_fairBubbles.indexOf(b); if(i>=0) qcBubRemove(i);
+  qcBoxConfirmNext();
+};
 /* ---- balloon undo: snapshot before every change (add, drag, remove, sort, line-up, clear, AI passes) ---- */
 function qcBubSnap(){ if($('char-body')) syncChars(); _bubUndo.push({bubbles:_fairBubbles.map(b=>({...b, reading:false})), chars:_chars.map(c=>({...c}))}); if(_bubUndo.length>50) _bubUndo.shift(); qcBubUndoBtn(); }
 function qcBubUndoBtn(){ const b=$('bws-undo-btn'); if(b) b.disabled=!_bubUndo.length; }
-window.qcBubbleUndo=()=>{ if(!_bubUndo.length) return; const s=_bubUndo.pop(); _fairBubbles=s.bubbles; _chars=s.chars; qcWsRender(); const tb=$('char-body'); if(tb) tb.innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); qcBubUndoBtn(); };
+window.qcBubbleUndo=()=>{ if(!_bubUndo.length) return; qcBoxConfirmKill(); const s=_bubUndo.pop(); _fairBubbles=s.bubbles; _chars=s.chars; qcWsRender(); const tb=$('char-body'); if(tb) tb.innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); qcBubUndoBtn(); };
 // Ctrl/Cmd+Z while the balloon workspace is on screen (and focus isn't in a text field)
 document.addEventListener('keydown',e=>{
   if(!(e.ctrlKey||e.metaKey) || e.shiftKey || String(e.key).toLowerCase()!=='z') return;
@@ -2640,7 +2698,7 @@ window.qcBubRemove=(i)=>{ qcBubSnap();
   // drop the matching characteristics row (only that one) and renumber the rest in step
   if(_chars.length){ if($('char-body')) syncChars(); const ci=_chars.findIndex(x=>x.no===no); if(ci>=0){ _chars.splice(ci,1); _chars.forEach((c,n)=>c.no=n+1); } const tb=$('char-body'); if(tb) tb.innerHTML=_chars.map((c,n)=>charRow(n,c)).join(''); }
   qcWsRender(); };
-window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; qcBubSnap(); _fairBubbles=[]; qcWsRender(); };
+window.qcBubbleClear=()=>{ if(!_fairBubbles.length) return; if(!confirm(t('Remove all balloons?'))) return; qcBoxConfirmKill(); qcBubSnap(); _fairBubbles=[]; qcWsRender(); };
 function qcWsHost(){ return _fairFull ? ($('fair-fs-body')||$('fair-bubble-ws')) : $('fair-bubble-ws'); }
 function qcWsRender(){ _bwsBound=false; const h=qcWsHost(); if(h) h.innerHTML=fairBubbleWorkspace(); }
 window.qcFairFull=(on)=>{
