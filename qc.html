@@ -48,7 +48,10 @@ h1,h2,h3{margin:0;font-weight:800;letter-spacing:-.01em}
 /* ===== Shell ===== */
 #qc-app{display:none;min-height:100vh;width:100%}
 .sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--rail);background:var(--accent);display:flex;flex-direction:column;overflow:hidden;white-space:nowrap;z-index:48;transition:width .18s ease,box-shadow .18s ease;--label-op:0}
-.sidebar:hover{width:var(--sb);--label-op:1;box-shadow:6px 0 28px rgba(0,0,0,.30)}
+/* hover-expand is mouse-only: on touch a tap makes :hover stick, so the menu
+   would expand and never compress — touch uses body.sb-open (JS) instead */
+@media (hover:hover) and (pointer:fine){ .sidebar:hover{width:var(--sb);--label-op:1;box-shadow:6px 0 28px rgba(0,0,0,.30)} }
+body.sb-open .sidebar{width:var(--sb);--label-op:1;box-shadow:6px 0 28px rgba(0,0,0,.30)}
 body.sb-pinned .sidebar{width:var(--sb);--label-op:1}
 .logo-flag{position:fixed;left:0;top:0;z-index:50;width:var(--sb);height:84px;display:flex;align-items:center;padding:0 18px;background:var(--accent);box-shadow:4px 5px 16px rgba(0,0,0,.24);border-bottom:2.25px solid var(--spark)}
 .logo-flag img{height:56px;width:auto;display:block}
@@ -666,6 +669,36 @@ async function dbRemove(path){ if(window.qcRemove) return window.qcRemove(path);
 async function upload(file,prefix){ if(window.qcUpload) return window.qcUpload(file,prefix); return ''; }
 
 window._qcPin=(e)=>{ e&&e.stopPropagation(); const p=document.body.classList.toggle('sb-pinned'); const ic=document.getElementById('qc-pin-ico'); if(ic)ic.className='ti '+(p?'ti-pinned':'ti-pin'); };
+
+/* Sidebar auto-compress. On touch screens a tap sticks the CSS :hover, so the
+   menu expanded and never closed. Now: a tap on the collapsed rail opens the
+   menu without navigating; picking a page — or tapping anywhere outside —
+   closes it again. Picking a page also clears a stuck :hover on touchscreen
+   laptops (they report a fine pointer, so the media-query gate can't help). */
+(function(){
+  const sb=document.getElementById('qc-sidebar'); if(!sb) return;
+  const closeSb=()=>{
+    document.body.classList.remove('sb-open');
+    sb.style.pointerEvents='none';                       // drops a stuck :hover
+    setTimeout(()=>{ sb.style.pointerEvents=''; },350);
+  };
+  const HOVER_OK=window.matchMedia('(hover:hover) and (pointer:fine)');
+  sb.addEventListener('click',(e)=>{
+    const b=document.body.classList;
+    if(b.contains('sb-pinned')) return;
+    // expanded = tapped open, or genuinely mouse-hovered (gate matches the CSS rule)
+    const expanded=b.contains('sb-open')||(HOVER_OK.matches&&sb.matches(':hover'));
+    if(!expanded){                                       // collapsed → this was a touch tap: open, don't navigate
+      e.preventDefault(); e.stopPropagation();
+      b.add('sb-open');
+      return;
+    }
+    if(e.target.closest('.nav-item')) closeSb();         // page picked → menu gets out of the way
+  },true);
+  document.addEventListener('click',(e)=>{
+    if(document.body.classList.contains('sb-open') && !sb.contains(e.target)) closeSb();
+  });
+})();
 
 /* ---------- routing ---------- */
 const META={
