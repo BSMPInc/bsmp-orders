@@ -2248,7 +2248,7 @@ function autosavePill(state){
     el.innerHTML='<i class="ti ti-cloud-off"></i><span>Couldn’t save — will retry</span>';
   } else {
     el.className='autosave saved show';
-    el.innerHTML='<i class="ti ti-rosette-discount-check-filled"></i><span>Saved</span>';
+    el.innerHTML='<i class="ti ti-discount-check-filled"></i><span>Saved</span>';
     _asHideTimer=setTimeout(()=>{ el.classList.remove('show'); }, 1700);
   }
 }
