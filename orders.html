@@ -2179,6 +2179,7 @@ function startDataListeners(){
     const data = snap.val();
     orders = data ? Object.values(data) : [];
     setSyncStatus('live'); render();
+    tryRevealDeepOrder();
     if(document.getElementById('archive-page')?.style.display==='block') renderArchive();
   }, () => setSyncStatus('error'));
   startCustomerListener();
@@ -3039,6 +3040,7 @@ function detailInner(r){
         <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
         <button class="act-ico green" title="Customer confirmation" aria-label="Customer confirmation" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i></button>
       </div>
+      ${r.mailKey?`<div style="margin-top:10px"><a href="mail.html?thread=${encodeURIComponent(r.mailKey)}" onclick="event.stopPropagation()" style="font-size:12px;font-weight:600;color:#0369a1;text-decoration:none" title="Open the email this PO came from"><i class="ti ti-mail"></i> Open the PO email</a></div>`:''}
       <div class="detail-label" style="margin-top:14px">Notes</div>
       <textarea class="notes-input" placeholder="Add notes…" onchange="window._sn('${r.id}',this.value)" onclick="event.stopPropagation()">${r.notes||''}</textarea>
       <button class="btn sm" style="margin-top:8px;align-self:flex-start;color:var(--red);border-color:#f0c9c9" onclick="window._deleteOrder('${r.id}');event.stopPropagation()"><i class="ti ti-trash"></i> Delete order</button>
@@ -3775,8 +3777,69 @@ window._doQuoteImport = (id) => {
 
 window.closeModal=(id)=>document.getElementById(id).style.display='none';
 window.openAI=()=>{document.getElementById('ai-modal').style.display='flex';aiParsed=[];};
+
+// ── Hand-off from the mail app ───────────────────────────────────────────────
+// orders.html?fromMail=<threadKey>&cust=…&subj=…&atts=<json>  ("Create orders from this PO")
+//   → pulls the PO document out of the email through the mail worker and runs it
+//     through the same AI reader as a hand-uploaded file; importing stamps mailKey
+//     on each order and links the mail thread back here.
+// orders.html?order=<id>  (the mail app's "Order — open")
+//   → jumps straight to that order once the list has loaded.
+let _fromMailKey='', _fromMailSubj='', _fromMailCust='', _mailAttList=[], _deepOrderId='', _mailParamsDone=false;
+function handleMailParams(){
+  if(_mailParamsDone) return; _mailParamsDone=true;
+  let p; try{ p=new URLSearchParams(location.search); }catch(e){ return; }
+  const fm=p.get('fromMail')||'', oid=p.get('order')||'';
+  if(!fm&&!oid) return;
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}   // a refresh shouldn't replay the hand-off
+  if(oid){ _deepOrderId=oid; tryRevealDeepOrder(); return; }
+  _fromMailKey=fm; _fromMailSubj=p.get('subj')||''; _fromMailCust=p.get('cust')||'';
+  try{ _mailAttList=JSON.parse(p.get('atts')||'[]')||[]; }catch(e){ _mailAttList=[]; }
+  fetchMailPO();
+}
+function tryRevealDeepOrder(){
+  if(!_deepOrderId) return;
+  const o=orders.find(x=>String(x.id)===String(_deepOrderId));
+  if(!o) return;   // list still loading — retried on the next snapshot
+  _deepOrderId='';
+  showPage('orders'); revealNewOrder(o.id); render();
+}
+async function fetchMailPO(){
+  openAI();
+  const rb=document.getElementById('ai-result-box'),rt=document.getElementById('ai-result-text'),ib=document.getElementById('ai-import-btn');
+  rb.style.display='block'; ib.disabled=true;
+  const a=_mailAttList[0];
+  if(!a||!a.a||!a.b||!a.m){
+    rt.textContent='The email from '+(_fromMailCust||'the customer')+' ("'+(_fromMailSubj||'no subject')+'") has no PO attachment I can read.\n\nDrop the PO file above by hand — importing will still link the orders back to the email.';
+    return;
+  }
+  rt.textContent='Pulling "'+(a.n||'the PO')+'" out of the email…';
+  try{
+    const s=await get(ref(db,'mail/settings'));
+    const proxy=(((s.val()||{}).proxyUrl)||'').replace(/\/+$/,'');
+    if(!proxy) throw new Error('mail proxy address not set');
+    const tok=await auth.currentUser.getIdToken();
+    const r=await fetch(proxy+'/attachment?box='+encodeURIComponent(a.b)+'&msg='+encodeURIComponent(a.m)+'&id='+encodeURIComponent(a.a)+'&mime='+encodeURIComponent(a.t||'application/octet-stream')+'&name='+encodeURIComponent(a.n||'po'),{headers:{Authorization:'Bearer '+tok}});
+    if(!r.ok) throw new Error('attachment fetch failed ('+r.status+')');
+    const blob=await r.blob();
+    let name=a.n||'po';
+    if(!/\.[a-z0-9]{2,4}$/i.test(name)){   // the reader routes by type; give the file a sensible extension
+      const mt=(a.t||blob.type||'').toLowerCase();
+      name+=mt.includes('pdf')?'.pdf':mt.includes('png')?'.png':'.jpg';
+    }
+    await readPOFile(new File([blob],name,{type:a.t||blob.type||'application/pdf'}));
+    if(_mailAttList.length>1) rt.textContent+='\n\n(The email has '+_mailAttList.length+' attachments — I read the first. Open the email in Mail for the rest.)';
+  }catch(e){
+    rt.textContent='Could not pull the PO out of the email: '+((e&&e.message)||e)+'\n\nYou can still drop the file in above by hand — importing will still link the orders back to the email.';
+  }
+}
 window.handleFile=async(input)=>{
   const file=input.files[0];if(!file)return;
+  await readPOFile(file);
+};
+// the AI reader itself — used by the upload box above and by the mail hand-off,
+// which fetches the PO out of the email and passes it in as a File
+async function readPOFile(file){
   const rb=document.getElementById('ai-result-box'),rt=document.getElementById('ai-result-text'),ib=document.getElementById('ai-import-btn');
   rb.style.display='block';rt.textContent='Extracting order details…';ib.disabled=true;
   const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
@@ -3799,6 +3862,7 @@ window.importAIOrders=()=>{
   let firstNewId=null;
   aiParsed.forEach(r=>{
     const o={id:uid(),customer:r.customer||'',po:r.po||'',job:'',part:r.part||'',desc:r.desc||'',qty:parseFloat(r.qty)||0,cost:parseFloat(r.cost)||0,total:(parseFloat(r.qty)||0)*(parseFloat(r.cost)||0),ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
+    if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
     // assign job number considering existing + already-added-this-batch orders
     o.job = suggestJobNumber(o.customer, o.po);
     orders.unshift(o);                 // add first so same-PO siblings get -2, -3…
@@ -3808,6 +3872,13 @@ window.importAIOrders=()=>{
     if(!firstNewId) firstNewId=o.id;
   });
   if(firstNewId) revealNewOrder(firstNewId);
+  if(_fromMailKey && firstNewId){
+    // point the mail thread at the first order — the mail app shows "Order — open"
+    const first=orders.find(x=>x.id===firstNewId)||{};
+    update(ref(db,'mail/threads/'+_fromMailKey),{link:{app:'orders', id:firstNewId, label:'Order'+(first.job?(' '+first.job):(first.po?(' PO '+first.po):''))}})
+      .catch(()=>{/* mail link-back is best-effort; the orders themselves are saved */});
+    _fromMailKey='';
+  }
   saveDB();render();closeModal('ai-modal');document.getElementById('ai-result-box').style.display='none';document.getElementById('file-input').value='';aiParsed=[];
 };
 
@@ -7130,6 +7201,7 @@ onAuthStateChanged(auth, (user) => {
     appRoot.style.display = 'flex';
     startDataListeners();
     applyRoleUI();
+    handleMailParams();
     if(userRole==='manager') scheduleAutoBackups();
   } else {
     userRole = 'manager';

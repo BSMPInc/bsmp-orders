@@ -1615,11 +1615,18 @@ function renderQcFile(){
     return;
   }
   if(lk&&lk.app==='quote'){
-    slot.innerHTML=`<a class="btn sm" href="quote.html?quote=${encodeURIComponent(lk.id)}" title="Open ${esc(lk.label||'the quote')} in the Quote Tool" style="text-decoration:none"><i class="ti ti-calculator"></i> ${esc(lk.label||'Quote')} — open</a>`;
+    // a quoted thread flagged Won means the PO landed in the same conversation —
+    // keep the quote link but also offer the Orders hand-off
+    const wonBtn=flagOf(CURRENT)==='won'?` <button class="btn sm" onclick="sendPoToOrders()" title="Open the Orders app with this email's PO — the AI reads the line items into new orders, and importing links them back here"><i class="ti ti-clipboard-plus"></i> Create orders from this PO</button>`:'';
+    slot.innerHTML=`<a class="btn sm" href="quote.html?quote=${encodeURIComponent(lk.id)}" title="Open ${esc(lk.label||'the quote')} in the Quote Tool" style="text-decoration:none"><i class="ti ti-calculator"></i> ${esc(lk.label||'Quote')} — open</a>`+wonBtn;
     return;
   }
   if(lk&&lk.app==='apar'){
     slot.innerHTML=`<a class="btn sm" href="apar.html?entry=${encodeURIComponent(lk.id)}" title="Open this bill in the AP / AR Tracker" style="text-decoration:none"><i class="ti ti-cash"></i> Bill in AP/AR — open</a>`;
+    return;
+  }
+  if(lk&&lk.app==='orders'){
+    slot.innerHTML=`<a class="btn sm" href="orders.html?order=${encodeURIComponent(lk.id)}" title="Open this job in the Orders app" style="text-decoration:none"><i class="ti ti-clipboard-list"></i> ${esc(lk.label||'Order')} — open</a>`;
     return;
   }
   const f=flagOf(CURRENT);
@@ -1633,6 +1640,10 @@ function renderQcFile(){
   }
   if(f==='invoice'){
     slot.innerHTML=`<button class="btn sm" onclick="sendBillToApar()" title="Open the AP / AR Tracker with a new payable prefilled from this email — saving the bill links it back here"><i class="ti ti-cash"></i> Send bill to AP/AR</button>`;
+    return;
+  }
+  if(f==='won'){
+    slot.innerHTML=`<button class="btn sm" onclick="sendPoToOrders()" title="Open the Orders app with this email's PO — the AI reads the line items into new orders, and importing links them back here"><i class="ti ti-clipboard-plus"></i> Create orders from this PO</button>`;
     return;
   }
   slot.innerHTML='';
@@ -1676,6 +1687,30 @@ window.sendBillToApar=async ()=>{
     +'&vendor='+encodeURIComponent(t.fromName||t.fromEmail||'')
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
     +'&date='+encodeURIComponent(String(t.date||''));
+};
+window.sendPoToOrders=async ()=>{
+  const t=CURRENT; if(!t) return;
+  // save the snapshot first so the flag (and later the link-back) survive
+  const frec=Object.assign({}, FLAGS[t.key]||{}, {
+    flag:(FLAGS[t.key]&&FLAGS[t.key].flag)||'won', meta:threadSnapshot(t),
+    by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
+  FLAGS[t.key]=frec;
+  try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){}
+  // the PO document rides along as a reference — the Orders app pulls it
+  // through the mail worker and feeds its AI line-item reader
+  const box=(t.mailboxes||[])[0];
+  let atts=[];
+  (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{
+    const mime=(a.mime||'').toLowerCase(), name=a.filename||'';
+    if(a.id && !sigJunk(m,a) && (mime.includes('pdf')||mime.startsWith('image/')||/\.(pdf|png|jpe?g)$/i.test(name)))
+      atts.push({b:box, m:m.id, a:a.id, t:a.mime||'', n:name});
+  }));
+  atts=atts.slice(0,3);
+  // carry the prefill in the link itself — same reasoning as the quote handoff
+  location.href='orders.html?fromMail='+encodeURIComponent(t.key)
+    +'&cust='+encodeURIComponent(t.fromName||t.fromEmail||'')
+    +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
+    +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
 };
 window.fileCertToQC=async ()=>{
   const t=CURRENT; if(!t) return;
