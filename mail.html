@@ -1618,6 +1618,10 @@ function renderQcFile(){
     slot.innerHTML=`<a class="btn sm" href="quote.html?quote=${encodeURIComponent(lk.id)}" title="Open ${esc(lk.label||'the quote')} in the Quote Tool" style="text-decoration:none"><i class="ti ti-calculator"></i> ${esc(lk.label||'Quote')} — open</a>`;
     return;
   }
+  if(lk&&lk.app==='apar'){
+    slot.innerHTML=`<a class="btn sm" href="apar.html?entry=${encodeURIComponent(lk.id)}" title="Open this bill in the AP / AR Tracker" style="text-decoration:none"><i class="ti ti-cash"></i> Bill in AP/AR — open</a>`;
+    return;
+  }
   const f=flagOf(CURRENT);
   if(f==='cert'){
     slot.innerHTML=`<button class="btn sm" id="qc-file-btn" onclick="fileCertToQC()" title="Copy the attachments into the QC cert library"><i class="ti ti-license"></i> File cert to QC</button>`;
@@ -1625,6 +1629,10 @@ function renderQcFile(){
   }
   if(f==='rfq'){
     slot.innerHTML=`<button class="btn sm" onclick="startQuoteFromEmail()" title="Open the Quote Tool with this customer prefilled — saving the quote links it back here"><i class="ti ti-calculator"></i> Create quote from this email</button>`;
+    return;
+  }
+  if(f==='invoice'){
+    slot.innerHTML=`<button class="btn sm" onclick="sendBillToApar()" title="Open the AP / AR Tracker with a new payable prefilled from this email — saving the bill links it back here"><i class="ti ti-cash"></i> Send bill to AP/AR</button>`;
     return;
   }
   slot.innerHTML='';
@@ -1654,6 +1662,20 @@ window.startQuoteFromEmail=async ()=>{
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
     +'&from='+encodeURIComponent(t.fromEmail||'')
     +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
+};
+window.sendBillToApar=async ()=>{
+  const t=CURRENT; if(!t) return;
+  // save the snapshot first so the flag (and later the link-back) survive
+  const frec=Object.assign({}, FLAGS[t.key]||{}, {
+    flag:(FLAGS[t.key]&&FLAGS[t.key].flag)||'invoice', meta:threadSnapshot(t),
+    by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
+  FLAGS[t.key]=frec;
+  try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){}
+  // carry the prefill in the link itself — same reasoning as the quote handoff
+  location.href='apar.html?fromMail='+encodeURIComponent(t.key)
+    +'&vendor='+encodeURIComponent(t.fromName||t.fromEmail||'')
+    +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
+    +'&date='+encodeURIComponent(String(t.date||''));
 };
 window.fileCertToQC=async ()=>{
   const t=CURRENT; if(!t) return;

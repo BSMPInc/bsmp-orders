@@ -1340,7 +1340,7 @@ function allEntriesRaw(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:canonicalParty(o.party||'—'),ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null,mailKey:o.mailKey||''});
     }
   });
   return merged;
@@ -3802,6 +3802,7 @@ window.openEntry=(id)=>{
       <div class="m-row"><span class="k">Paid</span><span class="v">${fmtMoney(e.paid)}</span></div>
       <div class="m-row"><span class="k">Balance</span><span class="v" style="color:${bal>0.005?'var(--red)':'var(--ar)'}">${fmtMoney(bal)}</span></div>
       <div class="m-row"><span class="k">Status</span><span class="v"><span class="pill ${st}">${STATUS_LABEL[st]}</span></span></div>
+      ${e.mailKey?`<div class="m-row"><span class="k">Email</span><span class="v"><a href="mail.html?thread=${encodeURIComponent(e.mailKey)}" style="color:var(--ap);font-weight:600;text-decoration:none" title="Open the email this bill came from"><i class="ti ti-mail"></i> Open the email</a></span></div>`:''}
       ${isAR?`<div class="m-row"><span class="k">Pays</span><span class="v"><select class="acct-sel" onchange="setCustomerDelay('${esc(e.party).replace(/'/g,"\\'")}',this.value)" title="Typical days after due date this customer pays — used in the cash forecast">
         ${DELAY_TIERS.map(t=>`<option value="${t.k}" ${delayOf(e.party)===t.k?'selected':''}>${t.label}</option>`).join('')}
       </select></span></div>`:''}
@@ -3877,7 +3878,7 @@ window.openEntry=(id)=>{
     </div>`;
   $('pay-modal').style.display='flex';
 };
-window.closePay=()=>{$('pay-modal').style.display='none';_cur=null;};
+window.closePay=()=>{$('pay-modal').style.display='none';_cur=null;_fromMailKey='';_fromMailSubj='';};
 function ovl(id){return overlay[id]?{...overlay[id]}:{};}
 function writeOverlay(id,o){ overlay[id]=o; dbSet('apar/entries/'+id,o) }
 window.comboLineSum=()=>{
@@ -3995,9 +3996,55 @@ window.saveManual=(type)=>{
     amount:Number($('nm-amt').value)||0,issue:$('nm-issue').value||'',terms:nmTermsRaw===''?DEFAULT_TERMS:Number(nmTermsRaw),
     account:acctEl?(acctEl.value||''):'',payments:[]};
   const dueVal=$('nm-due')?$('nm-due').value:''; if(dueVal)o.dueDate=dueVal;
+  const mailKey=_fromMailKey;   // grab before closePay() clears it
+  if(mailKey) o.mailKey=mailKey;
   writeOverlay(id,o); closePay(); render();
-  logAudit('add',{entryId:id,party,detail:`Added ${type==='ar'?'receivable':'payable'} · ${fmtMoney(o.amount)}`});
+  logAudit('add',{entryId:id,party,detail:`Added ${type==='ar'?'receivable':'payable'} · ${fmtMoney(o.amount)}`+(mailKey?' · from email':'')});
+  if(mailKey){
+    // point the mail thread at this bill — the mail app shows "Bill in AP/AR — open"
+    update(ref(db,'mail/threads/'+mailKey),{link:{app:'apar',id,label:'AP bill'}})
+      .catch(()=>{/* mail link-back is best-effort; the bill itself is saved */});
+  }
 };
+
+// ── Hand-off from the mail app ───────────────────────────────────────────────
+// apar.html?fromMail=<threadKey>&vendor=…&subj=…&date=<ms>  ("Send bill to AP/AR")
+//   → opens a New payable prefilled from the email; saving stores mailKey on the
+//     entry and links the mail thread back here.
+// apar.html?entry=<id>  (the mail app's "Bill in AP/AR — open")
+//   → jumps straight to that bill once entries have loaded.
+let _fromMailKey='', _fromMailSubj='', _deepEntryId='', _mailParamsDone=false;
+function handleMailParams(){
+  if(_mailParamsDone) return; _mailParamsDone=true;
+  let p; try{ p=new URLSearchParams(location.search); }catch(e){ return; }
+  const fm=p.get('fromMail')||'', eid=p.get('entry')||'';
+  if(!fm&&!eid) return;
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}   // a refresh shouldn't replay the hand-off
+  if(eid){ _deepEntryId=eid; tryOpenDeepEntry(); return; }
+  _fromMailKey=fm; _fromMailSubj=p.get('subj')||'';
+  go('ap');
+  openManual('ap');
+  const party=$('nm-party'); if(party) party.value=p.get('vendor')||'';
+  const rel=$('nm-rel'); if(rel) rel.value=_fromMailSubj.slice(0,120);
+  const ms=Number(p.get('date'))||0;
+  if(ms){ const iss=$('nm-issue'); if(iss) iss.value=toISO(new Date(ms)); }
+  const body=document.querySelector('#pay-modal .m-body');
+  if(body){
+    const n=document.createElement('div');
+    n.style.cssText='margin-top:10px;padding:8px 10px;border-radius:8px;background:#eef2f7;border:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.45';
+    n.innerHTML='<i class="ti ti-mail"></i> From email: <b>'+esc(_fromMailSubj||'(no subject)')+'</b> — saving links this bill back to the mail app.';
+    body.appendChild(n);
+  }
+  const amt=$('nm-amt'); if(amt) amt.focus();
+}
+function tryOpenDeepEntry(){
+  if(!_deepEntryId) return;
+  const e=allEntries().find(x=>x.id===_deepEntryId);
+  if(!e) return;   // entries still loading — retried on the next snapshot
+  _deepEntryId='';
+  go(e.type==='ar'?'ar':'ap');
+  openEntry(e.id);
+}
 
 // ── Export ───────────────────────────────────────────────────────────────────
 // ── Backup & restore ─────────────────────────────────────────────────────────
@@ -4490,7 +4537,8 @@ onAuthStateChanged(auth,(user)=>{
     $('login').style.display='none'; $('app').style.display='flex';
     watchConnection();
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
-    onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; autoArchiveOld(); render(); maybeAutoBackupOnce(); });
+    onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; autoArchiveOld(); render(); maybeAutoBackupOnce(); tryOpenDeepEntry(); });
+    handleMailParams();
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
     onValue(ref(db,'apar/recurring'),snap=>{ recurring=snap.val()||{}; autoGenerateDue(); render(); });
     onValue(ref(db,'apar/depositBuckets'),snap=>{ depositBuckets=snap.val()||{}; seedDepositBuckets(); render(); });
