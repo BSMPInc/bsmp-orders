@@ -715,6 +715,14 @@ const META={
 window.showPage=(p)=>{
   if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck')) p='inspections';
   page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
+  if(p==='selfcheck'){
+    // "New Self-Check" always starts clean. Photos/AI results left over from an
+    // earlier check (canceled, abandoned, or just viewed) were riding into the
+    // next job's form — and its editId meant the old record kept being edited.
+    editId=null;
+    _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[];
+    _scPhotoCheck=null; _scPhotoCheckFor=null;
+  }
   render();
 };
 function setActive(){
@@ -1169,7 +1177,7 @@ function viewInspections(){
         :`<div class="empty">${t('No self-checks yet. Press')} <b>${t('New self-check')}</b> ${t('to log one.')}</div>`}
     </div>`;
 }
-window.qcOpenSelf=(id)=>{ editId=id; page='selfcheck'; render(); };
+window.qcOpenSelf=(id)=>{ editId=id; _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[]; page='selfcheck'; render(); };
 
 /* =================== SELF-CHECK FORM =================== */
 function viewSelfCheck(){
@@ -1833,8 +1841,8 @@ function viewFairs(){
         :`<div class="empty">${t('No first articles yet.')}</div>`}
     </div>`;
 }
-window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
-window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; page='fair'; render(); };
+window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; page='fair'; render(); };
+window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; page='fair'; render(); };
 
 function charRow(i,c){
   c=c||{};
