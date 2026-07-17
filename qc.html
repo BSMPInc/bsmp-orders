@@ -518,6 +518,7 @@ const I18N = {
     'Full screen':'Pantalla completa','Exit full screen':'Salir de pantalla completa','Place bubbles':'Colocar globos','Editing in full screen…':'Editando en pantalla completa…','Record dimensions':'Registrar dimensiones','Viewing in full screen…':'Viendo en pantalla completa…','Change history':'Historial de cambios','No changes logged yet.':'Aún no hay cambios registrados.','First-article dimensions out of tolerance:':'Dimensiones de primer artículo fuera de tolerancia:','NCR raised':'NCR generada','NCR corrected':'NCR corregida','measured':'medido','corrected':'corregido','Open NCR':'NCR abierta','Default tolerances (title block)':'Tolerancias por defecto (cuadro de rótulo)','1 decimal (.X)':'1 decimal (.X)','2 decimals (.XX)':'2 decimales (.XX)','3 decimals (.XXX)':'3 decimales (.XXX)','Angles':'Ángulos','Fractional':'Fraccional','Angular':'Angular','Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.':'Se aplica cuando una característica no tiene su propio ± — se marcan con un * en la columna de tolerancia.','from callout':'del plano','title block':'cuadro de rótulo','No tolerance set — reading will not be checked':'Sin tolerancia — la lectura no se verificará',
     'Tap to place':'Tocar para colocar','Box a dimension':'Encuadrar una cota','Drag a box around one dimension — AI reads only what you boxed (most accurate).':'Dibuja un recuadro alrededor de una cota — la IA lee solo lo que encuadraste (lo más preciso).','reading…':'leyendo…','Could not read that box — try boxing a bit tighter.':'No se pudo leer ese recuadro — intenta encuadrar más ajustado.',
     'Confirm dimension':'Confirmar cota','more waiting':'más en espera','AI could not read this box — type the value, or remove it and box tighter.':'La IA no pudo leer este recuadro — escribe el valor, o elimínalo y encuadra más ajustado.','Value':'Valor','Tolerance':'Tolerancia','Category':'Categoría','Confirm':'Confirmar','Remove balloon':'Eliminar globo',
+    'Saving…':'Guardando…','First article saved.':'Primer artículo guardado.','Self-check saved.':'Autoinspección guardada.','NOT saved:':'NO guardado:','your entries are still on the form. Check the connection and press Save again.':'tus datos siguen en el formulario. Revisa la conexión y presiona Guardar de nuevo.','Drawing upload timed out — check the connection.':'La subida del plano expiró — revisa la conexión.','Photo upload timed out — check the connection.':'La subida de la foto expiró — revisa la conexión.',
     'Save':'Guardar','Submit for review':'Enviar a revisión','Approve':'Aprobar','Reject':'Rechazar','Close':'Cerrar',
     'Draft':'Borrador','Measuring':'Midiendo','Submitted':'Enviado','Approved':'Aprobado','Rejected':'Rechazado','Last decision:':'Última decisión:',
     // ncr
@@ -901,6 +902,8 @@ function qcRenderStrip(key){
   if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="qcDropFile('${key}',${i})"></i></span>`).join(' ');
 }
 window.qcDropFile=(key,i)=>{ (_pendingFiles[key]||[]).splice(i,1); qcRenderStrip(key); };
+// a hung upload (shop wifi) must become a loud error, not an endless quiet wait
+function withTimeout(p,ms,msg){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg)),ms))]); }
 
 /* ---------- AI extraction (shares the Quote app proxy/key on this origin) ---------- */
 function getProxyUrl(){ try{ return (localStorage.getItem('bsmp_proxy_url')||'').trim(); }catch(e){ return ''; } }
@@ -1235,7 +1238,7 @@ function viewSelfCheck(){
     <div class="field" id="sc-flag-note" style="display:${result==='Flag'?'block':'none'}"><label class="fl">${t('What\u2019s wrong? (starts a nonconformance)')}</label><textarea class="in" id="sc-issue">${esc(v('issue'))}</textarea></div>
     <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="sc-notes">${esc(v('notes'))}</textarea></div>
     <div class="toolbar" style="margin:4px 0 0">
-      <button class="btn primary" onclick="window.qcSaveSelf()"><i class="ti ti-device-floppy"></i> ${t('Save self-check')}</button>
+      <button class="btn primary" id="sc-save-btn" onclick="window.qcSaveSelf()"><i class="ti ti-device-floppy"></i> ${t('Save self-check')}</button>
       <button class="btn" onclick="showPage('inspections')">${t('Cancel')}</button>
     </div>
   </div>`;
@@ -1246,12 +1249,16 @@ window.qcSaveSelf=async ()=>{
   if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
   const result=gv('sc-result');
   if(!result){ alert(t('Mark the result as Pass or Flag.')); return; }
+  // same silent-stall guard as the first-article save
+  const btn=$('sc-save-btn'); const label=btn?btn.innerHTML:'';
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin"></i> '+t('Saving…'); }
+  try{
   const id=editId||newId('insp');
   const prev=editId?INSPECTIONS[editId]:null;
   const photos=(prev&&prev.photos)?prev.photos.slice():[];
-  const fresh=await uploadPending('sc','inspections');
+  const fresh=await withTimeout(uploadPending('sc','inspections'), 90000, t('Photo upload timed out — check the connection.'));
   fresh.forEach(f=>photos.push(f));
-  const dfresh=await uploadPending('scdraw','inspections');
+  const dfresh=await withTimeout(uploadPending('scdraw','inspections'), 90000, t('Drawing upload timed out — check the connection.'));
   const drawing=dfresh[0]||(prev&&prev.drawing)||null;
   const photoCheck=(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?_scPhotoCheck:((prev&&prev.photoCheck)||null);
   const rec={
@@ -1274,7 +1281,13 @@ window.qcSaveSelf=async ()=>{
     catch(e){ console.error('audit log failed', e); }
   }
   _scPhotoCheck=null; _scPhotoCheckFor=null;
+  qcToast(t('Self-check saved.'),'ok');
   editId=null; page='inspections'; render();
+  }catch(e){
+    console.error('self-check save failed', e);
+    qcToast(t('NOT saved:')+' '+((e&&e.message)||e)+' — '+t('your entries are still on the form. Check the connection and press Save again.'),'err');
+    if(btn){ btn.disabled=false; btn.innerHTML=label; }
+  }
 };
 
 /* =================== DRAWING CHECK ===================
@@ -1946,7 +1959,7 @@ function viewFair(){
   (Array.isArray(_fdvBubbles)?_fdvBubbles:Object.values(_fdvBubbles||{})).forEach(b=>{ if(b && b.no!=null && !_chars.find(x=>x.no===b.no)) _chars.push({no:b.no, requirement:b.value||'', tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}); });
   return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
   <div class="toolbar" style="margin-bottom:12px">
-    <button class="btn primary" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
+    <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
     <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
   </div>
   <div class="card">
@@ -2005,10 +2018,10 @@ function viewFair(){
     ${isMgr()?`<div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>`:''}
 
     <div class="toolbar" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-      <button class="btn primary" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
-      <button class="btn" onclick="window.qcSaveFair('Submitted')">${t('Submit for review')}</button>
-      ${canApprove?`<button class="btn green mgr-only" onclick="window.qcSaveFair('Approved')"><i class="ti ti-check"></i> ${t('Approve')}</button>
-        <button class="btn danger mgr-only" onclick="window.qcSaveFair('Rejected')">${t('Reject')}</button>`:''}
+      <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
+      <button class="btn fair-save-btn" onclick="window.qcSaveFair('Submitted')">${t('Submit for review')}</button>
+      ${canApprove?`<button class="btn green mgr-only fair-save-btn" onclick="window.qcSaveFair('Approved')"><i class="ti ti-check"></i> ${t('Approve')}</button>
+        <button class="btn danger mgr-only fair-save-btn" onclick="window.qcSaveFair('Rejected')">${t('Reject')}</button>`:''}
       <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
     </div>
     ${(r&&r.reviewedBy)?`<div class="hint">${t('Last decision:')} ${t(r.fairStatus)} · ${esc((r.reviewedBy||'').split('@')[0])} · ${fmtWhen(r.reviewedAt)}</div>`:''}
@@ -2286,10 +2299,16 @@ window.qcSaveFair=async (action)=>{
   syncChars();
   const part=gv('fr-part'), cust=gv('fr-customer');
   if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
+  // lock every save/submit/approve button and show progress — a save that stalls
+  // (hung upload, dropped wifi, rejected write) must never look like it worked
+  const btns=[...document.querySelectorAll('.fair-save-btn')];
+  const labels=btns.map(b=>b.innerHTML);
+  btns.forEach(b=>{ b.disabled=true; b.innerHTML='<i class="ti ti-loader-2 spin"></i> '+t('Saving…'); });
+  try{
   const id=editId||newId('fair');
   const prev=editId?INSPECTIONS[editId]:null;
   let drawing=(prev&&prev.drawing)||null;
-  const fresh=await uploadPending('frdraw','fair-drawings');
+  const fresh=await withTimeout(uploadPending('frdraw','fair-drawings'), 90000, t('Drawing upload timed out — check the connection.'));
   if(fresh.length) drawing=fresh[0];
   let status=(prev&&prev.fairStatus)||'Draft';
   if(action==='Submitted') status='Submitted';
@@ -2346,7 +2365,13 @@ window.qcSaveFair=async (action)=>{
   await dbSet('qc/inspections/'+id, rec);
   // never let an audit-trail write block the main save (e.g. if the qc/audit rule is missing)
   if(audits.length){ try{ await qcLogAudit(audits); }catch(e){ console.error('audit log failed', e); } }
+  qcToast(t('First article saved.'),'ok');
   editId=null; _chars=[]; page='fairs'; render();
+  }catch(e){
+    console.error('fair save failed', e);
+    qcToast(t('NOT saved:')+' '+((e&&e.message)||e)+' — '+t('your entries are still on the form. Check the connection and press Save again.'),'err');
+    btns.forEach((b,i)=>{ b.disabled=false; b.innerHTML=labels[i]; });
+  }
 };
 
 /* =================== FIRST ARTICLE AUTO-BUBBLE (AI) =================== */
