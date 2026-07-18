@@ -587,6 +587,7 @@ const I18N = {
     'In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia',
     'Could not judge — check the value':'No se pudo evaluar — revisa el valor',
     'No measurement entered for:':'Falta la medición de:','Save as Pass anyway?':'¿Guardar como Aprobado de todos modos?',
+    'No dimension callouts found on the attached drawing — add the customer’s dimensioned drawing (From library) and run the check again to get the two gauge checks.':'El plano adjunto no tiene cotas — agrega el plano acotado del cliente (Desde la biblioteca) y corre la revisión de nuevo para obtener las dos verificaciones con instrumento.',
     // Settings (AI connection)
     'Setup':'Configuración','Settings':'Ajustes','dock:settings':'Ajustes','AI connection for this device':'Conexión de IA para este equipo',
     'One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.':'Una sola conexión alimenta todas las funciones de IA — globos en planos, lectura de certificados y revisión de fotos.',
@@ -982,7 +983,7 @@ async function callAIJsonContent(content, maxTokens){
 }
 
 /* ---------- Self-check AI photo inspection (compare the part photo to its drawing) ---------- */
-const SELF_CHECK_PROMPT='You are an experienced sheet-metal QC inspector at a fabrication shop. You are given (1) an engineering drawing of a part, then (2) one or more photos of the actual fabricated part. Compare the PART IN THE PHOTOS against the DRAWING and judge whether the built part matches the drawing GEOMETRY: overall shape and proportions, the number and rough location of holes / cutouts / slots, bend locations and directions, and any obviously missing or extra features. Do NOT measure exact dimensions or tolerances — a person verifies those with gauges. Focus on gross build mistakes: wrong part entirely, mirrored or flipped bends, missing holes, extra or missing features, wrong hole pattern, or a shape that clearly does not match. Respond with ONLY valid JSON, no markdown, no extra text:\n{"verdict":"pass|fail|unsure","confidence":0,"summary":"one short sentence","issues":[{"severity":"major|minor","feature":"short label e.g. hole pattern","detail":"what looks wrong"}],"titleBlock":{"stated":true,"frac":null,"p2":null,"p3":null,"ang":null},"measure":{"hole":{"callout":"","zone":"","desc":""},"outside":{"callout":"","zone":"","desc":""}}}\nverdict rules: use "fail" only for a clear mismatch you are reasonably confident about; "unsure" if the photo is too blurry, cropped, dark or angled to judge; "pass" if it reasonably matches. confidence is 0-100. Use an empty issues array when it looks good. Keep every detail short and specific.\nAlso, FROM THE DRAWING ONLY (never from the photos), pick two callouts for a person to verify with a gauge: measure.hole = ONE hole-diameter callout, and measure.outside = ONE outside/overall dimension (overall length, width or height). Prefer a callout that is toleranced or clearly critical, and easy to read. "callout" MUST be the text exactly as written on the drawing (e.g. "Ø.250 ±.002", "12.000"). "zone" = the border-grid cell where that callout sits, read from the letters/numbers printed in the drawing border (e.g. "B3") — empty string if the drawing has no border grid or you cannot place it confidently; NEVER guess a zone. "desc" = a few plain words telling the operator which feature it is (e.g. "the four corner holes", "overall width across the bottom"). Use null for hole or outside when the drawing has no readable callout of that type. titleBlock = the drawing\'s "unless otherwise specified" default tolerances in decimal inches (frac = fractional, p2 = two-place, p3 = three-place, ang = angular in degrees); stated:false and nulls when missing or unreadable.';
+const SELF_CHECK_PROMPT='You are an experienced sheet-metal QC inspector at a fabrication shop. You are given (1) one or more engineering drawings of the SAME part — often the shop\'s flat-pattern/blank drawing (which may have NO dimensions) and/or the customer\'s dimensioned drawing — then (2) one or more photos of the actual fabricated part. Compare the PART IN THE PHOTOS against the DRAWING(S) and judge whether the built part matches the drawing GEOMETRY: overall shape and proportions, the number and rough location of holes / cutouts / slots, bend locations and directions, and any obviously missing or extra features. Do NOT measure exact dimensions or tolerances — a person verifies those with gauges. Focus on gross build mistakes: wrong part entirely, mirrored or flipped bends, missing holes, extra or missing features, wrong hole pattern, or a shape that clearly does not match. Respond with ONLY valid JSON, no markdown, no extra text:\n{"verdict":"pass|fail|unsure","confidence":0,"summary":"one short sentence","issues":[{"severity":"major|minor","feature":"short label e.g. hole pattern","detail":"what looks wrong"}],"titleBlock":{"stated":true,"frac":null,"p2":null,"p3":null,"ang":null},"measure":{"hole":{"callout":"","zone":"","desc":""},"outside":{"callout":"","zone":"","desc":""}}}\nverdict rules: use "fail" only for a clear mismatch you are reasonably confident about; "unsure" if the photo is too blurry, cropped, dark or angled to judge; "pass" if it reasonably matches. confidence is 0-100. Use an empty issues array when it looks good. Keep every detail short and specific.\nAlso, FROM THE DRAWINGS ONLY (never from the photos), pick two callouts for a person to verify with a gauge: measure.hole = ONE hole-diameter callout, and measure.outside = ONE outside/overall dimension (overall length, width or height). Pick ONLY from a drawing that actually prints dimension callouts — usually the customer\'s dimensioned drawing, never an undimensioned flat pattern — and pick dimensions measurable on the FINISHED part. Prefer a callout that is toleranced or clearly critical, and easy to read. "callout" MUST be the text exactly as written on that drawing (e.g. "Ø.250 ±.002", "12.000"). "zone" = the border-grid cell where that callout sits, read from the letters/numbers printed in that drawing\'s border (e.g. "B3") — empty string if there is no border grid or you cannot place it confidently; NEVER guess a zone. "desc" = a few plain words telling the operator which feature it is (e.g. "the four corner holes", "overall width across the bottom"). Use null for hole or outside when NO attached drawing has a readable callout of that type — never invent one. titleBlock = the "unless otherwise specified" default tolerances of the drawing you picked the callouts from, in decimal inches (frac = fractional, p2 = two-place, p3 = three-place, ang = angular in degrees); stated:false and nulls when missing or unreadable.';
 
 async function qcSelfPhotoCheck(){
   if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
@@ -994,7 +995,14 @@ async function qcSelfPhotoCheck(){
   if(btn) btn.disabled=true;
   if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('AI is comparing the part to the drawing…')}</div>`; }
   try{
-    const content=[{type:'text',text:'ENGINEERING DRAWING:'}, aiContentBlock(await toBase64(draws[0]), extFromFile(draws[0])), {type:'text',text:'PHOTO(S) OF THE ACTUAL PART:'}];
+    // every attached drawing goes to the AI — the flat pattern gives it the shape,
+    // the customer's dimensioned drawing gives it callouts to pick gauge checks from
+    const content=[];
+    for(let i=0;i<draws.length;i++){
+      content.push({type:'text',text:draws.length>1?('DRAWING '+(i+1)+':'):'ENGINEERING DRAWING:'});
+      content.push(aiContentBlock(await toBase64(draws[i]), extFromFile(draws[i])));
+    }
+    content.push({type:'text',text:'PHOTO(S) OF THE ACTUAL PART:'});
     for(const p of photos){ content.push(aiContentBlock(await toBase64(p), extFromFile(p))); }
     content.push({type:'text',text:SELF_CHECK_PROMPT});
     const res=await callAIJsonContent(content, 2000);
@@ -1034,8 +1042,11 @@ function qcSelfAIHtml(res){
 // math runs in code (dcJudge, same engine as FAIR / the drawing check) and the
 // arithmetic is shown in full.
 function qcSelfMeasHtml(res){
-  const meas=res.measure||{};
-  if(!meas.hole&&!meas.outside) return '';
+  if(!res.measure) return '';                       // older checks ran before gauge targets existed
+  const meas=res.measure;
+  if(!meas.hole&&!meas.outside)
+    // the AI looked and found nothing dimensioned — typical for a bare flat pattern
+    return `<div class="hint" style="margin-top:8px;color:var(--amber)"><i class="ti ti-ruler-off"></i> ${t('No dimension callouts found on the attached drawing — add the customer’s dimensioned drawing (From library) and run the check again to get the two gauge checks.')}</div>`;
   const row=(k,m,label)=>m?`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--border)">
       <div style="flex:1;min-width:170px">
         <b>${t(label)}</b>${m.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap"><i class="ti ti-map-pin"></i> ${esc(m.zone)}</span>`:''}
@@ -1358,13 +1369,16 @@ window.qcSaveSelf=async ()=>{
   const fresh=await withTimeout(uploadPending('sc','inspections'), 90000, t('Photo upload timed out — check the connection.'));
   fresh.forEach(f=>photos.push(f));
   const dfresh=await withTimeout(uploadPending('scdraw','inspections'), 90000, t('Drawing upload timed out — check the connection.'));
-  const drawing=dfresh[0]||(prev&&prev.drawing)||null;
+  // keep every attached drawing (flat pattern + dimensioned customer print);
+  // rec.drawing stays the first one so older readers keep working
+  const drawings=((prev&&(prev.drawings||(prev.drawing?[prev.drawing]:[])))||[]).concat(dfresh);
+  const drawing=drawings[0]||null;
   const photoCheck=(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?_scPhotoCheck:((prev&&prev.photoCheck)||null);
   const rec={
     id, type:'self', createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'',
     updatedAt:Date.now(), orderId:gv('sc-order'),
     partNum:part, customer:cust, rev:gv('sc-rev'), po:gv('sc-po'), job:gv('sc-job'), qty:gv('sc-qty'),
-    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos, drawing, photoCheck
+    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos, drawing, drawings, photoCheck
   };
   await dbSet('qc/inspections/'+id, rec);
   if(result==='Flag' && !(prev&&prev.ncrId)){
