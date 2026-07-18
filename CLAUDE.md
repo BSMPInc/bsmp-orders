@@ -78,7 +78,7 @@ Each app owns a top-level namespace, and some apps read across namespaces:
 
 ### Cloud Storage upload prefixes
 
-Actual upload prefixes in use (verified against the code 2026-07-05): `drawings/<orderId>/…` (orders.html), `quote-drawings/…` (quote.html), `qc/…` (qc.html), `notes/<uid>/…` (notes.html). **apar.html does not upload files at all** (its CSV import/backups are read locally). Follow the owning app's existing prefix when adding uploads, and remember each prefix needs a matching Storage security rule.
+Actual upload prefixes in use (verified against the code 2026-07-05, updated 2026-07-18): `drawings/<orderId>/…` (orders.html), `vendorInvoices/<po>_<ts>/…` (orders.html Need-PO receive step), `quote-drawings/…` (quote.html), `qc/…` (qc.html, plus mail.html cert filing to `qc/certs/…`), `notes/<uid>/…` (notes.html). **apar.html does not upload files at all** (its CSV import/backups are read locally). Follow the owning app's existing prefix when adding uploads, and remember each prefix needs a matching Storage security rule.
 
 ### Auth + role model (operator vs manager)
 
