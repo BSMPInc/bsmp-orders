@@ -1332,11 +1332,12 @@ const DC_PROMPT='You are a senior sheet-metal detailer at a fabrication shop, re
 +'Find every place OUR drawing disagrees with, omits, or adds to the CUSTOMER drawing — and every place the CUSTOMER drawing is unclear.\n\n'
 +'Return ONLY valid JSON, no markdown:\n'
 +'{"custTitleBlock":{"stated":true,"frac":null,"p2":null,"p3":null,"ang":null},'
-+'"rows":[{"feature":"short label","kind":"dim|angle|hole|thickness|material|finish|rev|part|qty|note","cust":"exact text on the customer drawing, or empty","mine":"exact text on our drawing, or empty","note":"short remark or empty"}],'
-+'"questions":[{"topic":"short label","detail":"what is unclear on the CUSTOMER drawing and what to ask them"}],'
++'"rows":[{"feature":"short label","kind":"dim|angle|hole|thickness|material|finish|rev|part|qty|note","cust":"exact text on the customer drawing, or empty","mine":"exact text on our drawing, or empty","zone":"customer-drawing border-grid zone like B3, or empty","note":"short remark or empty"}],'
++'"questions":[{"topic":"short label","detail":"what is unclear on the CUSTOMER drawing and what to ask them","zone":"customer-drawing border-grid zone like B3, or empty"}],'
 +'"summary":"one short sentence"}\n\n'
 +'Rules:\n'
 +'- "cust" and "mine" MUST be copied EXACTLY as written on that drawing — "2.500 ±.005", "Ø.250 THRU", "3/8", "16 GA CRS", "90°". Never rewrite, round, convert or invent a value. Use an empty string when that drawing does not state it; never guess.\n'
++'- "zone": many drawings print a reference grid in the border (numbers along the top/bottom edge, letters down the sides). If the CUSTOMER drawing has one, set "zone" to the grid cell where that feature\'s callout sits on THEIR drawing — read the border markers nearest the callout and give letter+number, e.g. "B3" or "D7". Give each question a zone the same way when it points at a specific spot on their drawing. If their drawing has no border grid, or you cannot place the callout confidently, use an empty string — NEVER guess a zone.\n'
 +'- One row per feature. Pair features by what they measure, not by wording: "OVERALL LENGTH" and "LG 12.000" are the same row.\n'
 +'- ALWAYS include a row for each of these when either drawing states it: part number (kind "part"), revision ("rev"), material ("material"), thickness ("thickness"), finish ("finish"), quantity ("qty").\n'
 +'- custTitleBlock = the CUSTOMER\'s "unless otherwise specified" default tolerances in decimal inches: frac = fractional, p2 = two-place decimal, p3 = three-place decimal, ang = angular in degrees. Use stated:false and nulls when their block is missing or unreadable. Never put our shop\'s defaults in it.\n'
@@ -1384,7 +1385,7 @@ function dcComputeRows(rows, tolDefaults){
   try{
     return (rows||[]).map(r=>{
       const j=dcJudge(r); if(!j) return null;
-      return Object.assign({feature:r.feature||'', kind:r.kind||'dim', cust:String(r.cust||'').trim(), mine:String(r.mine||'').trim(), note:r.note||''}, j);
+      return Object.assign({feature:r.feature||'', kind:r.kind||'dim', cust:String(r.cust||'').trim(), mine:String(r.mine||'').trim(), zone:String(r.zone||'').trim().toUpperCase(), note:r.note||''}, j);
     }).filter(Boolean);
   } finally { _fairTolDefaults=saved; }
 }
@@ -1583,7 +1584,7 @@ function dcResultHtml(res, where){
           <div class="dc-whys">${DC_WHY.map(x=>`<button class="dc-whybtn" title="${esc(t(x.hint))}" onclick="dcAcceptWhy('${esc(where)}',${i},'${x.k}')">${esc(t(x.l))}</button>`).join('')}</div>
         </div>`);
     return `<tr class="dc-row dc-${esc(r.status)}${done?' dc-accepted':''}">
-      <td><b>${esc(r.feature||'—')}</b>${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
+      <td><b>${esc(r.feature||'—')}</b>${r.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap" title="${esc(t('Where the callout sits on the customer drawing (border grid)'))}"><i class="ti ti-map-pin"></i> ${esc(r.zone)}</span>`:''}${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
       <td class="dc-val">${esc(r.cust)||`<span class="muted">${t('— not stated —')}</span>`}</td>
       <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}</td>
       <td>
@@ -1597,7 +1598,7 @@ function dcResultHtml(res, where){
   const qs=(res.questions||[]).map((q,i)=>{
     const qdone=dcQDone(q), qw=qdone?dcQWhyDef(q.qWhy):null;
     return `<li class="${qdone?'dc-qdone':''}">
-      <b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
+      <b>${esc(q.topic||'')}</b>${q.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap" title="${esc(t('Where this sits on the customer drawing (border grid)'))}"><i class="ti ti-map-pin"></i> ${esc(String(q.zone).toUpperCase())}</span>`:''}${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
       <div class="dc-acc">
         ${qdone
           ? `<div class="dc-why"><i class="ti ti-writing-sign"></i> ${esc(t((qw&&qw.l)||q.qWhy).replace('…',''))}</div>
@@ -1647,7 +1648,7 @@ window.qcDrawPrint=(where)=>{
     const sign=done?`<div style="margin-top:3px;font-size:10px;color:#333">${esc(t('Signed off'))} — ${esc(t((w&&w.l)||r.acceptWhy))}${r.acceptNote?': '+esc(r.acceptNote):''} — ${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+esc(fmtWhen(r.acceptAt)):''}</div>`
       : (dcIsDeviation(r)?`<div style="margin-top:3px;font-size:10px;font-weight:700;color:#9a6a00">${esc(t('OPEN'))}</div>`:'');
     return `<tr>
-      <td style="${cell}"><b>${esc(r.feature||'—')}</b>${r.note?`<div style="color:#666;font-size:10px">${esc(r.note)}</div>`:''}</td>
+      <td style="${cell}"><b>${esc(r.feature||'—')}</b>${r.zone?` <span style="font-size:9.5px;color:#555;font-weight:700;white-space:nowrap">[${esc(r.zone)}]</span>`:''}${r.note?`<div style="color:#666;font-size:10px">${esc(r.note)}</div>`:''}</td>
       <td style="${cell}">${esc(r.cust)||'<span style="color:#999">'+esc(t('— not stated —'))+'</span>'}</td>
       <td style="${cell}">${esc(r.mine)||'<span style="color:#999">'+esc(t('— not stated —'))+'</span>'}</td>
       <td style="${cell}">${mark[r.status]||''} ${esc(t(s.l))}${r.math?`<div style="font-family:Consolas,monospace;font-size:9.5px;color:#555;margin-top:2px">${esc(r.math)}</div>`:''}${sign}</td>
@@ -1658,7 +1659,7 @@ window.qcDrawPrint=(where)=>{
     const state=qdone
       ? `<div style="font-size:10px;color:#333;margin-top:2px">${esc(t((qw&&qw.l)||q.qWhy).replace('…',''))}${q.answer?': '+esc(q.answer):''} — ${esc((q.resolvedBy||'').split('@')[0])}${q.resolvedAt?' · '+esc(fmtWhen(q.resolvedAt)):''}</div>`
       : `<div style="font-size:10px;font-weight:700;color:#9a6a00;margin-top:2px">${esc(t('OPEN — ask the customer'))}</div>`;
-    return `<li style="margin-bottom:7px;font-size:11px"><b>${esc(q.topic||'')}</b>${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}${state}</li>`;
+    return `<li style="margin-bottom:7px;font-size:11px"><b>${esc(q.topic||'')}</b>${q.zone?` <span style="font-size:9.5px;color:#555;font-weight:700;white-space:nowrap">[${esc(String(q.zone).toUpperCase())}]</span>`:''}${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}${state}</li>`;
   }).join('');
   const tolNote=res.tolFromCustomer
     ? t('Differences are judged against the customer’s title-block tolerances, read off their drawing.')
