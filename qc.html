@@ -942,10 +942,35 @@ async function callAIJsonContent(content, maxTokens){
   if(data.error) throw new Error(data.error.message||'AI error');
   const raw=(data.content||[]).map(c=>c.text||'').join('');
   let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
-  const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
-  if(fb>=0 && lb>fb) clean=clean.slice(fb,lb+1);
-  clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
-  return JSON.parse(clean);
+  const fb=clean.indexOf('{');
+  if(fb>0) clean=clean.slice(fb);
+  const tidy=s=>s.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
+  const lb=clean.lastIndexOf('}');
+  try{ return JSON.parse(tidy(lb>0?clean.slice(0,lb+1):clean)); }
+  catch(e){ /* usually a reply cut off at the token limit — try to salvage below */ }
+  // Salvage a truncated reply: walk the text once (string-aware) noting every spot
+  // where an element just closed and what brackets were still open there; then try
+  // the longest prefix first, closing the open brackets, until one parses.
+  const marks=[]; let inStr=false, escp=false, stack=[];
+  for(let i=0;i<clean.length;i++){
+    const ch=clean[i];
+    if(inStr){ if(escp) escp=false; else if(ch==='\\') escp=true; else if(ch==='"') inStr=false; continue; }
+    if(ch==='"') inStr=true;
+    else if(ch==='{'||ch==='[') stack.push(ch);
+    else if(ch==='}'||ch===']'){ stack.pop(); marks.push({i, open:stack.slice()}); }
+  }
+  for(let m=marks.length-1; m>=0 && m>=marks.length-80; m--){
+    const mk=marks[m];
+    const cand=clean.slice(0,mk.i+1)+mk.open.slice().reverse().map(c=>c==='{'?'}':']').join('');
+    try{
+      const j=JSON.parse(tidy(cand));
+      if(j&&typeof j==='object') j.__truncated=true;   // callers can warn the list was cut short
+      return j;
+    }catch(e2){ /* try the next-shorter prefix */ }
+  }
+  throw new Error(data.stop_reason==='max_tokens'
+    ? 'the reply hit the AI length limit and could not be repaired — try again'
+    : 'AI returned unparseable JSON');
 }
 
 /* ---------- Self-check AI photo inspection (compare the part photo to its drawing) ---------- */
@@ -1509,13 +1534,15 @@ async function qcDrawCompare(){
       aiContentBlock(await toBase64(mine), extFromFile(mine)),
       {type:'text',text:DC_PROMPT}
     ];
-    const res=await callAIJsonContent(content, 4000);
+    const res=await callAIJsonContent(content, 12000);   // dense drawings run long — 4000 truncated real checks
+    const truncated=!!res.__truncated; delete res.__truncated;
     const tol=dcTolDefaults(res.custTitleBlock);
     const rows=dcComputeRows(res.rows, tol.defaults).sort((a,b)=>(DC_ORDER[a.status]-DC_ORDER[b.status]));
     const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail));
     _dcResult=dcRecomputeVerdict({
       ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'',
-      summary:res.summary||'', rows, questions,
+      summary:(res.summary||'')+(truncated?((res.summary?' ':'')+'⚠ The AI reply was cut off at its length limit — this list may be missing features. Re-run the check to be sure it is complete.'):''),
+      rows, questions,
       tolDefaults:tol.defaults, tolFromCustomer:tol.fromCustomer,
       custTitleBlock:res.custTitleBlock||null           // raw, exactly as read
     });
