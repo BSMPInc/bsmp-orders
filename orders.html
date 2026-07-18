@@ -1839,9 +1839,11 @@ body.sb-pinned .dock{left:var(--sb)}
       <label style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.3px;text-transform:uppercase">Notes printed on the confirmation</label>
       <textarea id="confirm-notes-input" rows="2" oninput="window._confirmNotesInput()" placeholder="e.g. Pricing valid 30 days. Material certs included. Partial shipments accepted." style="width:100%;box-sizing:border-box;margin-top:5px;font-family:inherit;font-size:13px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;resize:vertical"></textarea>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--border);background:var(--card);flex-shrink:0">
+    <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:12px 16px;border-top:1px solid var(--border);background:var(--card);flex-shrink:0;flex-wrap:wrap">
+      <div id="confirm-email-status" style="flex:1;min-width:120px;font-size:11.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
       <button class="btn" onclick="closeModal('confirm-modal')">Close</button>
       <button class="btn green" onclick="window.printConfirmation()"><i class="ti ti-printer"></i> Print / Save PDF</button>
+      <button class="btn" id="confirm-email-btn" onclick="window.emailConfirmation()" title="Email this confirmation straight to the customer through the shop mailbox — orders still marked Received flip to Confirmed when it sends" style="background:#1e3a5f;color:#fff;border:none"><i class="ti ti-send"></i> Email to customer</button>
     </div>
   </div>
 </div>
@@ -3530,6 +3532,7 @@ window._showConfirmation=(id)=>{
   </div>`;
   const _ct=document.getElementById('confirm-notes-text'); if(_ct) _ct.textContent=_cnotes;
   const _ci=document.getElementById('confirm-notes-input'); if(_ci) _ci.value=_cnotes;
+  _renderConfirmEmailStatus();
   openModalById('confirm-modal');
 };
 let _confirmItems=[];
@@ -3554,6 +3557,101 @@ window.printConfirmation=()=>{
   w.document.write(`<html><head><meta charset="utf-8"><title>${esc2(fileTitle)}</title></head><body style="margin:0">${node.outerHTML}</body></html>`);
   w.document.close();
   setTimeout(()=>{ w.focus(); w.print(); }, 250);
+};
+
+// ── Email the confirmation straight from here — one less trip through Mail ────
+// Sends through the mail proxy (the same Cloudflare Worker the Mail app uses),
+// so it goes out from the shop mailbox, lands in its real Sent folder, and
+// carries the shared signature. On success, anything still "Received" on this
+// PO flips to Confirmed automatically.
+function _renderConfirmEmailStatus(msg,err){
+  const el=document.getElementById('confirm-email-status'); if(!el) return;
+  el.style.color=err?'var(--red)':'var(--text2)';
+  if(msg!==undefined){ el.textContent=msg; return; }
+  const sent=(_confirmItems||[]).map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0];
+  el.textContent=sent?('Emailed to '+sent.to+' · '+new Date(sent.at).toLocaleDateString()):'';
+}
+window.emailConfirmation=async ()=>{
+  const items=_confirmItems||[]; if(!items.length) return;
+  const btn=document.getElementById('confirm-email-btn');
+  // best guess for the address: the customer index first, then whoever emailed the PO in
+  let guess='';
+  const cust=(_confirmMeta.customer||'').trim();
+  const cRec=customers.find(c=>(c.name||'').toLowerCase()===cust.toLowerCase());
+  if(cRec&&cRec.email) guess=cRec.email;
+  const mailKey=(items.find(i=>i.mailKey)||{}).mailKey||'';
+  if(!guess&&mailKey){
+    try{ const s=await get(ref(db,'mail/threads/'+mailKey)); guess=((s.val()||{}).meta||{}).fromEmail||''; }catch(e){}
+  }
+  const to=(prompt('Email this order confirmation to:',guess)||'').trim();
+  if(!to) return;
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){ _renderConfirmEmailStatus('That doesn’t look like an email address.',true); return; }
+  if(btn){ btn.disabled=true; btn.style.opacity=.6; }
+  _renderConfirmEmailStatus('Sending…');
+  try{
+    const s=await get(ref(db,'mail/settings'));
+    const cfg=s.val()||{};
+    const proxy=(cfg.proxyUrl||'').replace(/\/+$/,'');
+    if(!proxy) throw new Error('mail proxy address not set — finish the Mail app setup first');
+    const boxes=(cfg.mailboxes||[]).filter(Boolean);
+    const replyAs=boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||'info@bertsmp.com');
+    // shared signature — same record the Mail app appends on send (key = email with
+    // Firebase-illegal characters swapped for _, matching mail.html's mkey())
+    let sigText='', sigLogo=null;
+    try{
+      const sg=(await get(ref(db,'mail/signatures/'+replyAs.toLowerCase().replace(/[.#$\/\[\]]/g,'_')))).val();
+      const rec=(sg&&typeof sg==='object')?sg:{text:String(sg||'')};
+      sigText=String(rec.text||'').trim();
+      if(rec.logo&&rec.logo.data) sigLogo={data:rec.logo.data, mime:rec.logo.mime||'image/png', width:rec.logo.width||160};
+    }catch(e){ /* no signature — the fallback sign-off below covers it */ }
+    // dates + totals, computed the same way the printed ticket does
+    const dueDates=items.map(i=>i.due).filter(Boolean).sort();
+    const ordDates=items.map(i=>i.ordered).filter(Boolean).sort();
+    const dueDate=dueDates[dueDates.length-1]||'', orderDate=ordDates[0]||'';
+    const grand=items.reduce((s2,i)=>s2+rowTotal(i),0);
+    const notes=(items.find(i=>i.confirmNotes)||{}).confirmNotes||'';
+    const po=(_confirmMeta.po||'').trim();
+    let body='Hello,\n\nThis confirms receipt of your order'+(po?(' — PO '+po):'')+'. The line items are below.\n'
+      +(orderDate?('\nOrder date: '+fmtDate(orderDate)):'')
+      +(dueDate?('\nCompletion / due date: '+fmtDate(dueDate)):'')
+      +'\n\nThis confirms receipt of your order and is not an invoice.'
+      +(notes?('\n\nNotes:\n'+notes):'')
+      +'\n\nThank you,';
+    body+= sigText ? ('\n\n-- \n'+sigText)
+      : '\nBert\'s Sheet Metal Products Inc.\n9521 Irondale Ave, Chatsworth, CA 91311\n+1 818 775 0104\ninfo@bertsmp.com';
+    const rows=[['Part / Description','Qty','Rate','Amount']];
+    items.forEach(i=>{
+      const lt=rowTotal(i);
+      rows.push([[i.part,i.desc].filter(Boolean).join(' — ')||'—', String(i.qty||''), i.cost?Number(i.cost).toFixed(2):'', lt?fmtMoney(lt):'']);
+    });
+    rows.push(['','','TOTAL',fmtMoney(grand)]);
+    const payload={replyAs, to,
+      subject:'Order Confirmation'+(cust?(' — '+cust):'')+(po?(' — PO '+po):''),
+      body, tables:[{title:'', header:true, rows}], sigLogo};
+    const tok=await auth.currentUser.getIdToken();
+    const r=await fetch(proxy+'/send',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify(payload)});
+    if(!r.ok) throw new Error('mail proxy error '+r.status+': '+(await r.text()).slice(0,150));
+    // sent ✓ — stamp the orders and flip anything still "Received" to Confirmed
+    // (In Progress / Completed / etc. are never bumped backwards)
+    const at=Date.now(), by=(auth.currentUser&&auth.currentUser.email)||'';
+    let bumped=0;
+    items.forEach(i=>{
+      i.confirmEmailed={to:to, at:at, by:by};
+      if(!i.status||i.status==='Received'){ i.status='Confirmed'; bumped++; }
+    });
+    saveDB(); render();
+    // remember the address on the customer card so next time it's one click
+    if(cust){
+      autoIndexCustomer(cust,'');
+      const cr=customers.find(c=>(c.name||'').toLowerCase()===cust.toLowerCase());
+      if(cr&&!cr.email){ cr.email=to; saveCustomersDB(); }
+    }
+    _renderConfirmEmailStatus('Sent to '+to+' ✓'+(bumped?(' — '+bumped+' order'+(bumped!==1?'s':'')+' marked Confirmed'):''));
+  }catch(e){
+    _renderConfirmEmailStatus('Send failed: '+((e&&e.message)||e),true);
+  }finally{
+    if(btn){ btn.disabled=false; btn.style.opacity=''; }
+  }
 };
 
 
