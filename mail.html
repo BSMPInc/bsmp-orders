@@ -1707,10 +1707,15 @@ window.sendPoToOrders=async ()=>{
   }));
   atts=atts.slice(0,3);
   // carry the prefill in the link itself — same reasoning as the quote handoff
-  location.href='orders.html?fromMail='+encodeURIComponent(t.key)
+  const ordUrl='orders.html?fromMail='+encodeURIComponent(t.key)
     +'&cust='+encodeURIComponent(t.fromName||t.fromEmail||'')
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
     +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
+  // open Orders in its own named tab so mail stays put; the same name means
+  // repeat transfers reuse that tab instead of piling up new ones
+  const w=window.open(ordUrl,'bsmpOrders');
+  if(w){ try{ w.focus(); }catch(e){} toast('PO sent to Orders — opened in its own tab.'); }
+  else location.href=ordUrl; // popup blocked: fall back to navigating in place
 };
 window.fileCertToQC=async ()=>{
   const t=CURRENT; if(!t) return;
