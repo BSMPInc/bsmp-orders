@@ -579,6 +579,14 @@ const I18N = {
     'Advisory only — you still verify toleranced features with a gauge.':'Solo orientativo — verifica las tolerancias con un instrumento.',
     'Photo check failed:':'La revisión de la foto falló:','(from AI photo check)':'(de la revisión de foto con IA)',
     'major':'mayor','minor':'menor',
+    // Self-check gauge measurements
+    'Gauge checks — measure these and type what you get':'Verificación con instrumento — mide estas cotas y anota lo que obtengas',
+    'The AI picked these off the drawing so nobody has to choose or write them in.':'La IA las eligió del plano — nadie tiene que escogerlas ni escribirlas.',
+    'Hole diameter':'Diámetro de agujero','Outside dimension':'Medida exterior',
+    'Drawing says':'El plano indica','measured':'medido',
+    'In tolerance':'Dentro de tolerancia','Out of tolerance':'Fuera de tolerancia',
+    'Could not judge — check the value':'No se pudo evaluar — revisa el valor',
+    'No measurement entered for:':'Falta la medición de:','Save as Pass anyway?':'¿Guardar como Aprobado de todos modos?',
     // Settings (AI connection)
     'Setup':'Configuración','Settings':'Ajustes','dock:settings':'Ajustes','AI connection for this device':'Conexión de IA para este equipo',
     'One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.':'Una sola conexión alimenta todas las funciones de IA — globos en planos, lectura de certificados y revisión de fotos.',
@@ -974,7 +982,7 @@ async function callAIJsonContent(content, maxTokens){
 }
 
 /* ---------- Self-check AI photo inspection (compare the part photo to its drawing) ---------- */
-const SELF_CHECK_PROMPT='You are an experienced sheet-metal QC inspector at a fabrication shop. You are given (1) an engineering drawing of a part, then (2) one or more photos of the actual fabricated part. Compare the PART IN THE PHOTOS against the DRAWING and judge whether the built part matches the drawing GEOMETRY: overall shape and proportions, the number and rough location of holes / cutouts / slots, bend locations and directions, and any obviously missing or extra features. Do NOT measure exact dimensions or tolerances — a person verifies those with gauges. Focus on gross build mistakes: wrong part entirely, mirrored or flipped bends, missing holes, extra or missing features, wrong hole pattern, or a shape that clearly does not match. Respond with ONLY valid JSON, no markdown, no extra text:\n{"verdict":"pass|fail|unsure","confidence":0,"summary":"one short sentence","issues":[{"severity":"major|minor","feature":"short label e.g. hole pattern","detail":"what looks wrong"}]}\nverdict rules: use "fail" only for a clear mismatch you are reasonably confident about; "unsure" if the photo is too blurry, cropped, dark or angled to judge; "pass" if it reasonably matches. confidence is 0-100. Use an empty issues array when it looks good. Keep every detail short and specific.';
+const SELF_CHECK_PROMPT='You are an experienced sheet-metal QC inspector at a fabrication shop. You are given (1) an engineering drawing of a part, then (2) one or more photos of the actual fabricated part. Compare the PART IN THE PHOTOS against the DRAWING and judge whether the built part matches the drawing GEOMETRY: overall shape and proportions, the number and rough location of holes / cutouts / slots, bend locations and directions, and any obviously missing or extra features. Do NOT measure exact dimensions or tolerances — a person verifies those with gauges. Focus on gross build mistakes: wrong part entirely, mirrored or flipped bends, missing holes, extra or missing features, wrong hole pattern, or a shape that clearly does not match. Respond with ONLY valid JSON, no markdown, no extra text:\n{"verdict":"pass|fail|unsure","confidence":0,"summary":"one short sentence","issues":[{"severity":"major|minor","feature":"short label e.g. hole pattern","detail":"what looks wrong"}],"titleBlock":{"stated":true,"frac":null,"p2":null,"p3":null,"ang":null},"measure":{"hole":{"callout":"","zone":"","desc":""},"outside":{"callout":"","zone":"","desc":""}}}\nverdict rules: use "fail" only for a clear mismatch you are reasonably confident about; "unsure" if the photo is too blurry, cropped, dark or angled to judge; "pass" if it reasonably matches. confidence is 0-100. Use an empty issues array when it looks good. Keep every detail short and specific.\nAlso, FROM THE DRAWING ONLY (never from the photos), pick two callouts for a person to verify with a gauge: measure.hole = ONE hole-diameter callout, and measure.outside = ONE outside/overall dimension (overall length, width or height). Prefer a callout that is toleranced or clearly critical, and easy to read. "callout" MUST be the text exactly as written on the drawing (e.g. "Ø.250 ±.002", "12.000"). "zone" = the border-grid cell where that callout sits, read from the letters/numbers printed in the drawing border (e.g. "B3") — empty string if the drawing has no border grid or you cannot place it confidently; NEVER guess a zone. "desc" = a few plain words telling the operator which feature it is (e.g. "the four corner holes", "overall width across the bottom"). Use null for hole or outside when the drawing has no readable callout of that type. titleBlock = the drawing\'s "unless otherwise specified" default tolerances in decimal inches (frac = fractional, p2 = two-place, p3 = three-place, ang = angular in degrees); stated:false and nulls when missing or unreadable.';
 
 async function qcSelfPhotoCheck(){
   if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
@@ -989,7 +997,10 @@ async function qcSelfPhotoCheck(){
     const content=[{type:'text',text:'ENGINEERING DRAWING:'}, aiContentBlock(await toBase64(draws[0]), extFromFile(draws[0])), {type:'text',text:'PHOTO(S) OF THE ACTUAL PART:'}];
     for(const p of photos){ content.push(aiContentBlock(await toBase64(p), extFromFile(p))); }
     content.push({type:'text',text:SELF_CHECK_PROMPT});
-    const res=await callAIJsonContent(content, 1500);
+    const res=await callAIJsonContent(content, 2000);
+    // gauge targets picked off the drawing — keep only well-formed picks, measured starts empty
+    const normM=(m)=>(m&&m.callout)?{callout:String(m.callout).trim(), zone:String(m.zone||'').trim().toUpperCase(), desc:String(m.desc||'').trim(), measured:'', status:'', math:''}:null;
+    res.measure={hole:normM(res.measure&&res.measure.hole), outside:normM(res.measure&&res.measure.outside)};
     _scPhotoCheck=Object.assign({ ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'' }, res);
     _scPhotoCheckFor=editId||'new';
     qcRenderSelfAI(_scPhotoCheck);
@@ -1014,9 +1025,58 @@ function qcSelfAIHtml(res){
     <div style="font-weight:800;color:${col};display:flex;align-items:center;gap:6px"><i class="ti ${ic}"></i> ${esc(label)}${res.confidence!=null?` <span class="muted" style="font-weight:600">${esc(String(res.confidence))}%</span>`:''}</div>
     ${res.summary?`<div style="margin-top:3px">${esc(res.summary)}</div>`:''}
     ${issues?`<ul style="margin:6px 0 0;padding-left:18px">${issues}</ul>`:''}
+    ${qcSelfMeasHtml(res)}
     <div class="muted" style="margin-top:6px;font-size:11px">${t('Advisory only — you still verify toleranced features with a gauge.')}</div>
   </div>`;
 }
+// Two gauge checks the AI picked off the drawing (a hole diameter + an outside
+// dimension). The operator only measures and types the number — the tolerance
+// math runs in code (dcJudge, same engine as FAIR / the drawing check) and the
+// arithmetic is shown in full.
+function qcSelfMeasHtml(res){
+  const meas=res.measure||{};
+  if(!meas.hole&&!meas.outside) return '';
+  const row=(k,m,label)=>m?`<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 0;border-top:1px dashed var(--border)">
+      <div style="flex:1;min-width:170px">
+        <b>${t(label)}</b>${m.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap"><i class="ti ti-map-pin"></i> ${esc(m.zone)}</span>`:''}
+        ${m.desc?`<div class="muted" style="font-size:11.5px">${esc(m.desc)}</div>`:''}
+        <div style="font-size:12px">${t('Drawing says')}: <b>${esc(m.callout)}</b></div>
+      </div>
+      <input class="in" id="sc-meas-${k}" inputmode="decimal" placeholder="${esc(t('measured'))}" value="${esc(m.measured||'')}" style="width:110px;flex:none" onchange="qcScMeasure('${k}',this.value)">
+      <div id="sc-meas-${k}-out" style="min-width:170px;font-size:11.5px">${qcScMeasBadge(m)}</div>
+    </div>`:'';
+  return `<div style="margin-top:9px;font-weight:800">${t('Gauge checks — measure these and type what you get')}</div>
+    <div class="muted" style="font-size:11px">${t('The AI picked these off the drawing so nobody has to choose or write them in.')}</div>
+    ${row('hole',meas.hole,'Hole diameter')}${row('outside',meas.outside,'Outside dimension')}`;
+}
+function qcScMeasBadge(m){
+  if(!m||!m.measured) return '';
+  if(m.status==='mismatch') return `<span style="color:var(--red);font-weight:800"><i class="ti ti-alert-octagon"></i> ${t('Out of tolerance')}</span>${m.math?`<div class="dc-math">${esc(m.math)}</div>`:''}`;
+  if(m.status==='match') return `<span style="color:var(--green);font-weight:800"><i class="ti ti-check"></i> ${t('In tolerance')}</span>${m.math?`<div class="dc-math">${esc(m.math)}</div>`:''}`;
+  return `<span style="color:var(--amber);font-weight:700"><i class="ti ti-help-circle"></i> ${t('Could not judge — check the value')}</span>`;
+}
+window.qcScMeasure=(k,val)=>{
+  const res=_scPhotoCheck; if(!res||!res.measure||!res.measure[k]) return;
+  const m=res.measure[k]; m.measured=String(val||'').trim();
+  if(!m.measured){ m.status=''; m.math=''; }
+  else{
+    // judge against the drawing's callout / title block — same swap dcComputeRows does
+    const tb=dcTolDefaults(res.titleBlock);
+    const saved=_fairTolDefaults;
+    _fairTolDefaults=Object.assign({}, DEFAULT_TOL_DEFAULTS, tb.defaults);
+    let j=null; try{ j=dcJudge({cust:m.callout, mine:m.measured}); } finally { _fairTolDefaults=saved; }
+    if(j && j.math===t('Text differs')) j={status:'unreadable', math:''};   // typo / unparseable — don't call it a fail
+    m.status=(j&&j.status)||''; m.math=(j&&j.math)||'';
+    if(m.status==='mismatch'){
+      if($('sc-result')) qcPickResult('Flag');
+      const box=$('sc-issue');
+      const line='• '+t(k==='hole'?'Hole diameter':'Outside dimension')+': '+m.callout+' → '+m.measured+(m.math?(' ('+m.math+')'):'');
+      if(box && box.value.indexOf(line)<0) box.value=(box.value?box.value+'\n':'')+line;
+    }
+  }
+  const out=$('sc-meas-'+k+'-out'); if(out) out.innerHTML=qcScMeasBadge(m);
+  return {status:m.status, math:m.math};
+};
 function qcRenderSelfAI(res){ const p=$('sc-ai-panel'); if(!p) return; p.style.display='block'; p.innerHTML=qcSelfAIHtml(res); }
 function qcIssueTextFromAI(res){
   const lines=(res.issues||[]).map(i=>'• '+(i.feature?i.feature+': ':'')+(i.detail||''));
@@ -1215,7 +1275,13 @@ function viewInspections(){
         :`<div class="empty">${t('No self-checks yet. Press')} <b>${t('New self-check')}</b> ${t('to log one.')}</div>`}
     </div>`;
 }
-window.qcOpenSelf=(id)=>{ editId=id; _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[]; page='selfcheck'; render(); };
+window.qcOpenSelf=(id)=>{
+  editId=id; _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[];
+  // bring the saved AI panel (photo verdict + gauge measurements) back on screen
+  const rec=INSPECTIONS[id];
+  _scPhotoCheck=(rec&&rec.photoCheck)||null; _scPhotoCheckFor=_scPhotoCheck?id:null;
+  page='selfcheck'; render();
+};
 
 /* =================== SELF-CHECK FORM =================== */
 function viewSelfCheck(){
@@ -1274,6 +1340,14 @@ window.qcSaveSelf=async ()=>{
   if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
   const result=gv('sc-result');
   if(!result){ alert(t('Mark the result as Pass or Flag.')); return; }
+  // the two gauge checks are the point of the self-check — passing with them
+  // blank gets one clear "are you sure", never a hard block
+  const pcNow=(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?_scPhotoCheck:null;
+  if(result==='Pass' && pcNow && pcNow.measure){
+    const missing=['hole','outside'].filter(k=>pcNow.measure[k]&&!String(pcNow.measure[k].measured||'').trim())
+      .map(k=>t(k==='hole'?'Hole diameter':'Outside dimension'));
+    if(missing.length && !confirm(t('No measurement entered for:')+' '+missing.join(', ')+'\n\n'+t('Save as Pass anyway?'))) return;
+  }
   // same silent-stall guard as the first-article save
   const btn=$('sc-save-btn'); const label=btn?btn.innerHTML:'';
   if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin"></i> '+t('Saving…'); }
@@ -1302,7 +1376,9 @@ window.qcSaveSelf=async ()=>{
     rec.ncrId=ncrId; await dbSet('qc/inspections/'+id, rec);
   }
   if(photoCheck && photoCheck.ranAt){
-    try{ await qcLogAudit([{ inspectionId:id, partNum:part, field:'photocheck', action:'ai-photo-check', verdict:photoCheck.verdict||'', confidence:(photoCheck.confidence!=null?photoCheck.confidence:null), note:photoCheck.summary||'' }]); }
+    const mNote=['hole','outside'].map(k=>{ const m=photoCheck.measure&&photoCheck.measure[k];
+      return (m&&m.measured)?((k==='hole'?'hole ':'outside ')+m.callout+' → '+m.measured+(m.status?(' ('+(m.status==='match'?'in tol':m.status==='mismatch'?'OUT of tol':m.status)+')'):'')) : ''; }).filter(Boolean).join('; ');
+    try{ await qcLogAudit([{ inspectionId:id, partNum:part, field:'photocheck', action:'ai-photo-check', verdict:photoCheck.verdict||'', confidence:(photoCheck.confidence!=null?photoCheck.confidence:null), note:(photoCheck.summary||'')+(mNote?(' · '+mNote):'') }]); }
     catch(e){ console.error('audit log failed', e); }
   }
   _scPhotoCheck=null; _scPhotoCheckFor=null;
