@@ -6267,7 +6267,7 @@ function renderNeedPO(){
       <span class="pol-num">PO ${esc(p.po)}</span>
       <b>${esc(p.vendor)||'—'}</b>
       <span style="color:var(--text3)">received ${fmtDate(p.receivedAt)}</span>
-      ${p.invoiceInfo&&p.invoiceInfo.no?`<span style="color:var(--text2)">Inv ${esc(p.invoiceInfo.no)}${p.invoiceInfo.total?` · ${fmtMoney(p.invoiceInfo.total)}`:''}</span>`:''}
+      ${p.invoiceInfo&&p.invoiceInfo.no?`<span style="color:var(--text2)">Inv ${esc(p.invoiceInfo.no)}${p.invoiceInfo.total?` · ${fmtMoney(p.invoiceInfo.total)}`:''}${(p.invoiceInfo.lines||[]).some(l=>!l.sel)?` <span style="font-size:10.5px" title="Only the ticked invoice lines were counted for this PO — the invoice grand total is ${fmtMoney(p.invoiceInfo.invoiceGrandTotal||0)}">(${(p.invoiceInfo.lines||[]).filter(l=>l.sel).length} of ${(p.invoiceInfo.lines||[]).length} lines)</span>`:''}</span>`:''}
       ${p.invoice&&p.invoice.url?`<a class="pod-inv" href="${esc(p.invoice.url)}" target="_blank" rel="noopener"><i class="ti ti-file-invoice"></i> Invoice</a>`:''}
     </div>`).join('')}</div></div>`;
   host.innerHTML=html;
@@ -6382,6 +6382,7 @@ window.openReceivePO=(oi)=>{
     <div class="rcv-drop" onclick="document.getElementById('rcv-file').click()"><i class="ti ti-file-invoice"></i><b>Attach the vendor invoice</b> — PDF or photo. AI reads the invoice #, date, and total; you check them.</div>
     <input type="file" id="rcv-file" accept="application/pdf,image/*" style="display:none" onchange="_rcvFile(this)">
     <div class="rcv-status" id="rcv-status"></div>
+    <div id="rcv-lines" style="display:none;margin:4px 0 10px"></div>
     <div class="mkpo-grid" style="grid-template-columns:1fr 1fr 1fr">
       <div class="mkpo-field"><label>Invoice #</label><input id="rcv-inv" placeholder="—"></div>
       <div class="mkpo-field"><label>Invoice date</label><input id="rcv-invdate" type="date"></div>
@@ -6411,8 +6412,8 @@ window._rcvFile=async (input)=>{
   try{
     const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(file);});
     const block=file.type.startsWith('image/')?{type:'image',source:{type:'base64',media_type:file.type,data:b64}}:{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}};
-    const prompt='This is a vendor invoice sent TO Bert\'s Sheet Metal Products for purchased material or outside processing (our PO '+p.po+', vendor '+(p.vendor||'unknown')+'). Return ONLY JSON: {"invoice_no":"","invoice_date":"YYYY-MM-DD","total":0,"po_ref":"","vendor":""}. total = the invoice grand total as a number. po_ref = our PO number if printed on the invoice. Empty string / 0 when missing. No markdown.';
-    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:500,messages:[{role:'user',content:[block,{type:'text',text:prompt}]}]})});
+    const prompt='This is a vendor invoice sent TO Bert\'s Sheet Metal Products for purchased material or outside processing (our PO '+p.po+', vendor '+(p.vendor||'unknown')+'). Return ONLY JSON: {"invoice_no":"","invoice_date":"YYYY-MM-DD","total":0,"po_ref":"","vendor":"","lines":[{"desc":"","qty":0,"amount":0,"po_ref":""}]}. total = the invoice grand total as a number. po_ref at the top level = the main PO number printed on the invoice. lines = EVERY billed line item on the invoice: desc = a short description as printed, qty = quantity billed, amount = that line\'s EXTENDED total as a number (not the unit price), po_ref = the PO number referenced by that specific line if the invoice shows one per line (empty string if not). Empty string / 0 when missing. No markdown.';
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:1500,messages:[{role:'user',content:[block,{type:'text',text:prompt}]}]})});
     const data=await resp.json();
     const text=(data.content||[]).map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
     const j=JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}')+1));
@@ -6420,9 +6421,62 @@ window._rcvFile=async (input)=>{
     if(j.invoice_date) document.getElementById('rcv-invdate').value=j.invoice_date;
     if(j.total) document.getElementById('rcv-total').value=j.total;
     rcv.ai=true;
+    rcv.aiTotal=parseFloat(j.total)||0;
+    // multi-line invoice: offer a checklist so only the lines for THIS PO count.
+    // Lines whose printed PO reference matches come pre-ticked; with no per-line
+    // references (or none matching) everything starts ticked and the user prunes.
+    const digits=v=>String(v||'').replace(/\D/g,'');
+    rcv.lines=(Array.isArray(j.lines)?j.lines:[]).filter(l=>l&&(l.desc||l.amount))
+      .map(l=>({desc:String(l.desc||''), qty:String(l.qty||''), amount:parseFloat(l.amount)||0, po_ref:String(l.po_ref||''), sel:true}));
+    if(rcv.lines.length>1){
+      if(rcv.lines.some(l=>digits(l.po_ref))){
+        rcv.lines.forEach(l=>{ l.sel=digits(l.po_ref)===digits(p.po); });
+        if(!rcv.lines.some(l=>l.sel)) rcv.lines.forEach(l=>l.sel=true);
+      }
+      _rcvRenderLines();
+    }
     const mismatch=j.po_ref&&String(j.po_ref).replace(/\D/g,'')!==String(p.po).replace(/\D/g,'');
-    st.textContent='AI read the invoice — check the fields below.'+(mismatch?' ⚠ It references PO '+j.po_ref+', not '+p.po+' — double-check it\'s the right invoice.':'');
+    st.textContent='AI read the invoice — check the fields below.'+(rcv.lines.length>1?' It has '+rcv.lines.length+' line items — tick the ones that belong on this PO.':'')+(mismatch?' ⚠ It references PO '+j.po_ref+', not '+p.po+' — double-check it\'s the right invoice.':'');
   }catch(err){ st.textContent='Invoice attached ✓ — AI couldn\'t read it ('+err.message+'). Type the fields by hand.'; }
+};
+// ── invoice line checklist: only the ticked lines count toward this PO ────────
+// The total recomputes from the ticked lines and the math is shown in full
+// (calculations display their work; the raw lines persist on the PO record).
+window._rcvRenderLines=()=>{
+  const rcv=window._rcv, host=document.getElementById('rcv-lines');
+  if(!host) return;
+  if(!rcv||!rcv.lines||rcv.lines.length<2){ host.style.display='none'; host.innerHTML=''; return; }
+  host.style.display='block';
+  host.innerHTML='<label style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.3px;text-transform:uppercase">Invoice line items — tick what belongs on this PO</label>'
+    +rcv.lines.map((l,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px dashed var(--border)">
+      <input type="checkbox" id="rcv-ln-${i}" ${l.sel?'checked':''} onchange="_rcvLineToggle(${i},this.checked)" style="flex-shrink:0;width:15px;height:15px">
+      <label for="rcv-ln-${i}" style="flex:1;min-width:0;cursor:pointer;font-size:12.5px;line-height:1.35">${esc2(l.desc)||('Line '+(i+1))}${l.qty?` <span style="color:var(--text3)">· qty ${esc2(l.qty)}</span>`:''}${l.po_ref?` <span style="color:var(--text3);font-size:11px">· PO ${esc2(l.po_ref)}</span>`:''}</label>
+      <span style="flex-shrink:0;font-size:12.5px;font-weight:600">${fmtMoney(l.amount)}</span>
+    </div>`).join('')
+    +'<div id="rcv-lines-math" style="font-size:11.5px;color:var(--text3);margin-top:6px;line-height:1.4"></div>';
+  _rcvApplyLines();
+};
+window._rcvLineToggle=(i,on)=>{
+  const rcv=window._rcv; if(!rcv||!rcv.lines||!rcv.lines[i]) return;
+  rcv.lines[i].sel=!!on;
+  _rcvApplyLines();
+};
+window._rcvApplyLines=()=>{
+  const rcv=window._rcv; if(!rcv||!rcv.lines) return;
+  const math=document.getElementById('rcv-lines-math'), tot=document.getElementById('rcv-total');
+  const sel=rcv.lines.filter(l=>l.sel);
+  const sum=sel.reduce((s,l)=>s+(l.amount||0),0);
+  if(sel.length===rcv.lines.length&&rcv.aiTotal){
+    // everything ticked — the invoice is all ours, so its grand total stands
+    if(tot) tot.value=rcv.aiTotal;
+    if(math) math.textContent='All '+rcv.lines.length+' lines ticked — using the invoice grand total '+fmtMoney(rcv.aiTotal)
+      +(Math.abs(sum-rcv.aiTotal)>0.005?' (lines add to '+fmtMoney(sum)+'; the difference is usually tax or freight)':'');
+  }else{
+    if(tot) tot.value=sum?sum.toFixed(2):'';
+    if(math) math.textContent=sel.length
+      ? sel.length+' of '+rcv.lines.length+' lines: '+sel.map(l=>fmtMoney(l.amount)).join(' + ')+' = '+fmtMoney(sum)
+      : 'No lines ticked — total cleared. Tick a line or type the total by hand.';
+  }
 };
 window._rcvComplete=()=>{
   const rcv=window._rcv; if(!rcv) return;
@@ -6435,6 +6489,11 @@ window._rcvComplete=()=>{
     date:document.getElementById('rcv-invdate').value||'',
     total:parseFloat(document.getElementById('rcv-total').value)||null,
     extracted:rcv.ai?'ai':'manual' };
+  if(rcv.lines&&rcv.lines.length>1){
+    // keep the raw lines + which were ticked, so the total's math survives on the record
+    p.invoiceInfo.lines=rcv.lines.map(l=>({desc:l.desc||'', qty:l.qty||'', amount:l.amount||0, po_ref:l.po_ref||'', sel:!!l.sel}));
+    if(rcv.aiTotal) p.invoiceInfo.invoiceGrandTotal=rcv.aiTotal;
+  }
   (p.items||[]).forEach(it=>{
     const s=_extStep(it.orderId,it.step); if(!s) return;
     s.receivedAt=t; s.done=true; s.doneAt=t;   // received completes the external step
