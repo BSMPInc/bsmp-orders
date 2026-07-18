@@ -1663,20 +1663,25 @@ window.qcDrawPrint=(where)=>{
   const tolNote=res.tolFromCustomer
     ? t('Differences are judged against the customer’s title-block tolerances, read off their drawing.')
     : t('The customer’s title block could not be read, so differences are judged against BSMP’s standard block (frac ±1/16, .00 ±.020, .000 ±.005, angular ±1°).');
-  const info=(l,v)=>`<div style="flex:1;min-width:80px"><div style="font-size:9px;font-weight:700;color:#222;letter-spacing:.3px">${esc(l)}</div><div style="font-size:11.5px;color:#333;margin-top:2px">${esc(v)||'—'}</div></div>`;
   const files=saved?[saved.custDrawing&&saved.custDrawing.name?t('Customer drawing')+': '+saved.custDrawing.name:'', saved.myDrawing&&saved.myDrawing.name?t('Our drawing')+': '+saved.myDrawing.name:''].filter(Boolean).join(' · '):'';
-  const body=`<div style="background:#fff;padding:34px 40px;color:#222;font-family:Arial,Helvetica,sans-serif">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px">
+  const by=((saved?saved.createdBy:res.by)||'').split('@')[0];
+  // this header sits in a <thead>, so the browser repeats it at the top of every
+  // printed sheet — logo top-left, what/who/when on the right
+  const headHtml=`<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px">
       <div>
-        <div style="font-size:12px;font-weight:700;letter-spacing:.3px">BERT'S SHEET METAL PRODUCTS INC.</div>
-        <div style="font-size:10px;color:#333;margin-top:5px;line-height:1.5">9521 Irondale Ave · Chatsworth, CA 91311<br>+1 818 775 0104 · info@bertsmp.com</div>
+        <img src="${BSMP_PRINT_LOGO}" alt="Bert's Sheet Metal Products Inc." style="width:175px;height:auto;display:block">
+        <div style="font-size:9px;color:#333;line-height:1.5;margin-top:4px">9521 Irondale Ave · Chatsworth, CA 91311 · +1 818 775 0104 · info@bertsmp.com</div>
       </div>
-      <div style="font-size:26px;font-weight:400;color:#3a3a3a">${esc(t('Drawing Check'))}</div>
-    </div>
-    <div style="display:flex;gap:16px;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:10px">
-      ${info(t('PART #'),part)}${info(t('REV'),rev)}${info(t('CUSTOMER'),cust)}${info(t('JOB #'),job)}${info(t('CHECKED'),fmtWhen(res.ranAt||Date.now()))}${info(t('BY'),((saved?saved.createdBy:res.by)||'').split('@')[0])}
-    </div>
-    <div style="font-size:13px;font-weight:700;color:${verdict.c};margin:10px 0 4px">${verdict.txt}</div>
+      <div style="text-align:right">
+        <div style="font-size:21px;font-weight:400;color:#3a3a3a">${esc(t('Drawing Check'))}</div>
+        <div style="font-size:10.5px;color:#333;margin-top:3px">${esc([part||'—',rev?('Rev '+rev):'',cust].filter(Boolean).join(' · '))}${job?` · ${esc(t('Job'))} ${esc(job)}`:''}</div>
+        <div style="font-size:9.5px;color:#666;margin-top:2px">${esc(t('Checked'))} ${esc(fmtWhen(res.ranAt||Date.now()))}${by?' · '+esc(by):''}</div>
+      </div>
+    </div>`;
+  const body=`<table style="width:100%;border-collapse:collapse">
+    <thead><tr><td style="padding-bottom:10px">${headHtml}</td></tr></thead>
+    <tbody><tr><td>
+    <div style="font-size:13px;font-weight:700;color:${verdict.c};margin:4px 0">${verdict.txt}</div>
     ${res.summary?`<div style="font-size:11px;color:#333;margin-bottom:8px">${esc(res.summary)}</div>`:''}
     ${files?`<div style="font-size:10px;color:#666;margin-bottom:8px">${esc(files)}</div>`:''}
     <table style="width:100%;border-collapse:collapse;margin-top:6px">
@@ -1696,12 +1701,17 @@ window.qcDrawPrint=(where)=>{
       <div style="flex:1;border-top:1px solid #000;padding-top:5px;font-size:10px;color:#444">${esc(t('Reviewed By'))}</div>
       <div style="flex:1;border-top:1px solid #000;padding-top:5px;font-size:10px;color:#444">${esc(t('Date'))}</div>
     </div>
-  </div>`;
+    </td></tr></tbody></table>`;
   const raw=[part?part:'', rev?('Rev '+rev):'', cust].filter(Boolean).join(' - ');
   const fileTitle=((raw?raw+' - ':'')+t('Drawing Check')).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
   const w=window.open('','_blank','width=780,height=940');
   if(!w){ qcToast(t('The browser blocked the print window — allow popups for this site.'),'err'); return; }
-  w.document.write(`<html><head><meta charset="utf-8"><title>${esc(fileTitle)}</title></head><body style="margin:0">${body}</body></html>`);
+  w.document.write(`<html><head><meta charset="utf-8"><title>${esc(fileTitle)}</title><style>
+    @page{ size:letter; margin:12mm 11mm }
+    thead{ display:table-header-group }
+    tr{ page-break-inside:avoid }
+    @media screen{ body{ padding:28px } }
+  </style></head><body style="margin:0;background:#fff;color:#222;font-family:Arial,Helvetica,sans-serif">${body}</body></html>`);
   w.document.close();
   setTimeout(()=>{ w.focus(); w.print(); }, 250);
 };
