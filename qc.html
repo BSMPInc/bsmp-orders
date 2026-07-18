@@ -1703,7 +1703,7 @@ function viewDrawCheck(){
     </div>
     <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="dc-notes"></textarea></div>
     <div class="toolbar" style="margin:4px 0 0">
-      <button class="btn primary" onclick="window.qcSaveDrawCheck()"><i class="ti ti-device-floppy"></i> ${t('Save check')}</button>
+      <button class="btn primary" id="dc-save" onclick="window.qcSaveDrawCheck()"><i class="ti ti-device-floppy"></i> ${t('Save check')}</button>
       <button class="btn" onclick="qcDrawCheckNew()">${t('Clear')}</button>
     </div>
   </div>
@@ -1713,24 +1713,36 @@ function viewDrawCheck(){
   </div>`;
 }
 window.qcSaveDrawCheck=async ()=>{
+  const btn=$('dc-save');
+  if(btn&&btn.disabled) return;                       // already saving — ignore the extra click
   if(!_dcResult){ qcToast(t('Run the comparison first, then save it.'),'err'); return; }
   const part=gv('dc-part'), cust=gv('dc-customer');
   if(!part&&!cust){ alert(t('Enter at least a part # or customer.')); return; }
-  const id=newId('dchk');
-  const cf=await uploadPending('dccust','drawingChecks');
-  const mf=await uploadPending('dcmine','drawingChecks');
-  const rec=Object.assign({}, _dcResult, {
-    id, createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'', orderId:gv('dc-order'),
-    partNum:part, customer:cust, job:gv('dc-job'), rev:gv('dc-rev'), notes:gv('dc-notes'),
-    custDrawing:cf[0]||null, myDrawing:mf[0]||null
-  });
-  await dbSet('qc/drawingChecks/'+id, rec);
-  try{ await qcLogAudit([{ drawCheckId:id, partNum:part, field:'drawcheck', action:'ai-drawing-check', verdict:rec.verdict||'',
-    note:(rec.summary||'')+' · '+(rec.rows||[]).filter(r=>r.status==='mismatch').length+' mismatch, '+(rec.questions||[]).length+' question(s)' }]); }
-  catch(e){ console.error('audit log failed', e); }
-  _dcResult=null; _dcView=id;
-  qcToast(t('Drawing check saved.'),'ok');
-  render();
+  // the button narrates the save — the file uploads are the slow part
+  const setBtn=(html,dis)=>{ if(btn){ btn.disabled=dis; btn.innerHTML=html; } };
+  try{
+    setBtn('<i class="ti ti-loader-2 spin"></i> '+t('Uploading drawings…'), true);
+    const id=newId('dchk');
+    const cf=await uploadPending('dccust','drawingChecks');
+    const mf=await uploadPending('dcmine','drawingChecks');
+    setBtn('<i class="ti ti-loader-2 spin"></i> '+t('Saving…'), true);
+    const rec=Object.assign({}, _dcResult, {
+      id, createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'', orderId:gv('dc-order'),
+      partNum:part, customer:cust, job:gv('dc-job'), rev:gv('dc-rev'), notes:gv('dc-notes'),
+      custDrawing:cf[0]||null, myDrawing:mf[0]||null
+    });
+    await dbSet('qc/drawingChecks/'+id, rec);
+    try{ await qcLogAudit([{ drawCheckId:id, partNum:part, field:'drawcheck', action:'ai-drawing-check', verdict:rec.verdict||'',
+      note:(rec.summary||'')+' · '+(rec.rows||[]).filter(r=>r.status==='mismatch').length+' mismatch, '+(rec.questions||[]).length+' question(s)' }]); }
+    catch(e){ console.error('audit log failed', e); }
+    _dcResult=null; _dcView=id;
+    qcToast(t('Drawing check saved.'),'ok');
+    render();                                         // rebuilds the page, button comes back fresh
+  }catch(e){
+    console.error('drawing check save failed', e);
+    qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err');
+    setBtn('<i class="ti ti-device-floppy"></i> '+t('Save check'), false);   // result + fields are still here — try again
+  }
 };
 
 /* =================== DRAWING LIBRARY =================== */
