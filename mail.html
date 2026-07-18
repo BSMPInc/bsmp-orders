@@ -1668,11 +1668,16 @@ window.startQuoteFromEmail=async ()=>{
   atts=atts.slice(0,3);
   // carry the prefill in the link itself — the quote tool shouldn't have to
   // wait on (or trust) a database read to know who the customer is
-  location.href='quote.html?fromMail='+encodeURIComponent(t.key)
+  const qUrl='quote.html?fromMail='+encodeURIComponent(t.key)
     +'&cust='+encodeURIComponent(t.fromName||t.fromEmail||'')
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
     +'&from='+encodeURIComponent(t.fromEmail||'')
     +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
+  // open Quote in its own named tab so mail stays put; the same name means
+  // repeat handoffs reuse that tab instead of piling up new ones
+  const qw=window.open(qUrl,'bsmpQuote');
+  if(qw){ try{ qw.focus(); }catch(e){} toast('RFQ sent to Quote — opened in its own tab.'); }
+  else location.href=qUrl; // popup blocked: fall back to navigating in place
 };
 window.sendBillToApar=async ()=>{
   const t=CURRENT; if(!t) return;
@@ -1683,10 +1688,15 @@ window.sendBillToApar=async ()=>{
   FLAGS[t.key]=frec;
   try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){}
   // carry the prefill in the link itself — same reasoning as the quote handoff
-  location.href='apar.html?fromMail='+encodeURIComponent(t.key)
+  const apUrl='apar.html?fromMail='+encodeURIComponent(t.key)
     +'&vendor='+encodeURIComponent(t.fromName||t.fromEmail||'')
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
     +'&date='+encodeURIComponent(String(t.date||''));
+  // open AP/AR in its own named tab so mail stays put; the same name means
+  // repeat handoffs reuse that tab instead of piling up new ones
+  const apw=window.open(apUrl,'bsmpApar');
+  if(apw){ try{ apw.focus(); }catch(e){} toast('Invoice sent to AP/AR — opened in its own tab.'); }
+  else location.href=apUrl; // popup blocked: fall back to navigating in place
 };
 window.sendPoToOrders=async ()=>{
   const t=CURRENT; if(!t) return;
