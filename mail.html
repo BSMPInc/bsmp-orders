@@ -229,6 +229,12 @@ body.sb-pinned .dock{left:var(--sb)}
 .qtoggle{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:3px 10px;font-size:11.5px;font-weight:700;color:var(--text3);background:var(--bg);border:1px solid var(--border);cursor:pointer;user-select:none}
 .qtoggle:hover{border-color:var(--border2);color:var(--text)}
 .qtoggle i{font-size:14px}
+/* print-select mode — tick which emails in the conversation get printed */
+.psel{display:inline-flex;align-items:center;margin-right:4px}
+.psel input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;margin:0}
+.printbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;margin-bottom:10px;background:var(--accent-soft);border:1px solid var(--border2);font-size:12.5px;font-weight:700}
+.printbar .lk{color:var(--accent);cursor:pointer;text-decoration:underline;font-weight:700}
+.printbar .lk:hover{color:var(--accent-2)}
 .msg-html{width:100%;border:none;display:block;background:#fff;min-height:60px}
 .att{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;padding:6px 11px;background:var(--bg);border:1px solid var(--border);margin-top:8px;margin-right:6px}
 .att.clickable{cursor:pointer}
@@ -505,12 +511,14 @@ body.sb-pinned .dock{left:var(--sb)}
         <button class="btn sm" id="contact-btn" style="display:none" onclick="saveSenderContact()"></button>
         <button class="btn sm" id="price-btn" style="display:none" onclick="openPriceCapture()"></button>
         <button class="btn sm" id="mute-btn" style="display:none" onclick="toggleMute()"></button>
+        <button class="btn sm" id="print-btn" title="Print — tick which emails in this conversation to include" onclick="togglePrintMode()"><i class="ti ti-printer"></i> Print</button>
         <button class="btn sm" id="trash-btn" title="Delete this conversation — goes to Gmail's trash (kept 30 days), Undo brings it right back" onclick="trashThread()"><i class="ti ti-trash"></i> Delete</button>
       </div>
       <div class="page-head">
         <h2 id="cv-subject"></h2>
         <p id="cv-sub"></p>
       </div>
+      <div class="printbar" id="print-bar" style="display:none"></div>
       <div class="card">
         <div id="cv-msgs"></div>
         <div class="reply" id="reply-box">
@@ -1543,9 +1551,10 @@ function renderMsgs(){
   $('cv-msgs').innerHTML=t.messages.map((m,i)=>{
     const atts=(m.attachments||[]).filter(a=>!sigJunk(m,a));
     const tbls=detectMsgTables(m); _msgTables[i]=tbls;
+    const pchk=_printSel?`<label class="psel" title="Include this email in the printout"><input type="checkbox" ${_printSel[i]?'checked':''} onchange="printSelToggle(${i},this.checked)"></label>`:'';
     return `
       <div class="msg">
-        <div class="mh"><span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
+        <div class="mh">${pchk}<span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
         ${msgBodyHtml(m,i)}
         ${tbls.length?`<div class="msg-tbls">${tbls.map((r,ti)=>`<button class="btn sm" title="Copy this table into the reply so you can fill it in and send it back" onclick="useMsgTable(${i},${ti})"><i class="ti ti-table"></i> Copy table to reply · ${r.length}×${r[0].length}</button>`).join('')}</div>`:''}
         ${atts.length?`<div class="attcards">${atts.map(a=>attCard(box,m,a)).join('')}</div>`:''}
@@ -1554,6 +1563,110 @@ function renderMsgs(){
   hydrateCids();
   hydrateAttThumbs();
 }
+// ── print a conversation — tick which emails to include ──────────────────────
+let _printSel=null;   // null = mode off; else {msgIndex:true,...}
+window.togglePrintMode=()=>{
+  if(_printSel){ _printSel=null; renderPrintBar(); renderMsgs(); return; }
+  const t=CURRENT;
+  if(!t||!Array.isArray(t.messages)||!t.messages.length){ toast('Open a conversation first.'); return; }
+  _printSel={}; t.messages.forEach((m,i)=>_printSel[i]=true);
+  renderPrintBar(); renderMsgs();
+  try{ $('print-bar').scrollIntoView({block:'nearest'}); }catch(e){}
+};
+window.printSelToggle=(i,on)=>{ if(_printSel){ _printSel[i]=!!on; renderPrintBar(); } };
+window.printSelAll=(on)=>{
+  const t=CURRENT; if(!t||!_printSel) return;
+  (t.messages||[]).forEach((m,i)=>_printSel[i]=!!on);
+  renderPrintBar(); renderMsgs();
+};
+function renderPrintBar(){
+  const bar=$('print-bar'); if(!bar) return;
+  if(!_printSel){ bar.style.display='none'; bar.innerHTML=''; return; }
+  const n=Object.values(_printSel).filter(Boolean).length;
+  bar.style.display='flex';
+  bar.innerHTML=`<i class="ti ti-printer"></i> Tick the emails to print — <b>${n}</b> selected
+    · <span class="lk" onclick="printSelAll(true)">all</span>
+    <span class="lk" onclick="printSelAll(false)">none</span>
+    <span class="sp"></span>
+    <button class="btn sm primary" ${n?'':'disabled'} onclick="printSelected()" title="Quoted history prints only where it's expanded on screen"><i class="ti ti-printer"></i> Print</button>
+    <button class="btn sm" onclick="togglePrintMode()"><i class="ti ti-x"></i> Cancel</button>`;
+}
+// same trimming rules as the reading pane: scripts stripped, cid images swapped
+// for the copies already fetched, quoted history hidden unless expanded on screen
+function printSafeBody(m,i){
+  const open=!!_msgQuoteOpen[i];
+  if(m.bodyHtml){
+    let h=m.bodyHtml
+      .replace(/<script[\s\S]*?<\/script>/gi,'')
+      .replace(/\son\w+\s*=\s*"[^"]*"/gi,'')
+      .replace(/\son\w+\s*=\s*'[^']*'/gi,'');
+    (m.attachments||[]).forEach(a=>{
+      if(!a.cid) return;
+      const u=_cidCache[(m.id||'')+'|'+a.cid];
+      if(u) h=h.split('cid:'+a.cid).join(u);
+    });
+    h=h.replace(/<img[^>]*src=["']?cid:[^>]*>/gi,'');   // unfetched cid images → drop, no broken-image box
+    const hideq=htmlHasTrimmableQuote(m.bodyHtml)&&!open;
+    return `<div class="pbody${hideq?' hideq':''}">${h}</div>`;
+  }
+  const s=textQuoteSplit(m.bodyText||m.snippet||'');
+  return `<div class="pbody ptext">${esc(open||!s.rest?(m.bodyText||m.snippet||''):s.main)}</div>`;
+}
+window.printSelected=()=>{
+  const t=CURRENT; if(!t||!_printSel) return;
+  const idxs=(t.messages||[]).map((m,i)=>i).filter(i=>_printSel[i]);
+  if(!idxs.length) return;
+  const when=(d)=>new Date(Number(d)).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  const parts=idxs.map(i=>{
+    const m=t.messages[i];
+    const atts=(m.attachments||[]).filter(a=>!sigJunk(m,a));
+    return `<div class="pmsg">
+      <div class="ph"><div class="pf">${esc(m.fromName||m.fromEmail||'')} <span class="pe">&lt;${esc(m.fromEmail||'')}&gt;</span></div>
+        <div class="pto">to ${esc((m.to||[]).join(', '))}</div>
+        <div class="pd">${esc(when(m.date))}</div></div>
+      ${printSafeBody(m,i)}
+      ${atts.length?`<div class="patts">Attachments: ${atts.map(a=>esc(a.filename||'file')+(a.size?' ('+fmtSize(a.size)+')':'')).join(' · ')}</div>`:''}
+    </div>`;
+  });
+  const doc=`<!doctype html><html><head><meta charset="utf-8"><title>${esc(t.subject||'Email')}</title><style>
+    body{font-family:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",sans-serif;color:#1c1f24;margin:24px;font-size:13px;line-height:1.5}
+    h1{font-size:17px;margin:0 0 2px}
+    .psub{color:#5b6675;font-size:11.5px;margin:0 0 4px;padding-bottom:10px;border-bottom:2px solid #1c1f24}
+    .pmsg{padding:12px 0;border-bottom:1px solid #cfd5dd;page-break-inside:avoid}
+    .ph{margin-bottom:8px}
+    .pf{font-weight:800}.pe{font-weight:400;color:#5b6675}
+    .pto,.pd{color:#5b6675;font-size:11.5px}
+    .pbody{word-break:break-word}
+    .pbody img{max-width:100%;height:auto}
+    .pbody table{max-width:100%}
+    .ptext{white-space:pre-wrap}
+    .patts{margin-top:8px;font-size:11.5px;color:#5b6675;border:1px solid #cfd5dd;padding:5px 8px}
+    .hideq blockquote,.hideq div.gmail_quote,.hideq div.yahoo_quoted,.hideq div.moz-cite-prefix,.hideq #divRplyFwdMsg,.hideq #divRplyFwdMsg~*,.hideq div[id^="appendonsend"],.hideq div[id^="appendonsend"]~*{display:none!important}
+  </style></head><body>
+    <h1>${esc(t.subject||'(no subject)')}</h1>
+    <div class="psub">${esc(t.fromName||t.fromEmail||'')} · ${idxs.length} of ${t.messages.length} email${t.messages.length>1?'s':''} in this conversation · printed ${esc(new Date().toLocaleString('en-US',{month:'numeric',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}))}</div>
+    ${parts.join('')}
+  </body></html>`;
+  // hidden same-page iframe: no popup blocker in the way, and the blob: image
+  // URLs from the reading pane stay valid; wait for images before the dialog
+  const f=document.createElement('iframe');
+  f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(f);
+  f.onload=()=>{
+    const w=f.contentWindow, d=f.contentDocument;
+    let fired=false;
+    const go=()=>{ if(fired) return; fired=true;
+      try{ w.focus(); w.print(); }catch(e){ toast('Print failed — try again.'); }
+      setTimeout(()=>{ try{ f.remove(); }catch(e){} },60000); };
+    const imgs=[...d.images].filter(im=>!im.complete);
+    if(!imgs.length) return go();
+    let left=imgs.length; const done=()=>{ if(--left<=0) go(); };
+    imgs.forEach(im=>{ im.addEventListener('load',done); im.addEventListener('error',done); });
+    setTimeout(go,2500);   // don't wait forever on a dead remote image
+  };
+  f.srcdoc=doc;
+  toast('Preparing printout…');
+};
 window.openThread=async (key)=>{
   const t=THREADS.find(x=>x.key===key)||ghostThreads().find(x=>x.key===key); if(!t) return;
   _draftFlush('reply');   // save what was typed on the thread we're leaving
@@ -1577,6 +1690,7 @@ window.openThread=async (key)=>{
     setTimeout(()=>autoGrowReply($('reply-body')),40);
   }
   _msgQuoteOpen={};
+  _printSel=null; renderPrintBar();   // print-select mode doesn't follow you to another conversation
   // already have this conversation (read earlier or prefetched)? show it now
   // and refresh behind it — only re-render if something actually changed
   const cachedShown=Array.isArray(t.messages)&&t.messages.length>0;
