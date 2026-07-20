@@ -64,6 +64,7 @@ body.sb-pinned .topbar{padding-left:22px}
 .chip .dot{width:8px;height:8px;border-radius:50%;background:#8a93a0;flex:none}
 .icon-btn{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:#fff;color:var(--text2);cursor:pointer;font-size:17px}
 .icon-btn:hover{border-color:var(--accent);color:var(--accent)}
+.icon-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
 .content{flex:1;padding:22px 22px calc(26px + var(--dock-h));max-width:1500px;width:100%}
 /* dock */
 .dock{position:fixed;left:var(--rail);right:0;bottom:0;height:var(--dock-h);background:var(--card);border-top:1px solid var(--border);box-shadow:0 -4px 16px rgba(16,24,40,.06);display:none;align-items:stretch;padding-left:8px;z-index:46;transition:left .18s ease;overflow-x:auto;scrollbar-width:none}
@@ -671,6 +672,9 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="av-head">
       <i class="ti ti-paperclip"></i><span id="av-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0"></span>
       <span class="sp"></span>
+      <button class="icon-btn" id="av-prev" style="display:none" title="Previous attachment (←)" onclick="avNav(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span id="av-count" style="display:none;font-size:12px;color:var(--text3);white-space:nowrap;font-variant-numeric:tabular-nums"></span>
+      <button class="icon-btn" id="av-next" style="display:none" title="Next attachment (→)" onclick="avNav(1)"><i class="ti ti-chevron-right"></i></button>
       <button class="icon-btn" title="Download" onclick="avDownload()"><i class="ti ti-download"></i></button>
       <button class="icon-btn" title="Close" onclick="closeAtt()"><i class="ti ti-x"></i></button>
     </div>
@@ -782,6 +786,13 @@ window.addEventListener('beforeunload',(e)=>{
 // (Ctrl+C stays copy and Ctrl+A stays select-all — that's why M and Shift+A)
 document.addEventListener('keydown',(ev)=>{
   if($('login').style.display!=='none') return;   // signed out — nothing to do
+  // attachment viewer on top: arrows step through the files, Esc closes
+  if($('att-modal').style.display==='flex'){
+    if(ev.key==='Escape') window.closeAtt();
+    else if(ev.key==='ArrowRight'){ ev.preventDefault(); window.avNav(1); }
+    else if(ev.key==='ArrowLeft'){ ev.preventDefault(); window.avNav(-1); }
+    return;   // it's modal — no other app shortcuts behind it
+  }
   const composeOpen=$('compose-modal').style.display==='flex';
   const tableOpen=$('table-modal').style.display==='flex';
   const priceOpen=$('price-modal').style.display==='flex';
@@ -1396,6 +1407,9 @@ async function fetchAttBlob(d){
   if(!r.ok) throw new Error('Attachment error '+r.status);
   return r.blob();
 }
+// the viewer walks every attachment in the conversation without closing —
+// ‹ › buttons or ←/→ keys step through them; each file is fetched once
+let _avList=[], _avIdx=-1, _avSeq=0;
 window.attClick=async (el,dl)=>{
   const d=el.dataset;
   if(dl){
@@ -1408,21 +1422,39 @@ window.attClick=async (el,dl)=>{
     }catch(e){ toast(e.message,true); }
     return;
   }
-  // in-app viewer
+  // in-app viewer — snapshot the cards so a message re-render can't strand us
+  _avList=[...document.querySelectorAll('#cv-msgs .attcard[data-att]')].map(c=>({...c.dataset}));
+  _avIdx=_avList.findIndex(x=>x.att===d.att&&x.msg===d.msg);
+  if(_avIdx<0){ _avList=[{...d}]; _avIdx=0; }
+  $('att-modal').style.display='flex';
+  avShow(_avIdx);
+};
+async function avShow(i){
+  if(i<0||i>=_avList.length) return;
+  _avIdx=i;
+  const d=_avList[i], my=++_avSeq, many=_avList.length>1;
+  $('av-prev').style.display=$('av-next').style.display=$('av-count').style.display=many?'':'none';
+  $('av-prev').disabled=(i===0); $('av-next').disabled=(i===_avList.length-1);
+  if(many) $('av-count').textContent=(i+1)+' of '+_avList.length;
   $('av-name').textContent=d.name||'attachment';
   const body=$('av-body');
-  body.innerHTML='<div class="av-empty"><i class="ti ti-loader-2 nt-spin" style="font-size:28px"></i><div style="margin-top:8px">Loading…</div></div>';
-  $('att-modal').style.display='flex';
+  const ck='av|'+d.msg+'|'+d.att;
   try{
-    const blob=await fetchAttBlob(d);
-    if(_avUrl) URL.revokeObjectURL(_avUrl);
-    _avUrl=URL.createObjectURL(blob); _avName=d.name||'attachment';
+    if(!_cidCache[ck]){
+      body.innerHTML='<div class="av-empty"><i class="ti ti-loader-2 nt-spin" style="font-size:28px"></i><div style="margin-top:8px">Loading…</div></div>';
+      const blob=await fetchAttBlob({box:d.box, msg:d.msg, att:d.att, mime:d.mime, name:d.name});
+      if(my!==_avSeq) return;   // user already moved on to another attachment
+      _cidCache[ck]=URL.createObjectURL(blob);
+    }
+    if(my!==_avSeq) return;
+    _avUrl=_cidCache[ck]; _avName=d.name||'attachment';
     const mime=(d.mime||'').toLowerCase();
     if(mime.includes('pdf')) body.innerHTML=`<iframe src="${_avUrl}" title="Attachment preview"></iframe>`;
     else if(mime.startsWith('image/')) body.innerHTML=`<img src="${_avUrl}" alt="">`;
     else body.innerHTML=`<div class="av-empty"><i class="ti ti-file" style="font-size:32px"></i><div style="margin:8px 0 12px">No preview for this file type</div><button class="btn" onclick="avDownload()"><i class="ti ti-download"></i> Download</button></div>`;
-  }catch(e){ body.innerHTML=`<div class="av-empty">${esc(e.message)}</div>`; }
-};
+  }catch(e){ if(my===_avSeq) body.innerHTML=`<div class="av-empty">${esc(e.message)}</div>`; }
+}
+window.avNav=(step)=>{ avShow(_avIdx+step); };
 window.avDownload=()=>{
   if(!_avUrl){ toast('Nothing loaded yet.',true); return; }
   const a=document.createElement('a'); a.href=_avUrl; a.download=_avName||'attachment';
