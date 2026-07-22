@@ -5889,8 +5889,18 @@ function calcBreakForQty(qty){
 
 function calcQtyBreaks(){
   const qtys=[1,2,3,4,5].map(i=>parseFloat(document.getElementById(`qb-${i}`).value)||0).filter(q=>q>0);
-  if(!qtys.length) return;
-  const results=qtys.map(q=>calcBreakForQty(q));
+  if(!qtys.length){
+    document.getElementById('qty-breaks-result').innerHTML='<div style="font-size:12px;color:var(--red,#dc2626);padding:8px 0">Enter at least one quantity above, then click Calculate.</div>';
+    return;
+  }
+  let results;
+  try{
+    results=qtys.map(q=>calcBreakForQty(q));
+  }catch(e){
+    document.getElementById('qty-breaks-result').innerHTML='<div style="font-size:12px;color:var(--red,#dc2626);padding:8px 0">Quantity breaks hit an error: '+String(e.message||e)+'</div>';
+    console.error('calcQtyBreaks failed', e);
+    return;
+  }
   window._qtyBreaksResults = results.map(r=>({qty:r.qty, costPerPart:r.totalCostPart, pricePerPart:r.finalPrice}));
   const bestIdx=results.reduce((bi,r,i)=>r.finalPrice<results[bi].finalPrice?i:bi,0);
   const fmt=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -5902,6 +5912,7 @@ function calcQtyBreaks(){
       <th>Material/part</th>
       <th>Labor/part</th>
       <th>Cost/part</th>
+      <th>Markup</th>
       <th>Price/part</th>
       <th>Job total</th>
       <th>Margin</th>
