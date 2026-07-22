@@ -5812,23 +5812,10 @@ function calcBreakForQty(qty){
       const runCost=(mins/60)*rate*(1+finance);
       const setupCost=(setupHrs*rate*(1+finance))/qty;
       perPart=runCost+setupCost;
-    } else if(op==='903 Machine- Tap'||op==='902 Machine- Drill'||op==='904 Machine- Ream'){
-      const tapEnabled = document.getElementById('batch-tap-enabled').checked;
-      let mins;
-      if(tapEnabled){
-        const ppb=parseFloat(document.getElementById('bt-parts-per-blank').value)||1;
-        const holes=parseFloat(document.getElementById('bt-holes').value)||1;
-        const secsMin=parseFloat(document.getElementById('bt-secs-min').value)||5;
-        const secsMax=parseFloat(document.getElementById('bt-secs-max').value)||7;
-        const secsAvg=(secsMin+secsMax)/2;
-        mins=(Math.ceil(qty/ppb)*ppb*holes*secsAvg/60)/qty;
-      } else {
-        mins=parseFloat(minsEl.value)||0;
-      }
-      const runCost=(mins/60)*rate*(1+finance);
-      const setupCost=(setupHrs*rate*(1+finance))/qty;
-      perPart=runCost+setupCost;
     } else {
+      // Machine ops (tap/drill/ream/c'sink) need no special case here: the
+      // Machine Operations Calculator writes its per-part minutes into this
+      // op's minutes box, and those minutes don't change with order qty.
       const mins=parseFloat(minsEl.value)||0;
       const runCost=(mins/60)*rate*(1+finance);
       const setupCost=(setupHrs*rate*(1+finance))/qty;
