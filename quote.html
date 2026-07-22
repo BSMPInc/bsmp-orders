@@ -3351,7 +3351,7 @@ function populateWeldRateCodes(){
 }
 
 // Core: read the welding card and return all per-part cost components.
-function computeWelding(qty, finance){
+function computeWelding(qty, finance, silent){
   const enabledEl = document.getElementById('weld-enabled');
   if(!enabledEl || !enabledEl.checked) return {enabled:false, totalPart:0, bdLines:[]};
   qty = qty||1; finance = finance||0;
@@ -3381,7 +3381,7 @@ function computeWelding(qty, finance){
     const rowLaborMin = ofPct>0 ? (arcHr/ofPct)*60 : 0;
     weldRunMin += rowLaborMin;
     totalArcHr += arcHr; totalDepLb += depLb; totalFillerLb += fillerLb;
-    const rdEl = row.querySelector('.weld-readrow');
+    const rdEl = silent ? null : row.querySelector('.weld-readrow');
     if(rdEl) rdEl.textContent = (depLb>0)
       ? `${depLb.toFixed(3)}lb · ${(arcHr*60).toFixed(1)}min · ${weldPasses(area)}p`
       : '—';
@@ -3406,11 +3406,11 @@ function computeWelding(qty, finance){
   const totalPart = laborRun + setupPart + consumPart + ndtPart + htPart + finishPart + certPart;
 
   // Inline consumable info
-  const ci = document.getElementById('weld-consum-info');
+  const ci = silent ? null : document.getElementById('weld-consum-info');
   if(ci) ci.innerHTML = `Filler: <strong>${totalFillerLb.toFixed(3)} lb</strong> · Arc: <strong>${(totalArcHr*60).toFixed(1)} min</strong>`;
 
   // Readout
-  const ro = document.getElementById('weld-readout');
+  const ro = silent ? null : document.getElementById('weld-readout');
   if(ro){
     const fmt=v=>'$'+v.toFixed(2);
     ro.innerHTML = `Weld labor ${totalLaborMin.toFixed(1)} min/part @ $${rate}/hr`
@@ -3521,7 +3521,7 @@ function cncStockVolume(){
   return d1*d2*d3;
 }
 
-function computeCnc(qty, finance){
+function computeCnc(qty, finance, silent){
   const en=document.getElementById('cnc-enabled');
   if(!en || !en.checked) return {enabled:false, totalPart:0, bdLines:[]};
   qty=qty||1; finance=finance||0;
@@ -3555,17 +3555,17 @@ function computeCnc(qty, finance){
   window_cncEstMin=estMin;
 
   // Inline infos
-  const si=document.getElementById('cnc-stock-info');
+  const si=silent?null:document.getElementById('cnc-stock-info');
   if(si) si.innerHTML = form==='customer' ? 'Customer-furnished — $0 stock'
     : `Stock: <strong>${vol.toFixed(2)} in³</strong> · <strong>${wt.toFixed(2)} lb</strong> → $${stockCost.toFixed(2)}/part`;
-  const oi=document.getElementById('cnc-oh-info');
+  const oi=silent?null:document.getElementById('cnc-oh-info');
   if(oi) oi.innerHTML = `Prog $${progPart.toFixed(2)}/part · setup ${ops}×${gv('cnc-setup-min')}min = $${setupPart.toFixed(2)}/part (÷ ${qty})`;
-  const ri=document.getElementById('cnc-run-info');
+  const ri=silent?null:document.getElementById('cnc-run-info');
   if(ri) ri.innerHTML = `Run $${runPart.toFixed(2)}/part @ $${runRate}/hr`;
-  const ei=document.getElementById('cnc-est-info');
+  const ei=silent?null:document.getElementById('cnc-est-info');
   if(ei) ei.innerHTML = `≈ <strong>${estMin.toFixed(1)} min/part</strong> (rough ${roughMin.toFixed(1)} + holes ${holesMin.toFixed(1)})`;
 
-  const ro=document.getElementById('cnc-readout');
+  const ro=silent?null:document.getElementById('cnc-readout');
   if(ro){
     const f=v=>'$'+v.toFixed(2);
     ro.innerHTML = `Stock ${vol.toFixed(2)} in³ · ${wt.toFixed(2)} lb${form==='customer'?' (furnished)':''}`
@@ -5924,7 +5924,14 @@ function calcBreakForQty(qty){
     const progRate=RATES[progRateCode]||70;
     progCostPart=(progMins/60)*progRate*(1+finance)/qty;
   }
-  const totalCostPart=matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart;
+  // Welding + CNC mill estimators — same calcs as the main summary, with their
+  // one-time costs (setup, CAM) re-amortized over THIS break qty. silent=true so
+  // the on-card readouts keep showing the main qty's numbers.
+  const weld=computeWelding(qty,finance,true);
+  const weldCostPart=weld.enabled?weld.totalPart:0;
+  const cnc=computeCnc(qty,finance,true);
+  const cncCostPart=cnc.enabled?cnc.totalPart:0;
+  const totalCostPart=matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart+cncCostPart;
   const markupCost=totalCostPart*markup;
   const finalPrice=roundPrice(totalCostPart+markupCost);
   const expType=document.getElementById('exp-type')?.value||'none';
@@ -5933,7 +5940,7 @@ function calcBreakForQty(qty){
   const expediteFee=(expAmt>0&&expType==='pct')?Math.round(baseJobTotal*expAmt/100*100)/100:(expAmt>0&&expType==='flat')?expAmt:0;
   const jobTotal=baseJobTotal+expediteFee;
   const margin=finalPrice>0?((finalPrice-totalCostPart)/finalPrice*100):0;
-  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,totalCostPart,markup,markupCost,expediteFee,finalPrice,jobTotal,margin};
+  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,weldCostPart,cncCostPart,totalCostPart,markup,markupCost,expediteFee,finalPrice,jobTotal,margin};
 }
 
 function calcQtyBreaks(){
@@ -5954,12 +5961,16 @@ function calcQtyBreaks(){
   const bestIdx=results.reduce((bi,r,i)=>r.finalPrice<results[bi].finalPrice?i:bi,0);
   const fmt=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+  const hasCnc=results.some(r=>r.cncCostPart>0);
+  const hasWeld=results.some(r=>r.weldCostPart>0);
   let html=`<table class="qb-table">
     <thead><tr>
       <th>Quantity</th>
       <th>Sheets</th>
       <th>Material/part</th>
       <th>Labor/part</th>
+      ${hasCnc?'<th>CNC/part</th>':''}
+      ${hasWeld?'<th>Weld/part</th>':''}
       <th>Cost/part</th>
       <th>Markup</th>
       <th>Price/part</th>
@@ -5974,6 +5985,8 @@ function calcQtyBreaks(){
       <td><span class="qb-sub">${r.sheetsReq} × ${r.pps}/sht</span></td>
       <td class="qb-sub">${fmt(r.matCostPart)}</td>
       <td class="qb-sub">${fmt(r.laborCostPart)}</td>
+      ${hasCnc?`<td class="qb-sub">${fmt(r.cncCostPart)}</td>`:''}
+      ${hasWeld?`<td class="qb-sub">${fmt(r.weldCostPart)}</td>`:''}
       <td class="qb-sub">${fmt(r.totalCostPart)}</td>
       <td class="qb-sub" style="color:var(--sky)">${(r.markup*100).toFixed(0)}%</td>
       <td><span class="qb-price">${fmt(r.finalPrice)}</span></td>
