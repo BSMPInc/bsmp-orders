@@ -2902,6 +2902,9 @@ function getTimeStandard(code){
 
 let CUSTOMERS = JSON.parse(localStorage.getItem('bsmp_customers') || 'null') || [...DEFAULT_CUSTOMERS];
 let HISTORY = JSON.parse(localStorage.getItem('bsmp_history') || '[]');
+// id of the history record the form currently represents (set on load & save) —
+// re-saving updates that record instead of stacking a duplicate.
+let currentQuoteId = null;
 // Permanent archive of every printed quote/invoice for future reference.
 let ARCHIVE = JSON.parse(localStorage.getItem('bsmp_archive') || '[]');
 
@@ -4975,15 +4978,29 @@ function saveQuote(){
     if(min!==''||price!=='') matBreakRows.push({min,price});
   }
 
+  // ---- Update-in-place vs new record ----
+  // Re-saving the quote that's loaded in the form updates its history record
+  // instead of stacking a duplicate. Changing the part #, rev, or customer
+  // starts a fresh record, so an old quote used as a template is never
+  // overwritten. If the form wasn't loaded from history but a matching quote
+  // already exists, ask which the user wants.
+  const pnKey=pn||'—', custKey=cust||'—', revKey=document.getElementById('revision').value||'—';
+  const sameIdent=h=>!h.isAssembly && h.partNum===pnKey && h.customer===custKey && h.revision===revKey;
+  let existing=currentQuoteId!=null ? HISTORY.find(h=>h.id===currentQuoteId && sameIdent(h)) : null;
+  if(!existing){
+    const dup=HISTORY.find(sameIdent);
+    if(dup && confirm('A quote for this part, rev & customer is already in history ('+dup.date+', qty '+dup.qty+').\n\nOK — update that quote\nCancel — save as a separate quote')) existing=dup;
+  }
+
   const quote={
-    id: Date.now(),
+    id: existing ? existing.id : Date.now(),
     date: new Date().toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}),
-    status: 'pending',
-    mailKey: window._fromMailKey||null,   // set when this quote was started from an RFQ email
+    status: existing ? (existing.status||'pending') : 'pending',
+    mailKey: window._fromMailKey||(existing?existing.mailKey:null)||null,   // set when this quote was started from an RFQ email
     tier: currentTier || '',
-    partNum: pn||'—',
-    revision: document.getElementById('revision').value||'—',
-    customer: cust||'—',
+    partNum: pnKey,
+    revision: revKey,
+    customer: custKey,
     qty: d.qty,
     material: d.mat||'—',
     costPerPart: d.totalCostPart,
@@ -5043,8 +5060,10 @@ function saveQuote(){
     barOd: gv('bar-od'), barWall: gv('bar-wall'), barSide: gv('bar-side'),
     barWidth: gv('bar-width'), barHeight: gv('bar-height')
   };
+  if(existing){ const idx=HISTORY.indexOf(existing); if(idx>-1) HISTORY.splice(idx,1); }
   HISTORY.unshift(quote);
   if(HISTORY.length>500) HISTORY.pop();
+  currentQuoteId=quote.id;   // further saves keep updating this record
   try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(quote); }catch(e){}
   // Upload the full-res drawing to Firebase Storage, then attach its URL to the quote
   // (localStorage keeps only the small thumbnail; the database keeps only the URL).
@@ -5065,7 +5084,7 @@ function saveQuote(){
   const money = v => '$'+(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   if(persistResult.ok && !persistResult.droppedQuotes && !persistResult.strippedImgs){
     showToast({
-      title: 'Quote saved to history',
+      title: existing ? 'Quote updated in history' : 'Quote saved to history',
       sub: (pn||cust) + ' · ' + money(quote.jobTotal) + ' (qty ' + quote.qty + ')',
       actionLabel: 'View',
       onAction: () => showPanel('history'),
@@ -5104,6 +5123,7 @@ function resetForm(){
   const th=document.getElementById('tier-hint'); if(th) th.innerHTML='';
   if(typeof renderTierButtons==='function') renderTierButtons();
   if(!confirm('Clear this quote and start a new one?')) return;
+  currentQuoteId=null;        // next save creates a fresh history record
   window._fromMailKey=null;   // a fresh quote is no longer tied to the RFQ email
   document.getElementById('partnum').value='';
   document.getElementById('revision').value='';
@@ -5382,6 +5402,7 @@ function clearHistory(){
 function reloadQuote(id){
   const q=HISTORY.find(h=>h.id===id); if(!q) return;
   if(q.isAssembly){ loadAssemblyQuote(q); return; }   // assemblies reopen in their own panel
+  currentQuoteId=q.id;                   // re-saving updates this record, not a copy
   window._fromMailKey=q.mailKey||null;   // re-saving a reloaded quote keeps its RFQ-email link
   showPanel('quote');
   const sv=(id,val)=>{const el=document.getElementById(id); if(el && val!==undefined && val!==null && val!=='') el.value=val;};
