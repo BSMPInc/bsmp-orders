@@ -5059,7 +5059,34 @@ function saveQuote(){
     barEndWaste: gv('bar-end-waste'), barFaceCut: gv('bar-face-cut'),
     barMaterial: gv('bar-material'),
     barOd: gv('bar-od'), barWall: gv('bar-wall'), barSide: gv('bar-side'),
-    barWidth: gv('bar-width'), barHeight: gv('bar-height')
+    barWidth: gv('bar-width'), barHeight: gv('bar-height'),
+    // Welding estimator
+    weldEnabled: gc('weld-enabled'),
+    weldRateCode: gv('weld-rate-code'), weldFiller: gv('weld-filler'),
+    weldOf: gv('weld-of'), weldSetupMin: gv('weld-setup-min'),
+    weldRows: [...document.querySelectorAll('#weld-rows > div')].map(r=>({
+      proc:r.querySelector('.weld-proc')?.value||'', joint:r.querySelector('.weld-joint')?.value||'',
+      size:r.querySelector('.weld-size')?.value||'', len:r.querySelector('.weld-len')?.value||'',
+      count:r.querySelector('.weld-count')?.value||'', pos:r.querySelector('.weld-pos')?.value||''})),
+    weldFitupMin: gv('weld-fitup-min'), weldInterpassMin: gv('weld-interpass-min'), weldGrindMin: gv('weld-grind-min'),
+    weldFillerLb: gv('weld-filler-lb'), weldGasHr: gv('weld-gas-hr'),
+    weldNdtType: gv('weld-ndt-type'), weldNdtCost: gv('weld-ndt-cost'), weldNdtManual: weldNdtManual,
+    weldHtCost: gv('weld-ht-cost'), weldFinishCost: gv('weld-finish-cost'),
+    weldMarkMin: gv('weld-mark-min'), weldCertMin: gv('weld-cert-min'), weldCertRate: gv('weld-cert-rate'),
+    // CNC mill estimator
+    cncEnabled: gc('cnc-enabled'),
+    cncStockForm: gv('cnc-stock-form'), cncMaterial: gv('cnc-material'),
+    cncLb: gv('cnc-lb'), cncDrop: gv('cnc-drop'),
+    cncD1: gv('cnc-d1'), cncD2: gv('cnc-d2'), cncD3: gv('cnc-d3'),
+    cncProgMin: gv('cnc-prog-min'), cncProgRate: gv('cnc-prog-rate'),
+    cncOps: gv('cnc-ops'), cncSetupMin: gv('cnc-setup-min'), cncSetupRate: gv('cnc-setup-rate'),
+    cncRunMin: gv('cnc-run-min'), cncRunRate: gv('cnc-run-rate'), cncTooling: gv('cnc-tooling'),
+    cncRemoved: gv('cnc-removed'), cncMrr: gv('cnc-mrr'), cncFinish: gv('cnc-finish'),
+    cncDrills: gv('cnc-drills'), cncTaps: gv('cnc-taps'), cncReams: gv('cnc-reams'), cncCsinks: gv('cnc-csinks'),
+    cncRunManual: cncRunManual, cncLbManual: cncLbManual, cncMrrManual: cncMrrManual,
+    // Gang nesting (shared-sheet material split)
+    gangEnabled: gangEnabled,
+    gangParts: gangEnabled ? gangParts.map(p=>Object.assign({},p)) : []
   };
   if(existing){ const idx=HISTORY.indexOf(existing); if(idx>-1) HISTORY.splice(idx,1); }
   HISTORY.unshift(quote);
@@ -5155,6 +5182,16 @@ function resetForm(){
   opCount=0;hwCount=0;outCount=0;
   currentPartImg=null;
   addOp();addOp();addOp();addHw();addOut();
+  // Welding & CNC cards off for the fresh quote (their field values are
+  // harmless while disabled and get overwritten on the next load/enable)
+  { const wc=document.getElementById('weld-enabled'); if(wc){ wc.checked=false; toggleWelding(); }
+    const wr=document.getElementById('weld-rows'); if(wr){ wr.innerHTML=''; weldRowCount=0; }
+    weldNdtManual=false;
+    const cc=document.getElementById('cnc-enabled'); if(cc){ cc.checked=false; toggleCnc(); }
+    cncRunManual=false; cncLbManual=false; cncMrrManual=false;
+    const wCard=document.getElementById('weld-card'); if(wCard) wCard.style.display='none';
+    const cCard=document.getElementById('cnc-card'); if(cCard) cCard.style.display='none';
+    if(typeof syncOptCards==='function') syncOptCards(); }
   calculate();
 }
 
@@ -5639,6 +5676,58 @@ function reloadQuote(id){
   document.getElementById('batch-tap-label').style.color='var(--text2)';
   document.getElementById('batch-tap-dot').style.background='var(--border2)';
   if(q.batchTapEnabled) toggleBatchTap();
+
+  // ---- Welding estimator ----
+  const weCb=document.getElementById('weld-enabled');
+  if(weCb){
+    weCb.checked=!!q.weldEnabled;
+    toggleWelding();
+    if(q.weldEnabled){
+      populateWeldRateCodes();
+      const rowsEl=document.getElementById('weld-rows');
+      rowsEl.innerHTML=''; weldRowCount=0;
+      (q.weldRows||[]).forEach(r=>addWeldRow(r.proc,r.joint,r.size,r.len,r.count,r.pos));
+      if(!document.querySelector('#weld-rows .weld-proc')) addWeldRow();
+      sv('weld-rate-code', q.weldRateCode); sv('weld-filler', q.weldFiller);
+      sv('weld-of', q.weldOf); sv('weld-setup-min', q.weldSetupMin);
+      sv('weld-fitup-min', q.weldFitupMin); sv('weld-interpass-min', q.weldInterpassMin); sv('weld-grind-min', q.weldGrindMin);
+      sv('weld-filler-lb', q.weldFillerLb); sv('weld-gas-hr', q.weldGasHr);
+      weldNdtManual=!!q.weldNdtManual;
+      sv('weld-ndt-type', q.weldNdtType); sv('weld-ndt-cost', q.weldNdtCost);
+      sv('weld-ht-cost', q.weldHtCost); sv('weld-finish-cost', q.weldFinishCost);
+      sv('weld-mark-min', q.weldMarkMin); sv('weld-cert-min', q.weldCertMin); sv('weld-cert-rate', q.weldCertRate);
+    }
+  }
+
+  // ---- CNC mill estimator ----
+  const cncCb=document.getElementById('cnc-enabled');
+  if(cncCb){
+    cncCb.checked=!!q.cncEnabled;
+    toggleCnc();
+    if(q.cncEnabled){
+      populateCncRateCodes();
+      sv('cnc-stock-form', q.cncStockForm); onCncStockChange();
+      sv('cnc-material', q.cncMaterial);
+      cncLbManual=!!q.cncLbManual; cncMrrManual=!!q.cncMrrManual; cncRunManual=!!q.cncRunManual;
+      sv('cnc-lb', q.cncLb); sv('cnc-drop', q.cncDrop);
+      sv('cnc-d1', q.cncD1); sv('cnc-d2', q.cncD2); sv('cnc-d3', q.cncD3);
+      sv('cnc-prog-min', q.cncProgMin); sv('cnc-prog-rate', q.cncProgRate);
+      sv('cnc-ops', q.cncOps); sv('cnc-setup-min', q.cncSetupMin); sv('cnc-setup-rate', q.cncSetupRate);
+      sv('cnc-run-min', q.cncRunMin); sv('cnc-run-rate', q.cncRunRate); sv('cnc-tooling', q.cncTooling);
+      sv('cnc-removed', q.cncRemoved); sv('cnc-mrr', q.cncMrr); sv('cnc-finish', q.cncFinish);
+      sv('cnc-drills', q.cncDrills); sv('cnc-taps', q.cncTaps); sv('cnc-reams', q.cncReams); sv('cnc-csinks', q.cncCsinks);
+    }
+  }
+
+  // ---- Gang nesting ----
+  gangEnabled=!!q.gangEnabled;
+  gangParts=(q.gangParts||[]).map(p=>Object.assign({},p));
+  { const gCb=document.getElementById('gang-enabled'); if(gCb) gCb.checked=gangEnabled;
+    const gs=document.getElementById('gang-section'); if(gs) gs.style.display=gangEnabled?'block':'none'; }
+  renderGangParts();
+
+  // Open/close the optional cards to match what the quote actually uses
+  if(typeof syncOptCards==='function') syncOptCards();
 
   // ---- Recalculate everything ----
   calculate();
