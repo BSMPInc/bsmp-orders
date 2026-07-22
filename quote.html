@@ -1480,6 +1480,68 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Quantity Breaks
       <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:4px">— price at multiple quantities using current settings</span>
+      <button class="btn btn-sm" onclick="toggleQbHelp()" id="qb-help-btn" style="margin-left:auto;height:26px;padding:0 10px;font-size:11px;text-transform:none;letter-spacing:0">? How breaks work</button>
+    </div>
+
+    <!-- How price breaks work — collapsible explainer -->
+    <div id="qb-help" style="display:none;margin-bottom:16px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
+      <div style="display:flex;gap:14px;flex-wrap:wrap">
+
+        <div style="flex:1;min-width:210px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">1 · The tool already discounts</div>
+          <svg viewBox="0 0 220 110" style="width:100%;max-width:260px;display:block">
+            <line x1="18" y1="92" x2="212" y2="92" stroke="var(--border2)" stroke-width="1"/>
+            <rect x="26"  y="22" width="30" height="40" fill="#fbbf24" opacity="0.85"/>
+            <rect x="26"  y="62" width="30" height="30" fill="#94a3b8"/>
+            <rect x="74"  y="40" width="30" height="22" fill="#fbbf24" opacity="0.85"/>
+            <rect x="74"  y="62" width="30" height="30" fill="#94a3b8"/>
+            <rect x="122" y="51" width="30" height="11" fill="#fbbf24" opacity="0.85"/>
+            <rect x="122" y="62" width="30" height="30" fill="#94a3b8"/>
+            <rect x="170" y="57" width="30" height="5"  fill="#fbbf24" opacity="0.85"/>
+            <rect x="170" y="62" width="30" height="30" fill="#94a3b8"/>
+            <text x="41"  y="103" font-size="9" fill="var(--text3)" text-anchor="middle">10</text>
+            <text x="89"  y="103" font-size="9" fill="var(--text3)" text-anchor="middle">25</text>
+            <text x="137" y="103" font-size="9" fill="var(--text3)" text-anchor="middle">50</text>
+            <text x="185" y="103" font-size="9" fill="var(--text3)" text-anchor="middle">100</text>
+            <text x="30" y="14" font-size="9" fill="#b45309">■ one-time costs</text>
+            <text x="115" y="14" font-size="9" fill="#475569">■ material + labor</text>
+          </svg>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-top:6px">Programming, first article and setup are <strong>fixed dollars</strong>. More parts = fewer $ each, so price/part falls on its own — even with the markup % unchanged.</div>
+        </div>
+
+        <div style="flex:1;min-width:210px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">2 · Tiers are a second discount</div>
+          <svg viewBox="0 0 220 110" style="width:100%;max-width:260px;display:block">
+            <line x1="18" y1="92" x2="212" y2="92" stroke="var(--border2)" stroke-width="1"/>
+            <path d="M22 30 H60 V44 H98 V56 H136 V66 H174 V74 H206" fill="none" stroke="#0ea5e9" stroke-width="2.5"/>
+            <text x="40"  y="26" font-size="9" fill="#0369a1" text-anchor="middle">45%</text>
+            <text x="79"  y="40" font-size="9" fill="#0369a1" text-anchor="middle">38%</text>
+            <text x="117" y="52" font-size="9" fill="#0369a1" text-anchor="middle">30%</text>
+            <text x="155" y="62" font-size="9" fill="#0369a1" text-anchor="middle">25%</text>
+            <text x="190" y="70" font-size="9" fill="#0369a1" text-anchor="middle">20%</text>
+            <text x="115" y="105" font-size="9" fill="var(--text3)" text-anchor="middle">order quantity →</text>
+          </svg>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-top:6px">Drop the % only when real costs improve (full sheets, long runs, vendor breaks) or to win a big job. <strong>Keep steps small — 5 to 10 points</strong>, never a big cliff.</div>
+        </div>
+
+        <div style="flex:1;min-width:210px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">3 · The cliff test</div>
+          <svg viewBox="0 0 220 110" style="width:100%;max-width:260px;display:block">
+            <line x1="18" y1="92" x2="212" y2="92" stroke="var(--border2)" stroke-width="1"/>
+            <rect x="34" y="34" width="34" height="58" fill="#94a3b8"/>
+            <rect x="80" y="48" width="34" height="44" fill="#dc2626" opacity="0.8"/>
+            <text x="51" y="28" font-size="9" fill="var(--text2)" text-anchor="middle">$347</text>
+            <text x="97" y="42" font-size="9" fill="#dc2626" font-weight="bold" text-anchor="middle">$303</text>
+            <text x="51" y="103" font-size="9" fill="var(--text3)" text-anchor="middle">20 pcs</text>
+            <text x="97" y="103" font-size="9" fill="var(--text3)" text-anchor="middle">21 pcs</text>
+            <text x="150" y="55" font-size="20" fill="#dc2626">⚠</text>
+            <text x="168" y="52" font-size="9" fill="#dc2626">more parts,</text>
+            <text x="168" y="63" font-size="9" fill="#dc2626">smaller total</text>
+          </svg>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5;margin-top:6px">If a tier step is too steep, a <strong>bigger order can total less</strong> — a sharp buyer orders just past your cliff and you give markup away. Job totals should only go up. The tool checks every markup step when you hit Calculate and warns below the table.</div>
+        </div>
+
+      </div>
     </div>
     <!-- Sliding markup tiers -->
     <div style="margin-bottom:14px">
@@ -5920,8 +5982,53 @@ function calcQtyBreaks(){
     </tr>`;
   });
   html+=`</tbody></table>`;
+  html+=qbCliffCheckHtml(results);
   document.getElementById('qty-breaks-result').innerHTML=html;
   window._qtyBreaks=results;
+}
+
+function toggleQbHelp(){
+  const el=document.getElementById('qb-help');
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  const btn=document.getElementById('qb-help-btn');
+  if(btn) btn.textContent=open?'✕ Close help':'? How breaks work';
+}
+
+// Sanity-check the break schedule: a bigger order should never total less than a
+// smaller one. Checks the quantities in the table AND each markup-tier boundary
+// (qty t vs t+1), where a too-steep % step causes the inversion.
+function qbCliffCheckHtml(results){
+  const fmt=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const warns=[];
+  try{
+    const sorted=[...results].sort((a,b)=>a.qty-b.qty);
+    for(let i=1;i<sorted.length;i++){
+      if(sorted[i].jobTotal < sorted[i-1].jobTotal-0.005){
+        warns.push(`<strong>${sorted[i].qty.toLocaleString()} pcs totals ${fmt(sorted[i].jobTotal)}</strong> — less than ${fmt(sorted[i-1].jobTotal)} for ${sorted[i-1].qty.toLocaleString()} pcs.`);
+      }
+    }
+    // Probe only tier boundaries inside the range being quoted — those are the
+    // cliffs a buyer on THIS quote could exploit. (At high quantities any %
+    // step inverts the single-piece boundary math, so out-of-range boundaries
+    // would warn on nearly every schedule.)
+    const minQ=sorted[0].qty, maxQ=sorted[sorted.length-1].qty;
+    const seen=new Set();
+    for(const id of ['mt-thresh-1','mt-thresh-2','mt-thresh-3','mt-thresh-4']){
+      const t=Math.round(parseFloat(document.getElementById(id)?.value));
+      if(!t||t<1||seen.has(t)||t<minQ||t>maxQ) continue; seen.add(t);
+      const lo=calcBreakForQty(t), hi=calcBreakForQty(t+1);
+      if(hi.jobTotal < lo.jobTotal-0.005){
+        warns.push(`Markup steps ${(lo.markup*100).toFixed(0)}% → ${(hi.markup*100).toFixed(0)}% at qty ${t+1}: <strong>${t+1} pcs totals ${fmt(hi.jobTotal)}</strong> but ${t} pcs totals ${fmt(lo.jobTotal)} — a buyer pays less by ordering more.`);
+      }
+    }
+  }catch(e){ console.error('qbCliffCheck failed',e); return ''; }
+  if(!warns.length){
+    return `<div style="font-size:11px;color:#166534;padding:8px 2px 0">✓ Job totals rise with quantity at every break and markup step in this range.</div>`;
+  }
+  return `<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:var(--radius);font-size:12px;color:#92400e;line-height:1.7">`
+    +`<strong>⚠ Price-break check</strong><br>`+warns.join('<br>')
+    +`<br><span style="font-size:11px">Fix: keep the % flat across the quantities you're quoting, or soften the step / move the boundary until this box turns green — the check re-runs every Calculate. (Or accept it knowingly for a big order you want to win.)</span></div>`;
 }
 
 function copyQtyBreaks(){
@@ -7944,6 +8051,21 @@ function calcAsmQtyBreaks(){
     </tr>`;
   });
   tbl += '</tbody></table>';
+  // Same cliff test as the part-level breaks: bigger order must not total less.
+  {
+    const sorted=[...results].sort((a,b)=>a.qty-b.qty);
+    const w=[];
+    for(let i=1;i<sorted.length;i++){
+      if(sorted[i].jobTotal < sorted[i-1].jobTotal-0.005){
+        w.push(`<strong>${sorted[i].qty.toLocaleString()} assemblies total ${fmt(sorted[i].jobTotal)}</strong> — less than ${fmt(sorted[i-1].jobTotal)} for ${sorted[i-1].qty.toLocaleString()}.`);
+      }
+    }
+    if(w.length){
+      tbl += `<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:var(--radius);font-size:12px;color:#92400e;line-height:1.7"><strong>⚠ Price-break check</strong><br>`
+        + w.join('<br>')
+        + `<br><span style="font-size:11px">Fix: smooth the markup tiers — keep neighboring steps within 5–10 points so a bigger order always costs more in total.</span></div>`;
+    }
+  }
   document.getElementById('asm-qb-results').innerHTML = tbl;
 }
 
