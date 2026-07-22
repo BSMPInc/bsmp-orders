@@ -1702,6 +1702,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <button class="btn btn-sm" onclick="clearHistoryFilters()" title="Reset all filters">Clear filters</button>
       <div class="hist-actions">
         <button class="btn btn-sm" onclick="exportBackup()" title="Download a backup of all your saved data (quotes, prices, rates, settings)">⤓ Backup</button>
+        <button class="btn btn-sm" onclick="mergeDuplicateQuotes()" title="Collapse older duplicate saves of the same part # / rev / customer into the newest one">Merge duplicates</button>
         <button class="btn btn-sm" onclick="buildCombinedQuote()" id="combine-btn" style="white-space:nowrap">Combine selected (0)</button>
         <button class="btn btn-sm btn-danger" onclick="clearHistory()">Clear all</button>
       </div>
@@ -5397,6 +5398,79 @@ function deleteQuote(id){
 function clearHistory(){
   if(!confirm('Delete all saved quotes? This cannot be undone.')) return;
   HISTORY=[]; localStorage.setItem('bsmp_history','[]'); renderHistory();
+}
+
+// One-time cleanup for the duplicates the old Save button created: collapse
+// every group of quotes sharing a part # + rev + customer into the newest one.
+// A meaningful status, RFQ-email link, and drawing carry over from the removed
+// copies; the toast's Undo restores everything (local + cloud).
+function mergeDuplicateQuotes(){
+  const groups={};
+  HISTORY.forEach(q=>{
+    if(q.isAssembly) return;                                    // assemblies have their own identity
+    const noPn=!q.partNum||q.partNum==='—', noCust=!q.customer||q.customer==='—';
+    if(noPn&&noCust) return;                                    // nothing to match on
+    const key=(q.partNum||'—')+'\u0001'+(q.revision||'—')+'\u0001'+(q.customer||'—');
+    (groups[key]=groups[key]||[]).push(q);
+  });
+  const plans=Object.values(groups).filter(g=>g.length>1).map(g=>{
+    const sorted=[...g].sort((a,b)=>(b.id||0)-(a.id||0));       // id = save timestamp
+    return {keep:sorted[0], drop:sorted.slice(1)};
+  });
+  if(!plans.length){ alert('No duplicates found — every quote already has a unique part #, rev & customer.'); return; }
+  const totalDrop=plans.reduce((n,p)=>n+p.drop.length,0);
+
+  const lines=plans.slice(0,12).map(p=>{
+    const q=p.keep;
+    const ident=[q.partNum!=='—'?q.partNum:'(no part #)', q.revision&&q.revision!=='—'?'Rev '+q.revision:'', q.customer!=='—'?q.customer:''].filter(Boolean).join(' · ');
+    return '• '+ident+' — '+(p.drop.length+1)+' copies, keeping '+q.date;
+  });
+  if(plans.length>12) lines.push('…and '+(plans.length-12)+' more parts');
+  if(!confirm('Merge duplicate quotes?\n\n'+lines.join('\n')+'\n\nRemoves '+totalDrop+' older cop'+(totalDrop>1?'ies':'y')+' — the newest of each part is kept. Undo is available from the toast afterward.')) return;
+
+  const STATUS_RANK={accepted:3, declined:2, noresponse:1, pending:0};
+  const undo={removed:[], keeperBackups:[]};
+  plans.forEach(p=>{
+    const before=JSON.stringify(p.keep);
+    let changed=false;
+    p.drop.forEach(d=>{
+      if((STATUS_RANK[d.status]||0)>(STATUS_RANK[p.keep.status]||0)){ p.keep.status=d.status; changed=true; }
+      if(!p.keep.mailKey && d.mailKey){ p.keep.mailKey=d.mailKey; changed=true; }
+      if(!p.keep.drawingUrl && d.drawingUrl){ p.keep.drawingUrl=d.drawingUrl; changed=true; }
+      if(!p.keep.img && d.img){ p.keep.img=d.img; changed=true; }
+      undo.removed.push({index:HISTORY.indexOf(d), quote:d});
+    });
+    if(changed){
+      undo.keeperBackups.push({id:p.keep.id, json:before});
+      try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(p.keep); }catch(e){}
+    }
+  });
+  // Splice from the bottom up so the recorded indexes stay valid; per-id cloud
+  // removes only ([[whole-object-set-clobber]] — never rewrite the collection).
+  undo.removed.sort((a,b)=>b.index-a.index).forEach(r=>{
+    HISTORY.splice(r.index,1);
+    try{ if(window._qCloudRemoveQuote) window._qCloudRemoveQuote(r.quote.id); }catch(e){}
+  });
+  if(currentQuoteId!=null && undo.removed.some(r=>r.quote.id===currentQuoteId)) currentQuoteId=null;
+  persistHistory(); renderHistory();
+  showToast({
+    title:'Merged '+totalDrop+' duplicate quote'+(totalDrop>1?'s':''),
+    sub:plans.length+' part'+(plans.length>1?'s':'')+' now '+(plans.length>1?'have':'has')+' a single record (newest kept)',
+    actionLabel:'Undo', onAction:()=>undoMergeDuplicates(undo), duration:15000
+  });
+}
+
+function undoMergeDuplicates(undo){
+  undo.keeperBackups.forEach(b=>{
+    const i=HISTORY.findIndex(h=>h.id===b.id);
+    if(i>-1){ HISTORY[i]=JSON.parse(b.json); try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(HISTORY[i]); }catch(e){} }
+  });
+  undo.removed.sort((a,b)=>a.index-b.index).forEach(r=>{
+    HISTORY.splice(Math.min(r.index,HISTORY.length),0,r.quote);
+    try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(r.quote); }catch(e){}
+  });
+  persistHistory(); renderHistory();
+  showToast({title:'Merge undone', sub:'All duplicate copies restored', duration:5000});
 }
 
 function reloadQuote(id){
