@@ -560,6 +560,8 @@ const I18N = {
     'Customer / address':'Cliente / dirección','Customer PO #':'OC del cliente','Job / part':'Trabajo / parte','Date':'Fecha',
     'Notes (prints under the table)':'Notas (se imprimen bajo la tabla)','Generate & Print':'Generar e imprimir','Pick at least one cert.':'Elige al menos un certificado.',
     '— pick customer —':'— elige cliente —','Or type customer':'O escribe el cliente',
+    'Attach the cert documents behind the cover sheet':'Adjuntar los certificados detrás de la portada',
+    'Preparing cert pages…':'Preparando las páginas de certificados…','No file attached for':'Sin archivo adjunto para',
     'Order details':'Detalles de la orden','Orders using this material':'Órdenes que usan este material','Printed':'Impreso','No linked orders on this cert.':'Este certificado no tiene órdenes vinculadas.','Please allow pop-ups to open the printable order sheet.':'Permite ventanas emergentes para abrir la hoja imprimible.','View / print full order details':'Ver / imprimir detalles de la orden','Unit price':'Precio unitario','Order date':'Fecha de orden','Due date':'Fecha de entrega','Part #':'N.º de parte','Job #':'N.º de trabajo','Order':'Orden',
     'Material Certificate':'Certificado de material','Traceability sheet':'Hoja de trazabilidad','Certificate':'Certificado','Certificate document':'Documento del certificado','Loading cert document…':'Cargando documento del certificado…','No cert file attached.':'Sin archivo de certificado adjunto.','No cert details.':'Sin detalles del certificado.','Restricted':'Restringido','Could not embed this cert for printing. Open it from the cert viewer to print separately.':'No se pudo incrustar el certificado para imprimir. Ábrelo en el visor para imprimirlo por separado.',
     'Review detected certs':'Revisar certificados detectados','AI found multiple certs in this packet. Check each one, then save.':'La IA encontró varios certificados en este paquete. Revisa cada uno y guarda.',
@@ -3291,6 +3293,10 @@ window.qcCoverSheetOpen=()=>{
       <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="cs-date" type="date" value="${todayISO()}"></div>
       <div class="field"><label class="fl">${t('Notes (prints under the table)')}</label><input class="in" id="cs-notes"></div>
     </div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer;font-size:13px">
+      <input type="checkbox" id="cs-attach" checked style="width:auto;min-height:0;flex:none">
+      ${t('Attach the cert documents behind the cover sheet')}
+    </label>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="document.getElementById('cs-overlay').remove()">${t('Cancel')}</button>
       <button class="btn primary" onclick="window.qcCoverSheetPrint()"><i class="ti ti-printer"></i> ${t('Generate & Print')}</button>
@@ -3336,6 +3342,7 @@ window.qcCoverSheetPrint=()=>{
   const customer=gv('cs-cust')||gv('cs-cust-sel');
   const po=gv('cs-po'), job=gv('cs-job'), notes=gv('cs-notes');
   const dateStr=fmtDate(gv('cs-date')||todayISO());
+  const attachCerts=!!(document.getElementById('cs-attach')&&document.getElementById('cs-attach').checked);
   const ovEl=document.getElementById('cs-overlay'); if(ovEl) ovEl.remove();
   const logo=(typeof BSMP_PRINT_LOGO!=='undefined'&&BSMP_PRINT_LOGO)||'';   // paper logo — the app-header logo is white-on-dark and invisible on print
   const anyItar=certs.some(c=>c.itar);
@@ -3374,8 +3381,12 @@ window.qcCoverSheetPrint=()=>{
     html,body{background:#e5e7eb}
     .sheet{width:8.5in;min-height:11in;background:#fff;padding:42px 46px;color:#222;font-family:Arial,Helvetica,sans-serif}
     @page{size:letter portrait;margin:0}
-    @media screen{.sheet{margin:24px auto;box-shadow:0 2px 16px rgba(0,0,0,0.18)}}
-    @media print{html,body{background:#fff}.sheet{margin:0;box-shadow:none}}
+    .certpage{display:block;width:8.5in;height:auto;background:#fff;page-break-before:always}
+    .pagenote{width:8.5in;background:#fff;padding:24px 46px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#b3261e;page-break-before:always}
+    .actions{position:sticky;bottom:12px;text-align:center;padding:8px 0}
+    .actions button{font:700 14px Arial,Helvetica,sans-serif;background:#1e3a5f;color:#fff;border:none;border-radius:6px;padding:10px 26px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+    @media screen{.sheet,.certpage,.pagenote{margin:24px auto;box-shadow:0 2px 16px rgba(0,0,0,0.18)}}
+    @media print{html,body{background:#fff}.sheet,.certpage,.pagenote{margin:0;box-shadow:none}.actions{display:none}}
   </style></head><body><div class="sheet">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:30px">
       <div>
@@ -3417,9 +3428,58 @@ window.qcCoverSheetPrint=()=>{
       <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Prepared By</div>
       <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Date</div>
     </div>
-  </div><script>setTimeout(function(){window.focus();window.print();},350)<\/script></body></html>`);
+  </div>${attachCerts?`<div id="cert-pages"><div class="pagenote" style="color:#8a919b">${esc(t('Preparing cert pages…'))}</div></div>
+  <div class="actions"><button onclick="window.print()">${esc(t('Print'))}</button></div>`:''}
+  ${attachCerts?'':'<script>setTimeout(function(){window.focus();window.print();},350)<\/script>'}</body></html>`);
   w.document.close();
+  // With certs attached, print only after every page is rendered and decoded —
+  // an early print would ship blank pages behind the cover.
+  if(attachCerts){
+    qcCoverCertPages(certs, w)
+      .catch(e=>console.warn('cover cert render failed', e))
+      .then(()=>{ try{ w.focus(); w.print(); }catch(e){} });
+  }
 };
+// Rasterize every picked cert's files (PDF pages + photos) into the cover-sheet
+// print window, in the same order as the cover table. Resolves when all pages
+// are actually loaded, so the caller can safely print.
+async function qcCoverCertPages(certs, w){
+  const container=w.document.getElementById('cert-pages'); if(!container) return;
+  let html='';
+  const certLabel=c=>[c.material,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):''].filter(Boolean).join(' · ')||c.id;
+  for(const c of certs){
+    const files=c.files?vals(c.files):(c.file?[c.file]:[]);
+    const withUrl=files.filter(f=>f&&f.url);
+    if(!withUrl.length){ html+='<div class="pagenote">'+esc(t('No file attached for')+' '+certLabel(c))+' — '+esc(t('No cert file attached.'))+'</div>'; continue; }
+    for(const f of withUrl){
+      const isPdf=/pdf/i.test((f.type||'')+' '+(f.name||'')+' '+f.url);
+      if(!isPdf){ html+='<img class="certpage" src="'+f.url+'">'; continue; }
+      try{
+        if(typeof pdfjsLib==='undefined') throw new Error('no pdfjs');
+        const pdf=await pdfjsLib.getDocument({url:f.url}).promise;
+        for(let p=1;p<=pdf.numPages;p++){
+          const page=await pdf.getPage(p);
+          const vp=page.getViewport({scale:2});
+          const canvas=document.createElement('canvas');
+          canvas.width=vp.width; canvas.height=vp.height;
+          await page.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise;
+          html+='<img class="certpage" src="'+canvas.toDataURL('image/jpeg',0.86)+'">';
+        }
+      }catch(e){
+        console.warn('cover cert render failed', c.id, e);
+        html+='<div class="pagenote">'+esc(certLabel(c))+' — '+esc(t('Could not embed this cert for printing. Open it from the cert viewer to print separately.'))+'</div>';
+      }
+    }
+  }
+  container.innerHTML=html||('<div class="pagenote">'+esc(t('No cert file attached.'))+'</div>');
+  // wait for the non-PDF photo pages to finish loading before the print fires
+  // (load-event based — img.decode() can hang in a not-yet-rendered window)
+  await Promise.all([...container.querySelectorAll('img')].map(im=>new Promise(res=>{
+    if(im.complete) return res();
+    im.addEventListener('load',res,{once:true});
+    im.addEventListener('error',res,{once:true});
+  })));
+}
 
 /* =================== CERT VIEWER (view + print the actual PDF) =================== */
 function qcFileKind(f){ const s=((f&&f.url)||'')+' '+((f&&f.name)||'')+' '+((f&&f.type)||''); return /pdf/i.test(s)?'pdf':'img'; }
