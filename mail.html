@@ -1252,7 +1252,10 @@ function visibleThreads(){
   // still looks through everything — you searched for it, you get it)
   if(chipFilter==='muted') list=list.filter(t=>mutedOf(t));
   else if(!_searchQ) list=list.filter(t=>!mutedOf(t));
-  if(chipFilter!=='all' && chipFilter!=='muted'){
+  // the conversation you're reading stays visible while the Unread chip is on,
+  // even though opening it just marked it read — no list-jump mid-read
+  if(chipFilter==='unread') list=list.filter(t=>t.unread || (CURRENT&&CURRENT.key===t.key));
+  else if(chipFilter!=='all' && chipFilter!=='muted'){
     if(chipFilter==='none') list=list.filter(t=>!flagOf(t));
     else list=list.filter(t=>flagOf(t)===chipFilter);
   }
@@ -1270,10 +1273,11 @@ window.renderList=()=>{
   if(boxFilter) base=base.filter(t=>(t.mailboxes||[]).includes(boxFilter));
   const mutedCount=base.filter(t=>mutedOf(t)).length;
   base=base.filter(t=>!mutedOf(t));   // chip counts describe the visible inbox
-  const counts={all:base.length, none:base.filter(t=>!flagOf(t)).length};
+  const counts={all:base.length, unread:base.filter(t=>t.unread).length, none:base.filter(t=>!flagOf(t)).length};
   FLAG_DEFS.forEach(f=>counts[f.k]=base.filter(t=>flagOf(t)===f.k).length);
   $('fchips').innerHTML =
     `<span class="fchip${chipFilter==='all'?' on':''}" onclick="setChip('all')">All <span class="n">${counts.all}</span></span>`+
+    `<span class="fchip${chipFilter==='unread'?' on':''}" onclick="setChip('unread')"><span class="udot" style="margin-top:0"></span>Unread <span class="n">${counts.unread}</span></span>`+
     FLAG_DEFS.filter(f=>counts[f.k]>0||chipFilter===f.k).map(f=>
       `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')">${flagIcon(f,14)}${f.label==='Waiting on customer'?'Waiting':f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
     `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`+
