@@ -3483,14 +3483,15 @@ async function qcCoverCertPages(certs, w){
 
 /* =================== CERT VIEWER (view + print the actual PDF) =================== */
 function qcFileKind(f){ const s=((f&&f.url)||'')+' '+((f&&f.name)||'')+' '+((f&&f.type)||''); return /pdf/i.test(s)?'pdf':'img'; }
-function qcPrintFile(url,kind){
+function qcPrintFile(url,kind,name){
   const isPdf=(kind==='pdf')|| /pdf/i.test(kind||'') || /\.pdf($|\?)/i.test(url||'');
   if(isPdf){
     const w=window.open(url,'_blank');
     if(w){ const p=()=>{ try{ w.focus(); w.print(); }catch(e){} }; try{ w.addEventListener('load',p); }catch(e){} setTimeout(p,1400); }
   } else {
     const w=window.open('','_blank','width=900,height=760');
-    if(w){ w.document.write('<!doctype html><title>'+t('Print')+'</title><body style="margin:0;display:flex;align-items:center;justify-content:center"><img src="'+url+'" style="max-width:100%;max-height:100vh" onload="setTimeout(function(){window.focus();window.print();},200)"></body>'); w.document.close(); }
+    // the title becomes the default "Save as PDF" filename
+    if(w){ w.document.write('<!doctype html><title>'+esc(String(name||t('Print')).replace(/[\\/:*?"<>|]+/g,'-'))+'</title><body style="margin:0;display:flex;align-items:center;justify-content:center"><img src="'+url+'" style="max-width:100%;max-height:100vh" onload="setTimeout(function(){window.focus();window.print();},200)"></body>'); w.document.close(); }
   }
 }
 let _certView=null;
@@ -3518,7 +3519,7 @@ function qcvMount(){
 }
 window.qcvClose=()=>{ const ov=$('qcv-ov'); if(ov){ ov.style.display='none'; const b=$('qcv-body'); if(b) b.innerHTML=''; } _certView=null; };
 window.qcvGo=(i)=>{ if(_certView){ _certView.idx=i; qcvRender(); } };
-window.qcvPrint=()=>{ if(_certView){ const f=_certView.files[_certView.idx]; if(f) qcPrintFile(f.url,f.kind); } };
+window.qcvPrint=()=>{ if(_certView){ const f=_certView.files[_certView.idx]; if(f) qcPrintFile(f.url,f.kind,f.name); } };
 window.qcvOpen=()=>{ if(_certView){ const f=_certView.files[_certView.idx]; if(f) window.open(f.url,'_blank'); } };
 function qcvRender(){
   const V=_certView; if(!V) return; const c=V.c, f=V.files[V.idx];
@@ -3861,7 +3862,8 @@ window.qcRemove = (path)=> remove(ref(db,path));
 window.qcUpload = async (file, prefix)=>{
   const safe=(file.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
   const path='qc/'+(prefix||'misc')+'/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
-  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type});
+  // contentDisposition makes the browser save the file under its real name instead of the storage path
+  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
   await task;
   return await getDownloadURL(task.snapshot.ref);
 };

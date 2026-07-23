@@ -8933,7 +8933,9 @@ function openQtyBreakPrintWindow(q){
 
   const win = window.open("", "_blank", "width=850,height=1100");
   if(!win){ alert("Pop-up blocked. Allow pop-ups for this site to print quotes."); return; }
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Quote ${esc(q.quoteno)||""}</title>
+  // the window title becomes the default "Save as PDF" filename — include quote # and customer
+  const pdfTitle=('Quote '+((q.quoteno&&q.quoteno!=='—')?q.quoteno:'')+((q.customer&&q.customer!=='—'&&q.customer.trim())?' - '+q.customer:'')).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(pdfTitle)}</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     html, body { background:#e5e7eb; }
@@ -9081,7 +9083,9 @@ function openPrintWindow(q){
 
   const win = window.open("", "_blank", "width=850,height=1100");
   if(!win){ alert("Pop-up blocked. Allow pop-ups for this site to print quotes."); return; }
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Quote ${esc(q.quoteno)||""}</title>
+  // the window title becomes the default "Save as PDF" filename — include quote # and customer
+  const pdfTitle=('Quote '+((q.quoteno&&q.quoteno!=='—')?q.quoteno:'')+((q.customer&&q.customer!=='—'&&q.customer.trim())?' - '+q.customer:'')).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(pdfTitle)}</title>
   <style>
     * { box-sizing:border-box; margin:0; padding:0; }
     html, body { background:#e5e7eb; }
@@ -9330,7 +9334,8 @@ window._qUploadDrawing = async (id, dataUrl, ext) => {
   if(!_qUser) throw new Error('not signed in');
   if(!dataUrl) throw new Error('no drawing');
   const r = sref(storage, 'quote-drawings/' + id + '.' + (ext || 'png'));
-  await uploadString(r, dataUrl, 'data_url');
+  // contentDisposition gives downloads a readable name instead of the raw storage id
+  await uploadString(r, dataUrl, 'data_url', {contentDisposition:'inline; filename="quote-drawing-' + String(id).replace(/["\\\r\n]/g,'') + '.' + (ext || 'png') + '"'});
   return await getDownloadURL(r);
 };
 setPersistence(auth, browserLocalPersistence).catch(()=>{});

@@ -675,6 +675,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <button class="icon-btn" id="av-prev" style="display:none" title="Previous attachment (←)" onclick="avNav(-1)"><i class="ti ti-chevron-left"></i></button>
       <span id="av-count" style="display:none;font-size:12px;color:var(--text3);white-space:nowrap;font-variant-numeric:tabular-nums"></span>
       <button class="icon-btn" id="av-next" style="display:none" title="Next attachment (→)" onclick="avNav(1)"><i class="ti ti-chevron-right"></i></button>
+      <button class="icon-btn" title="Print" onclick="avPrint()"><i class="ti ti-printer"></i></button>
       <button class="icon-btn" title="Download" onclick="avDownload()"><i class="ti ti-download"></i></button>
       <button class="icon-btn" title="Close" onclick="closeAtt()"><i class="ti ti-x"></i></button>
     </div>
@@ -1453,7 +1454,9 @@ async function avShow(i){
     if(my!==_avSeq) return;
     _avUrl=_cidCache[ck]; _avName=d.name||'attachment';
     const mime=(d.mime||'').toLowerCase();
-    if(mime.includes('pdf')) body.innerHTML=`<iframe src="${_avUrl}" title="Attachment preview"></iframe>`;
+    // toolbar=0 hides Chrome's PDF toolbar — its download button saves blob previews under a
+    // random id, so downloads go through the header button, which uses the real file name
+    if(mime.includes('pdf')) body.innerHTML=`<iframe id="av-frame" src="${_avUrl}#toolbar=0&navpanes=0" title="Attachment preview"></iframe>`;
     else if(mime.startsWith('image/')) body.innerHTML=`<img src="${_avUrl}" alt="">`;
     else body.innerHTML=`<div class="av-empty"><i class="ti ti-file" style="font-size:32px"></i><div style="margin:8px 0 12px">No preview for this file type</div><button class="btn" onclick="avDownload()"><i class="ti ti-download"></i> Download</button></div>`;
   }catch(e){ if(my===_avSeq) body.innerHTML=`<div class="av-empty">${esc(e.message)}</div>`; }
@@ -1463,6 +1466,12 @@ window.avDownload=()=>{
   if(!_avUrl){ toast('Nothing loaded yet.',true); return; }
   const a=document.createElement('a'); a.href=_avUrl; a.download=_avName||'attachment';
   document.body.appendChild(a); a.click(); a.remove();
+};
+window.avPrint=()=>{
+  if(!_avUrl){ toast('Nothing loaded yet.',true); return; }
+  const f=document.getElementById('av-frame');
+  if(f&&f.contentWindow){ try{ f.contentWindow.focus(); f.contentWindow.print(); return; }catch(e){} }
+  window.open(_avUrl,'_blank');
 };
 window.closeAtt=()=>{ $('att-modal').style.display='none'; };
 const MSG_HTML_WRAP = '<base target="_blank"><style>body{font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;font-size:13.5px;color:#23262b;margin:0;line-height:1.5;word-break:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style>';
@@ -1894,7 +1903,8 @@ window.fileCertToQC=async ()=>{
       const blob=await fetchAttBlob(a);
       const safe=(a.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
       const path='qc/certs/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
-      const task=uploadBytesResumable(sRef(storage,path), blob, {contentType:a.mime});
+      // contentDisposition makes the browser save the file under its real name instead of the storage path
+      const task=uploadBytesResumable(sRef(storage,path), blob, {contentType:a.mime, contentDisposition:'inline; filename="'+String(a.name||'file').replace(/["\\\r\n]/g,'')+'"'});
       await task;
       files.push({name:a.name, url:await getDownloadURL(task.snapshot.ref), type:a.mime});
     }

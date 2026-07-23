@@ -6401,7 +6401,8 @@ window._rcvFile=async (input)=>{
   try{
     st.textContent='Uploading invoice…';
     const path=`vendorInvoices/${String(p.po).replace(/[^\w.\-]/g,'_')}_${Date.now()}/${file.name.replace(/[^\w.\-]/g,'_')}`;
-    const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type});
+    // contentDisposition makes the browser save the file under its real name instead of the storage path
+    const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
     task.on('state_changed', s=>{ st.textContent='Uploading invoice… '+Math.round((s.bytesTransferred/s.totalBytes)*100)+'%'; });
     await task;
     const url=await getDownloadURL(task.snapshot.ref);
@@ -7027,7 +7028,8 @@ window._uploadDrawing = async (id, file) => {
   const prog = document.getElementById('draw-progress-'+id);
   const path = `drawings/${id}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,'_')}`;
   try{
-    const task = uploadBytesResumable(sRef(storage, path), file, {contentType:file.type});
+    // contentDisposition makes the browser save the file under its real name instead of the storage path
+    const task = uploadBytesResumable(sRef(storage, path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
     task.on('state_changed', s=>{
       const pct = Math.round((s.bytesTransferred/s.totalBytes)*100);
       if(prog) prog.textContent = `Uploading… ${pct}%`;

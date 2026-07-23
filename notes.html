@@ -636,7 +636,8 @@ window.ntRemove = (path)=> remove(ref(db,path));
 window.ntUpload = async (file, uid, sub)=>{
   const safe=(file.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
   const path='notes/'+uid+'/'+(sub||'misc')+'/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
-  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type});
+  // contentDisposition makes the browser save the file under its real name instead of the storage path
+  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
   await task;
   return await getDownloadURL(task.snapshot.ref);
 };
