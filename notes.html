@@ -187,6 +187,21 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .log-mode{width:46px;height:42px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;font-size:19px}
 .log-mode:hover{border-color:var(--accent);color:var(--accent)}
 .log-mode.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.log-week{display:flex;gap:6px;align-items:stretch;margin:0 0 14px}
+.wk-arr{flex:none;width:34px;border:1px solid var(--border2);background:#fff;cursor:pointer;color:var(--text2);display:flex;align-items:center;justify-content:center;font-size:16px}
+.wk-arr:hover{border-color:var(--accent);color:var(--accent)}
+.wk-day{flex:1;min-width:0;border:1px solid var(--border2);background:#fff;cursor:pointer;padding:7px 2px 5px;display:flex;flex-direction:column;align-items:center;gap:1px;font-family:inherit}
+.wk-day:hover{border-color:var(--accent)}
+.wk-day .wk-dow{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)}
+.wk-day .wk-num{font-size:16px;font-weight:800;line-height:1.15}
+.wk-day.today{box-shadow:inset 0 -2.25px 0 var(--spark)}
+.wk-day.sel{background:var(--accent);border-color:var(--accent)}
+.wk-day.sel .wk-dow,.wk-day.sel .wk-num{color:#fff}
+.wk-dots{height:7px;display:flex;gap:3px;align-items:center}
+.wk-dot{width:5px;height:5px;border-radius:50%;background:var(--accent)}
+.wk-dot.open{background:var(--spark)}
+.wk-day.sel .wk-dot{background:#fff}
+.wk-day.sel .wk-dot.open{background:#ffb3b3}
 .log-card{padding:6px 0}
 .log-dayhead{padding:10px 16px 4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
 .log-item{border-bottom:1px solid var(--border)}
@@ -295,7 +310,7 @@ const tagIcon=tg=>TAG_ICONS[tg]||'tag';
 let page='list';       // 'list' | 'edit' | 'log'
 let editId=null;
 let filterTag='', pinnedOnly=false;
-let logDay=dayKey(), _logTaskMode=false;   // daily log: which day is showing + composer mode
+let logDay=dayKey(), weekStart=weekStartOf(logDay), _logTaskMode=false;   // daily log: shown day, week-strip anchor, composer mode
 let _editChecklist=[], _editTags=[], _editPhotos=[], _pendingPhotos=[], _editPinned=false, _photosCollapsed=true, _editOrderId='', _editCustomer='';
 
 /* ---------- helpers ---------- */
@@ -312,8 +327,11 @@ function dayLabel(k){
   if(k===dayKey()) return 'Today';
   const y=new Date(); y.setDate(y.getDate()-1);
   if(k===dayKey(y)) return 'Yesterday';
+  const tm=new Date(); tm.setDate(tm.getDate()+1);
+  if(k===dayKey(tm)) return 'Tomorrow';
   return dayFromKey(k).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
 }
+function weekStartOf(k){ const d=dayFromKey(k); d.setDate(d.getDate()-((d.getDay()+6)%7)); return dayKey(d); }   // Monday-first week
 function stripHtml(html){ const d=document.createElement('div'); d.innerHTML=String(html||''); return d.textContent||d.innerText||''; }
 function stripDangerous(html){
   return String(html||'')
@@ -352,7 +370,7 @@ window.ntOnAuth=(user)=>{
 window._ntPin=(e)=>{ e&&e.stopPropagation(); const p=document.body.classList.toggle('sb-pinned'); const ic=$('nt-pin-ico'); if(ic) ic.className='ti '+(p?'ti-pinned':'ti-pin'); };
 
 /* ---------- routing / render ---------- */
-window.showNtPage=(p)=>{ ntFlushSave(); if(p==='log'){ page='log'; logDay=dayKey(); } else { pinnedOnly=(p==='pinned'); page='list'; } editId=null; _pendingPhotos=[]; render(); };
+window.showNtPage=(p)=>{ ntFlushSave(); if(p==='log'){ page='log'; logDay=dayKey(); weekStart=weekStartOf(logDay); } else { pinnedOnly=(p==='pinned'); page='list'; } editId=null; _pendingPhotos=[]; render(); };
 window.ntNew=()=>{ editId=null; page='edit'; render(); };
 window.ntOpen=(id)=>{ editId=id; page='edit'; render(); };
 window.ntBack=async ()=>{ await ntFlushSave(); editId=null; page='list'; _pendingPhotos=[]; render(); };
@@ -429,21 +447,45 @@ window.ntTogglePin=async(id,e)=>{ if(e) e.stopPropagation(); const n=NOTES[id]; 
    Each entry is its own tiny record under notes/<uid> with kind:'log', so the
    existing Firebase rule covers it and every write is per-entry (no clobber). */
 function logEntries(){ return vals(NOTES).filter(n=>n.kind==='log'); }
+function logPlaceholder(){
+  const future=logDay>dayKey();
+  if(_logTaskMode) return future?('Type a task for '+dayLabel(logDay)+' and press Enter…'):'Type a task and press Enter…';
+  return future?('Planning ahead — press Enter to add to '+dayLabel(logDay)+'…'):"What's on your mind? Press Enter to log it…";
+}
+function weekStripHtml(){
+  const today=dayKey();
+  const counts={};
+  logEntries().forEach(n=>{ if(!n.day) return; const c=counts[n.day]=counts[n.day]||{n:0,open:0}; c.n++; if(n.task&&!n.done) c.open++; });
+  const d=dayFromKey(weekStart);
+  let cells='';
+  for(let i=0;i<7;i++){
+    const k=dayKey(d), c=counts[k];
+    const tip=c?(c.n+' entr'+(c.n>1?'ies':'y')+(c.open?(' · '+c.open+' open task'+(c.open>1?'s':'')):'')):dayLabel(k);
+    cells+=`<button class="wk-day${k===logDay?' sel':''}${k===today?' today':''}" title="${esc(tip)}" onclick="ntLogGo('${k}')">
+      <span class="wk-dow">${d.toLocaleDateString('en-US',{weekday:'short'})}</span>
+      <span class="wk-num">${(d.getDate()===1||i===0)?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):d.getDate()}</span>
+      <span class="wk-dots">${c?`<span class="wk-dot${c.open?' open':''}"></span>`:''}</span>
+    </button>`;
+    d.setDate(d.getDate()+1);
+  }
+  return `<button class="wk-arr" title="Previous week" aria-label="Previous week" onclick="ntWeekShift(-1)"><i class="ti ti-chevron-left"></i></button>
+    ${cells}
+    <button class="wk-arr" title="Next week" aria-label="Next week" onclick="ntWeekShift(1)"><i class="ti ti-chevron-right"></i></button>`;
+}
 function viewLog(){
   const today=dayKey();
   return `<div id="nt-log-page">
   <div class="toolbar">
-    <button class="btn icon" title="Previous day" aria-label="Previous day" onclick="ntLogShift(-1)"><i class="ti ti-chevron-left"></i></button>
-    <button class="btn icon" title="Next day" aria-label="Next day" onclick="ntLogShift(1)" ${logDay===today?'disabled':''}><i class="ti ti-chevron-right"></i></button>
     <button class="btn" onclick="ntLogToday()" ${logDay===today?'disabled':''}><i class="ti ti-calendar"></i> Today</button>
     <span class="log-dayttl">${dayLabel(logDay)}</span>
     <span class="sp" style="flex:1"></span>
     <div class="search-wrap" style="flex:1;max-width:340px"><i class="ti ti-search"></i><input id="nt-log-search" class="in" placeholder="Search the whole log…" oninput="ntLogRender()"></div>
   </div>
+  <div class="log-week" id="nt-log-week">${weekStripHtml()}</div>
   <div class="card">
     <div class="log-composer">
       <button class="log-mode ${_logTaskMode?'on':''}" id="nt-log-mode" title="Task mode — new entries get a checkbox" aria-label="Task mode" onclick="ntLogMode()"><i class="ti ti-checkbox"></i></button>
-      <input class="in" id="nt-log-in" placeholder="${_logTaskMode?'Type a task and press Enter…':'What&#39;s on your mind? Press Enter to log it…'}" autocomplete="off" onkeydown="if(event.key==='Enter')ntLogAdd()">
+      <input class="in" id="nt-log-in" placeholder="${esc(logPlaceholder())}" autocomplete="off" onkeydown="if(event.key==='Enter')ntLogAdd()">
       <button class="btn primary icon" style="height:42px" title="Add" aria-label="Add" onclick="ntLogAdd()"><i class="ti ti-plus"></i></button>
     </div>
   </div>
@@ -490,7 +532,7 @@ function logFeedHtml(){
   let html='';
   if(carried.length) html+=`<div class="card log-card"><div class="log-dayhead"><i class="ti ti-clock-exclamation"></i> Carried over — still open</div>${carried.map(n=>logRow(n,true)).join('')}</div>`;
   html+= dayList.length ? `<div class="card log-card">${dayList.map(n=>logRow(n,false)).join('')}</div>`
-    : `<div class="empty">${logDay===today?'Nothing logged yet today. Type above to start the stream.':'Nothing logged on this day.'}</div>`;
+    : `<div class="empty">${logDay===today?'Nothing logged yet today. Type above to start the stream.':(logDay>today?('Nothing planned for '+esc(dayLabel(logDay))+' yet — type above to add it.'):'Nothing logged on this day.')}</div>`;
   return html;
 }
 window.ntLogRender=()=>{
@@ -498,14 +540,21 @@ window.ntLogRender=()=>{
   const ae=document.activeElement;   // don't wipe an entry someone is mid-editing
   if(ae && f.contains(ae) && ae.classList && ae.classList.contains('log-text')) return;
   f.innerHTML=logFeedHtml();
+  const w=$('nt-log-week'); if(w) w.innerHTML=weekStripHtml();   // keep the dots current
 };
-function ntLogRebuild(){ const c=$('content'); if(!c) return; c.innerHTML=viewLog(); setActive(); const i=$('nt-log-in'); if(i) i.focus(); }
-window.ntLogShift=(dir)=>{ const d=dayFromKey(logDay); d.setDate(d.getDate()+dir); const k=dayKey(d); if(k>dayKey()) return; logDay=k; ntLogRebuild(); };
-window.ntLogToday=()=>{ logDay=dayKey(); ntLogRebuild(); };
+function ntLogRebuild(){
+  const c=$('content'); if(!c) return;
+  const prev=$('nt-log-in'); const draft=prev?prev.value:'';   // switching days keeps whatever's typed
+  c.innerHTML=viewLog(); setActive();
+  const i=$('nt-log-in'); if(i){ i.value=draft; i.focus(); }
+}
+window.ntLogGo=(k)=>{ if(k===logDay) return; logDay=k; weekStart=weekStartOf(k); ntLogRebuild(); };
+window.ntWeekShift=(dir)=>{ const d=dayFromKey(weekStart); d.setDate(d.getDate()+dir*7); weekStart=dayKey(d); const w=$('nt-log-week'); if(w) w.innerHTML=weekStripHtml(); };
+window.ntLogToday=()=>{ logDay=dayKey(); weekStart=weekStartOf(logDay); ntLogRebuild(); };
 window.ntLogMode=()=>{
   _logTaskMode=!_logTaskMode;
   const b=$('nt-log-mode'); if(b) b.classList.toggle('on',_logTaskMode);
-  const i=$('nt-log-in'); if(i){ i.placeholder=_logTaskMode?'Type a task and press Enter…':"What's on your mind? Press Enter to log it…"; i.focus(); }
+  const i=$('nt-log-in'); if(i){ i.placeholder=logPlaceholder(); i.focus(); }
 };
 window.ntLogAdd=async()=>{
   if(!NT_UID) return;
