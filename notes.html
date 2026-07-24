@@ -207,8 +207,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .log-item{border-bottom:1px solid var(--border)}
 .log-item:last-child{border-bottom:none}
 .log-row{display:flex;align-items:flex-start;gap:10px;padding:9px 16px 7px}
-.log-time{flex:none;width:64px;font-size:11.5px;color:var(--text3);font-weight:700;text-align:right;padding-top:3px;white-space:nowrap}
-.log-time.wide{width:auto}
+.log-time{flex:none;font-size:11.5px;color:var(--text3);font-weight:700;text-align:right;padding-top:3px;white-space:nowrap}
 .log-row input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:var(--accent);margin-top:2px}
 .log-text{flex:1;min-width:0;line-height:1.45;outline:none;white-space:pre-wrap;word-break:break-word;padding:2px 5px;border:1px solid transparent}
 .log-text:focus{border-color:var(--accent);background:#fff}
@@ -220,7 +219,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .log-acts button:hover{color:var(--accent)}
 .log-acts button.rm:hover{color:var(--red)}
 .log-subcount{flex:none;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 7px;margin-top:2px;white-space:nowrap}
-.log-subs{padding:0 16px 8px 104px}
+.log-subs{padding:0 16px 8px 44px}
 .log-sub{display:flex;align-items:flex-start;gap:8px;padding:2px 0}
 .log-sub input[type=checkbox]{width:15px;height:15px;flex:none;accent-color:var(--accent);margin-top:3px}
 .log-sub .log-text{font-size:13px;padding:1px 5px}
@@ -229,7 +228,6 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .log-sub:hover .rmsub,.log-sub:focus-within .rmsub{opacity:1}
 .log-sub .rmsub:hover{color:var(--red)}
 @media(pointer:coarse){.log-sub .rmsub{opacity:.55}}
-@media(max-width:700px){.log-subs{padding-left:60px}}
 
 .nt-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .nt-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -492,22 +490,25 @@ function viewLog(){
   <div id="nt-log-feed">${logFeedHtml()}</div>
 </div>`;
 }
-function logRow(n,showDay){
+function logEord(n){ return (n.ord!=null)?n.ord:-(n.ts||0); }   // default keeps newest-first until someone reorders
+function logRow(n,showDay,fixed){
   const subs=vals(n.subs);   // RTDB can hand lists back object-shaped with holes
   const subsDone=subs.filter(s=>s.done).length;
   return `<div class="log-item">
   <div class="log-row${n.task?' is-task':''}${(n.task&&n.done)?' done':''}">
-    <span class="log-time${showDay?' wide':''}">${showDay?esc(dayLabel(n.day))+' · ':''}${fmtTime(n.ts||n.updatedAt)}</span>
     ${n.task?`<input type="checkbox" ${n.done?'checked':''} title="Done" onchange="ntLogToggle('${n.id}',this.checked)">`:''}
     <div class="log-text" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onblur="ntLogEdit('${n.id}',this)">${esc(n.text||'')}</div>
     ${(n.task&&subs.length)?`<span class="log-subcount">${subsDone}/${subs.length}</span>`:''}
     <span class="log-acts">
+      ${fixed?'':`<button title="Move up" onclick="ntLogMove('${n.id}',-1)"><i class="ti ti-chevron-up"></i></button>
+      <button title="Move down" onclick="ntLogMove('${n.id}',1)"><i class="ti ti-chevron-down"></i></button>`}
       ${n.task?`<button title="Add a subtask" onclick="ntLogAddSub('${n.id}')"><i class="ti ti-subtask"></i></button>`:''}
       ${n.noteId?`<button title="Open the note made from this" onclick="ntOpen('${n.noteId}')"><i class="ti ti-note"></i></button>`
                 :`<button title="Turn into a full note" onclick="ntLogPromote('${n.id}')"><i class="ti ti-file-plus"></i></button>`}
       ${n.task?'':`<button title="Make it a task" onclick="ntLogMakeTask('${n.id}')"><i class="ti ti-checkbox"></i></button>`}
       <button class="rm" title="Delete entry" onclick="ntLogDel('${n.id}')"><i class="ti ti-x"></i></button>
     </span>
+    <span class="log-time">${showDay?esc(dayLabel(n.day))+' · ':''}${fmtTime(n.ts||n.updatedAt)}</span>
   </div>
   ${(n.task&&subs.length)?`<div class="log-subs">${subs.map(s=>`<div class="log-sub${s.done?' done':''}">
       <input type="checkbox" ${s.done?'checked':''} title="Done" onchange="ntLogSubToggle('${n.id}','${s.id}',this.checked)">
@@ -523,15 +524,15 @@ function logFeedHtml(){
     const hits=all.filter(n=>((n.text||'')+' '+vals(n.subs).map(s=>s.text||'').join(' ')).toLowerCase().includes(q)).sort((a,b)=>(b.ts||0)-(a.ts||0));
     if(!hits.length) return `<div class="empty">No log entries match.</div>`;
     let html='',last='';
-    hits.forEach(n=>{ if(n.day!==last){ last=n.day; html+=`<div class="log-dayhead">${esc(dayLabel(n.day))}</div>`; } html+=logRow(n,false); });
+    hits.forEach(n=>{ if(n.day!==last){ last=n.day; html+=`<div class="log-dayhead">${esc(dayLabel(n.day))}</div>`; } html+=logRow(n,false,true); });
     return `<div class="card log-card">${html}</div>`;
   }
   const today=dayKey();
-  const dayList=all.filter(n=>n.day===logDay).sort((a,b)=>(b.ts||0)-(a.ts||0));   // newest first, composer on top
+  const dayList=all.filter(n=>n.day===logDay).sort((a,b)=>logEord(a)-logEord(b));   // manual order; defaults newest-first
   const carried=(logDay===today)?all.filter(n=>n.task&&!n.done&&n.day&&n.day<today).sort((a,b)=>(a.ts||0)-(b.ts||0)):[];
   let html='';
-  if(carried.length) html+=`<div class="card log-card"><div class="log-dayhead"><i class="ti ti-clock-exclamation"></i> Carried over — still open</div>${carried.map(n=>logRow(n,true)).join('')}</div>`;
-  html+= dayList.length ? `<div class="card log-card">${dayList.map(n=>logRow(n,false)).join('')}</div>`
+  if(carried.length) html+=`<div class="card log-card"><div class="log-dayhead"><i class="ti ti-clock-exclamation"></i> Carried over — still open</div>${carried.map(n=>logRow(n,true,true)).join('')}</div>`;
+  html+= dayList.length ? `<div class="card log-card">${dayList.map(n=>logRow(n,false,false)).join('')}</div>`
     : `<div class="empty">${logDay===today?'Nothing logged yet today. Type above to start the stream.':(logDay>today?('Nothing planned for '+esc(dayLabel(logDay))+' yet — type above to add it.'):'Nothing logged on this day.')}</div>`;
   return html;
 }
@@ -568,6 +569,20 @@ window.ntLogAdd=async()=>{
 };
 window.ntLogToggle=async(id,v)=>{ const n=NOTES[id]; if(!n) return; n.done=!!v; n.doneAt=v?Date.now():null; n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); };
 window.ntLogMakeTask=async(id)=>{ const n=NOTES[id]; if(!n) return; n.task=true; n.done=false; n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); };
+window.ntLogMove=async(id,dir)=>{
+  const n=NOTES[id]; if(!n) return;
+  const list=logEntries().filter(x=>x.day===n.day).sort((a,b)=>logEord(a)-logEord(b));
+  const i=list.findIndex(x=>x.id===id), j=i+dir;
+  if(i<0||j<0||j>=list.length) return;                    // already at the top/bottom
+  const other=list[j];
+  const a=logEord(n), b=logEord(other);
+  n.ord=b; other.ord=a;
+  if(n.ord===other.ord) n.ord+=(dir<0?-1:1);              // identical-timestamp tiebreak
+  n.updatedAt=Date.now(); other.updatedAt=Date.now();
+  ntLogRender();
+  await dbSet('notes/'+NT_UID+'/'+n.id, n);
+  await dbSet('notes/'+NT_UID+'/'+other.id, other);
+};
 window.ntLogAddSub=(id)=>{
   const n=NOTES[id]; if(!n) return;
   n.subs=vals(n.subs);
