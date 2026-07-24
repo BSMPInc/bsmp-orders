@@ -180,6 +180,30 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .thumb-wrap{position:relative;display:inline-block}
 .thumb-x{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;background:var(--red);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px}
 .thumb-pending{width:auto;height:84px;display:inline-flex;align-items:center;gap:5px;padding:0 12px;font-size:11px;color:var(--text2);border:1px dashed var(--border2)}
+/* ===== Daily log ===== */
+.log-dayttl{font-size:16px;font-weight:800;padding:0 4px;white-space:nowrap}
+.log-composer{display:flex;gap:8px;align-items:center}
+.log-composer .in{flex:1;height:42px}
+.log-mode{width:46px;height:42px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border2);background:#fff;color:var(--text2);cursor:pointer;font-size:19px}
+.log-mode:hover{border-color:var(--accent);color:var(--accent)}
+.log-mode.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.log-card{padding:6px 0}
+.log-dayhead{padding:10px 16px 4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
+.log-row{display:flex;align-items:flex-start;gap:10px;padding:9px 16px;border-bottom:1px solid var(--border)}
+.log-row:last-child{border-bottom:none}
+.log-time{flex:none;width:64px;font-size:11.5px;color:var(--text3);font-weight:700;text-align:right;padding-top:3px;white-space:nowrap}
+.log-time.wide{width:auto}
+.log-row input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:var(--accent);margin-top:2px}
+.log-text{flex:1;min-width:0;line-height:1.45;outline:none;white-space:pre-wrap;word-break:break-word;padding:2px 5px;border:1px solid transparent}
+.log-text:focus{border-color:var(--accent);background:#fff}
+.log-row.done .log-text{color:var(--text3);text-decoration:line-through}
+.log-acts{flex:none;display:flex;gap:2px;opacity:0;transition:opacity .12s}
+.log-row:hover .log-acts,.log-row:focus-within .log-acts{opacity:1}
+@media(pointer:coarse){.log-acts{opacity:.55}}
+.log-acts button{border:none;background:none;color:var(--text3);cursor:pointer;font-size:15px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.log-acts button:hover{color:var(--accent)}
+.log-acts button.rm:hover{color:var(--red)}
+
 .nt-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .nt-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .nt-toast.err{background:var(--spark)}
@@ -208,6 +232,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
     <div class="nav">
       <div class="nav-sec">Notes</div>
       <div class="nav-item" id="nav-all" onclick="showNtPage('all')"><i class="ti ti-notes"></i><span class="nav-label">All Notes</span></div>
+      <div class="nav-item" id="nav-log" onclick="showNtPage('log')"><i class="ti ti-notebook"></i><span class="nav-label">Daily Log</span></div>
       <div class="nav-item" id="nav-pinned" onclick="showNtPage('pinned')"><i class="ti ti-pin"></i><span class="nav-label">Pinned</span></div>
       <div class="nav-item" onclick="ntNew()"><i class="ti ti-plus"></i><span class="nav-label">New Note</span></div>
     </div>
@@ -230,6 +255,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 <!-- ===== Dock ===== -->
 <div class="dock" id="nt-dock" style="display:none">
   <button class="dock-tab" id="dock-all" onclick="showNtPage('all')"><i class="ti ti-notes"></i><span>All</span></button>
+  <button class="dock-tab" id="dock-log" onclick="showNtPage('log')"><i class="ti ti-notebook"></i><span>Log</span></button>
   <button class="dock-tab" id="dock-pinned" onclick="showNtPage('pinned')"><i class="ti ti-pin"></i><span>Pinned</span></button>
   <button class="dock-tab" onclick="ntNew()"><i class="ti ti-plus"></i><span>New</span></button>
   <div class="dock-switch">
@@ -254,9 +280,10 @@ let NOTES={}, ORDERS={}, CUSTOMERS={};
 const TAGS=['Site Visit','Open Orders','RFQ','Purchasing','Fab Note','Scheduling'];
 const TAG_ICONS={'Site Visit':'map-pin','Open Orders':'clipboard-list','RFQ':'file-dollar','Purchasing':'shopping-cart','Fab Note':'hammer','Scheduling':'calendar'};
 const tagIcon=tg=>TAG_ICONS[tg]||'tag';
-let page='list';       // 'list' | 'edit'
+let page='list';       // 'list' | 'edit' | 'log'
 let editId=null;
 let filterTag='', pinnedOnly=false;
+let logDay=dayKey(), _logTaskMode=false;   // daily log: which day is showing + composer mode
 let _editChecklist=[], _editTags=[], _editPhotos=[], _pendingPhotos=[], _editPinned=false, _photosCollapsed=true, _editOrderId='', _editCustomer='';
 
 /* ---------- helpers ---------- */
@@ -266,6 +293,15 @@ const vals=o=>Object.values(o||{}).filter(Boolean);
 const newId=p=>(p||'r')+'_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
 function gv(id){const el=$(id);return el?el.value.trim():'';}
 function fmtWhen(ms){ if(!ms) return ''; return new Date(ms).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
+function fmtTime(ms){ if(!ms) return ''; return new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+function dayKey(dt){ dt=dt||new Date(); return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0'); }
+function dayFromKey(k){ const p=String(k||'').split('-'); return new Date(+p[0],(+p[1]||1)-1,+p[2]||1); }
+function dayLabel(k){
+  if(k===dayKey()) return 'Today';
+  const y=new Date(); y.setDate(y.getDate()-1);
+  if(k===dayKey(y)) return 'Yesterday';
+  return dayFromKey(k).toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+}
 function stripHtml(html){ const d=document.createElement('div'); d.innerHTML=String(html||''); return d.textContent||d.innerText||''; }
 function stripDangerous(html){
   return String(html||'')
@@ -304,7 +340,7 @@ window.ntOnAuth=(user)=>{
 window._ntPin=(e)=>{ e&&e.stopPropagation(); const p=document.body.classList.toggle('sb-pinned'); const ic=$('nt-pin-ico'); if(ic) ic.className='ti '+(p?'ti-pinned':'ti-pin'); };
 
 /* ---------- routing / render ---------- */
-window.showNtPage=(p)=>{ ntFlushSave(); pinnedOnly=(p==='pinned'); page='list'; editId=null; _pendingPhotos=[]; render(); };
+window.showNtPage=(p)=>{ ntFlushSave(); if(p==='log'){ page='log'; logDay=dayKey(); } else { pinnedOnly=(p==='pinned'); page='list'; } editId=null; _pendingPhotos=[]; render(); };
 window.ntNew=()=>{ editId=null; page='edit'; render(); };
 window.ntOpen=(id)=>{ editId=id; page='edit'; render(); };
 window.ntBack=async ()=>{ await ntFlushSave(); editId=null; page='list'; _pendingPhotos=[]; render(); };
@@ -312,10 +348,11 @@ window.ntBack=async ()=>{ await ntFlushSave(); editId=null; page='list'; _pendin
 function setActive(){
   document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const key = page==='edit'?null:(pinnedOnly?'pinned':'all');
+  const key = page==='edit'?null:(page==='log'?'log':(pinnedOnly?'pinned':'all'));
   if(key){ const d=$('dock-'+key), nv=$('nav-'+key); if(d) d.classList.add('active'); if(nv) nv.classList.add('active'); }
   const ttl=$('tb-title'), sub=$('tb-sub');
   if(page==='edit'){ if(ttl) ttl.textContent=editId?'Edit note':'New note'; if(sub) sub.textContent='Your private notes'; }
+  else if(page==='log'){ if(ttl) ttl.textContent='Daily Log'; if(sub) sub.textContent=dayLabel(logDay)+' — stream of thought'; }
   else if(pinnedOnly){ if(ttl) ttl.textContent='Pinned'; if(sub) sub.textContent='Your pinned notes'; }
   else { if(ttl) ttl.textContent='Notes'; if(sub) sub.textContent='Your private notes'; }
 }
@@ -324,6 +361,7 @@ function render(){
   setActive();
   const c=$('content'); if(!c) return;
   if(page==='edit'){ if($('nt-editor')) return; c.innerHTML=viewEdit(); ntRenderChecklist(); ntRenderTags(); ntRenderPhotos(); ntRenderOrderSel(); ntRenderCustSel(); return; }
+  if(page==='log'){ if($('nt-log-page')){ ntLogRender(); } else { c.innerHTML=viewLog(); const i=$('nt-log-in'); if(i) i.focus(); } return; }
   c.innerHTML=viewList();
 }
 
@@ -332,7 +370,7 @@ function orderShort(id){ const o=ORDERS[id]; if(!o) return ''; return [o.custome
 function orderSearchText(id){ const o=id?ORDERS[id]:null; return o?[o.customer,o.part||o.partNum,o.job,o.po].filter(Boolean).join(' ').toLowerCase():''; }
 function gridHtml(){
   const q=(($('nt-search')&&$('nt-search').value)||'').toLowerCase().trim();
-  let list=vals(NOTES);
+  let list=vals(NOTES).filter(n=>n.kind!=='log');   // log entries live on the Daily Log page
   if(filterTag) list=list.filter(n=>(n.tags||[]).includes(filterTag));
   if(pinnedOnly) list=list.filter(n=>n.pinned);
   if(q) list=list.filter(n=>
@@ -374,6 +412,115 @@ function viewList(){
 window.ntRenderGrid=()=>{ const g=$('nt-grid'); if(g) g.innerHTML=gridHtml(); };
 window.ntFilterTag=(tg,e)=>{ if(e) e.stopPropagation(); filterTag=(filterTag===tg)?'':tg; document.querySelectorAll('.tagfilter .tf').forEach(el=>el.classList.toggle('on', (el.dataset.tg||'')===filterTag)); ntRenderGrid(); };
 window.ntTogglePin=async(id,e)=>{ if(e) e.stopPropagation(); const n=NOTES[id]; if(!n) return; await dbSet('notes/'+NT_UID+'/'+id, Object.assign({}, n, {pinned:!n.pinned})); };
+
+/* ---------- daily log — a stream-of-thought feed, one day at a time ----------
+   Each entry is its own tiny record under notes/<uid> with kind:'log', so the
+   existing Firebase rule covers it and every write is per-entry (no clobber). */
+function logEntries(){ return vals(NOTES).filter(n=>n.kind==='log'); }
+function viewLog(){
+  const today=dayKey();
+  return `<div id="nt-log-page">
+  <div class="toolbar">
+    <button class="btn icon" title="Previous day" aria-label="Previous day" onclick="ntLogShift(-1)"><i class="ti ti-chevron-left"></i></button>
+    <button class="btn icon" title="Next day" aria-label="Next day" onclick="ntLogShift(1)" ${logDay===today?'disabled':''}><i class="ti ti-chevron-right"></i></button>
+    <button class="btn" onclick="ntLogToday()" ${logDay===today?'disabled':''}><i class="ti ti-calendar"></i> Today</button>
+    <span class="log-dayttl">${dayLabel(logDay)}</span>
+    <span class="sp" style="flex:1"></span>
+    <div class="search-wrap" style="flex:1;max-width:340px"><i class="ti ti-search"></i><input id="nt-log-search" class="in" placeholder="Search the whole log…" oninput="ntLogRender()"></div>
+  </div>
+  <div class="card">
+    <div class="log-composer">
+      <button class="log-mode ${_logTaskMode?'on':''}" id="nt-log-mode" title="Task mode — new entries get a checkbox" aria-label="Task mode" onclick="ntLogMode()"><i class="ti ti-checkbox"></i></button>
+      <input class="in" id="nt-log-in" placeholder="${_logTaskMode?'Type a task and press Enter…':'What&#39;s on your mind? Press Enter to log it…'}" autocomplete="off" onkeydown="if(event.key==='Enter')ntLogAdd()">
+      <button class="btn primary icon" style="height:42px" title="Add" aria-label="Add" onclick="ntLogAdd()"><i class="ti ti-plus"></i></button>
+    </div>
+  </div>
+  <div id="nt-log-feed">${logFeedHtml()}</div>
+</div>`;
+}
+function logRow(n,showDay){
+  return `<div class="log-row${n.task?' is-task':''}${(n.task&&n.done)?' done':''}">
+    <span class="log-time${showDay?' wide':''}">${showDay?esc(dayLabel(n.day))+' · ':''}${fmtTime(n.ts||n.updatedAt)}</span>
+    ${n.task?`<input type="checkbox" ${n.done?'checked':''} title="Done" onchange="ntLogToggle('${n.id}',this.checked)">`:''}
+    <div class="log-text" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onblur="ntLogEdit('${n.id}',this)">${esc(n.text||'')}</div>
+    <span class="log-acts">
+      ${n.noteId?`<button title="Open the note made from this" onclick="ntOpen('${n.noteId}')"><i class="ti ti-note"></i></button>`
+                :`<button title="Turn into a full note" onclick="ntLogPromote('${n.id}')"><i class="ti ti-file-plus"></i></button>`}
+      ${n.task?'':`<button title="Make it a task" onclick="ntLogMakeTask('${n.id}')"><i class="ti ti-checkbox"></i></button>`}
+      <button class="rm" title="Delete entry" onclick="ntLogDel('${n.id}')"><i class="ti ti-x"></i></button>
+    </span>
+  </div>`;
+}
+function logFeedHtml(){
+  const q=(($('nt-log-search')&&$('nt-log-search').value)||'').toLowerCase().trim();
+  const all=logEntries();
+  if(q){   // search sweeps every day, grouped under day headers
+    const hits=all.filter(n=>(n.text||'').toLowerCase().includes(q)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    if(!hits.length) return `<div class="empty">No log entries match.</div>`;
+    let html='',last='';
+    hits.forEach(n=>{ if(n.day!==last){ last=n.day; html+=`<div class="log-dayhead">${esc(dayLabel(n.day))}</div>`; } html+=logRow(n,false); });
+    return `<div class="card log-card">${html}</div>`;
+  }
+  const today=dayKey();
+  const dayList=all.filter(n=>n.day===logDay).sort((a,b)=>(b.ts||0)-(a.ts||0));   // newest first, composer on top
+  const carried=(logDay===today)?all.filter(n=>n.task&&!n.done&&n.day&&n.day<today).sort((a,b)=>(a.ts||0)-(b.ts||0)):[];
+  let html='';
+  if(carried.length) html+=`<div class="card log-card"><div class="log-dayhead"><i class="ti ti-clock-exclamation"></i> Carried over — still open</div>${carried.map(n=>logRow(n,true)).join('')}</div>`;
+  html+= dayList.length ? `<div class="card log-card">${dayList.map(n=>logRow(n,false)).join('')}</div>`
+    : `<div class="empty">${logDay===today?'Nothing logged yet today. Type above to start the stream.':'Nothing logged on this day.'}</div>`;
+  return html;
+}
+window.ntLogRender=()=>{
+  const f=$('nt-log-feed'); if(!f) return;
+  const ae=document.activeElement;   // don't wipe an entry someone is mid-editing
+  if(ae && f.contains(ae) && ae.classList && ae.classList.contains('log-text')) return;
+  f.innerHTML=logFeedHtml();
+};
+function ntLogRebuild(){ const c=$('content'); if(!c) return; c.innerHTML=viewLog(); setActive(); const i=$('nt-log-in'); if(i) i.focus(); }
+window.ntLogShift=(dir)=>{ const d=dayFromKey(logDay); d.setDate(d.getDate()+dir); const k=dayKey(d); if(k>dayKey()) return; logDay=k; ntLogRebuild(); };
+window.ntLogToday=()=>{ logDay=dayKey(); ntLogRebuild(); };
+window.ntLogMode=()=>{
+  _logTaskMode=!_logTaskMode;
+  const b=$('nt-log-mode'); if(b) b.classList.toggle('on',_logTaskMode);
+  const i=$('nt-log-in'); if(i){ i.placeholder=_logTaskMode?'Type a task and press Enter…':"What's on your mind? Press Enter to log it…"; i.focus(); }
+};
+window.ntLogAdd=async()=>{
+  if(!NT_UID) return;
+  const inp=$('nt-log-in'); const text=((inp&&inp.value)||'').trim(); if(!text) return;
+  const now=Date.now();
+  const rec={ id:newId('log'), kind:'log', text, ts:now, day:logDay, task:_logTaskMode, done:false, createdAt:now, updatedAt:now, by:(NT_USER&&NT_USER.email)||'' };
+  NOTES[rec.id]=rec;                       // show instantly; the listener confirms
+  if(inp){ inp.value=''; inp.focus(); }
+  ntLogRender();
+  await dbSet('notes/'+NT_UID+'/'+rec.id, rec);
+};
+window.ntLogToggle=async(id,v)=>{ const n=NOTES[id]; if(!n) return; n.done=!!v; n.doneAt=v?Date.now():null; n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); };
+window.ntLogMakeTask=async(id)=>{ const n=NOTES[id]; if(!n) return; n.task=true; n.done=false; n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); };
+window.ntLogEdit=async(id,el)=>{
+  const n=NOTES[id]; if(!n||!el) return;
+  const t=(el.textContent||'').trim();
+  if(!t){ el.textContent=n.text||''; return; }   // blanking an entry doesn't delete it — use the ✕
+  if(t===n.text) return;
+  n.text=t; n.updatedAt=Date.now();
+  await dbSet('notes/'+NT_UID+'/'+id, n);
+};
+window.ntLogDel=async(id)=>{
+  const n=NOTES[id]; if(!n) return;
+  if(!confirm('Delete this log entry?')) return;
+  delete NOTES[id]; ntLogRender();
+  await dbRemove('notes/'+NT_UID+'/'+id);
+};
+window.ntLogPromote=async(id)=>{
+  const n=NOTES[id]; if(!n) return;
+  const nid=newId('note'), now=Date.now();
+  const rec={ id:nid, title:'', body:'<p>'+esc(n.text||'')+'</p>', checklist:[], tags:[], orderId:'', customer:'',
+              photos:[], pinned:false, createdAt:now, updatedAt:now, by:(NT_USER&&NT_USER.email)||'' };
+  NOTES[nid]=rec;
+  await dbSet('notes/'+NT_UID+'/'+nid, rec);
+  n.noteId=nid; n.updatedAt=now;           // the entry stays in the stream, linked to its note
+  await dbSet('notes/'+NT_UID+'/'+id, n);
+  ntOpen(nid);
+};
 
 /* ---------- editor ---------- */
 function orderLabel(o){ return [o.customer,o.part||o.partNum,o.job?('Job '+o.job):'',o.po?('PO '+o.po):''].filter(Boolean).join(' · ')||o.id; }
