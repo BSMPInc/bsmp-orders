@@ -189,8 +189,9 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .log-mode.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .log-card{padding:6px 0}
 .log-dayhead{padding:10px 16px 4px;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
-.log-row{display:flex;align-items:flex-start;gap:10px;padding:9px 16px;border-bottom:1px solid var(--border)}
-.log-row:last-child{border-bottom:none}
+.log-item{border-bottom:1px solid var(--border)}
+.log-item:last-child{border-bottom:none}
+.log-row{display:flex;align-items:flex-start;gap:10px;padding:9px 16px 7px}
 .log-time{flex:none;width:64px;font-size:11.5px;color:var(--text3);font-weight:700;text-align:right;padding-top:3px;white-space:nowrap}
 .log-time.wide{width:auto}
 .log-row input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:var(--accent);margin-top:2px}
@@ -203,6 +204,17 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .log-acts button{border:none;background:none;color:var(--text3);cursor:pointer;font-size:15px;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;padding:0}
 .log-acts button:hover{color:var(--accent)}
 .log-acts button.rm:hover{color:var(--red)}
+.log-subcount{flex:none;font-size:11px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:2px 7px;margin-top:2px;white-space:nowrap}
+.log-subs{padding:0 16px 8px 104px}
+.log-sub{display:flex;align-items:flex-start;gap:8px;padding:2px 0}
+.log-sub input[type=checkbox]{width:15px;height:15px;flex:none;accent-color:var(--accent);margin-top:3px}
+.log-sub .log-text{font-size:13px;padding:1px 5px}
+.log-sub.done .log-text{color:var(--text3);text-decoration:line-through}
+.log-sub .rmsub{flex:none;border:none;background:none;color:var(--text3);cursor:pointer;font-size:13px;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;padding:0;opacity:0;transition:opacity .12s}
+.log-sub:hover .rmsub,.log-sub:focus-within .rmsub{opacity:1}
+.log-sub .rmsub:hover{color:var(--red)}
+@media(pointer:coarse){.log-sub .rmsub{opacity:.55}}
+@media(max-width:700px){.log-subs{padding-left:60px}}
 
 .nt-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:#fff;padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .nt-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
@@ -439,23 +451,34 @@ function viewLog(){
 </div>`;
 }
 function logRow(n,showDay){
-  return `<div class="log-row${n.task?' is-task':''}${(n.task&&n.done)?' done':''}">
+  const subs=vals(n.subs);   // RTDB can hand lists back object-shaped with holes
+  const subsDone=subs.filter(s=>s.done).length;
+  return `<div class="log-item">
+  <div class="log-row${n.task?' is-task':''}${(n.task&&n.done)?' done':''}">
     <span class="log-time${showDay?' wide':''}">${showDay?esc(dayLabel(n.day))+' · ':''}${fmtTime(n.ts||n.updatedAt)}</span>
     ${n.task?`<input type="checkbox" ${n.done?'checked':''} title="Done" onchange="ntLogToggle('${n.id}',this.checked)">`:''}
     <div class="log-text" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.blur();}" onblur="ntLogEdit('${n.id}',this)">${esc(n.text||'')}</div>
+    ${(n.task&&subs.length)?`<span class="log-subcount">${subsDone}/${subs.length}</span>`:''}
     <span class="log-acts">
+      ${n.task?`<button title="Add a subtask" onclick="ntLogAddSub('${n.id}')"><i class="ti ti-subtask"></i></button>`:''}
       ${n.noteId?`<button title="Open the note made from this" onclick="ntOpen('${n.noteId}')"><i class="ti ti-note"></i></button>`
                 :`<button title="Turn into a full note" onclick="ntLogPromote('${n.id}')"><i class="ti ti-file-plus"></i></button>`}
       ${n.task?'':`<button title="Make it a task" onclick="ntLogMakeTask('${n.id}')"><i class="ti ti-checkbox"></i></button>`}
       <button class="rm" title="Delete entry" onclick="ntLogDel('${n.id}')"><i class="ti ti-x"></i></button>
     </span>
+  </div>
+  ${(n.task&&subs.length)?`<div class="log-subs">${subs.map(s=>`<div class="log-sub${s.done?' done':''}">
+      <input type="checkbox" ${s.done?'checked':''} title="Done" onchange="ntLogSubToggle('${n.id}','${s.id}',this.checked)">
+      <div class="log-text" id="lst-${s.id}" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();const t=(this.textContent||'').trim();this.blur();if(t)ntLogAddSub('${n.id}');}" onblur="ntLogSubEdit('${n.id}','${s.id}',this)">${esc(s.text||'')}</div>
+      <button class="rmsub" title="Delete subtask" onclick="ntLogSubDel('${n.id}','${s.id}')"><i class="ti ti-x"></i></button>
+    </div>`).join('')}</div>`:''}
   </div>`;
 }
 function logFeedHtml(){
   const q=(($('nt-log-search')&&$('nt-log-search').value)||'').toLowerCase().trim();
   const all=logEntries();
   if(q){   // search sweeps every day, grouped under day headers
-    const hits=all.filter(n=>(n.text||'').toLowerCase().includes(q)).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    const hits=all.filter(n=>((n.text||'')+' '+vals(n.subs).map(s=>s.text||'').join(' ')).toLowerCase().includes(q)).sort((a,b)=>(b.ts||0)-(a.ts||0));
     if(!hits.length) return `<div class="empty">No log entries match.</div>`;
     let html='',last='';
     hits.forEach(n=>{ if(n.day!==last){ last=n.day; html+=`<div class="log-dayhead">${esc(dayLabel(n.day))}</div>`; } html+=logRow(n,false); });
@@ -496,6 +519,40 @@ window.ntLogAdd=async()=>{
 };
 window.ntLogToggle=async(id,v)=>{ const n=NOTES[id]; if(!n) return; n.done=!!v; n.doneAt=v?Date.now():null; n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); };
 window.ntLogMakeTask=async(id)=>{ const n=NOTES[id]; if(!n) return; n.task=true; n.done=false; n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); };
+window.ntLogAddSub=(id)=>{
+  const n=NOTES[id]; if(!n) return;
+  n.subs=vals(n.subs);
+  const s={id:newId('ls'),text:'',done:false};
+  n.subs.push(s);
+  ntLogRender();
+  const el=document.getElementById('lst-'+s.id); if(el) el.focus();
+  // not saved yet — an empty subtask is dropped on blur; it's saved once text lands
+};
+window.ntLogSubEdit=async(id,sid,el)=>{
+  const n=NOTES[id]; if(!n) return;
+  n.subs=vals(n.subs);
+  const s=n.subs.find(x=>x.id===sid); if(!s) return;
+  const t=((el&&el.textContent)||'').trim();
+  if(!t){ n.subs=n.subs.filter(x=>x.id!==sid); n.updatedAt=Date.now(); ntLogRender(); await dbSet('notes/'+NT_UID+'/'+id, n); return; }
+  if(t===s.text) return;
+  s.text=t; n.updatedAt=Date.now();
+  ntLogRender();
+  await dbSet('notes/'+NT_UID+'/'+id, n);
+};
+window.ntLogSubToggle=async(id,sid,v)=>{
+  const n=NOTES[id]; if(!n) return;
+  n.subs=vals(n.subs);
+  const s=n.subs.find(x=>x.id===sid); if(!s) return;
+  s.done=!!v; s.doneAt=v?Date.now():null; n.updatedAt=Date.now();
+  ntLogRender();
+  await dbSet('notes/'+NT_UID+'/'+id, n);
+};
+window.ntLogSubDel=async(id,sid)=>{
+  const n=NOTES[id]; if(!n) return;
+  n.subs=vals(n.subs).filter(x=>x.id!==sid); n.updatedAt=Date.now();
+  ntLogRender();
+  await dbSet('notes/'+NT_UID+'/'+id, n);
+};
 window.ntLogEdit=async(id,el)=>{
   const n=NOTES[id]; if(!n||!el) return;
   const t=(el.textContent||'').trim();
@@ -513,7 +570,8 @@ window.ntLogDel=async(id)=>{
 window.ntLogPromote=async(id)=>{
   const n=NOTES[id]; if(!n) return;
   const nid=newId('note'), now=Date.now();
-  const rec={ id:nid, title:'', body:'<p>'+esc(n.text||'')+'</p>', checklist:[], tags:[], orderId:'', customer:'',
+  const checklist=vals(n.subs).filter(s=>s.text).map(s=>({id:s.id,text:s.text,done:!!s.done,doneAt:s.doneAt||null}));   // subtasks become the note's checklist
+  const rec={ id:nid, title:'', body:'<p>'+esc(n.text||'')+'</p>', checklist, tags:[], orderId:'', customer:'',
               photos:[], pinned:false, createdAt:now, updatedAt:now, by:(NT_USER&&NT_USER.email)||'' };
   NOTES[nid]=rec;
   await dbSet('notes/'+NT_UID+'/'+nid, rec);
