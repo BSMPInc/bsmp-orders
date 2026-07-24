@@ -878,6 +878,11 @@ tr.inv-low td{background:#fdf6ee}
 .ci-job{font-weight:700;color:var(--text2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ci-desc{min-width:0;display:flex;flex-direction:column;gap:2px}
 .ci-desc-main{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-copy{cursor:pointer;color:var(--text3);font-size:13px;margin-left:5px;opacity:0;transition:opacity .12s;vertical-align:-1px}
+.ci-row:hover .ci-copy{opacity:.85}
+.ci-copy:hover{color:var(--navy)}
+@media(pointer:coarse){.ci-copy{opacity:.55}}
+.pm-part,.card-part-chip{cursor:copy}
 .ci-miss{display:inline-flex;align-items:center;color:#BA7517;font-size:12px;margin-right:4px;flex-shrink:0}
 .ci-out{font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:600}
 .ci-qty{text-align:center;color:var(--text2);font-weight:600}
@@ -2664,6 +2669,7 @@ function poItemsHtml(g){
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
         <span class="ci-desc-main" title="${((r.part?('Part '+r.part):'')+(r.part&&r.desc?' · ':'')+(r.desc||'')).replace(/"/g,'&quot;')}">${missBadge}${clip}${r.part||r.desc||'<span style="color:var(--text3)">(no part #)</span>'}</span>
+        ${(r.part||r.desc)?`<i class="ti ti-copy ci-copy" title="Copy part #" onclick="window._cpyPart('${r.id}',event)"></i>`:''}
         ${r.invoice?`<span class="inv-chip" title="Invoice number${r.invoiceDate?(' · invoiced '+fmtDate(r.invoiceDate)):''}">Inv ${r.invoice}${r.invoiceDate?` · ${fmtDate(r.invoiceDate)}`:''}</span>`:''}
         ${osLine}
       </div>
@@ -2680,7 +2686,8 @@ function poItemsHtml(g){
 
 function partChipHtml(g){
   const ps=[...new Set(g.items.map(i=>(i.part||'').trim()).filter(Boolean))];
-  return ps.length?`<span class="card-part-chip" title="${ps.join(', ').replace(/"/g,'&quot;')}"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
+  const gkE=g.gk.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return ps.length?`<span class="card-part-chip" title="${ps.join(', ').replace(/"/g,'&quot;')} — click to copy" onclick="window._cpyParts('${gkE}',event)"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
 }
 
 function outsourceStripHtml(g){
@@ -2706,7 +2713,7 @@ function condensedCard(g){
   const startDates=g.items.map(i=>i.ordered).filter(Boolean).sort();
   const startVal=startDates.length?fmtDate(startDates[0]):'';
   const ps=[...new Set(g.items.map(i=>(i.part||'').trim()).filter(Boolean))];
-  const partChip=ps.length?`<span class="pm-part" title="${ps.join(', ').replace(/"/g,'&quot;')}"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
+  const partChip=ps.length?`<span class="pm-part" title="${ps.join(', ').replace(/"/g,'&quot;')} — click to copy" onclick="window._cpyParts('${gkE}',event)"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
   const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
   const missTip=g.incompleteCount?`${g.incompleteCount} item${g.incompleteCount!==1?'s':''} missing info`:'';
   const missBadge=g.incompleteCount?`<span class="pm-miss" title="${missTip}"><i class="ti ti-alert-triangle"></i></span>`:'';
@@ -2841,6 +2848,7 @@ function sizeCardPanes(){
 }
 window.addEventListener('resize', ()=>{ if(document.querySelector('.po-list')) sizeCardPanes(); });
 window._selPO=(gk)=>{
+  if(String((window.getSelection&&window.getSelection())||'').trim())return;   // a drag-select isn't a click
   selectedPO=gk; renderCards();
   if(window.innerWidth<=900){ setTimeout(()=>document.querySelector('.po-detail')?.scrollIntoView({behavior:'smooth',block:'start'}),30); }
 };
@@ -3129,7 +3137,28 @@ function showPicker(picker,anchor){
 }
 
 window._tg=(gk)=>{if(collapsedGroups.has(gk))collapsedGroups.delete(gk);else collapsedGroups.add(gk);render();};
-window._tl=(id,e)=>{if(e.target.closest('button')||e.target.closest('input')||e.target.closest('textarea')||e.target.closest('.status-badge')||e.target.closest('.pay-badge')||e.target.closest('.editable'))return;if(expanded.has(id))expanded.delete(id);else expanded.add(id);render();};
+window._tl=(id,e)=>{if(e.target.closest('button')||e.target.closest('input')||e.target.closest('textarea')||e.target.closest('.status-badge')||e.target.closest('.pay-badge')||e.target.closest('.editable'))return;
+  // a drag-select ends in a click on this row — swallowing it (and re-rendering) destroyed the
+  // selection before anyone could copy it. If text is selected, this "click" was a selection.
+  if(String((window.getSelection&&window.getSelection())||'').trim())return;
+  if(expanded.has(id))expanded.delete(id);else expanded.add(id);render();};
+// ── copy the part # straight off a card (works on iPad where text-selection is fiddly) ──
+window._cpyText=async(txt,e)=>{ if(e){e.stopPropagation();e.preventDefault();} if(!txt)return;
+  try{ await navigator.clipboard.writeText(txt); }
+  catch(err){ const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e2){} ta.remove(); }
+  copyToast(txt);
+};
+window._cpyPart=(id,e)=>{ const r=orders.find(o=>o.id===id); if(r) window._cpyText(r.part||r.desc||'', e); };
+window._cpyParts=(gk,e)=>{ const g=poGroups().find(x=>x.gk===gk); if(!g) return; const ps=[...new Set(g.items.map(i=>(i.part||'').trim()).filter(Boolean))]; window._cpyText(ps.join(', '), e); };
+function copyToast(txt){
+  let el=document.getElementById('undo-toast');
+  if(!el){ el=document.createElement('div'); el.id='undo-toast'; el.className='undo-toast'; document.body.appendChild(el); }
+  el.innerHTML=`<span class="ut-msg"><i class="ti ti-copy"></i> Copied ${esc2(txt)}</span><button class="ut-x" id="ut-x-btn" title="Dismiss"><i class="ti ti-x"></i></button>`;
+  el.classList.add('show');
+  clearTimeout(_undoTimer);
+  document.getElementById('ut-x-btn').onclick=()=>el.classList.remove('show');
+  _undoTimer=setTimeout(()=>el.classList.remove('show'), 2500);
+}
 window._tp=(id,proc,e)=>{
   e.stopPropagation();
   const r=orders.find(o=>o.id===id);if(!r)return;
