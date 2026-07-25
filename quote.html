@@ -597,7 +597,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div class="nav-item" id="nav-assembly" onclick="showAssemblyPanel()"><i class="ti ti-stack-2"></i><span class="nav-label">New Assembly</span></div>
     <div class="nav-item" id="nav-history" onclick="showPanel('history')"><i class="ti ti-history"></i><span class="nav-label">Quote History</span><span class="nav-badge" id="nav-history-badge" style="display:none">0</span></div>
     <div class="nav-item" id="nav-archive" onclick="showPanel('archive');renderArchive()"><i class="ti ti-archive"></i><span class="nav-label">Printed Archive</span></div>
-    <div class="nav-item" id="nav-prices" onclick="showPanel('prices');renderPriceIndex()"><i class="ti ti-tag"></i><span class="nav-label">Material Prices</span></div>
+    <div class="nav-item" id="nav-prices" onclick="showPanel('prices');renderPriceIndex();renderHwBook()"><i class="ti ti-tag"></i><span class="nav-label">Price Book</span></div>
     <div class="nav-item" id="nav-laser" onclick="showPanel('laser');renderLaserSpeeds()"><i class="ti ti-bolt"></i><span class="nav-label">Laser Speeds</span></div>
     <div class="nav-section">Configuration</div>
     <div class="nav-item" id="nav-rates" onclick="showPanel('rates')"><i class="ti ti-adjustments-dollar"></i><span class="nav-label">Process Rates</span></div>
@@ -2141,8 +2141,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 <!-- ===== MATERIAL PRICES PANEL ===== -->
 <div class="panel" id="panel-prices">
   <div class="page-header">
-    <h2>Material Prices</h2>
-    <p>The shared price book — the same one the Mail app saves into. Drop a vendor quote here, or hit <b>Save prices</b> on a vendor email. Prices auto-fill your quotes.</p>
+    <h2>Price Book</h2>
+    <p>The shared price book — materials and hardware, the same book the Mail app saves into. Drop a vendor quote here, or hit <b>Save prices</b> on a vendor email. Prices auto-fill your quotes.</p>
   </div>
 
   <!-- Upload -->
@@ -2216,6 +2216,37 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
   </aside>
   </div><!-- /hist-main-grid -->
+
+  <!-- Hardware price book — same shared-book idea, keyed by part number -->
+  <div class="card" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+      <div class="card-title" style="margin-bottom:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        Hardware Prices
+      </div>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="hw-search" placeholder="e.g. cls-440 · pem · standoff" style="width:220px" oninput="renderHwBook()">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+      <div class="field" style="margin:0;flex:2;min-width:180px"><label style="font-size:10px">Part # / description</label>
+        <input type="text" id="hw-add-desc" placeholder="e.g. PEM CLS-440-2"></div>
+      <div class="field" style="margin:0;flex:1;min-width:120px"><label style="font-size:10px">Vendor</label>
+        <input type="text" id="hw-add-vendor" placeholder="Who quoted it"></div>
+      <div class="field" style="margin:0;width:90px"><label style="font-size:10px">Price</label>
+        <input type="number" id="hw-add-price" min="0" step="0.0001" placeholder="84.00" oninput="hwAddMath()"></div>
+      <div class="field" style="margin:0;width:110px"><label style="font-size:10px">Quoted per</label>
+        <select id="hw-add-per" onchange="hwAddMath()">
+          <option value="each">piece</option><option value="100">100 (C)</option><option value="1000">1,000 (M)</option>
+        </select></div>
+      <div class="field" style="margin:0;width:90px"><label style="font-size:10px">At qty (opt.)</label>
+        <input type="number" id="hw-add-qty" min="0" step="1" placeholder="e.g. 5000"></div>
+      <button class="btn btn-sm btn-primary" onclick="saveHwBookEntry()" style="height:34px">Add</button>
+    </div>
+    <div id="hw-add-math" style="font-size:11px;color:#166534;margin-bottom:12px"></div>
+    <div id="hw-book-body"></div>
+  </div>
 </div>
 
 
@@ -2475,7 +2506,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div class="dock-tabs">
       <div class="dock-tab active" id="dock-quote" onclick="showPanel('quote')"><i class="ti ti-file-invoice"></i><span>New Quote</span></div>
       <div class="dock-tab" id="dock-history" onclick="showPanel('history')"><i class="ti ti-history"></i><span>History</span></div>
-      <div class="dock-tab" id="dock-prices" onclick="showPanel('prices');renderPriceIndex()"><i class="ti ti-tag"></i><span>Materials</span></div>
+      <div class="dock-tab" id="dock-prices" onclick="showPanel('prices');renderPriceIndex();renderHwBook()"><i class="ti ti-tag"></i><span>Prices</span></div>
       <div class="dock-tab" id="dock-customers" onclick="showPanel('customers')"><i class="ti ti-users"></i><span>Customers</span></div>
     </div>
     <div class="dock-switch">
@@ -3239,12 +3270,15 @@ function addOp(code='', hrs=''){
 function addHw(desc='',qty='',cost=''){
   hwCount++; const id=hwCount;
   const d=document.createElement('div'); d.id=`hw-${id}`;
-  d.style.cssText='display:grid;grid-template-columns:1fr 80px 90px 28px;gap:8px;margin-bottom:6px;align-items:center';
-  d.innerHTML=`<input type="text" id="hw-desc-${id}" placeholder="description" value="${desc}" onchange="calculate()">
+  d.style.cssText='display:grid;grid-template-columns:1fr 80px 90px 28px 28px;gap:8px;margin-bottom:6px;align-items:center';
+  d.innerHTML=`<input type="text" id="hw-desc-${id}" list="hw-book-list" placeholder="description / part #" value="${qEsc(desc)}" onchange="applyHwPrice(${id});calculate()">
     <input type="number" id="hw-qty-${id}" placeholder="qty/part" value="${qty}" min="0" step="0.001" onchange="calculate()">
     <input type="number" id="hw-cost-${id}" placeholder="$/piece" value="${cost}" min="0" step="0.01" onchange="calculate()">
-    <button class="del-btn" onclick="removeRow('hw-${id}')" title="Remove">×</button>`;
+    <button class="del-btn" onclick="saveHwRowPrice(${id})" title="Save this price to the shared hardware book" style="color:var(--accent)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></button>
+    <button class="del-btn" onclick="removeRow('hw-${id}')" title="Remove">×</button>
+    <div id="hw-src-${id}" style="grid-column:1/-1;display:none;font-size:11px;color:#166534;margin:-2px 0 2px"></div>`;
   document.getElementById('hw-container').appendChild(d);
+  if(desc) applyHwPrice(id);   // restored rows get their provenance line back (never touches a saved cost)
 }
 
 function addOut(desc='',qty='',cost=''){
@@ -7464,6 +7498,173 @@ function deletePriceItem(id) {
   if (window._qDeletePrice) window._qDeletePrice(id).catch(() => alert('Could not delete — check your connection.'));
 }
 
+// ── shared hardware price book ───────────────────────────────────────────────
+// Lives at mail/hardwarePrices, next to the material book. Hardware identity is
+// the part number / description (CLS-440-2, FH-032-8…), not a family+thickness,
+// so matching is plain token search — no normalization tables needed.
+let HWPRICES = {};
+window._qOnHwPrices = (obj) => {
+  HWPRICES = obj || {};
+  const panel = document.getElementById('panel-prices');
+  if (panel && panel.classList.contains('active')) renderHwBook();
+  rebuildHwDatalist();
+  // like the material book: an arriving price never stomps a typed cost —
+  // it only refreshes the provenance lines and fills still-empty boxes
+  for (let i = 1; i <= hwCount; i++) if (document.getElementById('hw-desc-'+i)) applyHwPrice(i);
+};
+const hwList = () => Object.values(HWPRICES)
+  .filter(p => p && p.desc && Number(p.priceEach) > 0)
+  .sort((a,b) => (b.quoteDate||b.at||0) - (a.quoteDate||a.at||0));
+const hwTokens = s => String(s||'').toLowerCase().split(/[\s,]+/).filter(Boolean);
+
+// vendors quote hardware per piece, per 100 (C) or per 1,000 (M) — everything
+// normalizes to $/piece, and the math string shows the conversion out loud
+const HW_PERS = [['each','per piece',1],['100','per 100 (C)',100],['1000','per 1,000 (M)',1000]];
+function hwPerEach(price, per){
+  const div = (HW_PERS.find(x => x[0] === String(per)) || HW_PERS[0])[2];
+  if (!(price > 0)) return null;
+  const each = price / div;
+  return { each, math: div === 1 ? ('$'+(+price).toFixed(4).replace(/\.?0+$/,'')+' per piece')
+    : ('$'+(+price).toFixed(2)+' ÷ '+div.toLocaleString('en-US')+' = $'+each.toFixed(4)+'/pc') };
+}
+function hwRecord(x){
+  const id = 'hp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*46656).toString(36);
+  const c = hwPerEach(Number(x.price), x.per || 'each');
+  return { id, desc: x.desc, vendor: x.vendor || '', price: Number(x.price), per: x.per || 'each',
+    priceEach: c ? c.each : Number(x.price), math: c ? c.math : '', qty: Number(x.qty) || null,
+    quoteDate: x.quoteDate || Date.now(), at: Date.now(),
+    by: (window._qUserEmail && window._qUserEmail()) || '' };
+}
+// exact description first, then every-typed-token-appears, newest wins
+function hwBestPrice(desc){
+  const d = String(desc||'').trim().toLowerCase();
+  if (!d) return null;
+  const list = hwList();
+  return list.find(p => p.desc.trim().toLowerCase() === d)
+    || list.find(p => { const t = hwTokens(d); return t.length && t.every(tok => p.desc.toLowerCase().includes(tok)); })
+    || null;
+}
+const hwMoney = v => (+v) >= 1 ? '$'+(+v).toFixed(2)
+  : '$'+(+v).toFixed(4).replace(/(\.\d\d[1-9]?)0+$/,'$1');
+
+// one shared datalist feeds every hardware row's description box
+function rebuildHwDatalist(){
+  let dl = document.getElementById('hw-book-list');
+  if (!dl){ dl = document.createElement('datalist'); dl.id = 'hw-book-list'; document.body.appendChild(dl); }
+  const seen = new Set();
+  dl.innerHTML = hwList().filter(p => { const k = p.desc.trim().toLowerCase();
+    if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 300)
+    .map(p => `<option value="${qEsc(p.desc)}" label="${qEsc(hwMoney(p.priceEach)+'/pc'+(p.vendor?' · '+p.vendor:''))}"></option>`).join('');
+}
+
+// fills an EMPTY cost box from the book and writes the provenance line; a typed
+// number is a decision, not a placeholder — then the line just shows what the
+// book knows so you can compare
+function applyHwPrice(i){
+  const descEl = document.getElementById('hw-desc-'+i);
+  const costEl = document.getElementById('hw-cost-'+i);
+  const src = document.getElementById('hw-src-'+i);
+  const hit = descEl ? hwBestPrice(descEl.value) : null;
+  if (!hit){ if (src){ src.style.display='none'; src.textContent=''; } return; }
+  const typed = costEl && parseFloat(costEl.value) > 0;
+  if (costEl && !typed){
+    costEl.value = (+hit.priceEach).toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+    costEl.style.background = '#f0fdf4'; costEl.style.borderColor = '#86efac';
+    setTimeout(() => { costEl.style.background=''; costEl.style.borderColor=''; }, 3000);
+  }
+  if (src){
+    const bits = [hit.vendor || 'a saved price'];
+    const when = hit.quoteDate || hit.at;
+    if (when) bits.push(new Date(Number(when)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}));
+    if (hit.qty > 1) bits.push('at ' + fmtN(hit.qty) + '+');
+    src.innerHTML = (typed ? 'Book has ' + qEsc(hwMoney(hit.priceEach)) + '/pc — <b>' : 'From the hardware book — <b>')
+      + qEsc(bits.join(' · ')) + '</b>' + (hit.math ? '<br>' + qEsc(hit.math) : '');
+    src.style.display = '';
+  }
+}
+
+// the 💾 on a quote row — the row already knows desc + $/piece, just ask who
+function saveHwRowPrice(i){
+  const desc = ((document.getElementById('hw-desc-'+i)||{}).value||'').trim();
+  const cost = parseFloat((document.getElementById('hw-cost-'+i)||{}).value);
+  if (!desc || !(cost > 0)){ alert('Need a description and a $/piece before saving to the book.'); return; }
+  if (!window._qHwReady){ alert('The shared price book hasn’t loaded yet — make sure you’re signed in, then try again.'); return; }
+  const vendor = prompt('Save to the shared hardware book:\n\n'+desc+' at '+hwMoney(cost)+'/pc\n\nVendor (who sells it at this price)?','');
+  if (vendor == null) return;
+  const rec = hwRecord({ desc, vendor: vendor.trim(), price: cost, per: 'each' });
+  window._qSaveHw(rec).then(() => {
+    HWPRICES[rec.id] = rec; rebuildHwDatalist(); applyHwPrice(i);
+    const panel = document.getElementById('panel-prices');
+    if (panel && panel.classList.contains('active')) renderHwBook();
+  }).catch(() => alert('Could not save — check your connection.'));
+}
+
+// add-form on the Price Book page
+function hwAddMath(){
+  const el = document.getElementById('hw-add-math');
+  if (!el) return;
+  const c = hwPerEach(parseFloat((document.getElementById('hw-add-price')||{}).value),
+    (document.getElementById('hw-add-per')||{}).value);
+  el.textContent = c ? ('= ' + hwMoney(c.each) + ' per piece — ' + c.math) : '';
+}
+function saveHwBookEntry(){
+  const g = id => (document.getElementById(id)||{}).value || '';
+  const desc = g('hw-add-desc').trim();
+  const price = parseFloat(g('hw-add-price'));
+  if (!desc){ alert('Enter the part number / description.'); return; }
+  if (!(price > 0)){ alert('Enter the price.'); return; }
+  if (!window._qHwReady){ alert('Sign in first — the hardware book is shared and needs the connection.'); return; }
+  const rec = hwRecord({ desc, vendor: g('hw-add-vendor').trim(), price, per: g('hw-add-per'),
+    qty: parseFloat(g('hw-add-qty')) || null });
+  window._qSaveHw(rec).then(() => {
+    HWPRICES[rec.id] = rec;
+    ['hw-add-desc','hw-add-vendor','hw-add-price','hw-add-qty'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
+    hwAddMath(); rebuildHwDatalist(); renderHwBook();
+  }).catch(() => alert('Could not save — check your connection.'));
+}
+
+function renderHwBook(){
+  const body = document.getElementById('hw-book-body');
+  if (!body) return;
+  if (!window._qHwReady){
+    body.innerHTML = '<div class="empty-state"><h3>Sign in to see the hardware book</h3><p>Hardware prices are shared across the shop, so they load once you’re signed in.</p></div>';
+    return;
+  }
+  const tokens = hwTokens((document.getElementById('hw-search')||{}).value || '');
+  let list = hwList();
+  if (tokens.length) list = list.filter(p => { const hay = (p.desc+' '+(p.vendor||'')).toLowerCase(); return tokens.every(t => hay.includes(t)); });
+  if (!list.length){
+    body.innerHTML = hwList().length
+      ? '<div class="empty-state"><h3>Nothing matches that search</h3><p>Try part of the part number — e.g. <b>cls-440</b> or <b>standoff</b>.</p></div>'
+      : '<div class="empty-state"><h3>No hardware prices yet</h3><p>Add one above, or hit the save icon on a hardware line in a quote.</p></div>';
+    return;
+  }
+  const dt = ms => new Date(Number(ms)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+  body.innerHTML = `<table class="history-table">
+    <thead><tr><th>Part / description</th><th>Vendor</th><th>Date</th>
+      <th style="text-align:right">Qty</th><th style="text-align:right">As quoted</th>
+      <th style="text-align:right">$/piece</th><th></th></tr></thead>
+    <tbody>${list.map(p => `
+      <tr>
+        <td style="font-weight:600">${qEsc(p.desc)}</td>
+        <td style="font-size:13px">${qEsc(p.vendor||'—')}</td>
+        <td style="font-size:12px;color:var(--text2)">${qEsc(dt(p.quoteDate||p.at))}</td>
+        <td class="num" style="font-size:12px;color:var(--text2)">${p.qty>1?qEsc(fmtN(p.qty)+'+'):'—'}</td>
+        <td class="num" style="font-size:12px;font-family:'DM Mono',monospace">$${(+p.price).toFixed(2)}<div style="font-size:11px;color:var(--text3)">${qEsc((HW_PERS.find(x=>x[0]===String(p.per))||HW_PERS[0])[1])}</div></td>
+        <td class="num" style="font-weight:600;font-family:'DM Mono',monospace${p.math?';cursor:help':''}"${p.math?` title="${qEsc(p.math)}"`:''}>${qEsc(hwMoney(p.priceEach))}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteHwPrice('${qEsc(p.id)}')" title="Delete this price for everyone">×</button></td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+function deleteHwPrice(id){
+  const p = HWPRICES[id];
+  if (!p) return;
+  if (!confirm('Delete this hardware price for everyone?\n\n' + [p.desc, p.vendor].filter(Boolean).join(' — ') + '\n\nThe book is shared across the shop.')) return;
+  delete HWPRICES[id];
+  renderHwBook(); rebuildHwDatalist();
+  if (window._qDeleteHw) window._qDeleteHw(id).catch(() => alert('Could not delete — check your connection.'));
+}
+
 // Sheet cost auto-fill now lives in applyIndexPrice()/qBestPrice() up in the
 // shared price book section. The old getPriceFromIndex() matched vendor text
 // with one gauge table for every metal; getBarPriceFromIndex() was never called.
@@ -9348,6 +9549,10 @@ window._qPricesReady = false;
 window._qUserEmail = () => (_qUser && _qUser.email) || '';
 window._qSavePrice = (rec) => set(ref(db,'mail/materialPrices/'+rec.id), rec);
 window._qDeletePrice = (id) => remove(ref(db,'mail/materialPrices/'+id));
+// hardware book — same shape, same home (mail/*), same per-id write discipline
+window._qHwReady = false;
+window._qSaveHw = (rec) => set(ref(db,'mail/hardwarePrices/'+rec.id), rec);
+window._qDeleteHw = (id) => remove(ref(db,'mail/hardwarePrices/'+id));
 let _qPricesBound = false;
 function _qListenPrices(){
   if(_qPricesBound) return;
@@ -9358,6 +9563,13 @@ function _qListenPrices(){
   }, err => {
     console.warn('price book read failed', err);
     window._qPricesReady = false;
+  });
+  onValue(ref(db,'mail/hardwarePrices'), snap => {
+    window._qHwReady = true;
+    if(window._qOnHwPrices) window._qOnHwPrices(snap.val() || {});
+  }, err => {
+    console.warn('hardware book read failed', err);
+    window._qHwReady = false;
   });
 }
 
@@ -9604,6 +9816,8 @@ onAuthStateChanged(auth, (user) => {
     hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out');
     window._qPricesReady = false;
     if(window._qOnPrices) window._qOnPrices({});
+    window._qHwReady = false;
+    if(window._qOnHwPrices) window._qOnHwPrices({});
   }
 });
 document.addEventListener('keydown', (e) => {
