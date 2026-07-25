@@ -20,7 +20,8 @@ core = (grab('const MAT_FAMILIES=[', '// AI connection')
 # these are the names quote.html leans on — fail loudly rather than ship a half copy
 for name in ['MAT_FAMILIES','GAUGE_IN','UOMS','TUBE_SHAPES','matFam','parseSize','perLbCalc',
              'tubeXsec','tubeCalc','tubeLabel','tubeShape','isTube','fmtN','priceMatch',
-             'mpTokens','mpExtractPrompt','mpNormalizeItems','mpParseItems','mpRecord']:
+             'mpTokens','mpExtractPrompt','mpNormalizeItems','mpParseItems','mpRecord',
+             'HW_PERS','hwPerEach','hwMoney','hwTokens','hwPriceMatch','hwRecord']:
     assert re.search(r'\b(const|let|function)\s+' + name + r'\b', core), 'core is missing ' + name
 
 quote = io.open(QUOTE, encoding='utf-8').read()

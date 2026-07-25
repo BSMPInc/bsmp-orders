@@ -352,7 +352,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .mp-item .mp-fam{width:172px;flex:none}
 .mp-item .mp-form{width:112px;flex:none}
 .mp-item .mp-desc{flex:1;min-width:160px}
-.mp-item .mp-thk{width:76px}.mp-item .mp-ga{width:56px}.mp-item .mp-size{width:92px}.mp-item .mp-price{width:86px}.mp-item .mp-uom{width:104px;flex:none}
+.mp-item .mp-thk{width:76px}.mp-item .mp-ga{width:56px}.mp-item .mp-size{width:92px}.mp-item .mp-price{width:86px}.mp-item .mp-uom{width:104px;flex:none}.mp-item .mp-per{width:118px;flex:none}
 .mp-item .mp-shape{width:120px;flex:none}.mp-item .mp-dim{width:66px}.mp-item .mp-spec{width:78px}.mp-item .mp-len{width:80px}.mp-item .mp-qty{width:62px}
 .mp-x{width:32px;height:32px;border:1px solid var(--border);background:#fff;color:var(--text3);font-size:14px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .mp-x:hover{border-color:var(--red);color:var(--red)}
@@ -456,7 +456,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="nav-item" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span class="nav-label">Waiting on customer</span></div>
       <div class="nav-sec">Records</div>
       <div class="nav-item" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span class="nav-label">Certs &amp; invoices</span></div>
-      <div class="nav-item" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span class="nav-label">Material prices</span></div>
+      <div class="nav-item" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span class="nav-label">Price book</span></div>
       <div class="nav-item" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span class="nav-label">Contacts</span></div>
       <div class="nav-sec">Setup</div>
       <div class="nav-item" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span class="nav-label">Settings</span></div>
@@ -649,7 +649,7 @@ body.sb-pinned .dock{left:var(--sb)}
 <!-- material price capture -->
 <div class="modal-bg" id="price-modal">
   <div class="modal mp-modal">
-    <h3><i class="ti ti-tags"></i> Save material prices</h3>
+    <h3><i class="ti ti-tags"></i> Save prices</h3>
     <div class="set-help" style="margin-top:2px;margin-bottom:10px">AI fills the grid from this email (and any attached PDF quote) — a person checks it before anything saves. Every saved price keeps the vendor's exact wording and a link back to this email.</div>
     <div class="mp-head">
       <div><label>Vendor</label><input id="mp-vendor" type="text"></div>
@@ -843,6 +843,7 @@ let MUTED={};                 // mail/muted/<emailKey> → {email, name, by, at}
 let CONTACTS={};              // mail/contacts/<emailKey> → {name, email, company, phone, notes, by, at}
 let SIGS={};                  // mail/signatures/<emailKey> → plain-text signature, appended on send
 let PRICES={};                // mail/materialPrices/<id> → shared material price book, saved out of vendor emails
+let HWP={};                   // mail/hardwarePrices/<id> → shared hardware price book (same book the Quote Tool uses)
 let NOTES={};                 // mail/notes/<threadKey>/<noteId> → {id, uid, by, at, text} — shared team notes per conversation
 let _noteTarget=null;         // {key, label} while the notes popup is open
 let THREADS=[];               // from the proxy: {key, subject, fromName, fromEmail, snippet, date, unread, hasAttach, mailboxes:[…], gmail:{…per-box thread ids…}}
@@ -1227,7 +1228,7 @@ window.go=(page)=>{
   $('v-prices').style.display = page==='prices'?'':'none';
   if(page==='settings'){ $('tb-t').textContent='Settings'; $('tb-s').textContent='Mail connection'; renderSettings(); return; }
   if(page==='contacts'){ $('tb-t').textContent='Contacts'; $('tb-s').textContent='Shared shop address book'; _ctEdit=null; renderContacts(); return; }
-  if(page==='prices'){ $('tb-t').textContent='Material prices'; $('tb-s').textContent='Saved out of vendor emails — one search, every vendor'; renderPrices(); return; }
+  if(page==='prices'){ $('tb-t').textContent='Price book'; $('tb-s').textContent='Materials & hardware, saved out of vendor emails — one search, every vendor'; renderPrices(); return; }
   const m=NAV_META[page]||NAV_META.inbox;
   $('tb-t').textContent=m[0]; $('tb-s').textContent=m[1];
   chipFilter='all';
@@ -2157,10 +2158,11 @@ function mpExtractPrompt(opts){
   const lede = o.source==='file'
     ? 'You are reading a material vendor’s price quote document'
     : 'You are reading an email conversation'+(o.hasDoc?' (and the attached PDF quote)':'');
-  return lede+' from a metal supplier to a sheet-metal fabrication shop. Extract every material price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
+  return lede+' from a '+(o.hardware?'metal or hardware':'metal')+' supplier to a sheet-metal fabrication shop. Extract every '+(o.hardware?'material and hardware':'material')+' price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
 +'Every item has: {"form":"sheet" or "tube","family":"one of crs|hrs|galv|galvanneal|ss304|ss316|ss430|al5052|al6061|al3003|copper|brass|other","desc":"the vendor’s own wording for the material","price":number,"uom":"lb|cwt|sheet|sqft|ft|each","qty":the quantity this price needs (a break quantity) or null,"raw":"the exact line copied from the source"}\n\n'
 +'A FLAT SHEET, PLATE or COIL is form "sheet" and adds: {"thickness_in":decimal inches or null,"gauge":gauge number or null,"size":"e.g. 48x120, or null"}\n\n'
 +'TUBE, PIPE or BAR STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
++(o.hardware?'HARDWARE — self-clinching fasteners (PEM-style nuts, studs, standoffs), screws, rivets, threaded inserts, weld studs, hinges, latches, anything priced per piece rather than by weight or length — is form "hardware" and adds: {"per":"each|100|1000 — the block the price is quoted per (per C = 100, per M = 1,000)"}. Keep the complete part number in desc exactly as the vendor wrote it (e.g. CLS-440-2ZI). Hardware has no uom, family or dimensions — per replaces uom, and the family field is omitted.\n\n':'')
 +'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, with the break quantity in qty ("1-9 $92, 10+ $88" → two items, qty 1 and qty 10) and the vendor’s wording kept in desc. A plain price with no break = qty null.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".'
 +(o.text?('\n\nEMAIL (newest message first):\n'+o.text):'');
 }
@@ -2168,6 +2170,9 @@ function mpExtractPrompt(opts){
 // safe default; the person checks every row before it saves either way.
 function mpNormalizeItems(items){
   return (items||[]).filter(x=>x&&Number(x.price)>0).map(x=>{
+    if(String(x.form||'').toLowerCase()==='hardware') return { form:'hardware', desc:String(x.desc||''),
+      price:Number(x.price)||0, per:['each','100','1000'].includes(String(x.per))?String(x.per):'each',
+      qty:(x.qty!=null&&Number(x.qty)>0)?Number(x.qty):null, raw:String(x.raw||'') };
     const tube=String(x.form||'').toLowerCase()==='tube';
     return { form:tube?'tube':'sheet', family:matFam(x.family).k, desc:String(x.desc||''),
       thicknessIn:(!tube&&x.thickness_in!=null)?Number(x.thickness_in):null,
@@ -2215,6 +2220,39 @@ function mpRecord(x, src, byEmail){
     mailKey:s.mailKey||'', subject:s.subject||'', fileName:s.fileName||'',
     by:byEmail||'', at:Date.now() };
 }
+// ── hardware price book core (mail/hardwarePrices/<id>) ──────────────────────
+// Hardware identity is the part number, not a family+thickness, so there are no
+// normalization tables — just per-piece math and token search. Vendors quote per
+// piece, per 100 (C) or per 1,000 (M); everything normalizes to $/piece and the
+// math string shows the conversion out loud.
+const HW_PERS=[['each','per piece',1],['100','per 100 (C)',100],['1000','per 1,000 (M)',1000]];
+function hwPerEach(price,per){
+  const div=(HW_PERS.find(x=>x[0]===String(per))||HW_PERS[0])[2];
+  if(!(price>0)) return null;
+  const each=price/div;
+  return { each, math: div===1?('$'+(+price).toFixed(4).replace(/\.?0+$/,'')+' per piece')
+    :('$'+(+price).toFixed(2)+' ÷ '+div.toLocaleString('en-US')+' = $'+each.toFixed(4)+'/pc') };
+}
+const hwMoney=v=>(+v)>=1?'$'+(+v).toFixed(2):'$'+(+v).toFixed(4).replace(/(\.\d\d[1-9]?)0+$/,'$1');
+const hwTokens=s=>String(s||'').toLowerCase().split(/[\s,]+/).filter(Boolean);
+function hwPriceMatch(p,tokens){
+  const hay=((p.desc||'')+' '+(p.vendor||'')+' '+(p.raw||'')).toLowerCase();
+  return tokens.every(t=>hay.includes(t));
+}
+// One shared hardware record, ready to write to mail/hardwarePrices/<id>.
+// Same src shape as mpRecord: an email or a hand entry, but always something.
+let _hpSeq=0;
+function hwRecord(x, src, byEmail){
+  const c=hwPerEach(Number(x.price), x.per||'each');
+  const s=src||{};
+  return { id:'hp_'+Date.now().toString(36)+'_'+(_hpSeq++)+'_'+Math.floor(Math.random()*1e4),
+    form:'hardware', desc:String(x.desc||''), price:Number(x.price)||0, per:String(x.per||'each'),
+    priceEach:c?Number(c.each.toFixed(5)):null, math:c?c.math:'',
+    qty:(Number(x.qty)>0)?Number(x.qty):null, raw:x.raw||'',
+    vendor:s.vendor||'', vendorEmail:s.vendorEmail||'', emailDate:s.emailDate||Date.now(),
+    mailKey:s.mailKey||'', subject:s.subject||'', fileName:s.fileName||'',
+    by:byEmail||'', at:Date.now() };
+}
 // AI connection — the same one the Quote Tool uses (shared localStorage keys,
 // set up once per computer in the Quote Tool's settings). Proxy keeps the API
 // key server-side; the direct-key fallback matches the rest of the suite.
@@ -2238,12 +2276,13 @@ function mailPlainText(m){
 }
 const blobB64=(blob)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=rej; r.readAsDataURL(blob); });
 function priceRecsOf(key){ return Object.values(PRICES).filter(p=>p&&p.mailKey===key); }
+function hwRecsOf(key){ return Object.values(HWP).filter(p=>p&&p.mailKey===key); }
 function renderPriceBtn(){
   const b=$('price-btn'); if(!b) return;
   if(!CURRENT){ b.style.display='none'; return; }
   b.style.display='';
-  const n=priceRecsOf(CURRENT.key).length;
-  b.title=n?'Material prices already saved from this email — click to add more':'Read the material prices out of this email into the shared price book';
+  const n=priceRecsOf(CURRENT.key).length+hwRecsOf(CURRENT.key).length;
+  b.title=n?'Prices already saved from this email — click to add more':'Read the material and hardware prices out of this email into the shared price book';
   b.innerHTML='<i class="ti ti-tags"></i> '+(n?('Prices saved ('+n+')'):'Save prices');
 }
 let _mpItems=[];
@@ -2258,7 +2297,7 @@ window.openPriceCapture=async ()=>{
   const d=new Date(Number(t.date||Date.now()));
   $('mp-date').value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   _mpItems=[]; renderMpRows();
-  const n=priceRecsOf(t.key).length;
+  const n=priceRecsOf(t.key).length+hwRecsOf(t.key).length;
   const already=n?(' '+n+' price'+(n!==1?'s are':' is')+' already saved from this email — saving again adds new lines, it doesn’t replace them.'):'';
   if(!hasAI()){
     mpStatus('AI isn’t connected on this computer — add the lines by hand. (The AI connection is set up once in the Quote Tool’s settings and shared by every app.)'+already);
@@ -2289,7 +2328,7 @@ async function runPriceAI(t){
       try{ content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:await blobB64(await fetchAttBlob(p))}}); }
       catch(e){ /* attachment fetch failed — the email text still goes */ }
     }
-    content.push({type:'text', text:mpExtractPrompt({source:'email', hasDoc:content.length>0, text})});
+    content.push({type:'text', text:mpExtractPrompt({source:'email', hasDoc:content.length>0, hardware:true, text})});
     const r=await aiCall({model:'claude-sonnet-4-6', max_tokens:3000, messages:[{role:'user', content}]});
     const data=await r.json();
     if(data.error) throw new Error(data.error.message||'AI error');
@@ -2306,6 +2345,9 @@ async function runPriceAI(t){
 function mpRowData(i){
   const v=(id)=>{ const el=$(id+'-'+i); return el?el.value:''; };
   const num=(id)=>parseFloat(v(id))||null;
+  if(v('mp-form')==='hardware') return { form:'hardware', desc:(v('mp-desc')||'').trim(),
+    price:parseFloat(String(v('mp-price')).replace(/[$,]/g,''))||0,
+    per:v('mp-per')||'each', qty:num('mp-qty'), raw:(_mpItems[i]&&_mpItems[i].raw)||'' };
   const base={ form:v('mp-form')||'sheet', family:v('mp-fam')||'other', desc:(v('mp-desc')||'').trim(),
     gauge:num('mp-ga'), price:parseFloat(String(v('mp-price')).replace(/[$,]/g,''))||0,
     uom:v('mp-uom')||'each', qty:num('mp-qty'), raw:(_mpItems[i]&&_mpItems[i].raw)||'' };
@@ -2323,6 +2365,11 @@ window.mpDelRow=(i)=>{ mpSync(); _mpItems.splice(i,1); renderMpRows(); };
 window.mpTouched=(i)=>{
   const el=$('mp-math-'+i); if(!el) return;
   const r=mpRowData(i);
+  if(r.form==='hardware'){
+    const c=hwPerEach(r.price,r.per);
+    el.innerHTML=c?('<b>= '+esc(hwMoney(c.each))+'/pc</b> — '+esc(c.math)):'';
+    return;
+  }
   if(r.form==='tube'){
     const c=tubeCalc(r);
     el.innerHTML=c?('<b>'+(c.perFt!=null?'≈ $'+c.perFt.toFixed(3)+'/ft':'')+(c.perFt!=null&&c.perLb!=null?' · ':'')+(c.perLb!=null?'≈ $'+c.perLb.toFixed(3)+'/lb':'')+'</b> — '+esc(c.math)):'';
@@ -2334,8 +2381,9 @@ window.mpTouched=(i)=>{
 // typed values by syncing first
 window.mpForm=(i)=>{
   mpSync(); const x=_mpItems[i];
-  if(x.form==='tube'){ if(!x.shape) x.shape='square-tube'; if(!TUBE_UOMS.some(u=>u[0]===x.uom)) x.uom='ft'; }
-  else if(x.uom==='ft') x.uom='sheet';
+  if(x.form==='hardware'){ if(!x.per) x.per='each'; }
+  else if(x.form==='tube'){ if(!x.shape) x.shape='square-tube'; if(!TUBE_UOMS.some(u=>u[0]===x.uom)) x.uom='ft'; }
+  else { if(!x.family) x.family='crs'; if(!x.uom||x.uom==='ft') x.uom='sheet'; }
   renderMpRows();
 };
 window.mpShape=(i)=>{ mpSync(); renderMpRows(); };
@@ -2350,6 +2398,26 @@ window.mpGa=(i)=>{
 function renderMpRows(){
   const nv=(v)=>v!=null?v:'';
   $('mp-rows').innerHTML=_mpItems.map((x,i)=>{
+    const formSel=`<select class="mp-form" id="mp-form-${i}" onchange="mpForm(${i})" title="Sheet is bought by weight; tube and bar by the foot; hardware by the piece">
+          <option value="sheet"${x.form==='sheet'?' selected':''}>Sheet / plate</option>
+          <option value="tube"${x.form==='tube'?' selected':''}>Tube / bar</option>
+          <option value="hardware"${x.form==='hardware'?' selected':''}>Hardware</option>
+        </select>`;
+    if(x.form==='hardware') return `
+    <div class="mp-item">
+      <div class="mp-l1">
+        ${formSel}
+        <input class="mp-desc" id="mp-desc-${i}" value="${esc(x.desc)}" placeholder="Part number + vendor’s wording — e.g. PEM CLS-440-2ZI" oninput="mpTouched(${i})">
+      </div>
+      <div class="mp-l2">
+        <input class="mp-price" id="mp-price-${i}" value="${x.price||''}" placeholder="$" oninput="mpTouched(${i})">
+        <select class="mp-per" id="mp-per-${i}" onchange="mpTouched(${i})" title="The block the vendor’s price covers — per C is 100, per M is 1,000">${HW_PERS.map(u=>`<option value="${u[0]}"${u[0]===(x.per||'each')?' selected':''}>${u[1]}</option>`).join('')}</select>
+        <input class="mp-qty" id="mp-qty-${i}" value="${nv(x.qty)}" placeholder="qty" title="Quantity break this price applies to, if the vendor gave one. Blank for a plain price." oninput="mpTouched(${i})">
+        <button class="mp-x" title="Remove this line" onclick="mpDelRow(${i})"><i class="ti ti-trash"></i></button>
+      </div>
+      <div class="mp-math" id="mp-math-${i}"></div>
+      ${x.raw?`<div class="mp-raw" title="${esc(x.raw)}">“${esc(x.raw)}”</div>`:''}
+    </div>`;
     const tube=x.form==='tube', s=tubeShape(x.shape), uoms=tube?TUBE_UOMS:UOMS;
     const dims=tube?`
         <select class="mp-shape" id="mp-shape-${i}" onchange="mpShape(${i})">${TUBE_SHAPES.map(o=>`<option value="${o.k}"${o.k===x.shape?' selected':''}>${esc(o.label)}</option>`).join('')}</select>
@@ -2365,10 +2433,7 @@ function renderMpRows(){
     return `
     <div class="mp-item">
       <div class="mp-l1">
-        <select class="mp-form" id="mp-form-${i}" onchange="mpForm(${i})" title="Sheet is bought by weight; tube and bar are bought by the foot">
-          <option value="sheet"${tube?'':' selected'}>Sheet / plate</option>
-          <option value="tube"${tube?' selected':''}>Tube / bar</option>
-        </select>
+        ${formSel}
         <select class="mp-fam" id="mp-fam-${i}" onchange="mpGa(${i})">${MAT_FAMILIES.map(f=>`<option value="${f.k}"${f.k===x.family?' selected':''}>${esc(f.label)}</option>`).join('')}</select>
         <input class="mp-desc" id="mp-desc-${i}" value="${esc(x.desc)}" placeholder="${tube?'Vendor’s wording — e.g. 2x2x.125 A500 SQ TUBE':'Vendor’s wording — e.g. 304 S/S 2B 16GA'}" oninput="mpTouched(${i})">
       </div>
@@ -2397,11 +2462,18 @@ window.savePrices=async ()=>{
   $('mp-save').disabled=true;
   try{
     for(const x of rows){
-      const rec=mpRecord(x, {vendor, vendorEmail, emailDate, mailKey:t.key, subject:t.subject||''},
-        (auth.currentUser&&auth.currentUser.email)||'');
+      const src={vendor, vendorEmail, emailDate, mailKey:t.key, subject:t.subject||''};
+      const by=(auth.currentUser&&auth.currentUser.email)||'';
       // one write per record — never a whole-collection set()
-      await set(ref(db,'mail/materialPrices/'+rec.id), rec);
-      PRICES[rec.id]=rec;
+      if(x.form==='hardware'){
+        const rec=hwRecord(x, src, by);
+        await set(ref(db,'mail/hardwarePrices/'+rec.id), rec);
+        HWP[rec.id]=rec;
+      } else {
+        const rec=mpRecord(x, src, by);
+        await set(ref(db,'mail/materialPrices/'+rec.id), rec);
+        PRICES[rec.id]=rec;
+      }
     }
     window.closePriceCapture();
     renderPriceBtn();
@@ -2468,25 +2540,47 @@ function mpTokens(s){
 function renderPrices(){
   const el=$('v-prices'); if(!el) return;
   el.innerHTML=`
-    <div class="page-head"><h2>Material price book</h2><p>Saved out of vendor emails with the <b>Save prices</b> button — one search across every vendor’s wording. Each line keeps the vendor’s exact words and links back to the email it came from.</p></div>
+    <div class="page-head"><h2>Price book</h2><p>Materials and hardware, saved out of vendor emails with the <b>Save prices</b> button — one search across every vendor’s wording. Each line keeps the vendor’s exact words and links back to the email it came from. The Quote Tool prices from the same book.</p></div>
     <div class="toolbar">
-      <input class="search" id="mp-search" placeholder="Search — e.g. 304 16ga · galv 48x120 · 2x2x.125 a500 · 1.5 od .120 wall" value="${esc(_mpSearch)}" oninput="mpSearchInput()" style="max-width:470px">
+      <input class="search" id="mp-search" placeholder="Search — e.g. 304 16ga · 2x2x.125 a500 · cls-440 · standoff" value="${esc(_mpSearch)}" oninput="mpSearchInput()" style="max-width:470px">
       <span class="hint" id="mp-count" style="margin-left:auto"></span>
     </div>
     <div class="card"><div class="mp-tblwrap" id="mp-table"></div></div>
-    <div class="hint" style="margin-top:8px">Gauge and decimal searches understand each other — <b>16ga</b> finds a price saved as <b>.0598 CRS</b> and the other way round, using the right gauge table per metal. Tube and bar are searched the way the shop says them: <b>2x2x.125</b>, <b>2x1x14ga</b>, <b>1.5 od</b>, <b>.120 wall</b>, <b>a500</b>. Sheet compares on <b>≈ $/lb</b> because it's bought by weight; tube compares on <b>≈ $/ft</b> because it's bought by the foot. Both columns are computed — hover to see the math.</div>`;
+    <div class="hint" style="margin-top:8px">Gauge and decimal searches understand each other — <b>16ga</b> finds a price saved as <b>.0598 CRS</b> and the other way round, using the right gauge table per metal. Tube and bar are searched the way the shop says them: <b>2x2x.125</b>, <b>2x1x14ga</b>, <b>1.5 od</b>, <b>.120 wall</b>, <b>a500</b>. Sheet compares on <b>≈ $/lb</b> because it's bought by weight; tube compares on <b>≈ $/ft</b> because it's bought by the foot. Hardware is searched by part number or wording — <b>cls-440</b>, <b>pem</b>, <b>standoff</b> — and compares on <b>$/piece</b> whether the vendor quoted per piece, per C or per M. Computed columns show their math on hover.</div>`;
   renderPriceTable();
   const s=$('mp-search'); if(s) setTimeout(()=>s.focus(),30);
 }
+function hwPriceList(){ return Object.values(HWP).filter(p=>p&&p.price).sort((a,b)=>(b.emailDate||b.at||0)-(a.emailDate||a.at||0)); }
 function renderPriceTable(){
   const wrap=$('mp-table'); if(!wrap) return;
   const tokens=mpTokens(_mpSearch);
   let list=priceList();
   if(tokens.length) list=list.filter(p=>priceMatch(p,tokens));
-  const cEl=$('mp-count'); if(cEl) cEl.textContent=list.length+' price'+(list.length!==1?'s':'')+(tokens.length?' matched':' saved');
-  if(!list.length){ wrap.innerHTML='<div class="empty"><i class="ti ti-tag-off"></i>'+(tokens.length?'No saved prices match that search.':'No prices saved yet — open a vendor email and hit <b>Save prices</b>.')+'</div>'; return; }
+  let hlist=hwPriceList();
+  if(tokens.length) hlist=hlist.filter(p=>hwPriceMatch(p,tokens));
+  const cEl=$('mp-count'); if(cEl) cEl.textContent=list.length+' material · '+hlist.length+' hardware'+(tokens.length?' matched':' saved');
+  if(!list.length&&!hlist.length){ wrap.innerHTML='<div class="empty"><i class="ti ti-tag-off"></i>'+(tokens.length?'No saved prices match that search.':'No prices saved yet — open a vendor email and hit <b>Save prices</b>.')+'</div>'; return; }
   const dt=(ms)=>new Date(Number(ms)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
-  wrap.innerHTML=`<table class="mp-tbl"><thead><tr><th>Material</th><th>Thk / Wall</th><th>Size</th><th>Price</th><th>≈ $/ft</th><th>≈ $/lb</th><th>Vendor</th><th>Date</th><th></th></tr></thead><tbody>`
+  const hwHtml=!hlist.length?'':`<div class="mp-sect" style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:${list.length?'18px':'0'} 0 6px">Hardware</div>`
+    +`<table class="mp-tbl"><thead><tr><th>Part / description</th><th>As quoted</th><th>$/piece</th><th>Vendor</th><th>Date</th><th></th></tr></thead><tbody>`
+    +hlist.map(p=>{
+      const per=(HW_PERS.find(x=>x[0]===String(p.per))||HW_PERS[0])[1];
+      const math=p.math?`title="${esc(p.math)}" style="cursor:help;text-decoration:underline dotted"`:'';
+      return `<tr>
+        <td class="mp-mat"><b>${esc(p.desc)}</b>${p.raw?`<div class="d" title="${esc(p.raw)}">“${esc(p.raw)}”</div>`:''}</td>
+        <td class="num"><b>$${Number(p.price).toLocaleString('en-US',{minimumFractionDigits:2})}</b> <span style="color:var(--text3)">${esc(per)}</span>${p.qty?`<div style="color:var(--text3)">at ${esc(fmtN(p.qty))}+</div>`:''}</td>
+        <td class="num" ${math}><b>${esc(hwMoney(p.priceEach||0))}</b></td>
+        <td>${esc(p.vendor||'')}</td>
+        <td class="num" title="${esc(p.subject||'')}">${dt(p.emailDate||p.at)}</td>
+        <td><div class="mp-act">
+          ${p.mailKey?`<button class="icon-btn" title="Open the email this came from" onclick="mpOpenMail('${esc(p.id)}')"><i class="ti ti-mail"></i></button>`:''}
+          <button class="icon-btn" title="Delete this price" onclick="mpDelete('${esc(p.id)}')"><i class="ti ti-trash"></i></button>
+        </div></td>
+      </tr>`;
+    }).join('')+'</tbody></table>';
+  if(!list.length){ wrap.innerHTML=hwHtml; return; }
+  wrap.innerHTML=(hlist.length?`<div class="mp-sect" style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin:0 0 6px">Materials</div>`:'')
+    +`<table class="mp-tbl"><thead><tr><th>Material</th><th>Thk / Wall</th><th>Size</th><th>Price</th><th>≈ $/ft</th><th>≈ $/lb</th><th>Vendor</th><th>Date</th><th></th></tr></thead><tbody>`
     +list.map(p=>{
       const u=(UOMS.find(x=>x[0]===p.uom)||['',''])[1];
       const tube=isTube(p), s=tube?tubeShape(p.shape):null;
@@ -2508,10 +2602,10 @@ function renderPriceTable(){
           <button class="icon-btn" title="Delete this price" onclick="mpDelete('${esc(p.id)}')"><i class="ti ti-trash"></i></button>
         </div></td>
       </tr>`;
-    }).join('')+'</tbody></table>';
+    }).join('')+'</tbody></table>'+hwHtml;
 }
 window.mpOpenMail=(id)=>{
-  const p=PRICES[id]; if(!p||!p.mailKey) return;
+  const p=PRICES[id]||HWP[id]; if(!p||!p.mailKey) return;
   const k=p.mailKey;
   go('inbox');
   if(THREADS.some(t=>t.key===k)||ghostThreads().some(t=>t.key===k)){ openThread(k); return; }
@@ -2521,12 +2615,15 @@ window.mpOpenMail=(id)=>{
   else toast('That email isn’t in the loaded list anymore.',true);
 };
 window.mpDelete=(id)=>{
-  const p=PRICES[id]; if(!p) return;
-  delete PRICES[id]; renderPriceTable(); renderPriceBtn();
-  remove(ref(db,'mail/materialPrices/'+id)).catch(()=>toast('Could not delete — check the mail rule.',true));
+  const hw=!!HWP[id];
+  const p=hw?HWP[id]:PRICES[id]; if(!p) return;
+  if(hw) delete HWP[id]; else delete PRICES[id];
+  renderPriceTable(); renderPriceBtn();
+  const path=hw?'mail/hardwarePrices/':'mail/materialPrices/';
+  remove(ref(db,path+id)).catch(()=>toast('Could not delete — check the mail rule.',true));
   showUndo('Price deleted.',{secs:8, onUndo:()=>{
-    PRICES[id]=p;
-    set(ref(db,'mail/materialPrices/'+id),p).catch(()=>{});
+    if(hw) HWP[id]=p; else PRICES[id]=p;
+    set(ref(db,path+id),p).catch(()=>{});
     renderPriceTable(); renderPriceBtn(); toast('Restored ✓');
   }});
 };
@@ -2979,6 +3076,11 @@ onAuthStateChanged(auth,(user)=>{
       });
       onValue(ref(db,'mail/materialPrices'),snap=>{
         PRICES=snap.val()||{};
+        if(navPage==='prices') renderPriceTable();
+        renderPriceBtn();
+      });
+      onValue(ref(db,'mail/hardwarePrices'),snap=>{
+        HWP=snap.val()||{};
         if(navPage==='prices') renderPriceTable();
         renderPriceBtn();
       });

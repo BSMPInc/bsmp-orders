@@ -6981,10 +6981,11 @@ function mpExtractPrompt(opts){
   const lede = o.source==='file'
     ? 'You are reading a material vendor’s price quote document'
     : 'You are reading an email conversation'+(o.hasDoc?' (and the attached PDF quote)':'');
-  return lede+' from a metal supplier to a sheet-metal fabrication shop. Extract every material price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
+  return lede+' from a '+(o.hardware?'metal or hardware':'metal')+' supplier to a sheet-metal fabrication shop. Extract every '+(o.hardware?'material and hardware':'material')+' price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
 +'Every item has: {"form":"sheet" or "tube","family":"one of crs|hrs|galv|galvanneal|ss304|ss316|ss430|al5052|al6061|al3003|copper|brass|other","desc":"the vendor’s own wording for the material","price":number,"uom":"lb|cwt|sheet|sqft|ft|each","qty":the quantity this price needs (a break quantity) or null,"raw":"the exact line copied from the source"}\n\n'
 +'A FLAT SHEET, PLATE or COIL is form "sheet" and adds: {"thickness_in":decimal inches or null,"gauge":gauge number or null,"size":"e.g. 48x120, or null"}\n\n'
 +'TUBE, PIPE or BAR STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
++(o.hardware?'HARDWARE — self-clinching fasteners (PEM-style nuts, studs, standoffs), screws, rivets, threaded inserts, weld studs, hinges, latches, anything priced per piece rather than by weight or length — is form "hardware" and adds: {"per":"each|100|1000 — the block the price is quoted per (per C = 100, per M = 1,000)"}. Keep the complete part number in desc exactly as the vendor wrote it (e.g. CLS-440-2ZI). Hardware has no uom, family or dimensions — per replaces uom, and the family field is omitted.\n\n':'')
 +'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, with the break quantity in qty ("1-9 $92, 10+ $88" → two items, qty 1 and qty 10) and the vendor’s wording kept in desc. A plain price with no break = qty null.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".'
 +(o.text?('\n\nEMAIL (newest message first):\n'+o.text):'');
 }
@@ -6992,6 +6993,9 @@ function mpExtractPrompt(opts){
 // safe default; the person checks every row before it saves either way.
 function mpNormalizeItems(items){
   return (items||[]).filter(x=>x&&Number(x.price)>0).map(x=>{
+    if(String(x.form||'').toLowerCase()==='hardware') return { form:'hardware', desc:String(x.desc||''),
+      price:Number(x.price)||0, per:['each','100','1000'].includes(String(x.per))?String(x.per):'each',
+      qty:(x.qty!=null&&Number(x.qty)>0)?Number(x.qty):null, raw:String(x.raw||'') };
     const tube=String(x.form||'').toLowerCase()==='tube';
     return { form:tube?'tube':'sheet', family:matFam(x.family).k, desc:String(x.desc||''),
       thicknessIn:(!tube&&x.thickness_in!=null)?Number(x.thickness_in):null,
@@ -7035,6 +7039,39 @@ function mpRecord(x, src, byEmail){
     pricePerLb:tube?((c&&c.perLb!=null)?Number(c.perLb.toFixed(4)):null):(c?Number(c.v.toFixed(4)):null),
     lbPerFt:(tube&&c&&c.lbPerFt)?Number(c.lbPerFt.toFixed(4)):null,
     math:c?c.math:'', raw:x.raw||'',
+    vendor:s.vendor||'', vendorEmail:s.vendorEmail||'', emailDate:s.emailDate||Date.now(),
+    mailKey:s.mailKey||'', subject:s.subject||'', fileName:s.fileName||'',
+    by:byEmail||'', at:Date.now() };
+}
+// ── hardware price book core (mail/hardwarePrices/<id>) ──────────────────────
+// Hardware identity is the part number, not a family+thickness, so there are no
+// normalization tables — just per-piece math and token search. Vendors quote per
+// piece, per 100 (C) or per 1,000 (M); everything normalizes to $/piece and the
+// math string shows the conversion out loud.
+const HW_PERS=[['each','per piece',1],['100','per 100 (C)',100],['1000','per 1,000 (M)',1000]];
+function hwPerEach(price,per){
+  const div=(HW_PERS.find(x=>x[0]===String(per))||HW_PERS[0])[2];
+  if(!(price>0)) return null;
+  const each=price/div;
+  return { each, math: div===1?('$'+(+price).toFixed(4).replace(/\.?0+$/,'')+' per piece')
+    :('$'+(+price).toFixed(2)+' ÷ '+div.toLocaleString('en-US')+' = $'+each.toFixed(4)+'/pc') };
+}
+const hwMoney=v=>(+v)>=1?'$'+(+v).toFixed(2):'$'+(+v).toFixed(4).replace(/(\.\d\d[1-9]?)0+$/,'$1');
+const hwTokens=s=>String(s||'').toLowerCase().split(/[\s,]+/).filter(Boolean);
+function hwPriceMatch(p,tokens){
+  const hay=((p.desc||'')+' '+(p.vendor||'')+' '+(p.raw||'')).toLowerCase();
+  return tokens.every(t=>hay.includes(t));
+}
+// One shared hardware record, ready to write to mail/hardwarePrices/<id>.
+// Same src shape as mpRecord: an email or a hand entry, but always something.
+let _hpSeq=0;
+function hwRecord(x, src, byEmail){
+  const c=hwPerEach(Number(x.price), x.per||'each');
+  const s=src||{};
+  return { id:'hp_'+Date.now().toString(36)+'_'+(_hpSeq++)+'_'+Math.floor(Math.random()*1e4),
+    form:'hardware', desc:String(x.desc||''), price:Number(x.price)||0, per:String(x.per||'each'),
+    priceEach:c?Number(c.each.toFixed(5)):null, math:c?c.math:'',
+    qty:(Number(x.qty)>0)?Number(x.qty):null, raw:x.raw||'',
     vendor:s.vendor||'', vendorEmail:s.vendorEmail||'', emailDate:s.emailDate||Date.now(),
     mailKey:s.mailKey||'', subject:s.subject||'', fileName:s.fileName||'',
     by:byEmail||'', at:Date.now() };
@@ -7514,27 +7551,9 @@ window._qOnHwPrices = (obj) => {
 };
 const hwList = () => Object.values(HWPRICES)
   .filter(p => p && p.desc && Number(p.priceEach) > 0)
-  .sort((a,b) => (b.quoteDate||b.at||0) - (a.quoteDate||a.at||0));
-const hwTokens = s => String(s||'').toLowerCase().split(/[\s,]+/).filter(Boolean);
-
-// vendors quote hardware per piece, per 100 (C) or per 1,000 (M) — everything
-// normalizes to $/piece, and the math string shows the conversion out loud
-const HW_PERS = [['each','per piece',1],['100','per 100 (C)',100],['1000','per 1,000 (M)',1000]];
-function hwPerEach(price, per){
-  const div = (HW_PERS.find(x => x[0] === String(per)) || HW_PERS[0])[2];
-  if (!(price > 0)) return null;
-  const each = price / div;
-  return { each, math: div === 1 ? ('$'+(+price).toFixed(4).replace(/\.?0+$/,'')+' per piece')
-    : ('$'+(+price).toFixed(2)+' ÷ '+div.toLocaleString('en-US')+' = $'+each.toFixed(4)+'/pc') };
-}
-function hwRecord(x){
-  const id = 'hp_'+Date.now().toString(36)+'_'+Math.floor(Math.random()*46656).toString(36);
-  const c = hwPerEach(Number(x.price), x.per || 'each');
-  return { id, desc: x.desc, vendor: x.vendor || '', price: Number(x.price), per: x.per || 'each',
-    priceEach: c ? c.each : Number(x.price), math: c ? c.math : '', qty: Number(x.qty) || null,
-    quoteDate: x.quoteDate || Date.now(), at: Date.now(),
-    by: (window._qUserEmail && window._qUserEmail()) || '' };
-}
+  .sort((a,b) => (b.emailDate||b.at||0) - (a.emailDate||a.at||0));
+// HW_PERS / hwPerEach / hwRecord / hwTokens / hwMoney / hwPriceMatch live in the
+// shared price core above — the Mail app's email capture writes the same records.
 // exact description first, then every-typed-token-appears, newest wins
 function hwBestPrice(desc){
   const d = String(desc||'').trim().toLowerCase();
@@ -7544,9 +7563,6 @@ function hwBestPrice(desc){
     || list.find(p => { const t = hwTokens(d); return t.length && t.every(tok => p.desc.toLowerCase().includes(tok)); })
     || null;
 }
-const hwMoney = v => (+v) >= 1 ? '$'+(+v).toFixed(2)
-  : '$'+(+v).toFixed(4).replace(/(\.\d\d[1-9]?)0+$/,'$1');
-
 // one shared datalist feeds every hardware row's description box
 function rebuildHwDatalist(){
   let dl = document.getElementById('hw-book-list');
@@ -7574,7 +7590,7 @@ function applyHwPrice(i){
   }
   if (src){
     const bits = [hit.vendor || 'a saved price'];
-    const when = hit.quoteDate || hit.at;
+    const when = hit.emailDate || hit.at;
     if (when) bits.push(new Date(Number(when)).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}));
     if (hit.qty > 1) bits.push('at ' + fmtN(hit.qty) + '+');
     src.innerHTML = (typed ? 'Book has ' + qEsc(hwMoney(hit.priceEach)) + '/pc — <b>' : 'From the hardware book — <b>')
@@ -7591,7 +7607,8 @@ function saveHwRowPrice(i){
   if (!window._qHwReady){ alert('The shared price book hasn’t loaded yet — make sure you’re signed in, then try again.'); return; }
   const vendor = prompt('Save to the shared hardware book:\n\n'+desc+' at '+hwMoney(cost)+'/pc\n\nVendor (who sells it at this price)?','');
   if (vendor == null) return;
-  const rec = hwRecord({ desc, vendor: vendor.trim(), price: cost, per: 'each' });
+  const rec = hwRecord({ desc, price: cost, per: 'each' }, { vendor: vendor.trim() },
+    (window._qUserEmail && window._qUserEmail()) || '');
   window._qSaveHw(rec).then(() => {
     HWPRICES[rec.id] = rec; rebuildHwDatalist(); applyHwPrice(i);
     const panel = document.getElementById('panel-prices');
@@ -7614,8 +7631,8 @@ function saveHwBookEntry(){
   if (!desc){ alert('Enter the part number / description.'); return; }
   if (!(price > 0)){ alert('Enter the price.'); return; }
   if (!window._qHwReady){ alert('Sign in first — the hardware book is shared and needs the connection.'); return; }
-  const rec = hwRecord({ desc, vendor: g('hw-add-vendor').trim(), price, per: g('hw-add-per'),
-    qty: parseFloat(g('hw-add-qty')) || null });
+  const rec = hwRecord({ desc, price, per: g('hw-add-per'), qty: parseFloat(g('hw-add-qty')) || null },
+    { vendor: g('hw-add-vendor').trim() }, (window._qUserEmail && window._qUserEmail()) || '');
   window._qSaveHw(rec).then(() => {
     HWPRICES[rec.id] = rec;
     ['hw-add-desc','hw-add-vendor','hw-add-price','hw-add-qty'].forEach(id => { const el = document.getElementById(id); if (el) el.value=''; });
@@ -7632,7 +7649,7 @@ function renderHwBook(){
   }
   const tokens = hwTokens((document.getElementById('hw-search')||{}).value || '');
   let list = hwList();
-  if (tokens.length) list = list.filter(p => { const hay = (p.desc+' '+(p.vendor||'')).toLowerCase(); return tokens.every(t => hay.includes(t)); });
+  if (tokens.length) list = list.filter(p => hwPriceMatch(p, tokens));
   if (!list.length){
     body.innerHTML = hwList().length
       ? '<div class="empty-state"><h3>Nothing matches that search</h3><p>Try part of the part number — e.g. <b>cls-440</b> or <b>standoff</b>.</p></div>'
@@ -7648,7 +7665,7 @@ function renderHwBook(){
       <tr>
         <td style="font-weight:600">${qEsc(p.desc)}</td>
         <td style="font-size:13px">${qEsc(p.vendor||'—')}</td>
-        <td style="font-size:12px;color:var(--text2)">${qEsc(dt(p.quoteDate||p.at))}</td>
+        <td style="font-size:12px;color:var(--text2)">${qEsc(dt(p.emailDate||p.at))}</td>
         <td class="num" style="font-size:12px;color:var(--text2)">${p.qty>1?qEsc(fmtN(p.qty)+'+'):'—'}</td>
         <td class="num" style="font-size:12px;font-family:'DM Mono',monospace">$${(+p.price).toFixed(2)}<div style="font-size:11px;color:var(--text3)">${qEsc((HW_PERS.find(x=>x[0]===String(p.per))||HW_PERS[0])[1])}</div></td>
         <td class="num" style="font-weight:600;font-family:'DM Mono',monospace${p.math?';cursor:help':''}"${p.math?` title="${qEsc(p.math)}"`:''}>${qEsc(hwMoney(p.priceEach))}</td>
