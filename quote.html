@@ -374,6 +374,17 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
   background: var(--surface2); border: 1px solid var(--border);
   display: flex; align-items: center; justify-content: center;
 }
+/* Compare tab */
+.cmp-cand{display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid var(--border);background:var(--surface);margin-bottom:6px}
+.cmp-cand .cc-main{flex:1;min-width:0;font-size:13px}
+.cmp-cand .cc-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.cmp-tbl th.cmp-col{min-width:150px;vertical-align:top}
+.cmp-tbl .cmp-part{font-weight:700;font-size:13px;margin-top:4px}
+.cmp-tbl .cmp-rev{font-weight:600;font-size:10px;color:var(--text3)}
+.cmp-tbl .cmp-cust{font-size:11px;color:var(--text3);font-weight:500;margin:1px 0 5px}
+.cmp-tbl .cmp-lbl{font-size:12px;font-weight:600;color:var(--text2);white-space:nowrap}
+.cmp-tbl .cmp-bold{font-weight:700}
+.cmp-tbl .cmp-na{color:var(--text3)}
 .empty-state {
   text-align: center; padding: 56px 20px; color: var(--text3);
 }
@@ -596,6 +607,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div class="nav-item active" id="nav-quote" onclick="showPanel('quote')"><i class="ti ti-file-invoice"></i><span class="nav-label">New Quote</span></div>
     <div class="nav-item" id="nav-assembly" onclick="showAssemblyPanel()"><i class="ti ti-stack-2"></i><span class="nav-label">New Assembly</span></div>
     <div class="nav-item" id="nav-history" onclick="showPanel('history')"><i class="ti ti-history"></i><span class="nav-label">Quote History</span><span class="nav-badge" id="nav-history-badge" style="display:none">0</span></div>
+    <div class="nav-item" id="nav-compare" onclick="showPanel('compare');renderCompare()"><i class="ti ti-layout-columns"></i><span class="nav-label">Compare</span></div>
     <div class="nav-item" id="nav-archive" onclick="showPanel('archive');renderArchive()"><i class="ti ti-archive"></i><span class="nav-label">Printed Archive</span></div>
     <div class="nav-item" id="nav-prices" onclick="showPanel('prices');renderPriceIndex();renderHwBook()"><i class="ti ti-tag"></i><span class="nav-label">Price Book</span></div>
     <div class="nav-item" id="nav-laser" onclick="showPanel('laser');renderLaserSpeeds()"><i class="ti ti-bolt"></i><span class="nav-label">Laser Speeds</span></div>
@@ -2249,6 +2261,38 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   </div>
 </div>
 
+
+<!-- ===== COMPARE PANEL ===== -->
+<div class="panel" id="panel-compare">
+  <div class="page-header">
+    <h2>Compare Quotes</h2>
+    <p>Put 2–4 quotes side by side — costs, labor, hardware, markup and price line up so a mispriced part stands out. Pick the first quote and similar ones sort to the top.</p>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <div class="card-title" style="margin-bottom:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Pick quotes
+      </div>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="cmp-search" placeholder="part #, customer, material…" style="width:220px" oninput="renderCompare()">
+      </div>
+    </div>
+    <div id="cmp-hint" style="font-size:11px;color:var(--text3);margin-bottom:8px"></div>
+    <div id="cmp-picker-body" style="max-height:280px;overflow-y:auto"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="card-title" style="margin-bottom:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/></svg>
+        Side by side
+      </div>
+      <button class="btn btn-sm" id="cmp-clear" style="display:none" onclick="cmpClear()">Clear all</button>
+    </div>
+    <div id="cmp-table"></div>
+  </div>
+</div>
 
 <!-- ===== LASER SPEEDS PANEL ===== -->
 <div class="panel" id="panel-laser">
@@ -5044,6 +5088,12 @@ function saveQuote(){
     expediteFee: d.expediteFee||0,
     markup: d.markup,
     finance: d.finance,
+    // per-part cost breakdown snapshot — the Compare tab reads this; older
+    // quotes without it show "—" until they're re-saved
+    breakdown:{ mat:d.matCostPart||0, labor:d.laborCostPart||0, weld:d.weldCostPart||0,
+      cnc:d.cncCostPart||0, insp:d.inspCostPart||0, prog:d.progCostPart||0,
+      hw:d.hwCostPart||0, out:d.outCostPart||0, purch:d.purchasing||0,
+      pps:d.pps||null, costSheet:d.costSheet||null, margin:d.margin!=null?d.margin:null },
     qtyBreaks: window._qtyBreaksResults || [],
     laborLines, hwLines, outLines,
     notes: document.getElementById('notes').value,
@@ -5356,6 +5406,146 @@ function quoteAgeDays(q){
 function isStale(q){
   const s = q.status || 'pending';
   return s === 'pending' && quoteAgeDays(q) >= STALE_DAYS;
+}
+
+// ===================== QUOTE COMPARISON =====================
+let cmpSel=[];   // quote ids being compared, in pick order (max 4)
+
+// A quote saved since the compare tab exists carries its cost breakdown; for
+// older ones, derive what the stored lines allow and show "—" for the rest.
+function cmpBreakdown(q){
+  if(q.breakdown) return Object.assign({approx:false}, q.breakdown);
+  const fin=1+(Number(q.finance)||0);
+  const sum=lines=>(lines||[]).reduce((s,l)=>s+((parseFloat(l.q)||0)*(parseFloat(l.c)||0)),0);
+  return { mat:null, labor:null, weld:null, cnc:null, insp:null, prog:null,
+    hw:sum(q.hwLines)*fin||null, out:sum(q.outLines)*fin||null, purch:null,
+    pps:null, costSheet:null, margin:null, approx:true };
+}
+function cmpLaborMins(q){ return (q.laborLines||[]).reduce((s,l)=>s+(parseFloat(l.mins)||0),0); }
+
+// similarity of quote b to the anchor a — same customer, shared part-number
+// prefix, same material (or at least the same metal), and a comparable qty
+function cmpScore(a,b){
+  let s=0;
+  if(a.customer&&a.customer===b.customer) s+=2;
+  const ap=(a.partNum||'').toLowerCase(), bp=(b.partNum||'').toLowerCase();
+  let pre=0; while(pre<ap.length&&pre<bp.length&&ap[pre]===bp[pre]) pre++;
+  if(pre>=4) s+=3; else if(pre>=2) s+=1;
+  if(a.material&&a.material===b.material) s+=2;
+  else if(a.material&&b.material&&qFamilyOf(a.material)===qFamilyOf(b.material)) s+=1;
+  const q1=Number(a.qty)||0, q2=Number(b.qty)||0;
+  if(q1&&q2&&Math.max(q1,q2)/Math.min(q1,q2)<=2) s+=1;
+  return s;
+}
+window.cmpAdd=(id)=>{
+  if(!cmpSel.includes(id)){
+    if(cmpSel.length>=4){ alert('Compare up to 4 quotes at a time — remove one first.'); return; }
+    cmpSel.push(id);
+  }
+  renderCompare();
+};
+window.cmpRemove=(id)=>{ cmpSel=cmpSel.filter(x=>x!==id); renderCompare(); };
+window.cmpClear=()=>{ cmpSel=[]; renderCompare(); };
+
+function renderCompare(){
+  const listEl=document.getElementById('cmp-picker-body'); if(!listEl) return;
+  const search=((document.getElementById('cmp-search')||{}).value||'').toLowerCase();
+  const anchor=cmpSel.length?HISTORY.find(h=>h.id===cmpSel[0]):null;
+  let cands=HISTORY.filter(q=>!q.isAssembly&&!cmpSel.includes(q.id));
+  if(search) cands=cands.filter(q=>(q.partNum||'').toLowerCase().includes(search)||(q.customer||'').toLowerCase().includes(search)||(q.material||'').toLowerCase().includes(search));
+  if(anchor) cands=cands.map(q=>[cmpScore(anchor,q),q]).sort((x,y)=>y[0]-x[0]||y[1].id-x[1].id).map(x=>x[1]);
+  else cands=cands.slice().sort((a,b)=>b.id-a.id);
+  const fmt=v=>'$'+(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  listEl.innerHTML=cands.slice(0,12).map(q=>`
+    <div class="cmp-cand">
+      ${q.img?`<img src="${q.img}" class="history-thumb" alt="">`:''}
+      <div class="cc-main"><b>${qEsc(q.partNum)}</b> · ${qEsc(q.customer||'')}
+        <div class="cc-sub">${qEsc(q.date||'')} · ${qEsc(q.material||'—')} · qty ${qEsc(String(q.qty!=null?q.qty:'—'))} · ${fmt(q.pricePerPart||0)}/pc</div></div>
+      <button class="btn btn-sm" onclick="cmpAdd(${q.id})">Add</button>
+    </div>`).join('')||'<div class="empty-state" style="padding:16px 8px"><p>No other quotes match.</p></div>';
+  const hint=document.getElementById('cmp-hint');
+  if(hint) hint.textContent=anchor
+    ?('Sorted by similarity to '+anchor.partNum+' — same customer, part number, material and quantity rank first.')
+    :'Pick the first quote to anchor the comparison — the list then re-sorts by similarity to it.';
+  renderCompareTable();
+}
+
+function renderCompareTable(){
+  const el=document.getElementById('cmp-table'); if(!el) return;
+  const qs=cmpSel.map(id=>HISTORY.find(h=>h.id===id)).filter(Boolean);
+  const clr=document.getElementById('cmp-clear'); if(clr) clr.style.display=qs.length?'':'none';
+  if(qs.length<2){
+    el.innerHTML=`<div class="empty-state"><h3>${qs.length?'Add one more quote':'Nothing to compare yet'}</h3><p>Pick 2–4 quotes from the list above${qs.length?'':' — once you pick the first, similar quotes sort to the top'}.</p></div>`;
+    return;
+  }
+  const bds=qs.map(cmpBreakdown);
+  const money=v=>'$'+(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rows=[];
+  const push=(label,vals,kind,opt)=>rows.push(Object.assign({label,vals,kind},opt||{}));
+  push('Date',qs.map(q=>q.date||'—'),'text');
+  push('Status',qs.map(q=>(QUOTE_STATUSES[q.status||'pending']||{}).label||'—'),'text');
+  push('Qty',qs.map(q=>q.qty!=null?fmtN(q.qty):null),'text');
+  push('Material',qs.map(q=>q.material||null),'text');
+  push('Sheet cost',bds.map(b=>b.costSheet),'moneyCost');
+  push('Parts / sheet',bds.map(b=>b.pps!=null?String(b.pps):null),'text');
+  push('Material / part',bds.map(b=>b.mat),'moneyCost');
+  push('Labor mins / part',qs.map(q=>{const m=cmpLaborMins(q);return m?m.toFixed(1):null;}),'text');
+  push('Labor / part',bds.map(b=>b.labor),'moneyCost');
+  push('Welding / part',bds.map(b=>b.weld),'moneyCost');
+  push('CNC / part',bds.map(b=>b.cnc),'moneyCost');
+  push('Inspection / part',bds.map(b=>b.insp),'moneyCost');
+  push('Programming / part',bds.map(b=>b.prog),'moneyCost');
+  push('Hardware / part',bds.map(b=>b.hw),'moneyCost');
+  push('Outsource / part',bds.map(b=>b.out),'moneyCost');
+  push('Purchasing / part',bds.map(b=>b.purch),'moneyCost');
+  push('Cost / part',qs.map(q=>q.costPerPart),'moneyCost',{bold:true});
+  push('Markup',qs.map(q=>q.markup!=null?((Number(q.markup)||0)*100).toFixed(0)+'%':null),'text');
+  push('Price / part',qs.map(q=>q.pricePerPart),'money',{bold:true});
+  push('Margin',bds.map(b=>b.margin!=null?(+b.margin).toFixed(1)+'%':null),'text');
+  push('Job total',qs.map(q=>q.jobTotal),'money');
+  const base=Number(qs[0].pricePerPart)||0;
+  push('Price vs '+(qs[0].partNum||'first'),qs.map((q,i)=>{
+    if(i===0) return '—';
+    const p=Number(q.pricePerPart)||0;
+    if(!base||!p) return null;
+    const d=(p-base)/base*100;
+    return (d>=0?'+':'')+d.toFixed(1)+'%';
+  }),'text');
+
+  // drop rows nobody has a value for (keeps welding/CNC lines out of flat-part comparisons)
+  const kept=rows.filter(r=>r.vals.some(v=>v!=null&&v!==''&&!(typeof v==='number'&&Math.abs(v)<0.005)));
+  const naTip='title="Not stored in quotes saved before the Compare tab existed — load the quote and re-save it to fill this in"';
+  const body=kept.map(r=>{
+    let cells;
+    if(r.kind==='money'||r.kind==='moneyCost'){
+      const nums=r.vals.map(v=>v!=null?Number(v):null);
+      const present=nums.filter(v=>v!=null&&isFinite(v));
+      const mn=Math.min.apply(null,present), mx=Math.max.apply(null,present);
+      // tint the cheapest / dearest cost cells, but only when there is a real spread
+      const spread=present.length>1&&mx>0&&(mx-mn)/mx>0.005;
+      cells=nums.map(v=>{
+        if(v==null||!isFinite(v)) return `<td class="num cmp-na" ${naTip}>—</td>`;
+        const hl=(r.kind==='moneyCost'&&spread)?(v===mn?' style="background:#e9f4ec"':(v===mx?' style="background:#f9ecea"':'')):'';
+        return `<td class="num${r.bold?' cmp-bold':''}"${hl}>${money(v)}</td>`;
+      }).join('');
+    } else {
+      cells=r.vals.map(v=>v!=null&&v!==''?`<td class="num${r.bold?' cmp-bold':''}">${qEsc(String(v))}</td>`:`<td class="num cmp-na" ${naTip}>—</td>`).join('');
+    }
+    return `<tr><td class="cmp-lbl">${r.label}</td>${cells}</tr>`;
+  }).join('');
+  const heads=qs.map(q=>`<th class="cmp-col">
+      ${q.img?`<img src="${q.img}" class="history-thumb" alt="">`:''}
+      <div class="cmp-part">${qEsc(q.partNum||'—')}${q.revision&&q.revision!=='—'?` <span class="cmp-rev">Rev ${qEsc(q.revision)}</span>`:''}</div>
+      <div class="cmp-cust">${qEsc(q.customer||'')}</div>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="reloadQuote(${q.id})">Load</button>
+        <button class="btn btn-sm" onclick="cmpRemove(${q.id})" title="Remove from comparison">×</button>
+      </div>
+    </th>`).join('');
+  const anyOld=bds.some(b=>b.approx);
+  el.innerHTML=`<div style="overflow-x:auto"><table class="history-table cmp-tbl">
+    <thead><tr><th style="min-width:120px"></th>${heads}</tr></thead><tbody>${body}</tbody></table></div>
+    ${anyOld?'<div style="font-size:11px;color:var(--text3);margin-top:8px">A “—” means that quote was saved before the Compare tab existed, so it didn’t store its cost breakdown. Load it and re-save to fill those lines in. Hardware and outsource are estimated from the saved lines.</div>':''}`;
 }
 
 function renderHistoryInsights(list){
@@ -9660,6 +9850,7 @@ function quotePayload(q){
     material: q.material || '',
     costPerPart: _qNum(q.costPerPart),
     pricePerPart: _qNum(q.pricePerPart),
+    breakdown: q.breakdown || null,
     jobTotal: _qNum(q.jobTotal),
     poNumber: q.poNumber || '',
     dueDate: q.dueDate || '',
