@@ -882,7 +882,8 @@ tr.inv-low td{background:#fdf6ee}
 .ci-row:hover .ci-copy{opacity:.85}
 .ci-copy:hover{color:var(--navy)}
 @media(pointer:coarse){.ci-copy{opacity:.55}}
-.pm-part,.card-part-chip{cursor:copy}
+.chip-copy{cursor:pointer;color:var(--text3);font-size:12px;opacity:.5;margin-left:2px;vertical-align:-1px;flex-shrink:0}
+.chip-copy:hover{color:var(--navy);opacity:1}
 .ci-miss{display:inline-flex;align-items:center;color:#BA7517;font-size:12px;margin-right:4px;flex-shrink:0}
 .ci-out{font-size:10px;color:var(--text3);display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:600}
 .ci-qty{text-align:center;color:var(--text2);font-weight:600}
@@ -2687,7 +2688,7 @@ function poItemsHtml(g){
 function partChipHtml(g){
   const ps=[...new Set(g.items.map(i=>(i.part||'').trim()).filter(Boolean))];
   const gkE=g.gk.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-  return ps.length?`<span class="card-part-chip" title="${ps.join(', ').replace(/"/g,'&quot;')} — click to copy" onclick="window._cpyParts('${gkE}',event)"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
+  return ps.length?`<span class="card-part-chip" title="${ps.join(', ').replace(/"/g,'&quot;')}"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span><i class="ti ti-copy chip-copy" title="Copy part #" onclick="window._cpyParts('${gkE}',event)"></i>`:'';
 }
 
 function outsourceStripHtml(g){
@@ -2713,7 +2714,7 @@ function condensedCard(g){
   const startDates=g.items.map(i=>i.ordered).filter(Boolean).sort();
   const startVal=startDates.length?fmtDate(startDates[0]):'';
   const ps=[...new Set(g.items.map(i=>(i.part||'').trim()).filter(Boolean))];
-  const partChip=ps.length?`<span class="pm-part" title="${ps.join(', ').replace(/"/g,'&quot;')} — click to copy" onclick="window._cpyParts('${gkE}',event)"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span>`:'';
+  const partChip=ps.length?`<span class="pm-part" title="${ps.join(', ').replace(/"/g,'&quot;')}"><i class="ti ti-tag"></i>${ps[0]}${ps.length>1?` +${ps.length-1}`:''}</span><i class="ti ti-copy chip-copy" title="Copy part #" onclick="window._cpyParts('${gkE}',event)"></i>`:'';
   const statusBadges=g.statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}">${st}</span>`).join('');
   const missTip=g.incompleteCount?`${g.incompleteCount} item${g.incompleteCount!==1?'s':''} missing info`:'';
   const missBadge=g.incompleteCount?`<span class="pm-miss" title="${missTip}"><i class="ti ti-alert-triangle"></i></span>`:'';
@@ -2848,7 +2849,6 @@ function sizeCardPanes(){
 }
 window.addEventListener('resize', ()=>{ if(document.querySelector('.po-list')) sizeCardPanes(); });
 window._selPO=(gk)=>{
-  if(String((window.getSelection&&window.getSelection())||'').trim())return;   // a drag-select isn't a click
   selectedPO=gk; renderCards();
   if(window.innerWidth<=900){ setTimeout(()=>document.querySelector('.po-detail')?.scrollIntoView({behavior:'smooth',block:'start'}),30); }
 };
@@ -3137,11 +3137,7 @@ function showPicker(picker,anchor){
 }
 
 window._tg=(gk)=>{if(collapsedGroups.has(gk))collapsedGroups.delete(gk);else collapsedGroups.add(gk);render();};
-window._tl=(id,e)=>{if(e.target.closest('button')||e.target.closest('input')||e.target.closest('textarea')||e.target.closest('.status-badge')||e.target.closest('.pay-badge')||e.target.closest('.editable'))return;
-  // a drag-select ends in a click on this row — swallowing it (and re-rendering) destroyed the
-  // selection before anyone could copy it. If text is selected, this "click" was a selection.
-  if(String((window.getSelection&&window.getSelection())||'').trim())return;
-  if(expanded.has(id))expanded.delete(id);else expanded.add(id);render();};
+window._tl=(id,e)=>{if(e.target.closest('button')||e.target.closest('input')||e.target.closest('textarea')||e.target.closest('.status-badge')||e.target.closest('.pay-badge')||e.target.closest('.editable'))return;if(expanded.has(id))expanded.delete(id);else expanded.add(id);render();};
 // ── copy the part # straight off a card (works on iPad where text-selection is fiddly) ──
 window._cpyText=async(txt,e)=>{ if(e){e.stopPropagation();e.preventDefault();} if(!txt)return;
   try{ await navigator.clipboard.writeText(txt); }
