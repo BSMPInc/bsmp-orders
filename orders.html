@@ -914,6 +914,8 @@ tr.inv-low td{background:#fdf6ee}
 .board-tray{width:250px;border-left:1px solid var(--border);background:#fff;overflow-y:auto;padding:10px;flex-shrink:0}
 .board-tray h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:10px 0 6px}
 .board-tray h4:first-child{margin-top:0}
+.bt-search{width:100%;box-sizing:border-box;border:1px solid var(--border);padding:6px 8px;font-size:12px;margin-bottom:8px;outline:none}
+.bt-search:focus{border-color:var(--navy)}
 .bt-row{display:flex;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--border);margin-bottom:5px;font-size:11.5px}
 .bt-row .btr-main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-row .btr-sub{color:var(--text3);font-size:10.5px}
@@ -1425,7 +1427,10 @@ body.sb-pinned .dock{left:var(--sb)}
     </div>
     <div class="board-shell">
       <div class="board-wrap" id="board-wrap"><div class="board-canvas" id="board-canvas"></div></div>
-      <aside class="board-tray" id="board-tray"></aside>
+      <aside class="board-tray" id="board-tray">
+        <input type="text" class="bt-search" id="bt-search" placeholder="Search orders &amp; POs…" oninput="bTraySearch()">
+        <div id="board-tray-list"></div>
+      </aside>
     </div>
   </div>
 
@@ -6294,24 +6299,37 @@ function bItemHtml(it){
   return '';
 }
 
+let _bTrayQ='';
+window.bTraySearch=()=>{
+  _bTrayQ=((document.getElementById('bt-search')||{}).value||'').toLowerCase();
+  const list=document.getElementById('board-tray-list');
+  if(list) list.innerHTML=bTrayHtml();   // only the list repaints — the search box keeps focus
+};
 function bTrayHtml(){
+  const q=_bTrayQ;
   const onGk=new Set(Object.values(BOARD).filter(i=>i&&i.type==='order').map(i=>i.gk));
   const onPo=new Set(Object.values(BOARD).filter(i=>i&&i.type==='po').map(i=>i.refId));
   const map=new Map();
   orders.filter(r=>!r.archived&&r.status!=='Invoiced').forEach(r=>{
     const k=r.customer+'||'+(r.po||'verbal'); if(!map.has(k))map.set(k,[]); map.get(k).push(r); });
-  const grows=[...map.entries()].filter(([gk])=>!onGk.has(gk)).map(([gk,items])=>{
+  const grows=[...map.entries()].filter(([gk])=>!onGk.has(gk)).filter(([gk,items])=>{
+    if(!q) return true;
+    const parts=items.map(r=>(r.part||'')+' '+(r.desc||'')+' '+(r.job||'')).join(' ');
+    return ((items[0].customer||'')+' '+(items[0].po||'verbal')+' '+parts).toLowerCase().includes(q);
+  }).map(([gk,items])=>{
     const parts=[...new Set(items.map(r=>(r.part||'').trim()).filter(Boolean))];
     return `<div class="bt-row"><div class="btr-main"><b>${esc2(items[0].customer||'')}</b> · PO ${esc2(items[0].po||'verbal')}
       <div class="btr-sub">${esc2(parts[0]||'')}${parts.length>1?' +'+(parts.length-1):''}</div></div>
       <button class="bt-add" data-gk="${esc2(gk)}">Add</button></div>`;
   }).join('');
-  const prows=poRecList().filter(p=>(p.status||'')!=='void'&&!onPo.has(p.id)).map(p=>
+  const prows=poRecList().filter(p=>(p.status||'')!=='void'&&!onPo.has(p.id)).filter(p=>
+    !q||((p.po||'')+' '+(p.vendor||'')+' '+(p.proc||'')+' '+(p.detail||'')).toLowerCase().includes(q)
+  ).map(p=>
     `<div class="bt-row"><div class="btr-main"><b>PO ${esc2(p.po)}</b> · ${esc2(p.vendor||'')}
       <div class="btr-sub">${esc2(p.proc||'')}${p.shipDate?' · ship '+fmtDate(p.shipDate):''}</div></div>
       <button class="bt-add" data-po="${esc2(p.id)}">Add</button></div>`).join('');
-  return '<h4>Open orders</h4>'+(grows||'<div class="btr-sub" style="padding:4px 2px">Everything is on the board.</div>')
-    +'<h4>Purchase orders</h4>'+(prows||'<div class="btr-sub" style="padding:4px 2px">No open POs.</div>');
+  return '<h4>Open orders</h4>'+(grows||`<div class="btr-sub" style="padding:4px 2px">${q?'No open orders match.':'Everything is on the board.'}</div>`)
+    +'<h4>Purchase orders</h4>'+(prows||`<div class="btr-sub" style="padding:4px 2px">${q?'No POs match.':'No open POs.'}</div>`);
 }
 
 function bClick(it){
@@ -6407,7 +6425,10 @@ function renderBoardPage(){
   const nf=document.getElementById('b-add-frame'); if(nf) nf.style.display=canEd?'':'none';
   cv.innerHTML=Object.values(BOARD).filter(Boolean).map(bItemHtml).join('');
   const tray=document.getElementById('board-tray');
-  if(tray){ tray.style.display=canEd?'':'none'; if(canEd) tray.innerHTML=bTrayHtml(); }
+  if(tray){ tray.style.display=canEd?'':'none';
+    const list=document.getElementById('board-tray-list');
+    if(canEd&&list) list.innerHTML=bTrayHtml();
+  }
 }
 
 // ══════════════ NEED PO — one pipeline: needs a PO → PO issued → received ══════════════
