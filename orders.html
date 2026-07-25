@@ -898,6 +898,7 @@ tr.inv-low td{background:#fdf6ee}
 .b-card .bc-sub{color:var(--text3);font-size:11px;margin-top:2px}
 .b-card .bc-due{font-size:11px;font-weight:600;margin-top:3px}
 .b-card.b-po{border-left-color:#8a6d2f}
+.b-card.b-part{border-left-color:#5e7ba7;width:175px}
 .b-card.b-stale{opacity:.55;border-left-color:#9aa3b2}
 .b-note{width:170px;min-height:90px;padding:9px 10px 20px;font-size:12.5px;line-height:1.35;box-shadow:0 2px 6px rgba(90,70,20,.18);cursor:grab;white-space:pre-wrap;word-break:break-word}
 .b-note:active{cursor:grabbing}
@@ -923,6 +924,11 @@ tr.inv-low td{background:#fdf6ee}
 .bt-row{display:flex;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--border);margin-bottom:5px;font-size:11.5px}
 .bt-row .btr-main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-row .btr-sub{color:var(--text3);font-size:10.5px}
+.bt-tgl{cursor:pointer;color:var(--text3);font-size:13px;flex-shrink:0;padding:2px}
+.bt-tgl:hover{color:var(--navy)}
+.bt-kids{margin:-2px 0 6px 14px;border-left:2px solid var(--border);padding-left:6px}
+.bt-kid{display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:11px}
+.bt-kid .btr-main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-add{border:1px solid var(--border);background:var(--surface2,#f4f3f0);cursor:pointer;font-size:11px;padding:2px 8px;flex-shrink:0}
 .bt-add:hover{background:#e8ecf3}
 @media(max-width:900px){.board-tray{display:none}}
@@ -1427,6 +1433,7 @@ body.sb-pinned .dock{left:var(--sb)}
     <div class="board-toolbar" id="board-toolbar">
       <button class="btn" id="b-add-note" onclick="bAddNote()"><i class="ti ti-note"></i> Add note</button>
       <button class="btn" id="b-add-frame" onclick="bAddFrame()"><i class="ti ti-crop-landscape"></i> Add frame</button>
+      <button class="btn" id="b-publish" onclick="bPublish()" title="Stamp the board's top-to-bottom order onto everyone's Today list"><i class="ti ti-send"></i> Publish to Today</button>
       <span class="hint" id="board-hint"></span>
     </div>
     <div class="board-shell">
@@ -6272,6 +6279,54 @@ window.bAddPO=(pid)=>{ if(!canEditBoard())return;
   bSave({id:'bp_'+uid(),type:'po',refId:pid,x:p.x,y:p.y,z:++_bZ,by:bBy(),at:Date.now()});
   renderBoardPage();
 };
+window.bAddPart=(oid)=>{ if(!canEditBoard())return;
+  const r=orders.find(o=>String(o.id)===String(oid)); if(!r) return;
+  const p=bDropXY();
+  bSave({id:'bi_'+uid(),type:'part',refId:r.id,x:p.x,y:p.y,z:++_bZ,by:bBy(),at:Date.now()});
+  renderBoardPage();
+};
+
+// a plain toast for board actions (copyToast is copy-specific)
+function bToast(msg){
+  let el=document.getElementById('undo-toast');
+  if(!el){ el=document.createElement('div'); el.id='undo-toast'; el.className='undo-toast'; document.body.appendChild(el); }
+  el.innerHTML=`<span class="ut-msg"><i class="ti ti-check"></i> ${esc2(msg)}</span><button class="ut-x" id="ut-x-btn" title="Dismiss"><i class="ti ti-x"></i></button>`;
+  el.classList.add('show');
+  clearTimeout(_undoTimer);
+  document.getElementById('ut-x-btn').onclick=()=>el.classList.remove('show');
+  _undoTimer=setTimeout(()=>el.classList.remove('show'), 3500);
+}
+
+// Publish: the board's top-to-bottom arrangement becomes today's manual order
+// (daySeq) on every job it holds — the same field the Today page's drag-reorder
+// writes, so each person's list follows the board. Jobs not on the board keep
+// their urgency order below the published ones. Resets tomorrow, like any
+// manual Today order.
+window.bPublish=()=>{
+  if(!canEditBoard()) return;
+  const cards=Object.values(BOARD).filter(i=>i&&(i.type==='order'||i.type==='part'))
+    .sort((a,b)=>((Number(a.y)||0)-(Number(b.y)||0))||((Number(a.x)||0)-(Number(b.x)||0)));
+  const ids=[];
+  cards.forEach(it=>{
+    if(it.type==='part'){
+      const r=orders.find(o=>String(o.id)===String(it.refId)&&!o.archived);
+      if(r&&!['Completed','Invoiced'].includes(r.status)) ids.push(r.id);
+    } else {
+      const g=orders.filter(r=>!r.archived&&(r.customer+'||'+(r.po||'verbal'))===it.gk&&!['Completed','Invoiced'].includes(r.status));
+      g.sort((x,y)=>((x.due||'9999')+'').localeCompare((y.due||'9999')+''));
+      g.forEach(r=>ids.push(r.id));
+    }
+  });
+  const seen=new Set();
+  const uniq=ids.filter(id=>{ const k=String(id); if(seen.has(k)) return false; seen.add(k); return true; });
+  if(!uniq.length){ alert('Nothing to publish — put order or part cards on the board first.'); return; }
+  if(!confirm(`Publish this board to Today?\n\nThe ${uniq.length} job${uniq.length!==1?'s':''} on the board (top to bottom) become today's task order under each team member. Jobs not on the board fall in below them in urgency order. This lasts for today — tomorrow starts fresh.`)) return;
+  const ds=_todayStr();
+  uniq.forEach((id,i)=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.daySeq=i+1; r.daySeqDate=ds; } });
+  saveDB();
+  bToast(`Published — ${uniq.length} job${uniq.length!==1?'s':''} set as today's order`);
+  if(document.getElementById('dispatch-page')?.style.display!=='none') renderDispatch();
+};
 
 function bItemHtml(it){
   const pos=`left:${Number(it.x)||0}px;top:${Number(it.y)||0}px;`;
@@ -6295,6 +6350,19 @@ function bItemHtml(it){
       ${g.gdue?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${g.done?'Done':'Due '+fmtDate(g.gdue)+(overdue?' — overdue':'')}</div>`:''}
       <button class="b-x" title="Remove from board (the order itself is untouched)" onclick="_bDel('${it.id}',event)">×</button></div>`;
   }
+  if(it.type==='part'){
+    const r=orders.find(o=>String(o.id)===String(it.refId)&&!o.archived);
+    if(!r) return `<div class="b-item b-card b-part b-stale" data-id="${it.id}" style="${pos}${z}"><div class="bc-top">(part gone)</div><button class="b-x" onclick="_bDel('${it.id}',event)">×</button></div>`;
+    const done=['Completed','Invoiced'].includes(r.status);
+    const d=r.due?daysUntil(r.due):null;
+    const overdue=d!=null&&d<0&&!done;
+    return `<div class="b-item b-card b-part${done?' b-stale':''}" data-id="${it.id}" style="${pos}${z}" title="Click to open in Open Orders">
+      <div class="bc-top"><span>${esc2(r.part||r.desc||'(no part #)')}</span></div>
+      <div class="bc-sub">${esc2(r.job||'')}${r.job?' · ':''}${esc2(r.customer||'')} · PO ${esc2(r.po||'verbal')}</div>
+      <div class="bc-sub">${esc2(r.status||'Confirmed')}</div>
+      ${r.due?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${done?'Done':'Due '+fmtDate(r.due)+(overdue?' — overdue':'')}</div>`:''}
+      <button class="b-x" title="Remove from board (the order itself is untouched)" onclick="_bDel('${it.id}',event)">×</button></div>`;
+  }
   if(it.type==='po'){
     const p=POS[it.refId];
     if(!p) return `<div class="b-item b-card b-po b-stale" data-id="${it.id}" style="${pos}${z}"><div class="bc-top">(PO gone)</div><button class="b-x" onclick="_bDel('${it.id}',event)">×</button></div>`;
@@ -6309,6 +6377,7 @@ function bItemHtml(it){
 }
 
 let _bTrayQ='', _bTrayF='';
+const _bTrayOpen=new Set();   // which jobs in the tray are expanded to their parts
 window.bTraySearch=()=>{
   _bTrayQ=((document.getElementById('bt-search')||{}).value||'').toLowerCase();
   const list=document.getElementById('board-tray-list');
@@ -6340,6 +6409,7 @@ function bTrayHtml(){
   const q=_bTrayQ;
   const onGk=new Set(Object.values(BOARD).filter(i=>i&&i.type==='order').map(i=>i.gk));
   const onPo=new Set(Object.values(BOARD).filter(i=>i&&i.type==='po').map(i=>i.refId));
+  const onPart=new Set(Object.values(BOARD).filter(i=>i&&i.type==='part').map(i=>String(i.refId)));
   const map=new Map();
   orders.filter(r=>!r.archived&&r.status!=='Invoiced').forEach(r=>{
     const k=r.customer+'||'+(r.po||'verbal'); if(!map.has(k))map.set(k,[]); map.get(k).push(r); });
@@ -6349,9 +6419,18 @@ function bTrayHtml(){
     return ((items[0].customer||'')+' '+(items[0].po||'verbal')+' '+parts).toLowerCase().includes(q);
   }).map(([gk,items])=>{
     const parts=[...new Set(items.map(r=>(r.part||'').trim()).filter(Boolean))];
-    return `<div class="bt-row"><div class="btr-main"><b>${esc2(items[0].customer||'')}</b> · PO ${esc2(items[0].po||'verbal')}
+    const open=_bTrayOpen.has(gk);
+    // expanded: one row per part in the job — grab a single part onto the board
+    const kids=open?`<div class="bt-kids">${items.map(r=>{
+      const onB=onPart.has(String(r.id));
+      return `<div class="bt-kid"><div class="btr-main">${esc2(r.part||r.desc||'(no part #)')}
+        <div class="btr-sub">${esc2(r.job||'')}${r.job&&r.status?' · ':''}${esc2(r.status||'')}</div></div>
+        ${onB?'<span class="btr-sub">on board</span>':`<button class="bt-add" data-oid="${esc2(String(r.id))}">Add</button>`}</div>`;
+    }).join('')}</div>`:'';
+    return `<div class="bt-row"><i class="ti ti-chevron-${open?'down':'right'} bt-tgl" data-tgl="${esc2(gk)}" title="${open?'Hide':'Show'} the individual parts in this job"></i>
+      <div class="btr-main"><b>${esc2(items[0].customer||'')}</b> · PO ${esc2(items[0].po||'verbal')}
       <div class="btr-sub">${esc2(parts[0]||'')}${parts.length>1?' +'+(parts.length-1):''}</div></div>
-      <button class="bt-add" data-gk="${esc2(gk)}">Add</button></div>`;
+      <button class="bt-add" data-gk="${esc2(gk)}">Add</button></div>${kids}`;
   }).join('');
   const prows=poRecList().filter(p=>(p.status||'')!=='void'&&!onPo.has(p.id)).filter(bTrayPoPass).filter(p=>
     !q||((p.po||'')+' '+(p.vendor||'')+' '+(p.proc||'')+' '+(p.detail||'')).toLowerCase().includes(q)
@@ -6365,6 +6444,10 @@ function bTrayHtml(){
 
 function bClick(it){
   if(it.type==='order'&&it.gk){ showPage('orders'); setTimeout(()=>window._selPO&&window._selPO(it.gk),60); }
+  if(it.type==='part'){
+    const r=orders.find(o=>String(o.id)===String(it.refId));
+    if(r){ const gk=r.customer+'||'+(r.po||'verbal'); showPage('orders'); setTimeout(()=>window._selPO&&window._selPO(gk),60); }
+  }
   if(it.type==='po'){ const p=POS[it.refId]; showPage(p&&(p.status||'')==='open'?'needpo':'issuedpos'); }
 }
 window._bEditNote=(id)=>{
@@ -6437,9 +6520,14 @@ function bindBoardCanvas(){
   });
   const tray=document.getElementById('board-tray');
   if(tray) tray.addEventListener('click',(e)=>{
+    const tgl=e.target.closest('.bt-tgl');
+    if(tgl){ const gk=tgl.dataset.tgl;
+      if(_bTrayOpen.has(gk)) _bTrayOpen.delete(gk); else _bTrayOpen.add(gk);
+      window.bTraySearch(); return; }
     const b=e.target.closest('.bt-add'); if(!b) return;
     if(b.dataset.gk) window.bAddOrder(b.dataset.gk);
     else if(b.dataset.po) window.bAddPO(b.dataset.po);
+    else if(b.dataset.oid) window.bAddPart(b.dataset.oid);
   });
 }
 
@@ -6454,6 +6542,7 @@ function renderBoardPage(){
     :'View only — this board is arranged by '+BOARD_EDITORS.join(' and ')+'.';
   const na=document.getElementById('b-add-note'); if(na) na.style.display=canEd?'':'none';
   const nf=document.getElementById('b-add-frame'); if(nf) nf.style.display=canEd?'':'none';
+  const np=document.getElementById('b-publish'); if(np) np.style.display=canEd?'':'none';
   cv.innerHTML=Object.values(BOARD).filter(Boolean).map(bItemHtml).join('');
   const tray=document.getElementById('board-tray');
   if(tray){ tray.style.display=canEd?'':'none';
