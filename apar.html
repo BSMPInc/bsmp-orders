@@ -658,6 +658,9 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .ck-bill{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
 .ck-bill .ckb-main{flex:1;min-width:0;font-size:13px}
 .ck-bill .ckb-sub{font-size:12px;color:var(--text3);margin-top:1px}
+.ck-opt{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--text);text-transform:none;margin:0 0 5px;cursor:pointer}
+.ck-opt input{accent-color:var(--ap);cursor:pointer}
+.ck-opt .cko-sub{font-size:11.5px;color:var(--text3);font-weight:400}
 .pay-log .pl{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2)}
 .pay-log .pl:last-child{border-bottom:none}
 .pay-log .pl .rm{color:var(--red);cursor:pointer;font-size:11px}
@@ -1421,7 +1424,7 @@ const PAGE_HELP={
     <li>Assign each bill to the bank account it'll be paid from — that powers Cash Flow, Pay Run, and the Forecast.</li>
     <li>Click a bill to record payment, set its pay status, or attach early-pay discount terms.</li>
     <li><b>AI Extract</b> in the sidebar reads a PDF bill and fills the details for you.</li>
-    <li><b>Record a check</b> logs a check you wrote to a vendor with no invoice (verbal orders) — the memo is your paper trail, and it files itself as an already-paid bill. If the vendor has an open bill, you can apply the check to it instead.</li></ul>`},
+    <li><b>Record a check</b> logs a check you wrote to a vendor with no invoice (verbal orders) — the memo is your paper trail. If the vendor hasn't cashed it yet, save it as <b>Still outstanding</b>: it stays visible as scheduled money, and when it clears, set its status to Withdrawn to record the payment and true up the account balance. If the vendor has an open bill, you can apply the check to it instead.</li></ul>`},
   aging:{title:'Aging',body:`<p>Outstanding balances sorted by how overdue they are — the classic 0-30 / 31-60 / 61-90 / 90+ day buckets.</p>
     <ul><li>Spot which customers are slow to pay and which bills are falling behind.</li>
     <li>Older balances are the ones to chase first.</li></ul>`},
@@ -4037,6 +4040,10 @@ window.openRecordCheck=()=>{
         <option value="">Unassigned</option>
         ${Object.entries(accounts).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join('')}
       </select></div>
+      <div class="fld"><label>Has it cleared the bank?</label>
+        <label class="ck-opt"><input type="radio" name="ck-cleared" value="no" checked> Still outstanding <span class="cko-sub">— vendor hasn't cashed it yet; stays visible until you mark it withdrawn</span></label>
+        <label class="ck-opt"><input type="radio" name="ck-cleared" value="yes"> Cleared <span class="cko-sub">— money already left the account</span></label>
+      </div>
       <div id="ck-bills"></div>
     </div>
     <div class="m-foot"><button class="btn" onclick="closePay()">Cancel</button><button class="btn primary" onclick="saveCheck()"><i class="ti ti-checkbook"></i> Record check</button></div>`;
@@ -4067,7 +4074,8 @@ function ckReadFields(){
     date:$('ck-date').value||toISO(new Date()),
     num:($('ck-num').value||'').trim(),
     memo:($('ck-memo').value||'').trim(),
-    account:$('ck-account').value||''
+    account:$('ck-account').value||'',
+    cleared:(document.querySelector('input[name="ck-cleared"]:checked')||{}).value==='yes'
   };
 }
 // Same one-click reconcile Pay Run offers: keep the typed account balance honest.
@@ -4086,12 +4094,20 @@ window.saveCheck=()=>{
   if(!(f.amt>0)){alert('Enter the check amount');return;}
   const id='m_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
   const o={manual:true,type:'ap',party:f.party,ref:f.num?('Check #'+f.num):'Check',rel:f.memo,
-    amount:f.amt,issue:f.date,terms:0,dueDate:f.date,account:f.account,
-    payments:[{date:f.date,amount:f.amt,method:'Check',refNo:f.num,note:f.memo}],
-    payStatus:'withdrawn',withdrawnDate:f.date,checkEntry:true};
+    amount:f.amt,issue:f.date,terms:0,dueDate:f.date,account:f.account,checkEntry:true};
+  if(f.cleared){
+    // money already left the account → born fully paid + withdrawn (files itself after 45 days)
+    o.payments=[{date:f.date,amount:f.amt,method:'Check',refNo:f.num,note:f.memo}];
+    o.payStatus='withdrawn'; o.withdrawnDate=f.date;
+  }else{
+    // outstanding check float: committed but still in the bank. Scheduled keeps it visible on
+    // Payables and Cash Flow; marking it withdrawn later auto-records the payment (method
+    // comes from planMethod) and offers the balance reconcile then — not now.
+    o.payments=[]; o.payStatus='scheduled'; o.planMethod='Check';
+  }
   writeOverlay(id,o); closePay(); render();
-  logAudit('check',{entryId:id,party:f.party,detail:`${f.num?('Check #'+f.num):'Check'} · ${fmtMoney(f.amt)}${f.memo?(' · '+f.memo):''}`});
-  ckOfferReconcile(id,f.party,f.account,f.amt);
+  logAudit('check',{entryId:id,party:f.party,detail:`${f.num?('Check #'+f.num):'Check'} · ${fmtMoney(f.amt)}${f.memo?(' · '+f.memo):''}${f.cleared?'':' · outstanding (not yet cashed)'}`});
+  if(f.cleared) ckOfferReconcile(id,f.party,f.account,f.amt);
 };
 window.applyCheckToBill=(id)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
@@ -4102,12 +4118,21 @@ window.applyCheckToBill=(id)=>{
   const o=ovl(id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;if(o.amount==null)o.amount=e.amount;}
   if(e.amount==null)o.amount=f.amt;   // verbal order: the check defines the price
-  o.payments=[...(e.payments||[]),{date:f.date,amount:f.amt,method:'Check',refNo:f.num,note:f.memo}];
   if(o.terms==null)o.terms=e.terms; if(!o.issue&&e.issue)o.issue=e.issue;
   if(f.account&&!e.account)o.account=f.account;
+  if(f.cleared){
+    o.payments=[...(e.payments||[]),{date:f.date,amount:f.amt,method:'Check',refNo:f.num,note:f.memo}];
+  }else{
+    // Outstanding: recording the payment now would file the bill as paid while the money is
+    // still in the bank. Mark it scheduled instead; the check # goes in the notes as the paper
+    // trail, and marking the bill withdrawn when it clears auto-records the payment.
+    o.payStatus='scheduled'; o.planMethod='Check';
+    const note=`${f.num?('Check #'+f.num):'Check'} sent ${fmtDate(f.date)} — awaiting clearing`;
+    o.notes=[e.notes,note].filter(Boolean).join(' · ');
+  }
   writeOverlay(id,o); closePay(); render();
-  logAudit('check',{entryId:id,party:e.party,detail:`${f.num?('Check #'+f.num):'Check'} applied to ${e.ref||'bill'} · ${fmtMoney(f.amt)}`});
-  ckOfferReconcile(id,e.party,f.account||e.account,f.amt);
+  logAudit('check',{entryId:id,party:e.party,detail:`${f.num?('Check #'+f.num):'Check'} applied to ${e.ref||'bill'} · ${fmtMoney(f.amt)}${f.cleared?'':' · outstanding (not yet cashed)'}`});
+  if(f.cleared) ckOfferReconcile(id,e.party,f.account||e.account,f.amt);
   openEntry(id);
 };
 
