@@ -6192,7 +6192,7 @@ window._iodUndo = (id,name)=>{ undoSent(id,name); openStepDetail(id,name); };
 // Everyone signed in can SEE the board; only the editors below can change it.
 // Keep this list in sync with the published `board` database rule — the rule is
 // what actually enforces the restriction, this just hides the controls.
-const BOARD_EDITORS=['info@bertsmp.com','ofc.anahi@bertsmp.com'];
+const BOARD_EDITORS=['info@bertsmp.com','ofc.edgar@bertsmp.com','ofc.anahi@bertsmp.com'];
 function canEditBoard(){ return BOARD_EDITORS.includes(((auth.currentUser&&auth.currentUser.email)||'').toLowerCase()); }
 const bBy=()=>((auth.currentUser&&auth.currentUser.email)||'');
 const B_NOTE_COLORS=['#fff9c4','#ffe0e0','#d8ecd9','#dbe7f6'];
