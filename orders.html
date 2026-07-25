@@ -914,8 +914,12 @@ tr.inv-low td{background:#fdf6ee}
 .board-tray{width:250px;border-left:1px solid var(--border);background:#fff;overflow-y:auto;padding:10px;flex-shrink:0}
 .board-tray h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:10px 0 6px}
 .board-tray h4:first-child{margin-top:0}
-.bt-search{width:100%;box-sizing:border-box;border:1px solid var(--border);padding:6px 8px;font-size:12px;margin-bottom:8px;outline:none}
+.bt-search{width:100%;box-sizing:border-box;border:1px solid var(--border);padding:6px 8px;font-size:12px;margin-bottom:6px;outline:none}
 .bt-search:focus{border-color:var(--navy)}
+.bt-chips{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.bt-chip{border:1px solid var(--border);background:#fff;font-size:10.5px;font-weight:600;color:var(--text2);padding:3px 8px;cursor:pointer;border-radius:10px}
+.bt-chip:hover{border-color:var(--navy)}
+.bt-chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .bt-row{display:flex;align-items:center;gap:6px;padding:5px 6px;border:1px solid var(--border);margin-bottom:5px;font-size:11.5px}
 .bt-row .btr-main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bt-row .btr-sub{color:var(--text3);font-size:10.5px}
@@ -1429,6 +1433,11 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="board-wrap" id="board-wrap"><div class="board-canvas" id="board-canvas"></div></div>
       <aside class="board-tray" id="board-tray">
         <input type="text" class="bt-search" id="bt-search" placeholder="Search orders &amp; POs…" oninput="bTraySearch()">
+        <div class="bt-chips">
+          <button class="bt-chip" id="bt-chip-overdue" onclick="bTrayFilter('overdue')">Overdue</button>
+          <button class="bt-chip" id="bt-chip-behind" onclick="bTrayFilter('behind')">Behind Schedule</button>
+          <button class="bt-chip" id="bt-chip-purchasing" onclick="bTrayFilter('purchasing')">Purchasing</button>
+        </div>
         <div id="board-tray-list"></div>
       </aside>
     </div>
@@ -6299,12 +6308,34 @@ function bItemHtml(it){
   return '';
 }
 
-let _bTrayQ='';
+let _bTrayQ='', _bTrayF='';
 window.bTraySearch=()=>{
   _bTrayQ=((document.getElementById('bt-search')||{}).value||'').toLowerCase();
   const list=document.getElementById('board-tray-list');
   if(list) list.innerHTML=bTrayHtml();   // only the list repaints — the search box keeps focus
 };
+window.bTrayFilter=(f)=>{
+  _bTrayF=(_bTrayF===f)?'':f;   // click the active chip again to clear it
+  ['overdue','behind','purchasing'].forEach(k=>{
+    const el=document.getElementById('bt-chip-'+k); if(el) el.classList.toggle('on',_bTrayF===k);
+  });
+  window.bTraySearch();
+};
+// filter semantics: overdue = a due date in the past (order) / open PO past its
+// ship date; behind = the schedule math says the job should have started already;
+// purchasing = orders still waiting on a PO, plus every open PO
+function bTrayGroupPass(items){
+  if(_bTrayF==='overdue') return items.some(r=>{const d=daysUntil(r.due);return d!=null&&d<0&&!['Completed','Invoiced'].includes(r.status);});
+  if(_bTrayF==='behind') return items.some(r=>jobHealth(r).state==='behind');
+  if(_bTrayF==='purchasing') return items.some(r=>r.status==='Need Purchase Order');
+  return true;
+}
+function bTrayPoPass(p){
+  if(_bTrayF==='overdue') return (p.status||'')==='open'&&p.shipDate&&daysUntil(p.shipDate)!=null&&daysUntil(p.shipDate)<0;
+  if(_bTrayF==='behind') return false;
+  if(_bTrayF==='purchasing') return (p.status||'')==='open';
+  return true;
+}
 function bTrayHtml(){
   const q=_bTrayQ;
   const onGk=new Set(Object.values(BOARD).filter(i=>i&&i.type==='order').map(i=>i.gk));
@@ -6312,7 +6343,7 @@ function bTrayHtml(){
   const map=new Map();
   orders.filter(r=>!r.archived&&r.status!=='Invoiced').forEach(r=>{
     const k=r.customer+'||'+(r.po||'verbal'); if(!map.has(k))map.set(k,[]); map.get(k).push(r); });
-  const grows=[...map.entries()].filter(([gk])=>!onGk.has(gk)).filter(([gk,items])=>{
+  const grows=[...map.entries()].filter(([gk])=>!onGk.has(gk)).filter(([gk,items])=>bTrayGroupPass(items)).filter(([gk,items])=>{
     if(!q) return true;
     const parts=items.map(r=>(r.part||'')+' '+(r.desc||'')+' '+(r.job||'')).join(' ');
     return ((items[0].customer||'')+' '+(items[0].po||'verbal')+' '+parts).toLowerCase().includes(q);
@@ -6322,14 +6353,14 @@ function bTrayHtml(){
       <div class="btr-sub">${esc2(parts[0]||'')}${parts.length>1?' +'+(parts.length-1):''}</div></div>
       <button class="bt-add" data-gk="${esc2(gk)}">Add</button></div>`;
   }).join('');
-  const prows=poRecList().filter(p=>(p.status||'')!=='void'&&!onPo.has(p.id)).filter(p=>
+  const prows=poRecList().filter(p=>(p.status||'')!=='void'&&!onPo.has(p.id)).filter(bTrayPoPass).filter(p=>
     !q||((p.po||'')+' '+(p.vendor||'')+' '+(p.proc||'')+' '+(p.detail||'')).toLowerCase().includes(q)
   ).map(p=>
     `<div class="bt-row"><div class="btr-main"><b>PO ${esc2(p.po)}</b> · ${esc2(p.vendor||'')}
       <div class="btr-sub">${esc2(p.proc||'')}${p.shipDate?' · ship '+fmtDate(p.shipDate):''}</div></div>
       <button class="bt-add" data-po="${esc2(p.id)}">Add</button></div>`).join('');
-  return '<h4>Open orders</h4>'+(grows||`<div class="btr-sub" style="padding:4px 2px">${q?'No open orders match.':'Everything is on the board.'}</div>`)
-    +'<h4>Purchase orders</h4>'+(prows||`<div class="btr-sub" style="padding:4px 2px">${q?'No POs match.':'No open POs.'}</div>`);
+  return '<h4>Open orders</h4>'+(grows||`<div class="btr-sub" style="padding:4px 2px">${(q||_bTrayF)?'No open orders match.':'Everything is on the board.'}</div>`)
+    +'<h4>Purchase orders</h4>'+(prows||`<div class="btr-sub" style="padding:4px 2px">${(q||_bTrayF)?'No POs match.':'No open POs.'}</div>`);
 }
 
 function bClick(it){
