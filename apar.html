@@ -655,6 +655,9 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .fld input,.fld select,.fld textarea{width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--border);border-radius:7px}
 .frow{display:flex;gap:9px}.frow .fld{flex:1}
 .pay-log{font-size:12.5px}
+.ck-bill{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px}
+.ck-bill .ckb-main{flex:1;min-width:0;font-size:13px}
+.ck-bill .ckb-sub{font-size:12px;color:var(--text3);margin-top:1px}
 .pay-log .pl{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2)}
 .pay-log .pl:last-child{border-bottom:none}
 .pay-log .pl .rm{color:var(--red);cursor:pointer;font-size:11px}
@@ -946,6 +949,7 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
       <div class="nav-section">Tools</div>
       <div class="nav-item" onclick="openManual('ar')"><i class="ti ti-plus"></i> Add receivable</div>
       <div class="nav-item" onclick="openManual('ap')"><i class="ti ti-plus"></i> Add payable</div>
+      <div class="nav-item" onclick="openRecordCheck()"><i class="ti ti-checkbook"></i> Record a check</div>
       <div class="nav-item" onclick="openAI()"><i class="ti ti-sparkles"></i> AI Extract</div>
       <div class="nav-item" onclick="openImport()"><i class="ti ti-table-import"></i> Import (CSV/paste)</div>
       <div class="nav-item" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</div>
@@ -1416,7 +1420,8 @@ const PAGE_HELP={
     <ul><li>When several order steps share the <b>same vendor and PO number</b>, they combine into one bill with each step as a line item — enter an amount per line and the total adds up. Open it to <b>Split apart</b> (or re-combine) if you'd rather track them separately.</li>
     <li>Assign each bill to the bank account it'll be paid from — that powers Cash Flow, Pay Run, and the Forecast.</li>
     <li>Click a bill to record payment, set its pay status, or attach early-pay discount terms.</li>
-    <li><b>AI Extract</b> in the sidebar reads a PDF bill and fills the details for you.</li></ul>`},
+    <li><b>AI Extract</b> in the sidebar reads a PDF bill and fills the details for you.</li>
+    <li><b>Record a check</b> logs a check you wrote to a vendor with no invoice (verbal orders) — the memo is your paper trail, and it files itself as an already-paid bill. If the vendor has an open bill, you can apply the check to it instead.</li></ul>`},
   aging:{title:'Aging',body:`<p>Outstanding balances sorted by how overdue they are — the classic 0-30 / 31-60 / 61-90 / 90+ day buckets.</p>
     <ul><li>Spot which customers are slow to pay and which bills are falling behind.</li>
     <li>Older balances are the ones to chase first.</li></ul>`},
@@ -1875,6 +1880,7 @@ function renderList(entries,side){
   $('content').innerHTML=`
     <div class="toolbar">
       <button class="btn ${isAR?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button>
+      ${!isAR?`<button class="btn" onclick="openRecordCheck()"><i class="ti ti-checkbook"></i> Record a check</button>`:''}
       <button class="btn ${S.group?'primary':''}" onclick="toggleGroupMode()"><i class="ti ti-layout-list"></i> ${S.group?'Grouped':'Group by '+(isAR?'customer':'vendor')}</button>
       <button class="btn ${S.compact?'primary':''}" onclick="toggleCompact()" title="${S.compact?'Switch to roomy cards':'Switch to compact rows — see more at once'}"><i class="ti ti-${S.compact?'layout-cards':'list-details'}"></i> ${S.compact?'Compact':'Compact rows'}</button>
       ${S.group?`<button class="btn" onclick="toggleCollapseAll()"><i class="ti ti-chevrons-${allCollapsed?'down':'up'}"></i> ${allCollapsed?'Expand all':'Collapse all'}</button>`:''}
@@ -3355,6 +3361,7 @@ function renderForecast(){
 const AUDIT_META={
   add:{icon:'ti-plus',color:'var(--green)',label:'Added'},
   payment:{icon:'ti-cash',color:'var(--green)',label:'Payment'},
+  check:{icon:'ti-checkbook',color:'var(--green)',label:'Check'},
   'payment-removed':{icon:'ti-arrow-back-up',color:'var(--amber)',label:'Payment removed'},
   status:{icon:'ti-flag',color:'var(--blue)',label:'Status'},
   payrun:{icon:'ti-calendar-check',color:'var(--blue)',label:'Pay run'},
@@ -4005,6 +4012,103 @@ window.saveManual=(type)=>{
     update(ref(db,'mail/threads/'+mailKey),{link:{app:'apar',id,label:'AP bill'}})
       .catch(()=>{/* mail link-back is best-effort; the bill itself is saved */});
   }
+};
+
+// ── Record a check ───────────────────────────────────────────────────────────
+// Many vendor orders are verbal — no invoice ever exists. The check entry IS the
+// record: it saves as a manual AP bill born fully paid (payment + withdrawn), so
+// vendor history, aging, cash flow, archive and Activity all stay consistent
+// without the user ever seeing a bill step.
+window.openRecordCheck=()=>{
+  const vendors=[...new Set(allEntries().filter(e=>e.type==='ap'&&!e.trashed).map(e=>e.party).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  $('pay-body').innerHTML=`
+    <div class="m-head ap"><div class="m-t"><div class="t1">Record a check</div><div class="t2">A check you wrote to a vendor — no bill needed</div></div><button class="m-x" onclick="closePay()"><i class="ti ti-x"></i></button></div>
+    <div class="m-body">
+      <div class="fld"><label>Vendor</label><input id="ck-vendor" type="text" list="ck-vendor-list" placeholder="Who was the check to?" oninput="ckRefreshBills()">
+        <datalist id="ck-vendor-list">${vendors.map(v=>`<option value="${esc(v)}">`).join('')}</datalist></div>
+      <div class="frow">
+        <div class="fld"><label>Check #</label><input id="ck-num" type="text" placeholder="e.g. 1187"></div>
+        <div class="fld"><label>Date written</label><input id="ck-date" type="date" value="${toISO(new Date())}"></div>
+      </div>
+      <div class="fld"><label>Amount</label><input id="ck-amt" type="number" step="0.01" oninput="ckRefreshBills()"></div>
+      <div class="fld"><label>What was it for?</label><input id="ck-memo" type="text" placeholder="e.g. 4×8 sheet 304SS — verbal order">
+        <div style="font-size:12px;color:var(--text3);margin-top:3px">This is the paper trail for verbal orders — say what you bought.</div></div>
+      <div class="fld"><label>Account (which bank account it draws from)</label><select id="ck-account">
+        <option value="">Unassigned</option>
+        ${Object.entries(accounts).map(([id,a])=>`<option value="${id}">${esc(a.name)}</option>`).join('')}
+      </select></div>
+      <div id="ck-bills"></div>
+    </div>
+    <div class="m-foot"><button class="btn" onclick="closePay()">Cancel</button><button class="btn primary" onclick="saveCheck()"><i class="ti ti-checkbook"></i> Record check</button></div>`;
+  $('pay-modal').style.display='flex';
+};
+// If the typed vendor already has open bills, offer to apply the check against one
+// instead of creating a duplicate record (the mail invoice→AP handoff makes bills too).
+window.ckRefreshBills=()=>{
+  const box=$('ck-bills'); if(!box)return;
+  const name=($('ck-vendor').value||'').trim();
+  if(!name){box.innerHTML='';return;}
+  const vk=vendorKey(canonicalParty(name));
+  const open=allEntries().filter(e=>e.type==='ap'&&!isArchived(e)&&statusOf(e)!=='paid'&&vendorKey(e.party)===vk);
+  if(!open.length){box.innerHTML='';return;}
+  box.innerHTML=`<div class="m-sect">Open bills for ${esc(canonicalParty(name))}</div>
+    <div style="font-size:12px;color:var(--text3);margin:-2px 0 8px">This vendor already has ${open.length} open bill${open.length!==1?'s':''}. If this check pays one of them, apply it there instead of creating a new record.</div>
+    ${open.map(e=>{
+      const bal=e.amount!=null?Math.max(0,(e.amount||0)-(e.paid||0)):null;
+      return `<div class="ck-bill"><div class="ckb-main"><b>${esc(e.ref||'—')}</b>${e.rel?` · ${esc(e.rel)}`:''}
+        <div class="ckb-sub">${bal!=null?fmtMoney(bal)+' open':'no amount set — the check amount becomes the bill amount'}${e.due?' · due '+fmtDate(e.due):''}</div></div>
+        <button class="btn sm" onclick="applyCheckToBill('${e.id}')">Apply check</button></div>`;
+    }).join('')}`;
+};
+function ckReadFields(){
+  return {
+    party:($('ck-vendor').value||'').trim(),
+    amt:Number($('ck-amt').value),
+    date:$('ck-date').value||toISO(new Date()),
+    num:($('ck-num').value||'').trim(),
+    memo:($('ck-memo').value||'').trim(),
+    account:$('ck-account').value||''
+  };
+}
+// Same one-click reconcile Pay Run offers: keep the typed account balance honest.
+function ckOfferReconcile(entryId,party,account,amt){
+  if(!account||!accounts[account]||!(amt>0.005))return;
+  const acc=accounts[account];
+  const cur=Number(acc.balance)||0; const next=cur-amt;
+  if(confirm(`Subtract ${fmtMoney(amt)} from ${acc.name}'s balance?\n\n${fmtMoney(cur)} → ${fmtMoney(next)}\n\nThis keeps the balance in sync with what just left the account. Cancel to leave the balance unchanged.`)){
+    dbUpdate('apar/accounts/'+account,{balance:next,balanceUpdatedAt:Date.now()});
+    logAudit('reconcile',{entryId,party,detail:`${acc.name}: ${fmtMoney(cur)} → ${fmtMoney(next)} (−${fmtMoney(amt)})`});
+  }
+}
+window.saveCheck=()=>{
+  const f=ckReadFields();
+  if(!f.party){alert('Enter the vendor name');return;}
+  if(!(f.amt>0)){alert('Enter the check amount');return;}
+  const id='m_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
+  const o={manual:true,type:'ap',party:f.party,ref:f.num?('Check #'+f.num):'Check',rel:f.memo,
+    amount:f.amt,issue:f.date,terms:0,dueDate:f.date,account:f.account,
+    payments:[{date:f.date,amount:f.amt,method:'Check',refNo:f.num,note:f.memo}],
+    payStatus:'withdrawn',withdrawnDate:f.date,checkEntry:true};
+  writeOverlay(id,o); closePay(); render();
+  logAudit('check',{entryId:id,party:f.party,detail:`${f.num?('Check #'+f.num):'Check'} · ${fmtMoney(f.amt)}${f.memo?(' · '+f.memo):''}`});
+  ckOfferReconcile(id,f.party,f.account,f.amt);
+};
+window.applyCheckToBill=(id)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const f=ckReadFields();
+  if(!(f.amt>0)){alert('Enter the check amount first');return;}
+  const bal=e.amount!=null?Math.max(0,(e.amount||0)-(e.paid||0)):null;
+  if(bal!=null&&f.amt>bal+0.005&&!confirm(`This check (${fmtMoney(f.amt)}) is more than the ${fmtMoney(bal)} open on this bill. Apply it anyway?`))return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;if(o.amount==null)o.amount=e.amount;}
+  if(e.amount==null)o.amount=f.amt;   // verbal order: the check defines the price
+  o.payments=[...(e.payments||[]),{date:f.date,amount:f.amt,method:'Check',refNo:f.num,note:f.memo}];
+  if(o.terms==null)o.terms=e.terms; if(!o.issue&&e.issue)o.issue=e.issue;
+  if(f.account&&!e.account)o.account=f.account;
+  writeOverlay(id,o); closePay(); render();
+  logAudit('check',{entryId:id,party:e.party,detail:`${f.num?('Check #'+f.num):'Check'} applied to ${e.ref||'bill'} · ${fmtMoney(f.amt)}`});
+  ckOfferReconcile(id,e.party,f.account||e.account,f.amt);
+  openEntry(id);
 };
 
 // ── Hand-off from the mail app ───────────────────────────────────────────────
