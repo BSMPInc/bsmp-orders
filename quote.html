@@ -2157,7 +2157,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
       </div>
       <div class="drop-title">Drop vendor quote here or click to browse</div>
-      <div class="drop-sub">PDF · PNG · JPG — works with any vendor format</div>
+      <div class="drop-sub">PDF · PNG · JPG — material or hardware quotes, any vendor format</div>
     </div>
     <div class="ai-status" id="price-ai-status">
       <div class="spinner"></div>
@@ -7287,7 +7287,7 @@ function handlePriceFile(file) {
     return callAnthropic({
       model: 'claude-sonnet-4-6',
       max_tokens: 3000,
-      messages: [{role:'user', content:[contentBlock, {type:'text', text:mpExtractPrompt({source:'file', hasDoc:true})}]}]
+      messages: [{role:'user', content:[contentBlock, {type:'text', text:mpExtractPrompt({source:'file', hasDoc:true, hardware:true})}]}]
     });
   }).then(r => r.json()).then(data => {
     if (data.error) throw new Error(data.error.message);
@@ -7319,6 +7319,26 @@ function renderExtractedPreview(items) {
   const container = document.getElementById('price-extracted-rows');
   const nv = v => v != null ? v : '';
   container.innerHTML = items.map((item, i) => {
+    const formSel = `<select id="pi-form-${i}" onchange="piForm(${i})" title="Sheet is bought by weight; tube and bar by the foot; hardware by the piece" style="font-size:12px;width:108px">
+            <option value="sheet"${item.form==='sheet'?' selected':''}>Sheet / plate</option>
+            <option value="tube"${item.form==='tube'?' selected':''}>Tube / bar</option>
+            <option value="hardware"${item.form==='hardware'?' selected':''}>Hardware</option>
+          </select>`;
+    if (item.form === 'hardware') return `
+      <div style="border:1px solid var(--border);background:var(--surface);padding:8px 9px;margin-bottom:7px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+          ${formSel}
+          <input type="text" id="pi-desc-${i}" value="${qEsc(item.desc||'')}" placeholder="Part number + vendor’s wording — e.g. PEM CLS-440-2ZI" style="font-size:12px;flex:1;min-width:170px" oninput="piTouched(${i})">
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="pi-price-${i}" value="${item.price||''}" placeholder="$" style="font-size:13px;width:80px" oninput="piTouched(${i})">
+          <select id="pi-per-${i}" onchange="piTouched(${i})" title="The block the vendor’s price covers — per C is 100, per M is 1,000" style="font-size:12px;width:116px">${HW_PERS.map(u=>`<option value="${u[0]}"${u[0]===(item.per||'each')?' selected':''}>${u[1]}</option>`).join('')}</select>
+          <input type="text" id="pi-qty-${i}" value="${nv(item.qty)}" placeholder="qty" title="Quantity break this price needs, if the vendor gave one" style="font-size:12px;width:58px" oninput="piTouched(${i})">
+          <button class="del-btn" onclick="removePendingItem(${i})" title="Remove this line">×</button>
+        </div>
+        <div id="pi-math-${i}" style="font-size:11px;color:#166534;margin-top:5px"></div>
+        ${item.raw?`<div style="font-size:11px;color:var(--text3);font-style:italic;margin-top:3px" title="${qEsc(item.raw)}">“${qEsc(item.raw)}”</div>`:''}
+      </div>`;
     const tube = item.form === 'tube', s = tubeShape(item.shape);
     const uoms = tube ? TUBE_UOMS : UOMS;
     const dims = tube ? `
@@ -7335,10 +7355,7 @@ function renderExtractedPreview(items) {
     return `
       <div style="border:1px solid var(--border);background:var(--surface);padding:8px 9px;margin-bottom:7px">
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
-          <select id="pi-form-${i}" onchange="piForm(${i})" title="Sheet is bought by weight; tube and bar are bought by the foot" style="font-size:12px;width:108px">
-            <option value="sheet"${tube?'':' selected'}>Sheet / plate</option>
-            <option value="tube"${tube?' selected':''}>Tube / bar</option>
-          </select>
+          ${formSel}
           <select id="pi-fam-${i}" onchange="piGa(${i})" style="font-size:12px;width:160px">${MAT_FAMILIES.map(f=>`<option value="${f.k}"${f.k===item.family?' selected':''}>${qEsc(f.label)}</option>`).join('')}</select>
           <input type="text" id="pi-desc-${i}" value="${qEsc(item.desc||'')}" placeholder="Vendor’s wording" style="font-size:12px;flex:1;min-width:150px" oninput="piTouched(${i})">
         </div>
@@ -7362,6 +7379,10 @@ function renderExtractedPreview(items) {
 function piRowData(i) {
   const v = id => { const el = document.getElementById(id+'-'+i); return el ? el.value : ''; };
   const num = id => parseFloat(v(id)) || null;
+  if (v('pi-form') === 'hardware') return { form:'hardware', desc:(v('pi-desc')||'').trim(),
+    price:parseFloat(String(v('pi-price')).replace(/[$,]/g,''))||0,
+    per:v('pi-per')||'each', qty:num('pi-qty'),
+    raw:(pendingPriceItems[i]||{}).raw||'', _id:(pendingPriceItems[i]||{})._id };
   const base = { form:v('pi-form')||'sheet', family:v('pi-fam')||'other', desc:(v('pi-desc')||'').trim(),
     gauge:num('pi-ga'), price:parseFloat(String(v('pi-price')).replace(/[$,]/g,''))||0,
     uom:v('pi-uom')||'each', qty:num('pi-qty'), raw:(pendingPriceItems[i]||{}).raw||'', _id:(pendingPriceItems[i]||{})._id };
@@ -7376,6 +7397,11 @@ function piTouched(i) {
   const el = document.getElementById('pi-math-'+i);
   if (!el) return;
   const r = piRowData(i);
+  if (r.form === 'hardware') {
+    const c = hwPerEach(r.price, r.per);
+    el.textContent = c ? ('= ' + hwMoney(c.each) + '/pc — ' + c.math) : '';
+    return;
+  }
   if (r.form === 'tube') {
     const c = tubeCalc(r);
     el.textContent = c ? ((c.perFt!=null?'≈ $'+c.perFt.toFixed(3)+'/ft':'') + (c.perFt!=null&&c.perLb!=null?' · ':'') + (c.perLb!=null?'≈ $'+c.perLb.toFixed(3)+'/lb':'') + ' — ' + c.math) : '';
@@ -7387,8 +7413,9 @@ function piTouched(i) {
 function piForm(i) {
   piSync();
   const x = pendingPriceItems[i];
-  if (x.form === 'tube') { if(!x.shape) x.shape='square-tube'; if(!TUBE_UOMS.some(u=>u[0]===x.uom)) x.uom='ft'; }
-  else if (x.uom === 'ft') x.uom = 'sheet';
+  if (x.form === 'hardware') { if(!x.per) x.per='each'; }
+  else if (x.form === 'tube') { if(!x.shape) x.shape='square-tube'; if(!TUBE_UOMS.some(u=>u[0]===x.uom)) x.uom='ft'; }
+  else { if(!x.family) x.family='crs'; if(!x.uom || x.uom==='ft') x.uom='sheet'; }
   renderExtractedPreview(pendingPriceItems);
 }
 function piShape(i){ piSync(); renderExtractedPreview(pendingPriceItems); }
@@ -7422,15 +7449,23 @@ async function savePriceItems() {
   if (!rows.length) { setPriceStatus('error', 'Nothing to save — every line needs a price.'); return; }
   setPriceStatus('loading', 'Saving to the shared price book…');
   try {
+    const by = (window._qUserEmail && window._qUserEmail()) || '';
     for (const x of rows) {
-      const rec = mpRecord(x, {vendor, emailDate, fileName}, (window._qUserEmail && window._qUserEmail()) || '');
-      await window._qSavePrice(rec);
-      MPRICES[rec.id] = rec;
+      // hardware and material rows live in sibling books — route by the row's form
+      if (x.form === 'hardware') {
+        const rec = hwRecord(x, {vendor, emailDate, fileName}, by);
+        await window._qSaveHw(rec);
+        HWPRICES[rec.id] = rec;
+      } else {
+        const rec = mpRecord(x, {vendor, emailDate, fileName}, by);
+        await window._qSavePrice(rec);
+        MPRICES[rec.id] = rec;
+      }
     }
     document.getElementById('price-extracted-preview').style.display = 'none';
     pendingPriceItems = [];
     document.getElementById('price-file-input').value = '';
-    renderPriceIndex();
+    renderPriceIndex(); renderHwBook(); rebuildHwDatalist();
     setPriceStatus('success', `Saved ${rows.length} price${rows.length!==1?'s':''} — the Mail app sees them too.`);
   } catch(e) {
     setPriceStatus('error', 'Could not save: ' + ((e&&e.message)||e));
