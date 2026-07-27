@@ -2251,12 +2251,24 @@ function isDoneGroup(items){ return items.length>0 && items.every(isDoneRow); }
 let saveTimeout=null;
 let _listenersStarted=false;
 
+// Last copy of each order as received from the server (stable-stringified).
+// saveDB() diffs against this so a device only writes the orders IT changed —
+// a stale/just-reconnected device can no longer overwrite another person's
+// edit (e.g. a qty fix) on an order this device never touched.
+let _ordersBase={};
+function _stableStr(v){
+  if(v===null||typeof v!=='object') return JSON.stringify(v);
+  if(Array.isArray(v)) return '['+v.map(x=>_stableStr(x)??'null').join(',')+']';
+  return '{'+Object.keys(v).sort().map(k=>{const s=_stableStr(v[k]);return s===undefined?null:JSON.stringify(k)+':'+s;}).filter(Boolean).join(',')+'}';
+}
+
 function startDataListeners(){
   if(_listenersStarted) return;
   _listenersStarted = true;
   onValue(ordersRef, (snap) => {
     const data = snap.val();
-    orders = data ? Object.values(data) : [];
+    orders = data ? Object.values(data).filter(r=>r&&r.id!=null) : [];
+    _ordersBase={}; orders.forEach(r=>{ _ordersBase[r.id]=_stableStr(r); });
     setSyncStatus('live'); render();
     tryRevealDeepOrder();
     if(document.getElementById('archive-page')?.style.display==='block') renderArchive();
@@ -2336,10 +2348,13 @@ function autosavePill(state){
 function saveDB() {
   setSyncStatus('saving'); autosavePill('saving'); clearTimeout(saveTimeout);
   saveTimeout=setTimeout(()=>{
-    // update() writes each order but NEVER deletes children this device doesn't
-    // have — so a stale/just-reconnected device can no longer wipe out orders
-    // added elsewhere. (Deletes go through deleteDB()'s per-id remove.)
-    const o={}; orders.forEach(r=>o[r.id]=r);
+    // update() writes ONLY the orders this device actually changed (diffed
+    // against _ordersBase, the last copy seen from the server) and NEVER
+    // deletes children — so a stale/just-reconnected device can neither wipe
+    // out orders added elsewhere nor revert another person's edits on orders
+    // it didn't touch. (Deletes go through deleteDB()'s per-id remove.)
+    const o={}; orders.forEach(r=>{ if(_ordersBase[r.id]!==_stableStr(r)) o[r.id]=r; });
+    if(!Object.keys(o).length){ setSyncStatus('live'); autosavePill('saved'); return; }
     update(ordersRef,o).then(()=>{ setSyncStatus('live'); autosavePill('saved'); })
                     .catch(()=>{ setSyncStatus('error'); autosavePill('error'); });
   },400);
@@ -3759,6 +3774,18 @@ window.handleCustomerSelect = (sel) => {
   else { inp.style.display='none'; inp.value=sel.value; }
 };
 let _prefillSteps = null;
+// Snapshot of the edit form as it looked when the modal OPENED. saveOrder()
+// compares against it so fields the user never touched keep the order's
+// current value — an edit that arrived from another device while this modal
+// was open (e.g. someone else fixing the qty) isn't silently reverted on save.
+let _editLoaded=null;
+function _snapEditForm(){
+  const g=id=>document.getElementById(id).value;
+  return {customer:g('f-customer'),po:g('f-po'),job:g('f-job'),part:g('f-part'),desc:g('f-desc'),
+    qty:g('f-qty'),cost:g('f-cost'),ordered:g('f-ordered'),due:g('f-due'),status:g('f-status'),
+    invoice:g('f-invoice'),invoiceDate:g('f-invoice-date'),payment:g('f-payment'),notes:g('f-notes'),
+    buildOnly:document.getElementById('f-buildonly').checked};
+}
 window.openAdd=()=>{
   editId=null;_prefillSteps=null;document.getElementById('modal-title').textContent='Add New Order';document.getElementById('save-btn').innerHTML='<i class="ti ti-check"></i> Save Order';
   ['customer','po','job','part','desc','notes','invoice'].forEach(f=>document.getElementById('f-'+f).value='');
@@ -3766,6 +3793,7 @@ window.openAdd=()=>{
   document.getElementById('f-status').value='Received';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
   document.getElementById('f-ordered').value='';document.getElementById('f-due').value='';document.getElementById('f-invoice-date').value='';
   document.getElementById('f-buildonly').checked=false;window._toggleBuildOnly(false);
+  _editLoaded=null;
   document.getElementById('add-modal').style.display='flex';
 };
 function openEdit(id){
@@ -3780,6 +3808,7 @@ function openEdit(id){
   document.getElementById('f-notes').value=r.notes||'';
   document.getElementById('f-buildonly').checked=!!r.buildOnly;
   window._toggleBuildOnly(!!r.buildOnly);
+  _editLoaded=_snapEditForm();
   document.getElementById('add-modal').style.display='flex';
 }
 // Grey out the cost field when a line is marked build-only (it isn't billed separately).
@@ -3828,21 +3857,28 @@ function revealNewOrder(id){
 }
 window.saveOrder=()=>{
   const customer=document.getElementById('f-customer').value.trim();if(!customer){alert('Customer name is required.');return;}
-  const buildOnly=document.getElementById('f-buildonly').checked;
-  const qty=parseFloat(document.getElementById('f-qty').value)||0,cost=buildOnly?0:(parseFloat(document.getElementById('f-cost').value)||0);
-  const ex=editId?orders.find(o=>o.id===editId):{};
+  const ex=(editId?orders.find(o=>o.id===editId):{})||{};
+  // Per-field merge: a form field the user did NOT change in this session takes
+  // the order's CURRENT value instead — so another device's edit that landed
+  // while the modal was open survives the save. Changed fields win as typed.
+  const now=_snapEditForm();
+  const fresh=(f,formVal,curVal)=> (editId && _editLoaded && now[f]===_editLoaded[f]) ? curVal : formVal;
+  const buildOnly=fresh('buildOnly', now.buildOnly, !!ex.buildOnly);
+  const qty=fresh('qty', parseFloat(now.qty)||0, parseFloat(ex.qty)||0);
+  const cost=buildOnly?0:fresh('cost', parseFloat(now.cost)||0, parseFloat(ex.cost)||0);
   // Start from the existing record so fields the edit form doesn't touch — drawing,
   // schedule, process state, priority, archive flags, timestamps — are preserved.
-  const order={...(ex||{}),
-    id:editId||uid(),customer,
-    po:document.getElementById('f-po').value.trim(),job:document.getElementById('f-job').value.trim(),
-    part:document.getElementById('f-part').value.trim(),desc:document.getElementById('f-desc').value.trim(),
+  const order={...ex,
+    id:editId||uid(),
+    customer:fresh('customer', customer, ex.customer||customer),
+    po:fresh('po', now.po.trim(), ex.po||''),job:fresh('job', now.job.trim(), ex.job||''),
+    part:fresh('part', now.part.trim(), ex.part||''),desc:fresh('desc', now.desc.trim(), ex.desc||''),
     qty,cost,total:qty&&cost?qty*cost:0,buildOnly,
-    ordered:document.getElementById('f-ordered').value,due:document.getElementById('f-due').value,
-    status:document.getElementById('f-status').value,invoice:document.getElementById('f-invoice').value.trim(),invoiceDate:document.getElementById('f-invoice-date').value,
-    payment:document.getElementById('f-payment').value,notes:document.getElementById('f-notes').value.trim(),
-    currentProcess:(ex||{}).currentProcess||'',completedProcesses:(ex||{}).completedProcesses||[],
-    schedule:(ex||{}).schedule||null};
+    ordered:fresh('ordered', now.ordered, ex.ordered||''),due:fresh('due', now.due, ex.due||''),
+    status:fresh('status', now.status, ex.status||'Received'),invoice:fresh('invoice', now.invoice.trim(), ex.invoice||''),invoiceDate:fresh('invoiceDate', now.invoiceDate, ex.invoiceDate||''),
+    payment:fresh('payment', now.payment, ex.payment||'Unpaid'),notes:fresh('notes', now.notes.trim(), ex.notes||''),
+    currentProcess:ex.currentProcess||'',completedProcesses:ex.completedProcesses||[],
+    schedule:ex.schedule||null};
   // if adding a part with copied process steps, seed its schedule
   if(!editId && _prefillSteps){ order.schedule = { steps: _prefillSteps }; }
   _prefillSteps = null;
