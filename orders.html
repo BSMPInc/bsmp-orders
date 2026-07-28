@@ -912,6 +912,21 @@ tr.inv-low td{background:#fdf6ee}
 .b-pal{position:absolute;left:6px;bottom:3px;display:none;gap:4px}
 .b-item:hover .b-pal{display:flex}
 .b-pal span{width:12px;height:12px;border-radius:50%;cursor:pointer;border:1px solid rgba(0,0,0,.25)}
+.b-card .bc-name{flex:1;min-width:0}
+.b-card .bc-amt{font-weight:800;font-size:11.5px;color:#2e6b1e;white-space:nowrap;flex-shrink:0}
+.bc-chk{width:17px;height:17px;border-radius:50%;border:1.5px solid #c4bda9;background:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:11px;padding:0;flex-shrink:0}
+.bc-chk i{visibility:hidden}
+.bc-chk:hover{border-color:#4a8f3c}
+.bc-chk:hover i{visibility:visible;color:#4a8f3c}
+.bc-chk.on{background:#4a8f3c;border-color:#4a8f3c}
+.bc-chk.on i{visibility:visible;color:#fff}
+.b-card.b-done{border-left-color:#4a8f3c;background:#f5faf1;opacity:.85}
+.b-card.b-done .bc-name{text-decoration:line-through;color:var(--text3)}
+.b-frame .bf-total{position:absolute;top:-1px;right:14px;background:#efe9da;color:#6b6350;font-size:11px;font-weight:800;padding:2px 10px;white-space:nowrap;letter-spacing:.02em}
+.bf-total .ok{color:#3B6D11}
+#board-sb .sb-wrap{margin-bottom:10px}
+.sb-minsum{font-size:13px;font-weight:800;color:var(--text);display:inline-flex;gap:5px;align-items:baseline;flex-wrap:wrap}
+.sb-minsum small{font-size:11px;font-weight:600;color:var(--text3)}
 .board-tray{width:250px;border-left:1px solid var(--border);background:#fff;overflow-y:auto;padding:10px;flex-shrink:0}
 .board-tray h4{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--text3);margin:10px 0 6px}
 .board-tray h4:first-child{margin-top:0}
@@ -1073,7 +1088,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .dcust-bar{height:6px;background:var(--inset-bg);overflow:hidden}
 .dcust-bar span{display:block;height:100%;background:var(--accent)}
 
-/* ── Dashboard: Weekly Scoreboard ── */
+/* ── Weekly Scoreboard (lives on the Board page) ── */
 .sb-wrap{background:var(--card);border:1px solid var(--border);box-shadow:var(--shadow);padding:15px 17px;margin-bottom:14px}
 .sb-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .sb-title{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:var(--text)}
@@ -1474,6 +1489,7 @@ body.sb-pinned .dock{left:var(--sb)}
 
   <!-- Board Page (freeform whiteboard) -->
   <div id="board-page" style="display:none">
+    <div id="board-sb"></div>
     <div class="board-toolbar" id="board-toolbar">
       <button class="btn" id="b-add-note" onclick="bAddNote()"><i class="ti ti-note"></i> Add note</button>
       <button class="btn" id="b-add-frame" onclick="bAddFrame()"><i class="ti ti-crop-landscape"></i> Add frame</button>
@@ -2540,11 +2556,17 @@ window.genDashBrief=async ()=>{
 //    the apps already record — nothing is entered twice.
 let _sbTargets={weekTarget:18500,monthTarget:80000};
 let _sbShowMath=(()=>{try{return localStorage.getItem('bsmp_sb_math')==='1';}catch(e){return false;}})();
+let _sbMin=(()=>{try{return localStorage.getItem('bsmp_sb_min')==='1';}catch(e){return false;}})();
+// repaint whichever page currently shows the scoreboard (it lives on the Board)
+function _sbRepaint(){
+  if(document.getElementById('dashboard-page')?.style.display!=='none'){try{renderDashboard();}catch(e){}}
+  if(document.getElementById('board-page')?.style.display!=='none'){try{renderBoardPage();}catch(e){}}
+}
 function startScoreboardTargets(){
   onValue(ref(db,'config/scoreboard'),(snap)=>{
     const v=snap.val()||{};
     _sbTargets={weekTarget:parseFloat(v.weekTarget)||18500,monthTarget:parseFloat(v.monthTarget)||80000};
-    if(document.getElementById('dashboard-page')?.style.display!=='none'){try{renderDashboard();}catch(e){}}
+    _sbRepaint();
   });
 }
 window._sbEditTargets=()=>{
@@ -2555,7 +2577,8 @@ window._sbEditTargets=()=>{
   update(ref(db,'config/scoreboard'),{weekTarget:wt,monthTarget:mt})
     .catch(()=>alert('Could not save targets — check your connection.'));
 };
-window._sbToggleMath=()=>{ _sbShowMath=!_sbShowMath; try{localStorage.setItem('bsmp_sb_math',_sbShowMath?'1':'0');}catch(e){} renderDashboard(); };
+window._sbToggleMath=()=>{ _sbShowMath=!_sbShowMath; try{localStorage.setItem('bsmp_sb_math',_sbShowMath?'1':'0');}catch(e){} _sbRepaint(); };
+window._sbToggleMin=()=>{ _sbMin=!_sbMin; try{localStorage.setItem('bsmp_sb_min',_sbMin?'1':'0');}catch(e){} _sbRepaint(); };
 function _sbISO(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function _sbAddDays(iso,n){ const p=iso.split('-'); return _sbISO(new Date(+p[0],+p[1]-1,+p[2]+n)); }
 function computeScoreboard(){
@@ -2593,6 +2616,14 @@ function computeScoreboard(){
 function _sbSectionHtml(){
   const sb=computeScoreboard();
   const m0=n=>'$'+Math.round(n||0).toLocaleString('en-US');
+  if(_sbMin){
+    // collapsed: one slim line so the board canvas keeps its height
+    return `<div class="sb-wrap">
+      <div class="sb-head" style="margin-bottom:0"><span class="sb-title"><i class="ti ti-scoreboard"></i> Weekly Scoreboard</span>
+        <span class="sb-minsum">${m0(sb.wkVal)} <small>of ${m0(_sbTargets.weekTarget)} this week</small> · ${m0(sb.readyVal)} <small>on the dock</small> · ${sb.backlogWeeks.toFixed(1)} <small>wks backlog</small></span>
+        <div class="sb-actions"><span onclick="_sbToggleMin()"><i class="ti ti-chevron-down"></i> Expand</span></div>
+      </div></div>`;
+  }
   const pct=(v,t)=>t>0?Math.min(100,v/t*100):0;
   const bar=(v,t)=>`<div class="sb-bar"><span class="${v>=t?'hit':''}" style="width:${pct(v,t).toFixed(1)}%"></span></div>`;
   const tile=(kind,label,val,extra,note)=>`<div class="sb-tile" onclick="_sbDetail('${kind}')" title="Click for the full list behind this number"><div class="sb-label">${label}</div><div class="sb-val ${extra&&extra.cls||''}">${val}</div>${extra&&extra.bar||''}${note?`<div class="sb-note">${note}</div>`:''}</div>`;
@@ -2642,6 +2673,7 @@ function _sbSectionHtml(){
       <div class="sb-actions">
         <span onclick="_sbToggleMath()"><i class="ti ti-math-symbols"></i> ${_sbShowMath?'Hide':'Show'} the math</span>
         <span onclick="_sbEditTargets()" title="Weekly ${m0(_sbTargets.weekTarget)} · Monthly ${m0(_sbTargets.monthTarget)}"><i class="ti ti-adjustments"></i> Targets</span>
+        <span onclick="_sbToggleMin()"><i class="ti ti-chevron-up"></i> Collapse</span>
       </div></div>
     <div class="sb-grid">${tiles}</div>${math}</div>`;
 }
@@ -2759,9 +2791,7 @@ function renderDashboard(){
         ? `<div class="brief-text">${fmtBrief(db.text)}</div><div class="brief-meta">Generated ${esc2(db.at)} from the current board \u2014 double-check against the orders below.</div>`
         : `<div class="brief-empty">Generate plain-English meeting notes for the morning stand-up \u2014 what\u2019s overdue, what to invoice, and what to push this week.</div>`;
   const dbBtn = `<button class="btn ai" onclick="genDashBrief()" ${db.loading?'disabled':''}><i class="ti ti-${db.loading?'loader-2 spin':(db.text?'refresh':'wand')}"></i> ${db.text?'Refresh notes':'Write today\u2019s meeting notes'}</button>`;
-  let sbHtml=''; try{ sbHtml=_sbSectionHtml(); }catch(e){}
   body.innerHTML=`
-    ${sbHtml}
     <div class="brief-card dash-brief">
       <div class="brief-head"><span class="brief-title"><i class="ti ti-sparkles"></i> AI Daily De-brief</span>${dbBtn}</div>
       ${dbBody}
@@ -4141,8 +4171,8 @@ onValue(quotesRef, snap => {
   _quoteCache = Object.values(v).filter(Boolean).sort((a,b)=> (b.id||0) - (a.id||0));
   const m = document.getElementById('qimport-modal');
   if(m && m.style.display === 'flex') window._renderQuoteImportList();
-  // the scoreboard's "Quoted this week" tile reads _quoteCache
-  if(document.getElementById('dashboard-page')?.style.display!=='none'){try{renderDashboard();}catch(e){}}
+  // the scoreboard's "Quoted this week" tile (on the Board) reads _quoteCache
+  _sbRepaint();
 });
 
 // Map a quote operation code (leading number) to an order-tracker process.
@@ -6531,7 +6561,51 @@ function boardGroupInfo(gk){
   return { customer:items[0].customer||'', po:items[0].po||'verbal', parts,
     gdue, gdays:gdue?daysUntil(gdue):null,
     statuses:[...new Set(items.map(r=>r.status||'Confirmed'))],
-    done:items.every(r=>['Completed','Invoiced'].includes(r.status)), n:items.length };
+    done:items.every(r=>['Completed','Invoiced'].includes(r.status)), n:items.length,
+    val:items.reduce((t,r)=>t+rowTotal(r),0) };
+}
+const bMoney=n=>'$'+Math.round(n||0).toLocaleString('en-US');
+// the live orders behind a board card (order card = whole PO group, part card = one row)
+function bCardOrders(it){
+  if(it.type==='order') return orders.filter(r=>!r.archived&&(r.customer+'||'+(r.po||'verbal'))===it.gk);
+  if(it.type==='part'){ const r=orders.find(o=>String(o.id)===String(it.refId)&&!o.archived); return r?[r]:[]; }
+  return [];
+}
+// a card counts as done when it's checked off on the board, or every order
+// behind it is Completed/Invoiced — either way its $ moves to the ✓ side
+function bCardDone(it){
+  if(it.done) return true;
+  const rs=bCardOrders(it);
+  return rs.length>0&&rs.every(r=>['Completed','Invoiced'].includes(r.status));
+}
+window._bChk=(id,e)=>{ if(e)e.stopPropagation(); if(!canEditBoard())return;
+  const it=BOARD[id]; if(!it) return;
+  it.done=!it.done; it.doneBy=bBy(); it.doneAt=Date.now(); it.by=bBy(); it.at=Date.now();
+  bSave(it); renderBoardPage(); };
+// $ totals per frame: every order/part card whose center sits inside the frame,
+// deduped by order id so a part card doesn't double-count its own job card
+let _bFrameTotals={};
+function bFrameTotals(){
+  const out={};
+  const cards=Object.values(BOARD).filter(i=>i&&(i.type==='order'||i.type==='part'))
+    .sort((a,b)=>(a.type==='order'?0:1)-(b.type==='order'?0:1));   // whole jobs first
+  Object.values(BOARD).filter(i=>i&&i.type==='frame').forEach(f=>{
+    const fx=Number(f.x)||0, fy=Number(f.y)||0, fw=Number(f.w)||440, fh=Number(f.h)||300;
+    const counted=new Set(); let left=0, done=0, n=0, nDone=0;
+    cards.forEach(it=>{
+      const cw=it.type==='part'?175:190;
+      const cx=(Number(it.x)||0)+cw/2, cy=(Number(it.y)||0)+40;
+      if(cx<fx||cx>fx+fw||cy<fy||cy>fy+fh) return;
+      const rs=bCardOrders(it).filter(r=>!counted.has(String(r.id)));
+      if(!rs.length) return;
+      rs.forEach(r=>counted.add(String(r.id)));
+      const val=rs.reduce((t,r)=>t+rowTotal(r),0);
+      n++;
+      if(bCardDone(it)){ done+=val; nDone++; } else left+=val;
+    });
+    out[f.id]={left,done,n,nDone};
+  });
+  return out;
 }
 
 // where a new item lands: middle of the visible board, cascading a touch
@@ -6588,7 +6662,7 @@ function bToast(msg){
 // manual Today order.
 window.bPublish=()=>{
   if(!canEditBoard()) return;
-  const cards=Object.values(BOARD).filter(i=>i&&(i.type==='order'||i.type==='part'))
+  const cards=Object.values(BOARD).filter(i=>i&&(i.type==='order'||i.type==='part')&&!i.done)
     .sort((a,b)=>((Number(a.y)||0)-(Number(b.y)||0))||((Number(a.x)||0)-(Number(b.x)||0)));
   const ids=[];
   cards.forEach(it=>{
@@ -6614,10 +6688,15 @@ window.bPublish=()=>{
 
 function bItemHtml(it){
   const pos=`left:${Number(it.x)||0}px;top:${Number(it.y)||0}px;`;
-  if(it.type==='frame')
+  if(it.type==='frame'){
+    const ft=_bFrameTotals[it.id];
+    const tot=ft&&ft.n?`<div class="bf-total" title="Total of the ${ft.n} job${ft.n!==1?'s':''} inside this frame — checked-off jobs move to the ✓ side">${
+      ft.nDone?`${bMoney(ft.left)} left · <span class="ok">${bMoney(ft.done)} ✓</span>`
+              :`${bMoney(ft.left)} · ${ft.n} job${ft.n!==1?'s':''}`}</div>`:'';
     return `<div class="b-item b-frame" data-id="${it.id}" style="${pos}width:${Number(it.w)||440}px;height:${Number(it.h)||300}px;z-index:5">
-      <div class="bf-label">${esc2(it.label||'Zone')}</div><div class="bf-resize" title="Drag to resize"></div>
+      <div class="bf-label">${esc2(it.label||'Zone')}</div>${tot}<div class="bf-resize" title="Drag to resize"></div>
       <button class="b-x" title="Remove frame" onclick="_bDel('${it.id}',event)">×</button></div>`;
+  }
   const z=`z-index:${Number(it.z)||100}`;
   if(it.type==='note')
     return `<div class="b-item b-note" data-id="${it.id}" style="${pos}${z};background:${B_NOTE_COLORS[Number(it.color)||0]||B_NOTE_COLORS[0]}">${esc2(it.text||'')||'<span style="color:rgba(0,0,0,.35)">Double-click to write…</span>'}
@@ -6626,25 +6705,27 @@ function bItemHtml(it){
   if(it.type==='order'){
     const g=boardGroupInfo(it.gk);
     if(!g) return `<div class="b-item b-card b-stale" data-id="${it.id}" style="${pos}${z}"><div class="bc-top">(order gone)</div><div class="bc-sub">${esc2(String(it.gk).split('||')[0]||'')}</div><button class="b-x" onclick="_bDel('${it.id}',event)">×</button></div>`;
-    const overdue=g.gdays!=null&&g.gdays<0&&!g.done;
-    return `<div class="b-item b-card${g.done?' b-stale':''}" data-id="${it.id}" style="${pos}${z}" title="Click to open in Open Orders">
-      <div class="bc-top"><span>${esc2(g.customer)}</span></div>
+    const comp=it.done||g.done;
+    const overdue=g.gdays!=null&&g.gdays<0&&!comp;
+    return `<div class="b-item b-card${comp?' b-done':''}" data-id="${it.id}" style="${pos}${z}" title="Click to open in Open Orders">
+      <div class="bc-top"><button class="bc-chk${comp?' on':''}" title="${comp?'Un-check':'Check off — done, ready to invoice'}" onclick="_bChk('${it.id}',event)"><i class="ti ti-check"></i></button><span class="bc-name">${esc2(g.customer)}</span>${g.val?`<span class="bc-amt">${bMoney(g.val)}</span>`:''}</div>
       <div class="bc-sub">PO ${esc2(g.po)}${g.parts.length?` · ${esc2(g.parts[0])}${g.parts.length>1?' +'+(g.parts.length-1):''}`:''}</div>
       <div class="bc-sub">${esc2(g.statuses.join(', '))}${g.n>1?' · '+g.n+' items':''}</div>
-      ${g.gdue?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${g.done?'Done':'Due '+fmtDate(g.gdue)+(overdue?' — overdue':'')}</div>`:''}
+      ${g.gdue?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${comp?'Done ✓':'Due '+fmtDate(g.gdue)+(overdue?' — overdue':'')}</div>`:''}
       <button class="b-x" title="Remove from board (the order itself is untouched)" onclick="_bDel('${it.id}',event)">×</button></div>`;
   }
   if(it.type==='part'){
     const r=orders.find(o=>String(o.id)===String(it.refId)&&!o.archived);
     if(!r) return `<div class="b-item b-card b-part b-stale" data-id="${it.id}" style="${pos}${z}"><div class="bc-top">(part gone)</div><button class="b-x" onclick="_bDel('${it.id}',event)">×</button></div>`;
-    const done=['Completed','Invoiced'].includes(r.status);
+    const comp=it.done||['Completed','Invoiced'].includes(r.status);
     const d=r.due?daysUntil(r.due):null;
-    const overdue=d!=null&&d<0&&!done;
-    return `<div class="b-item b-card b-part${done?' b-stale':''}" data-id="${it.id}" style="${pos}${z}" title="Click to open in Open Orders">
-      <div class="bc-top"><span>${esc2(r.part||r.desc||'(no part #)')}</span></div>
+    const overdue=d!=null&&d<0&&!comp;
+    const val=rowTotal(r);
+    return `<div class="b-item b-card b-part${comp?' b-done':''}" data-id="${it.id}" style="${pos}${z}" title="Click to open in Open Orders">
+      <div class="bc-top"><button class="bc-chk${comp?' on':''}" title="${comp?'Un-check':'Check off — done, ready to invoice'}" onclick="_bChk('${it.id}',event)"><i class="ti ti-check"></i></button><span class="bc-name">${esc2(r.part||r.desc||'(no part #)')}</span>${val?`<span class="bc-amt">${bMoney(val)}</span>`:''}</div>
       <div class="bc-sub">${esc2(r.job||'')}${r.job?' · ':''}${esc2(r.customer||'')} · PO ${esc2(r.po||'verbal')}</div>
       <div class="bc-sub">${esc2(r.status||'Confirmed')}</div>
-      ${r.due?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${done?'Done':'Due '+fmtDate(r.due)+(overdue?' — overdue':'')}</div>`:''}
+      ${r.due?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${comp?'Done ✓':'Due '+fmtDate(r.due)+(overdue?' — overdue':'')}</div>`:''}
       <button class="b-x" title="Remove from board (the order itself is untouched)" onclick="_bDel('${it.id}',event)">×</button></div>`;
   }
   if(it.type==='po'){
@@ -6827,6 +6908,9 @@ function renderBoardPage(){
   const na=document.getElementById('b-add-note'); if(na) na.style.display=canEd?'':'none';
   const nf=document.getElementById('b-add-frame'); if(nf) nf.style.display=canEd?'':'none';
   const np=document.getElementById('b-publish'); if(np) np.style.display=canEd?'':'none';
+  const sbHost=document.getElementById('board-sb');
+  if(sbHost){ let h=''; try{h=_sbSectionHtml();}catch(e){} sbHost.innerHTML=h; }
+  _bFrameTotals=bFrameTotals();
   cv.innerHTML=Object.values(BOARD).filter(Boolean).map(bItemHtml).join('');
   const tray=document.getElementById('board-tray');
   if(tray){ tray.style.display=canEd?'':'none';
