@@ -923,6 +923,11 @@ tr.inv-low td{background:#fdf6ee}
 .b-card.b-done{border-left-color:#4a8f3c;background:#f5faf1;opacity:.85}
 .b-card.b-done .bc-name{text-decoration:line-through;color:var(--text3)}
 .b-frame .bf-total{position:absolute;top:-1px;right:14px;background:#efe9da;color:#6b6350;font-size:11px;font-weight:800;padding:2px 10px;white-space:nowrap;letter-spacing:.02em}
+.b-frame.b-pinned{cursor:default}
+.b-pin{position:absolute;bottom:2px;left:4px;border:none;background:none;color:rgba(0,0,0,.35);cursor:pointer;font-size:13px;line-height:1;padding:2px;display:none}
+.b-item:hover .b-pin{display:block}
+.b-pin:hover{color:var(--navy)}
+.b-pin.on{display:block;color:#8a6d2f}
 .bf-total .ok{color:#3B6D11}
 #board-sb .sb-wrap{margin-bottom:10px}
 .sb-minsum{font-size:13px;font-weight:800;color:var(--text);display:inline-flex;gap:5px;align-items:baseline;flex-wrap:wrap}
@@ -6582,6 +6587,9 @@ window._bChk=(id,e)=>{ if(e)e.stopPropagation(); if(!canEditBoard())return;
   const it=BOARD[id]; if(!it) return;
   it.done=!it.done; it.doneBy=bBy(); it.doneAt=Date.now(); it.by=bBy(); it.at=Date.now();
   bSave(it); renderBoardPage(); };
+window._bPin=(id,e)=>{ if(e)e.stopPropagation(); if(!canEditBoard())return;
+  const it=BOARD[id]; if(!it||it.type!=='frame') return;
+  it.pinned=!it.pinned; it.by=bBy(); it.at=Date.now(); bSave(it); renderBoardPage(); };
 // $ totals per frame: every order/part card whose center sits inside the frame,
 // deduped by order id so a part card doesn't double-count its own job card
 let _bFrameTotals={};
@@ -6693,8 +6701,9 @@ function bItemHtml(it){
     const tot=ft&&ft.n?`<div class="bf-total" title="Total of the ${ft.n} job${ft.n!==1?'s':''} inside this frame — checked-off jobs move to the ✓ side">${
       ft.nDone?`${bMoney(ft.left)} left · <span class="ok">${bMoney(ft.done)} ✓</span>`
               :`${bMoney(ft.left)} · ${ft.n} job${ft.n!==1?'s':''}`}</div>`:'';
-    return `<div class="b-item b-frame" data-id="${it.id}" style="${pos}width:${Number(it.w)||440}px;height:${Number(it.h)||300}px;z-index:5">
-      <div class="bf-label">${esc2(it.label||'Zone')}</div>${tot}<div class="bf-resize" title="Drag to resize"></div>
+    return `<div class="b-item b-frame${it.pinned?' b-pinned':''}" data-id="${it.id}" style="${pos}width:${Number(it.w)||440}px;height:${Number(it.h)||300}px;z-index:5">
+      <div class="bf-label">${esc2(it.label||'Zone')}</div>${tot}${it.pinned?'':'<div class="bf-resize" title="Drag to resize"></div>'}
+      <button class="b-pin${it.pinned?' on':''}" title="${it.pinned?'Unpin — allow moving and resizing':'Pin the frame in place'}" onclick="_bPin('${it.id}',event)"><i class="ti ti-pin${it.pinned?'ned':''}"></i></button>
       <button class="b-x" title="Remove frame" onclick="_bDel('${it.id}',event)">×</button></div>`;
   }
   const z=`z-index:${Number(it.z)||100}`;
@@ -6832,6 +6841,7 @@ function bindBoardCanvas(){
     if(t.closest('button')||t.closest('textarea')||t.closest('input')||t.closest('.b-pal')) return;
     const el=t.closest('.b-item'); if(!el) return;
     const it=BOARD[el.dataset.id]; if(!it) return;
+    if(it.type==='frame'&&it.pinned) return;   // pinned frames stay put
     const resize=!!t.closest('.bf-resize');
     e.preventDefault();
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
