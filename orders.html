@@ -1083,7 +1083,8 @@ body.sb-pinned .dock{left:var(--sb)}
 .sb-actions span{font-size:11px;font-weight:700;color:var(--text3);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .sb-actions span:hover{color:var(--accent)}
 .sb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
-.sb-tile{background:var(--inset-bg);border:1px solid var(--inset-border);border-radius:10px;padding:10px 12px;min-width:0}
+.sb-tile{background:var(--inset-bg);border:1px solid var(--inset-border);border-radius:10px;padding:10px 12px;min-width:0;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.sb-tile:hover{border-color:var(--accent);box-shadow:0 2px 10px rgba(0,0,0,.07)}
 .sb-label{font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--text3);margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sb-val{font-size:19px;font-weight:800;color:var(--text);line-height:1.15}
 .sb-val small{font-size:11.5px;font-weight:700;color:var(--text3)}
@@ -1098,6 +1099,23 @@ body.sb-pinned .dock{left:var(--sb)}
 .sb-line b{color:var(--text)}
 .sb-line.tot{border-top:1px solid var(--border);margin-top:3px;padding-top:3px;font-weight:700;color:var(--text)}
 .sb-formula{font-size:11.5px;color:var(--text2);line-height:1.6}
+/* scoreboard tile detail modal */
+.sbd-sum{font-size:12.5px;color:var(--text2);line-height:1.6;background:var(--inset-bg);border:1px solid var(--inset-border);border-radius:10px;padding:10px 13px;margin-bottom:12px}
+.sbd-sum b{color:var(--text)}
+.sbd-scroll{max-height:56vh;overflow:auto;border:1px solid var(--border);border-radius:10px}
+.sbd-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.sbd-table th{position:sticky;top:0;background:var(--inset-bg);text-align:left;font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--text3);padding:8px 10px;border-bottom:1px solid var(--border);z-index:1}
+.sbd-table td{padding:8px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+.sbd-table tbody tr:last-child td{border-bottom:none}
+.sbd-table tr.sbd-click{cursor:pointer}
+.sbd-table tr.sbd-click:hover td{background:var(--accent-soft)}
+.sbd-table .sbd-cust{color:var(--text);font-weight:600}
+.sbd-table .sbd-num{text-align:right;font-weight:700;color:var(--text);white-space:nowrap}
+.sbd-table tfoot td{position:sticky;bottom:0;background:var(--inset-bg);border-top:1px solid var(--border);font-weight:700;color:var(--text)}
+.sbd-tag{font-size:10px;font-weight:700;color:var(--text3);background:var(--inset-bg);border:1px solid var(--inset-border);border-radius:20px;padding:1px 7px;white-space:nowrap}
+.sbd-hit{color:var(--green2);font-weight:700;white-space:nowrap}
+.sbd-miss{color:var(--red);font-weight:700;white-space:nowrap}
+.sbd-late{color:var(--red);font-weight:600}
 
 /* ── Dashboard: AI de-brief + needs-attention tables ── */
 .dash-brief{margin-bottom:14px}
@@ -1706,6 +1724,16 @@ body.sb-pinned .dock{left:var(--sb)}
 </div><!-- /app-root -->
 
 <!-- Restore-from-backup confirmation -->
+<div class="modal-bg" id="sb-detail-modal" style="display:none" onclick="if(event.target===this)closeModal('sb-detail-modal')">
+  <div class="modal" style="width:760px;max-width:96vw">
+    <div class="modal-header" style="margin-bottom:12px;padding-bottom:12px">
+      <i id="sbd-icon" class="ti ti-gauge" style="color:var(--accent)"></i><h2 id="sbd-title">Detail</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('sb-detail-modal')"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="sbd-sum" class="sbd-sum"></div>
+    <div id="sbd-body"></div>
+  </div>
+</div>
 <div class="modal-bg" id="restore-modal" style="display:none;align-items:center;justify-content:center;z-index:120">
   <div class="modal" style="max-width:440px;padding:22px">
     <div style="font-size:17px;font-weight:800;margin-bottom:6px;color:var(--red)"><i class="ti ti-alert-triangle"></i> Restore from backup</div>
@@ -2557,8 +2585,8 @@ function computeScoreboard(){
   { const y=today.getFullYear(), m=today.getMonth(), last=new Date(y,m+1,0).getDate();
     for(let day=today.getDate();day<=last;day++){ const g=new Date(y,m,day).getDay(); if(g>0&&g<6) bizLeft++; } }
   return {weekStart,monthStart,todayISO,
-    wk,wkVal:sum(wk),lastWkVal:sum(lastWk),moCount:mo.length,moVal:sum(mo),bizLeft,
-    qWk,qVal,openCount:open.length,backlogVal,
+    wk,wkVal:sum(wk),lastWkVal:sum(lastWk),mo,moCount:mo.length,moVal:sum(mo),bizLeft,
+    qWk,qVal,open,openCount:open.length,backlogVal,
     backlogWeeks:_sbTargets.weekTarget>0?backlogVal/_sbTargets.weekTarget:0,
     otPool,otHit,ready,readyVal:sum(ready)};
 }
@@ -2567,7 +2595,7 @@ function _sbSectionHtml(){
   const m0=n=>'$'+Math.round(n||0).toLocaleString('en-US');
   const pct=(v,t)=>t>0?Math.min(100,v/t*100):0;
   const bar=(v,t)=>`<div class="sb-bar"><span class="${v>=t?'hit':''}" style="width:${pct(v,t).toFixed(1)}%"></span></div>`;
-  const tile=(label,val,extra,note)=>`<div class="sb-tile"><div class="sb-label">${label}</div><div class="sb-val ${extra&&extra.cls||''}">${val}</div>${extra&&extra.bar||''}${note?`<div class="sb-note">${note}</div>`:''}</div>`;
+  const tile=(kind,label,val,extra,note)=>`<div class="sb-tile" onclick="_sbDetail('${kind}')" title="Click for the full list behind this number"><div class="sb-label">${label}</div><div class="sb-val ${extra&&extra.cls||''}">${val}</div>${extra&&extra.bar||''}${note?`<div class="sb-note">${note}</div>`:''}</div>`;
   const wkPct=pct(sb.wkVal,_sbTargets.weekTarget), moPct=pct(sb.moVal,_sbTargets.monthTarget);
   const moGap=Math.max(0,_sbTargets.monthTarget-sb.moVal);
   const perDay=sb.bizLeft>0?moGap/sb.bizLeft:0;
@@ -2575,20 +2603,20 @@ function _sbSectionHtml(){
   const bwCls=bw<3?'red':(bw>6?'amber':'green');
   const otPct=sb.otPool.length?Math.round(sb.otHit.length/sb.otPool.length*100):null;
   const tiles=
-    tile('Invoiced this week', `${m0(sb.wkVal)} <small>of ${m0(_sbTargets.weekTarget)}</small>`,
+    tile('week','Invoiced this week', `${m0(sb.wkVal)} <small>of ${m0(_sbTargets.weekTarget)}</small>`,
       {bar:bar(sb.wkVal,_sbTargets.weekTarget), cls:sb.wkVal>=_sbTargets.weekTarget?'green':''},
       `${wkPct.toFixed(0)}% · last week ${m0(sb.lastWkVal)}`)
-   +tile('Invoiced this month', `${m0(sb.moVal)} <small>of ${m0(_sbTargets.monthTarget)}</small>`,
+   +tile('month','Invoiced this month', `${m0(sb.moVal)} <small>of ${m0(_sbTargets.monthTarget)}</small>`,
       {bar:bar(sb.moVal,_sbTargets.monthTarget), cls:sb.moVal>=_sbTargets.monthTarget?'green':''},
       moGap>0?`${m0(moGap)} to go — ${m0(perDay)}/workday (${sb.bizLeft} left)`:'Target hit — everything above this is profit')
-   +tile('Quoted this week', `${m0(sb.qVal)} <small>· ${sb.qWk.length} quote${sb.qWk.length!==1?'s':''}</small>`, null,
+   +tile('quotes','Quoted this week', `${m0(sb.qVal)} <small>· ${sb.qWk.length} quote${sb.qWk.length!==1?'s':''}</small>`, null,
       'New quotes feed next month’s invoices')
-   +tile('Backlog', `<span class="${bwCls}">${bw.toFixed(1)} wks</span>`, null,
+   +tile('backlog','Backlog', `<span class="${bwCls}">${bw.toFixed(1)} wks</span>`, null,
       bw<3?`${m0(sb.backlogVal)} open — under 3 wks: go sell`:(bw>6?`${m0(sb.backlogVal)} open — over 6 wks: quote up / protect dates`:`${m0(sb.backlogVal)} open — healthy (3–6 wks)`))
-   +tile('On the dock', `${m0(sb.readyVal)} <small>· ${sb.ready.length} job${sb.ready.length!==1?'s':''}</small>`,
+   +tile('dock','On the dock', `${m0(sb.readyVal)} <small>· ${sb.ready.length} job${sb.ready.length!==1?'s':''}</small>`,
       {cls:sb.readyVal>0?'amber':''},
       sb.readyVal>0?'Ready for Invoice — bill it today':'Nothing waiting to be billed')
-   +tile('Invoiced by due date', otPct===null?'—':`${otPct}%`,
+   +tile('ontime','Invoiced by due date', otPct===null?'—':`${otPct}%`,
       {cls:otPct===null?'':(otPct>=90?'green':(otPct>=75?'amber':'red'))},
       otPct===null?'No dated invoices in the last 4 weeks':`${sb.otHit.length} of ${sb.otPool.length} invoices, last 4 weeks`);
   let math='';
@@ -2617,6 +2645,83 @@ function _sbSectionHtml(){
       </div></div>
     <div class="sb-grid">${tiles}</div>${math}</div>`;
 }
+// Click a scoreboard tile → the full list behind that number, in a modal.
+// Every view repeats its formula up top (show-the-work rule) and rows that
+// map to a live order click through to it on the board.
+window._sbDetail=(kind)=>{
+  const sb=computeScoreboard();
+  const m0=n=>'$'+Math.round(n||0).toLocaleString('en-US');
+  const dayDiff=(a,b)=>{ const p=a.split('-'),q=b.split('-'); return Math.round((new Date(+p[0],+p[1]-1,+p[2])-new Date(+q[0],+q[1]-1,+q[2]))/86400000); };
+  const clickAttr=r=>r.archived?'':` class="sbd-click" onclick="closeModal('sb-detail-modal');_dashOpenOrder('${r.id}')"`;
+  const custCell=r=>`<td class="sbd-cust">${esc2(r.customer||'—')}${r.archived?' <span class="sbd-tag">archived</span>':''}</td>`;
+  const scroll=t=>`<div class="sbd-scroll">${t}</div>`;
+  const empty=msg=>`<div class="dc-empty" style="padding:14px 4px">${msg}</div>`;
+  const invTable=list=>{
+    if(!list.length) return empty('No invoices in this period yet.');
+    const rows=list.slice().sort((a,b)=>a.invoiceDate<b.invoiceDate?1:-1).map(r=>
+      `<tr${clickAttr(r)}><td style="white-space:nowrap">${fmtDate(r.invoiceDate)}</td>${custCell(r)}<td>${esc2(r.po||'verbal')}</td><td>${esc2(r.invoice||'—')}</td><td class="sbd-num">${m0(rowTotal(r))}</td></tr>`).join('');
+    return scroll(`<table class="sbd-table"><thead><tr><th>Invoiced</th><th>Customer</th><th>PO #</th><th>Inv #</th><th style="text-align:right">$</th></tr></thead><tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="4">${list.length} invoice${list.length!==1?'s':''}</td><td class="sbd-num">= ${m0(list.reduce((t,r)=>t+rowTotal(r),0))}</td></tr></tfoot></table>`);
+  };
+  const jobTable=(list,sumVal)=>{
+    if(!list.length) return empty('Nothing here right now.');
+    const rows=list.slice().sort((a,b)=>(a.due||'9999')<(b.due||'9999')?-1:1).map(r=>{
+      const d=daysUntil(r.due);
+      const due=r.due?`${fmtDate(r.due)} <small class="${d!=null&&d<0?'sbd-late':''}">${d==null?'':(d<0?Math.abs(d)+'d late':(d===0?'today':'+'+d+'d'))}</small>`:'—';
+      return `<tr${clickAttr(r)}>${custCell(r)}<td>${esc2(r.po||'verbal')}</td><td>${esc2(r.job||'')}</td><td style="white-space:nowrap">${due}</td><td>${esc2(r.status||'')}</td><td class="sbd-num">${m0(rowTotal(r))}</td></tr>`;}).join('');
+    return scroll(`<table class="sbd-table"><thead><tr><th>Customer</th><th>PO #</th><th>Job</th><th>Due</th><th>Status</th><th style="text-align:right">$</th></tr></thead><tbody>${rows}</tbody>
+      <tfoot><tr><td colspan="5">${list.length} order${list.length!==1?'s':''}</td><td class="sbd-num">= ${m0(sumVal)}</td></tr></tfoot></table>`);
+  };
+  let icon='ti-gauge', title='', sum='', body='';
+  if(kind==='week'){
+    icon='ti-cash'; title='Invoiced this week';
+    sum=`<b>${m0(sb.wkVal)}</b> of the ${m0(_sbTargets.weekTarget)} weekly target (${_sbTargets.weekTarget>0?Math.round(sb.wkVal/_sbTargets.weekTarget*100):0}%), counting every order invoice-dated since Mon ${fmtDate(sb.weekStart)}. Last week finished at <b>${m0(sb.lastWkVal)}</b>. Each order’s $ = qty × cost/part, or its PO total.`;
+    body=invTable(sb.wk);
+  } else if(kind==='month'){
+    icon='ti-calendar-dollar'; title='Invoiced this month';
+    const gap=Math.max(0,_sbTargets.monthTarget-sb.moVal);
+    sum=`<b>${m0(sb.moVal)}</b> of ${m0(_sbTargets.monthTarget)} since ${fmtDate(sb.monthStart)}. `+(gap>0
+      ?`${m0(_sbTargets.monthTarget)} − ${m0(sb.moVal)} = <b>${m0(gap)}</b> still to invoice ÷ ${sb.bizLeft} workday${sb.bizLeft!==1?'s':''} left = <b>${m0(sb.bizLeft>0?gap/sb.bizLeft:0)}/day</b> that must ship &amp; invoice.`
+      :`<b>Target hit — everything above this is profit.</b>`);
+    body=invTable(sb.mo);
+  } else if(kind==='quotes'){
+    icon='ti-file-dollar'; title='Quoted this week';
+    sum=`<b>${sb.qWk.length}</b> quote${sb.qWk.length!==1?'s':''} created since Mon ${fmtDate(sb.weekStart)} totaling <b>${m0(sb.qVal)}</b> — synced from the Quote Tool. Quotes are the leading indicator: this week’s quotes are next month’s invoices.`;
+    if(!sb.qWk.length) body=empty('No quotes created this week yet.');
+    else{
+      const rows=sb.qWk.slice().sort((a,b)=>(b.id||0)-(a.id||0)).map(q=>{
+        const v=parseFloat(q.jobTotal)||((parseFloat(q.qty)||0)*(parseFloat(q.pricePerPart)||0));
+        return `<tr><td style="white-space:nowrap">${fmtDate(_sbISO(new Date(q.id)))}</td><td>${esc2(q.quoteNo||'—')}</td><td class="sbd-cust">${esc2(q.customer||'—')}</td><td>${esc2(q.partNum||'')}</td><td>${q.qty||''}</td><td class="sbd-num">${m0(v)}</td></tr>`;}).join('');
+      body=scroll(`<table class="sbd-table"><thead><tr><th>Date</th><th>Quote #</th><th>Customer</th><th>Part #</th><th>Qty</th><th style="text-align:right">$</th></tr></thead><tbody>${rows}</tbody>
+        <tfoot><tr><td colspan="5">${sb.qWk.length} quote${sb.qWk.length!==1?'s':''}</td><td class="sbd-num">= ${m0(sb.qVal)}</td></tr></tfoot></table>`);
+    }
+  } else if(kind==='backlog'){
+    icon='ti-stack-2'; title='Backlog — work in house';
+    sum=`Every open order not yet invoiced: <b>${m0(sb.backlogVal)}</b> across ${sb.openCount} order${sb.openCount!==1?'s':''} ÷ ${m0(_sbTargets.weekTarget)}/wk target = <b>${sb.backlogWeeks.toFixed(1)} weeks</b> of work. Under 3 weeks: go sell. Over 6: quote up and protect delivery dates.`;
+    body=jobTable(sb.open,sb.backlogVal);
+  } else if(kind==='dock'){
+    icon='ti-file-invoice'; title='On the dock — Ready for Invoice';
+    sum=`<b>${m0(sb.readyVal)}</b> sitting at <b>Ready for Invoice</b>. This is finished work that isn’t money yet — bill it today. Click a row to open the order.`;
+    body=jobTable(sb.ready,sb.readyVal);
+  } else if(kind==='ontime'){
+    icon='ti-clock-check'; title='Invoiced by due date — last 4 weeks';
+    const pctTxt=sb.otPool.length?`<b>${sb.otHit.length}</b> of <b>${sb.otPool.length}</b> (${Math.round(sb.otHit.length/sb.otPool.length*100)}%)`:'no dated invoices yet';
+    sum=`Of invoices from the last 28 days that had a due date: ${pctTxt} went out on or before it. (No ship date is recorded, so the invoice date is the proxy for delivery.)`;
+    if(!sb.otPool.length) body=empty('No invoices with a due date in the last 4 weeks.');
+    else{
+      const rows=sb.otPool.slice().sort((a,b)=>a.invoiceDate<b.invoiceDate?1:-1).map(r=>{
+        const d=dayDiff(r.invoiceDate,r.due);
+        const verdict=d<=0?`<span class="sbd-hit">✓ on time${d<0?' ('+Math.abs(d)+'d early)':''}</span>`:`<span class="sbd-miss">✗ ${d}d late</span>`;
+        return `<tr${clickAttr(r)}>${custCell(r)}<td>${esc2(r.po||'verbal')}</td><td style="white-space:nowrap">${fmtDate(r.due)}</td><td style="white-space:nowrap">${fmtDate(r.invoiceDate)}</td><td>${verdict}</td><td class="sbd-num">${m0(rowTotal(r))}</td></tr>`;}).join('');
+      body=scroll(`<table class="sbd-table"><thead><tr><th>Customer</th><th>PO #</th><th>Due</th><th>Invoiced</th><th></th><th style="text-align:right">$</th></tr></thead><tbody>${rows}</tbody></table>`);
+    }
+  } else return;
+  document.getElementById('sbd-icon').className='ti '+icon;
+  document.getElementById('sbd-title').textContent=title;
+  document.getElementById('sbd-sum').innerHTML=sum;
+  document.getElementById('sbd-body').innerHTML=body;
+  document.getElementById('sb-detail-modal').style.display='flex';
+};
 
 function renderDashboard(){
   const body=document.getElementById('dash-body'); if(!body) return;
