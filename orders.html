@@ -888,7 +888,9 @@ tr.inv-low td{background:#fdf6ee}
 .board-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .board-toolbar .hint{font-size:11px;color:var(--text3);margin-left:auto}
 .board-shell{display:flex;gap:0;border:1px solid var(--border);background:#fff;height:calc(100vh - 210px);min-height:420px}
-.board-wrap{flex:1;overflow:auto;position:relative;background:#fbfaf8}
+/* z-index:0 makes the canvas its own stacking context, so card z-indexes
+   (which grow every bring-to-front) can never paint over the sidebar/dock */
+.board-wrap{flex:1;overflow:auto;position:relative;z-index:0;background:#fbfaf8}
 .board-canvas{position:relative;width:3200px;height:2000px;
   background-image:radial-gradient(circle,#d9d4cb 1px,transparent 1px);background-size:24px 24px}
 .b-item{position:absolute;touch-action:none;user-select:none}
