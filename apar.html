@@ -352,6 +352,8 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .acct-sel.status-withdrawn{border-color:#2f8f6b55;background:#2f8f6b0d;color:var(--green);font-weight:700}
 .acct-bill .ab-due.wd-date input{border:1px solid #2f8f6b44;background:#2f8f6b0d;border-radius:6px;font-size:11px;font-family:inherit;color:var(--green);padding:3px 5px;width:100%;min-width:0}
 .acct-bill .ab-due.wd-date input:focus{outline:none;border-color:var(--green)}
+.acct-bill .ab-due.plan-date input{border:1px solid #3a6ea544;background:#3a6ea50d;border-radius:6px;font-size:11px;font-family:inherit;color:var(--blue);padding:3px 5px;width:100%;min-width:0}
+.acct-bill .ab-due.plan-date input:focus{outline:none;border-color:var(--blue)}
 .acct-foot{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
 .acct-mini{font-size:9.5px;font-weight:700;color:var(--text3);background:#0000000a;border-radius:5px;padding:2px 6px}
 .paid-toggle{margin-left:6px;font-size:11px;font-weight:600;color:var(--text2);background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
@@ -1337,7 +1339,7 @@ function allEntriesRaw(){
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0};
+    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -1347,7 +1349,7 @@ function allEntriesRaw(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:canonicalParty(o.party||'—'),ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null,mailKey:o.mailKey||''});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null,mailKey:o.mailKey||''});
     }
   });
   return merged;
@@ -1432,6 +1434,7 @@ const PAGE_HELP={
     <ul><li><b>Balance</b> is a number you type — keep it current; the "updated X ago" note turns amber after a week.</li>
     <li><b>Projected</b> = balance minus what you've marked Scheduled. Only "Scheduled" bills reduce it.</li>
     <li>Bill statuses flow Open → Attention → Scheduled → Withdrawn. Scheduled bills rise to the top of each card; withdrawn ones sink to the bottom.</li>
+    <li>A <b>Scheduled</b> bill gets a date box in the Due column — set the planned withdrawal date (when the payment actually comes out). The Forecast buckets the bill into that week, and when you mark it Withdrawn that date is pre-filled as the withdrawal date.</li>
     <li>Collapse any account card by clicking its header, or use Collapse all — handy when you have many accounts. Filter by status or due date, or search, to focus on specific invoices.</li>
     <li>When you mark a bill Withdrawn, the app offers to subtract it from that account's balance to keep things in sync.</li></ul>`},
   forecast:{title:'Cash Forecast',body:`<p>A week-by-week projection of where your cash is heading over the next 8 weeks, per account and combined.</p>
@@ -2207,7 +2210,13 @@ function sortBills(list,sectionKey){
     else if(s.key==='method'){av=(a.planMethod||'').toLowerCase();bv=(b.planMethod||'').toLowerCase();}
     else if(s.key==='status'){av=STATUS_ORDER[a.payStatus||'open'];bv=STATUS_ORDER[b.payStatus||'open'];}
     else if(s.key==='amount'){av=Math.max(0,(a.amount||0)-(a.paid||0));bv=Math.max(0,(b.amount||0)-(b.paid||0));}
-    else{av=a.due||'9999-99-99';bv=b.due||'9999-99-99';}
+    else{
+      // Due sort uses the date money actually moves: planned withdrawal for
+      // scheduled bills, actual withdrawal for withdrawn ones, else the due date.
+      const eff=e=>((e.payStatus||'open')==='scheduled'&&e.planDate)?e.planDate
+        :(((e.payStatus||'open')==='withdrawn'&&e.withdrawnDate)?e.withdrawnDate:(e.due||'9999-99-99'));
+      av=eff(a);bv=eff(b);
+    }
     if(av<bv)return -1*s.dir; if(av>bv)return 1*s.dir; return 0;
   };
   // Default float order within each card: scheduled bills rise to the top, withdrawn
@@ -2294,8 +2303,11 @@ function renderCash(entries){
     const d=daysUntil(e.due);
     const dueTxt=e.due?fmtDate(e.due)+(d!=null?` (${d<0?Math.abs(d)+'d late':d+'d'})`:''):'no due date';
     const wd=(e.payStatus||'open')==='withdrawn';
+    const sched=(e.payStatus||'open')==='scheduled';
     const dueCell=wd
       ? `<span class="ab-due wd-date"><input type="date" value="${e.withdrawnDate||''}" onclick="event.stopPropagation()" onchange="setWithdrawnDate('${e.id}',this.value)" title="Withdrawal date"></span>`
+      : sched
+      ? `<span class="ab-due plan-date"><input type="date" value="${e.planDate||''}" onclick="event.stopPropagation()" onchange="setPlanDate('${e.id}',this.value)" title="Planned withdrawal date — when this payment comes out${e.due?' (bill due '+fmtDate(e.due)+(d!=null?', '+(d<0?Math.abs(d)+'d late':d+'d'):'')+')':''}"></span>`
       : `<span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>`;
     return `<div class="acct-bill${wd?' is-wd':''}" data-search="${esc([e.party,e.ref,e.planMethod].filter(Boolean).join(' ').toLowerCase())}">
       <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
@@ -2507,7 +2519,9 @@ window.setPayStatus=(id,val)=>{
   // remaining balance BEFORE we touch payments (used for both auto-pay and reconcile)
   const remainBefore=Math.max(0,(e.amount||0)-(e.paid||0));
   if(val==='withdrawn'){
-    if(!o.withdrawnDate) o.withdrawnDate=toISO(new Date());
+    // a planned withdrawal date becomes the default actual date (still editable inline)
+    if(!o.withdrawnDate) o.withdrawnDate=e.planDate||toISO(new Date());
+    delete o.planDate;
     // Auto-record a full payment so the bill reads as Paid (and drops the "Record payment" button).
     // Tagged autoWithdraw so we can cleanly reverse it if the status changes back.
     const pays=[...(e.payments||[])];
@@ -2518,6 +2532,7 @@ window.setPayStatus=(id,val)=>{
     }
   } else {
     delete o.withdrawnDate;
+    if(val!=='scheduled') delete o.planDate;   // the plan belonged to that scheduling
     // Reverse only the payment WE auto-added; never touch manually recorded payments.
     if((e.payments||[]).some(p=>p&&p.autoWithdraw)){
       o.payments=(e.payments||[]).filter(p=>!(p&&p.autoWithdraw));
@@ -2545,6 +2560,13 @@ window.setWithdrawnDate=(id,val)=>{
   const o=ovl(id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
   o.withdrawnDate=val||'';
+  writeOverlay(id,o); render();
+};
+window.setPlanDate=(id,val)=>{
+  const e=allEntries().find(x=>x.id===id); if(!e)return;
+  const o=ovl(id);
+  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
+  o.planDate=val||'';
   writeOverlay(id,o); render();
 };
 window.unarchiveBill=(id)=>{
@@ -3238,8 +3260,13 @@ function buildForecast(numWeeks){
   const unassignedFlows=weeks.map(()=>({in:0,out:0}));
   const fl=(accId)=> accId&&flows[accId] ? flows[accId] : unassignedFlows;
 
-  // OUTFLOWS: payables by due date (overdue folds into week 0)
-  ap.forEach(e=>{ const wi=weekIndexFor(e.due); if(wi<0)return; fl(e.account)[wi].out+=unpaid(e); });
+  // OUTFLOWS: payables by due date (overdue folds into week 0). A scheduled bill
+  // with a planned withdrawal date is bucketed by that date instead — that's the
+  // week the money actually leaves.
+  ap.forEach(e=>{
+    const when=((e.payStatus||'open')==='scheduled'&&e.planDate)?e.planDate:e.due;
+    const wi=weekIndexFor(when); if(wi<0)return; fl(e.account)[wi].out+=unpaid(e);
+  });
 
   // OUTFLOWS: recurring templates projected across the horizon by cadence
   Object.values(recurring).forEach(r=>{
