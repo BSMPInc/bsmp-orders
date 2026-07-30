@@ -24,6 +24,10 @@
                    plain-text alternative gets padded-column versions
                    sigLogo: {data(base64), mime, width} — signature logo,
                    embedded inline (cid) under the signature text
+                   inline: [{marker, name, mime, data(base64)}] — images pasted
+                   into the body; each one replaces its "[image N]" marker in
+                   the HTML as an embedded (cid) picture, so it shows exactly
+                   where it was pasted — never a blocked remote image
       POST /trash   {ids:{box:threadId}} move to Gmail trash in every box
       POST /untrash {ids:{box:threadId}} restore from trash (the undo)
 */
@@ -313,7 +317,19 @@ async function sendMail(env, mailboxes, p) {
   if (!to) throw new Error('no recipient');
 
   const atts = (Array.isArray(p.attachments) ? p.attachments : []).filter(a => a && a.data && a.name);
-  const attBytes = atts.reduce((s, a) => s + String(a.data).length * 0.75, 0);
+  // images pasted into the body — embedded inline (cid) where their [image N]
+  // marker sits in the text; any without a marker land after the body instead
+  const inline = (Array.isArray(p.inline) ? p.inline : []).slice(0, 12)
+    .filter(a => a && typeof a.data === 'string' && /^image\//.test(a.mime || ''))
+    .map((a, i) => ({
+      cid: 'bsmpinl' + (i + 1),
+      marker: String(a.marker || ''),
+      name: String(a.name || 'image' + (i + 1)).replace(/["\r\n]/g, '').slice(0, 120),
+      mime: String(a.mime).replace(/[\r\n";]/g, ''),
+      data: a.data.replace(/[^A-Za-z0-9+/=]/g, '') }))
+    .filter(a => a.data.length);
+  const attBytes = atts.reduce((s, a) => s + String(a.data).length * 0.75, 0)
+    + inline.reduce((s, a) => s + a.data.length * 0.75, 0);
   if (attBytes > 16 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~10 MB total');
 
   // optional tables: sent as structured rows, rendered as real HTML tables.
@@ -331,7 +347,7 @@ async function sendMail(env, mailboxes, p) {
         mime: String(p.sigLogo.mime).replace(/[\r\n";]/g, ''),
         width: Math.max(40, Math.min(600, parseInt(p.sigLogo.width) || 160)) }
     : null;
-  const wantHtml = tables.length > 0 || !!logo;
+  const wantHtml = tables.length > 0 || !!logo || inline.length > 0;
   let main = p.body || '', sig = '';
   if (wantHtml) {   // tables go after the text but the signature stays last
     const si = main.lastIndexOf('\n\n-- \n');
@@ -340,9 +356,18 @@ async function sendMail(env, mailboxes, p) {
   }
   const mid = tables.map(tableText).join('\n\n');
   const plain = wantHtml ? main + (mid ? (main ? '\n\n' : '') + mid : '') + sig : main;
+  // pasted images: swap each [image N] marker for its embedded picture — the
+  // markers pass through escHtml untouched, so a plain string replace is safe.
+  // The plain-text alternative keeps the "[image N]" text as its stand-in.
+  const inlineTag = (im) => `<img src="cid:${im.cid}" style="max-width:100%;height:auto;border:0" alt="${escHtml(im.name)}">`;
+  let mainHtml = textToHtml(main), loose = '';
+  for (const im of inline) {
+    if (im.marker && mainHtml.includes(im.marker)) mainHtml = mainHtml.replace(im.marker, () => inlineTag(im));
+    else loose += `<div style="margin:10px 0">${inlineTag(im)}</div>`;
+  }
   const html = wantHtml
     ? '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111">' +
-      textToHtml(main) + tables.map(tableHtml).join('') + textToHtml(sig) +
+      mainHtml + tables.map(tableHtml).join('') + loose + textToHtml(sig) +
       (logo ? `<div style="margin-top:10px"><img src="cid:bsmpsiglogo" width="${logo.width}" style="display:block;max-width:100%;height:auto;border:0" alt=""></div>` : '') +
       '</div>'
     : '';
@@ -352,14 +377,17 @@ async function sendMail(env, mailboxes, p) {
   const utf8 = (s) => unescape(encodeURIComponent(s));   // text → binary string for btoa
   let cType = 'text/plain; charset=UTF-8', content = plain;
   if (html) {
-    // HTML side: plain text/html, or multipart/related when a logo is embedded
+    // HTML side: plain text/html, or multipart/related when pictures are
+    // embedded (pasted body images and/or the signature logo)
+    const relParts = inline.map(im => ({ cid: im.cid, mime: im.mime, name: im.name, data: im.data }));
+    if (logo) relParts.push({ cid: 'bsmpsiglogo', mime: logo.mime, name: 'logo', data: logo.data });
     let htmlSection;
-    if (logo) {
+    if (relParts.length) {
       const rel = 'rel_bsmp_' + Math.random().toString(36).slice(2);
-      const lb64 = logo.data.replace(/(.{76})/g, '$1\r\n');
       htmlSection = `Content-Type: multipart/related; boundary="${rel}"\r\n\r\n` +
         `--${rel}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n${html}\r\n\r\n` +
-        `--${rel}\r\nContent-Type: ${logo.mime}\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <bsmpsiglogo>\r\nContent-Disposition: inline; filename="logo"\r\n\r\n${lb64}\r\n--${rel}--`;
+        relParts.map(pt => `--${rel}\r\nContent-Type: ${pt.mime}\r\nContent-Transfer-Encoding: base64\r\nContent-ID: <${pt.cid}>\r\nContent-Disposition: inline; filename="${pt.name}"\r\n\r\n${pt.data.replace(/(.{76})/g, '$1\r\n')}\r\n`).join('') +
+        `--${rel}--`;
     } else {
       htmlSection = `Content-Type: text/html; charset=UTF-8\r\n\r\n${html}`;
     }
