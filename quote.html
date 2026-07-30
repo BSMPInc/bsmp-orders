@@ -757,6 +757,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         </select>
       </div>
       <div class="field"><label>Expedite amount <span style="font-weight:400;color:var(--text3);text-transform:none">(% or $)</span></label><input id="exp-amount" type="number" value="0" min="0" step="0.5" onchange="calculate()"></div>
+      <div class="field"><label>Round price up to</label>
+        <select id="rounding" onchange="roundingChanged()" title="The final price per part always rounds UP so the margin never slips. Saved with the quote.">
+          <option value="auto" selected>Auto — 10¢ under $50 · $5 under $500 · $10 above</option>
+          <option value="cent">Nearest 1¢ (exact)</option>
+          <option value="nickel">Nearest 5¢</option>
+          <option value="dollar">Nearest $1</option>
+        </select>
+      </div>
     </div>
     <div class="grid3" style="margin-top:4px">
       <div class="field">
@@ -4216,6 +4224,13 @@ function calculate(){
   }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Total cost / part</span><span class="breakdown-val">${fmt(totalCostPart)}</span></div>`;
   bd+=br(`Markup (${(markup*100).toFixed(0)}% + ${(finance*100).toFixed(1)}% finance)`,fmt(markupCost));
+  {
+    const preRound=Math.round((totalCostPart+markupCost)*100)/100;
+    if(finalPrice>preRound+1e-9){
+      const st=roundStep(preRound,document.getElementById('rounding')?.value||'auto');
+      bd+=br(`Rounded up (nearest ${st<1?Math.round(st*100)+'¢':'$'+st})`,'+'+fmt(finalPrice-preRound),fmt(preRound)+' → '+fmt(finalPrice));
+    }
+  }
   if(expediteFee>0){
     bd+=br(`Subtotal (×${qty})`,fmt(baseJobTotal));
     bd+=br(`Expedite fee${expType==='pct' ? ` (${expAmt}% of subtotal)` : ''}`,fmt(expediteFee));
@@ -5089,6 +5104,7 @@ function saveQuote(){
     expediteFee: d.expediteFee||0,
     markup: d.markup,
     finance: d.finance,
+    rounding: gv('rounding')||'auto',
     // per-part cost breakdown snapshot — the Compare tab reads this; older
     // quotes without it show "—" until they're re-saved
     breakdown:{ mat:d.matCostPart||0, labor:d.laborCostPart||0, weld:d.weldCostPart||0,
@@ -5760,6 +5776,9 @@ function reloadQuote(id){
   }
   renderTierButtons();
   document.getElementById('finance').value=(q.finance*100).toFixed(1);
+  // quotes saved before the rounding option existed were priced at nearest 5¢ —
+  // reload them that way so their numbers don't shift
+  { const rsel=document.getElementById('rounding'); if(rsel) rsel.value=q.rounding||'nickel'; }
   document.getElementById('notes').value=q.notes||'';
 
   // ---- Material mode (sheet vs bar) ----
@@ -6970,6 +6989,8 @@ function loadAssemblyQuote(q){
   document.getElementById('asm-order-qty').value = q.qty||1;
   if(q.markup!=null)  document.getElementById('asm-markup').value  = Math.round(q.markup*100);
   if(q.finance!=null) document.getElementById('asm-finance').value = (q.finance*100).toFixed(1);
+  // pre-rounding-option assemblies were priced at nearest 5¢ — reload them that way
+  { const rsel=document.getElementById('rounding'); if(rsel) rsel.value=q.rounding||'nickel'; }
 
   const missing=[];
   let oldFormat=false;
@@ -7018,6 +7039,7 @@ function saveAssembly() {
     material: asmSelectedParts.map(p=>p.material).filter((v,i,a)=>a.indexOf(v)===i).join(', '),
     costPerPart: d.assemblyCost, pricePerPart: d.assemblyPrice, jobTotal: d.jobTotal,
     markup: d.markup, finance: d.finance,
+    rounding: document.getElementById('rounding')?.value||'auto',
     laborLines: [], hwLines: [], outLines: [],
     notes: 'Assembly: ' + asmSelectedParts.map(p=>p.name+'×'+p.qtyPerAssembly).join(', '),
     isAssembly: true, partCount: asmSelectedParts.length,
@@ -8828,12 +8850,29 @@ function resetLaserSpeeds(){
 let MIN_SHEET = parseFloat(localStorage.getItem('bsmp_min_sheet'));
 if(isNaN(MIN_SHEET)) MIN_SHEET = 0.125;
 
-// Given exact sheets used, round up to the nearest 1/8 of a sheet for billing,
-// but never below the configured minimum.
-// Round a price UP to the nearest $0.05 (never rounds down below target margin).
+// ===================== PRICE ROUNDING =====================
+// The final price always rounds UP (never below target margin). The grain comes
+// from the "Round price up to" choice on the quote form and is saved with each
+// quote. Auto = the shop tiers: under $50/part → 10¢, under $500 → $5,
+// $500 and up → $10.
+function roundStep(v,mode){
+  if(mode==='cent') return 0.01;
+  if(mode==='nickel') return 0.05;
+  if(mode==='dollar') return 1;
+  return v<50 ? 0.10 : (v<500 ? 5 : 10);   // auto tiers
+}
 function roundPrice(v){
   if(!isFinite(v) || v<=0) return v;
-  return Math.ceil(v * 20) / 20;
+  const mode=document.getElementById('rounding')?.value||'auto';
+  const cents=Math.round(v*100)/100;                    // shed float dust before stepping
+  const step=roundStep(cents,mode);
+  return Math.round(Math.ceil(cents/step-1e-9)*step*100)/100;
+}
+// re-price everything that's showing when the rounding choice changes
+function roundingChanged(){
+  calculate();
+  try{ if(window._qtyBreaksResults&&window._qtyBreaksResults.length) calcQtyBreaks(); }catch(e){}
+  try{ if(window._asmCalc&&typeof asmSelectedParts!=='undefined'&&asmSelectedParts.length) calcAssembly(); }catch(e){}
 }
 
 function billableSheets(exactSheets){
