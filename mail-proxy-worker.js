@@ -18,7 +18,8 @@
       POST /send   reply: {replyAs, box, id, ids, body, all?, attachments?, tables?}
                    new:   {replyAs, to, subject, body, attachments?, tables?}
                    all: reply-all — cc everyone on the email except our boxes
-                   attachments: [{name, mime, data(base64)}] — ~10 MB total
+                   attachments: [{name, mime, data(base64)}] — ~18 MB total
+                   (Gmail rejects a message over 25 MB after base64 +33%)
                    tables: [{title?, header?, rows:[[cells…]]}] — appended after
                    the body (before the signature) as real HTML tables; the
                    plain-text alternative gets padded-column versions
@@ -330,7 +331,7 @@ async function sendMail(env, mailboxes, p) {
     .filter(a => a.data.length);
   const attBytes = atts.reduce((s, a) => s + String(a.data).length * 0.75, 0)
     + inline.reduce((s, a) => s + a.data.length * 0.75, 0);
-  if (attBytes > 16 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~10 MB total');
+  if (attBytes > 20 * 1024 * 1024) throw new Error('attachments too large — keep an email under ~18 MB total');
 
   // optional tables: sent as structured rows, rendered as real HTML tables.
   // With tables (or a signature logo) the email goes out multipart/alternative
