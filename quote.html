@@ -4283,7 +4283,8 @@ async function analyzeDrawing(file, ext){
   setAIStatus('loading','Reading drawing with AI — extracting title block and dimensions…');
   try{
     const b64 = await toBase64(file);
-    const mediaType = ext==='pdf'?'application/pdf':'image/'+ext;
+    // API only accepts image/jpeg, never image/jpg — a ".jpg" file needs the map
+    const mediaType = ext==='pdf'?'application/pdf':(ext==='jpg'?'image/jpeg':'image/'+ext);
     const isImg = ext!=='pdf';
     const contentBlock = isImg
       ? {type:'image',source:{type:'base64',media_type:mediaType,data:b64}}
@@ -7466,7 +7467,8 @@ function handlePriceFile(file) {
 
   toBase64(file).then(b64 => {
     const ext = file.name.split('.').pop().toLowerCase();
-    const mediaType = ext === 'pdf' ? 'application/pdf' : 'image/' + ext;
+    // API only accepts image/jpeg, never image/jpg — a ".jpg" file needs the map
+    const mediaType = ext === 'pdf' ? 'application/pdf' : (ext === 'jpg' ? 'image/jpeg' : 'image/' + ext);
     const isImg = ext !== 'pdf';
     const contentBlock = isImg
       ? {type:'image', source:{type:'base64', media_type:mediaType, data:b64}}
