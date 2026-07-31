@@ -2073,6 +2073,7 @@ const TUBE_SHAPES=[
   {k:'square-tube',label:'Square tube',hollow:true, ph:['side'],          al:'square tube hss tubing'},
   {k:'rect-tube',  label:'Rect tube',  hollow:true, ph:['A','B'],         al:'rectangular rect tube hss tubing'},
   {k:'round-tube', label:'Round tube', hollow:true, ph:['OD'],            al:'round tube tubing pipe dom seamless erw od'},
+  {k:'angle',      label:'Angle',      hollow:true, ph:['leg A','leg B'], wph:'thk', al:'angle iron l angles structural leg'},
   {k:'square-bar', label:'Square bar', hollow:false,ph:['side'],          al:'square bar solid'},
   {k:'flat-bar',   label:'Flat bar',   hollow:false,ph:['width','thk'],   al:'flat bar strip rectangular solid'},
   {k:'round-bar',  label:'Round bar',  hollow:false,ph:['dia'],           al:'round bar rod solid dia'},
@@ -2087,6 +2088,7 @@ function tubeLabel(r){
   if(!a) return '';
   let d=s.ph.length>1?(fmtN(a)+'×'+(b?fmtN(b):'?')):(s.k.indexOf('round')===0?'Ø'+fmtN(a):fmtN(a)+'×'+fmtN(a));
   if(s.hollow&&w) d+='×'+fmtN(w);
+  if(s.k==='angle') d='L'+d;   // the shop callout: L2×2×.25
   return d;
 }
 // metal in one cross-section, in², and the arithmetic behind it. Same formulas
@@ -2106,6 +2108,8 @@ function tubeXsec(r){
     case 'round-bar':{ const x=Math.PI/4*a*a; return {a:x, math:'π/4 × Ø'+fmtN(a)+'² = '+rnd(x)+' in² solid'}; }
     case 'square-bar':{ const x=a*a; return {a:x, math:fmtN(a)+'×'+fmtN(a)+' = '+rnd(x)+' in² solid'}; }
     case 'flat-bar':{ if(!b) return null; const x=a*b; return {a:x, math:fmtN(a)+'×'+fmtN(b)+' = '+rnd(x)+' in² solid'}; }
+    case 'angle':{ if(!b) return null; if(w>=a||w>=b) return null; const x=w*(a+b-w);
+      return {a:x, math:'L'+fmtN(a)+'×'+fmtN(b)+'×'+fmtN(w)+': '+fmtN(w)+' × ('+fmtN(a)+' + '+fmtN(b)+' − '+fmtN(w)+') = '+rnd(x)+' in² of metal (sharp corners — ignores fillet radius)'}; }
   }
   return null;
 }
@@ -2162,9 +2166,9 @@ function mpExtractPrompt(opts){
   return lede+' from a '+(o.hardware?'metal or hardware':'metal')+' supplier to a sheet-metal fabrication shop. Extract every '+(o.hardware?'material and hardware':'material')+' price into a JSON array. Return ONLY the JSON array, no markdown.\n\n'
 +'Every item has: {"form":"sheet" or "tube","family":"one of crs|hrs|galv|galvanneal|ss304|ss316|ss430|al5052|al6061|al3003|copper|brass|other","desc":"the vendor’s own wording for the material","price":number,"uom":"lb|cwt|sheet|sqft|ft|each","qty":the quantity this price needs (a break quantity) or null,"raw":"the exact line copied from the source"}\n\n'
 +'A FLAT SHEET, PLATE or COIL is form "sheet" and adds: {"thickness_in":decimal inches or null,"gauge":gauge number or null,"size":"e.g. 48x120, or null"}\n\n'
-+'TUBE, PIPE or BAR STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
++'TUBE, PIPE, BAR or ANGLE STOCK (anything sold by the foot or the stick) is form "tube" and adds: {"shape":"one of square-tube|rect-tube|round-tube|angle|square-bar|flat-bar|round-bar","od_in":outside size in decimal inches,"b_in":second outside dimension or null,"wall_in":wall thickness in decimal inches or null,"gauge":wall gauge number or null,"spec":"e.g. A500, A513, A53, DOM, seamless — or empty","length_ft":stick length in feet or null}\n\n'
 +(o.hardware?'HARDWARE — self-clinching fasteners (PEM-style nuts, studs, standoffs), screws, rivets, threaded inserts, weld studs, hinges, latches, anything priced per piece rather than by weight or length — is form "hardware" and adds: {"per":"each|100|1000 — the block the price is quoted per (per C = 100, per M = 1,000)"}. Keep the complete part number in desc exactly as the vendor wrote it (e.g. CLS-440-2ZI). Hardware has no uom, family or dimensions — per replaces uom, and the family field is omitted.\n\n':'')
-+'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, with the break quantity in qty ("1-9 $92, 10+ $88" → two items, qty 1 and qty 10) and the vendor’s wording kept in desc. A plain price with no break = qty null.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".'
++'Rules:\n- Only items with an actual price. Quantity breaks = one item per price, with the break quantity in qty ("1-9 $92, 10+ $88" → two items, qty 1 and qty 10) and the vendor’s wording kept in desc. A plain price with no break = qty null.\n- Gauge to inches must use the right table for the metal: steel 16ga=.0598, galvanized 16ga=.0635, stainless 16ga=.0625, aluminum 16ga=.0508. On a tube the gauge describes the WALL, so it fills wall_in — never thickness_in.\n- If both thickness and gauge appear keep both; if only one, fill the other only when the metal is certain, else null.\n- Finish callouts (2B, #4, mill) belong in desc, not family. A500/A513/DOM belong in spec, not family — the family is the metal itself (carbon-steel tube is "hrs" unless it is called cold-rolled, cold-drawn or DOM, which is "crs").\n- Tube sizes: "2x2x.125" → square-tube od_in 2, wall_in .125. "2x1x14ga" → rect-tube od_in 2, b_in 1, gauge 14. "1.5 OD x .120 wall" → round-tube od_in 1.5, wall_in .120. "1/2 x 2 flat bar" → flat-bar od_in 2, b_in .5 (od_in is the bigger face). Angle iron ("2x2x1/4 angle", "L2x2x.25", "A36 angle 3 x 2 x 3/16") → angle, the two LEGS go in od_in and b_in and the leg thickness in wall_in — never in thickness_in. Pipe called out by nominal size (e.g. "2 NPS sch 40") → round-tube, put the actual OD/wall in od_in/wall_in if you know them, and keep the nominal callout in desc.\n- Price per stick or per length → uom "each" with length_ft filled in; price per foot → uom "ft".'
 +(o.text?('\n\nEMAIL (newest message first):\n'+o.text):'');
 }
 // AI's JSON → editable rows. Anything the model gets creative with lands on a
@@ -2424,7 +2428,7 @@ function renderMpRows(){
         <select class="mp-shape" id="mp-shape-${i}" onchange="mpShape(${i})">${TUBE_SHAPES.map(o=>`<option value="${o.k}"${o.k===x.shape?' selected':''}>${esc(o.label)}</option>`).join('')}</select>
         <input class="mp-dim" id="mp-od-${i}" value="${nv(x.odIn)}" placeholder="${esc(s.ph[0])}" title="Outside size in decimal inches" oninput="mpTouched(${i})">
         ${s.ph.length>1?`<input class="mp-dim" id="mp-b-${i}" value="${nv(x.bIn)}" placeholder="${esc(s.ph[1])}" title="Second outside dimension" oninput="mpTouched(${i})">`:''}
-        ${s.hollow?`<input class="mp-dim" id="mp-wall-${i}" value="${nv(x.wallIn)}" placeholder="wall" title="Wall thickness in decimal inches" oninput="mpTouched(${i})">
+        ${s.hollow?`<input class="mp-dim" id="mp-wall-${i}" value="${nv(x.wallIn)}" placeholder="${esc(s.wph||'wall')}" title="${s.k==='angle'?'Leg thickness in decimal inches':'Wall thickness in decimal inches'}" oninput="mpTouched(${i})">
         <input class="mp-ga" id="mp-ga-${i}" value="${nv(x.gauge)}" placeholder="ga" title="Wall gauge as the vendor quoted it — fills the wall decimal from the right table for this metal" onchange="mpGa(${i})">`:''}
         <input class="mp-spec" id="mp-spec-${i}" value="${esc(x.spec||'')}" placeholder="A500" title="Spec or grade — A500, A513, DOM, seamless" oninput="mpTouched(${i})">`
     :`
