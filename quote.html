@@ -1623,8 +1623,13 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print breaks
       </button>
+      <button class="btn" id="qb-ai-btn" onclick="runQbAiReview('part')" style="margin-bottom:1px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+        AI review
+      </button>
     </div>
     <div id="qty-breaks-result"></div>
+    <div id="qb-ai-review" style="display:none"></div>
   </div>
   </div><!-- /quote-main -->
   <aside class="quote-side scrl">
@@ -2118,9 +2123,14 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
         Print breaks
       </button>
+      <button class="btn" id="asm-qb-ai-btn" onclick="runQbAiReview('asm')" style="margin-bottom:1px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
+        AI review
+      </button>
     </div>
 
     <div id="asm-qb-results"></div>
+    <div id="asm-qb-ai-review" style="display:none"></div>
     <div id="asm-qb-empty" style="font-size:12px;color:var(--text3);padding:10px 0">Add parts above, then click Calculate. Uses each part's saved quantity-break prices where available.</div>
   </div>
 
@@ -6438,6 +6448,7 @@ function calcBreakForQty(qty){
 }
 
 function calcQtyBreaks(){
+  clearQbAiReview('part'); // numbers are changing — a shown review would be stale
   const qtys=[1,2,3,4,5].map(i=>parseFloat(document.getElementById(`qb-${i}`).value)||0).filter(q=>q>0);
   if(!qtys.length){
     document.getElementById('qty-breaks-result').innerHTML='<div style="font-size:12px;color:var(--red,#dc2626);padding:8px 0">Enter at least one quantity above, then click Calculate.</div>';
@@ -6508,6 +6519,98 @@ function toggleAsmQbHelp(){
   el.style.display=open?'block':'none';
   const btn=document.getElementById('asm-qb-help-btn');
   if(btn) btn.textContent=open?'✕ Close help':'? How breaks work';
+}
+
+// ===================== AI BREAK-SCHEDULE REVIEW =====================
+// Sends the calculated schedule + tier settings to the AI and shows its verdict
+// under the table. Advisory only — never changes any numbers.
+function clearQbAiReview(kind){
+  const box=document.getElementById(kind==='asm'?'asm-qb-ai-review':'qb-ai-review');
+  if(box){ box.style.display='none'; box.innerHTML=''; }
+}
+
+async function runQbAiReview(kind){
+  const isAsm = kind==='asm';
+  const rows = isAsm ? window._asmQtyBreaks : window._qtyBreaks;
+  if(!rows || !rows.length){ alert('Calculate the quantity breaks first.'); return; }
+  if(!hasAIConnection()){ alert('No AI connection configured — set the Proxy URL or API key on the Settings page.'); return; }
+
+  const box = document.getElementById(isAsm?'asm-qb-ai-review':'qb-ai-review');
+  const btn = document.getElementById(isAsm?'asm-qb-ai-btn':'qb-ai-btn');
+  const money = v=>'$'+(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  // Tier settings as configured on the card
+  const pre = isAsm?'asm-mt-':'mt-';
+  const tiers=[];
+  for(let i=1;i<=4;i++){
+    tiers.push(`up to ${document.getElementById(pre+'thresh-'+i)?.value}: ${document.getElementById(pre+'markup-'+i)?.value}% markup`);
+  }
+  tiers.push(`above: ${document.getElementById(pre+'markup-5')?.value}% markup`);
+
+  let ctx='';
+  if(isAsm){
+    const jobName=(document.getElementById('asm-job-name')?.value||'').trim();
+    ctx += `Assembly job: ${jobName||'(unnamed)'}\nComponents per assembly:\n`;
+    asmSelectedParts.forEach(p=>{
+      const h=HISTORY.find(q=>String(q.id)===String(p.quoteId));
+      const hasBreaks=!!(h&&h.qtyBreaks&&h.qtyBreaks.length);
+      ctx += `- ${p.qtyPerAssembly}x ${p.name}, base cost ${money(p.costPerPart)}/part${hasBreaks?' (has its own saved qty breaks)':' (flat cost at every qty — no saved breaks)'}\n`;
+    });
+    ctx += `\nSchedule (assembly ops are fixed $ per assembly):\n`;
+    rows.forEach(r=>{
+      ctx += `- qty ${r.qty}: parts ${money(r.partsCost)} + ops ${money(r.opsCost)} = cost ${money(r.assemblyCost)}/assy, markup ${(r.markup*100).toFixed(0)}%, price ${money(r.finalPrice)}/assy, job total ${money(r.jobTotal)}, margin ${r.margin.toFixed(1)}%\n`;
+    });
+  } else {
+    const partNum=(document.getElementById('partnum')?.value||'').trim();
+    const material=document.getElementById('material')?.value||'';
+    ctx += `Part: ${partNum||'(unnamed)'}${material?', '+material:''}\nSchedule:\n`;
+    rows.forEach(r=>{
+      ctx += `- qty ${r.qty}: cost ${money(r.totalCostPart)}/part, markup ${(r.markup*100).toFixed(0)}%, price ${money(r.finalPrice)}/part, job total ${money(r.jobTotal)}${r.expediteFee?` (incl. ${money(r.expediteFee)} expedite fee)`:''}, margin ${r.margin.toFixed(1)}%\n`;
+    });
+  }
+  ctx += `\nMarkup tier settings: ${tiers.join('; ')}\n`;
+
+  box.style.display='block';
+  box.innerHTML='<div style="margin-top:12px;padding:12px 14px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1d4ed8;display:flex;align-items:center;gap:8px"><div class="spinner"></div>AI is reviewing the break schedule…</div>';
+  if(btn) btn.disabled=true;
+
+  try{
+    const resp = await callAnthropic({
+      model:'claude-sonnet-4-6', max_tokens:700,
+      system:"You review quantity-break price schedules for Bert's Sheet Metal Products, a small sheet-metal job shop. Be direct and concrete, plain language, and reference the actual numbers. Answer in at most 6 short bullet points (lines starting with \"- \"), no preamble and no headers. Check: (1) markup tier steps should be small, roughly 5-10 points, with no cliff — a bigger order must NEVER total less dollars than a smaller one; (2) is the discount between neighboring quantities meaningful or trivial; (3) do margins stay healthy at every row; (4) anything else odd — price per piece not falling as qty rises, components with no saved breaks making big-qty pricing look too flat, suspicious inputs. Finish with one final bullet that starts with either \"Verdict: OK to send\" or \"Verdict: fix first\" plus a short reason.",
+      messages:[{role:'user',content:ctx}]
+    });
+    if(!resp.ok){
+      let msg='AI request failed ('+resp.status+')';
+      try{ const j=await resp.json(); if(j.error&&j.error.message) msg+=': '+j.error.message; }catch(e){}
+      throw new Error(msg);
+    }
+    const data=await resp.json();
+    const txt=((data.content||[]).map(b=>b.text||'').join('')||'').trim();
+    if(!txt) throw new Error('AI returned an empty answer.');
+
+    const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const lines=txt.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+      let t=esc(l.replace(/^[-•*]\s*/,'')).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+      const verdict=/^Verdict:/i.test(l.replace(/^[-•*]\s*/,''));
+      const ok=verdict&&/OK to send/i.test(l);
+      if(verdict) return `<div style="margin-top:8px;padding:7px 10px;border-radius:var(--radius);font-weight:700;${ok?'background:var(--success-bg);color:#065f46;border:1px solid #a7f3d0':'background:#fffbeb;color:#92400e;border:1px solid #f59e0b'}">${t}</div>`;
+      return `<div style="display:flex;gap:7px;margin-bottom:5px"><span style="color:var(--sky);flex:0 0 auto">•</span><span>${t}</span></div>`;
+    }).join('');
+
+    box.innerHTML=`<div style="margin-top:12px;padding:14px;background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--sky);border-radius:var(--radius)">
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+        AI review — advisory only, numbers unchanged
+        <button class="btn btn-sm" onclick="clearQbAiReview('${kind}')" style="margin-left:auto;height:22px;padding:0 8px;font-size:10px;text-transform:none;letter-spacing:0">✕ Dismiss</button>
+      </div>
+      <div style="font-size:12px;color:var(--text);line-height:1.55">${lines}</div>
+    </div>`;
+  }catch(e){
+    box.innerHTML=`<div style="margin-top:12px;padding:12px 14px;background:var(--danger-bg);border:1px solid #fecaca;border-radius:var(--radius);font-size:12px;color:#991b1b">AI review failed: ${String(e.message||e)}</div>`;
+  }finally{
+    if(btn) btn.disabled=false;
+  }
 }
 
 // Sanity-check the break schedule: a bigger order should never total less than a
@@ -8720,6 +8823,7 @@ function findPartCostAtQty(part, qty){
 }
 
 function calcAsmQtyBreaks(){
+  clearQbAiReview('asm'); // numbers are changing — a shown review would be stale
   if (!asmSelectedParts.length) {
     document.getElementById('asm-qb-results').innerHTML = '';
     document.getElementById('asm-qb-empty').style.display = 'block';
