@@ -155,6 +155,12 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .pill.partial{color:var(--amber);background:#BA75171a}
 .pill.paid{color:var(--ar);background:#2f8f6b1a}
 .pill.over{color:var(--red);background:#A32D2D1a}
+.pill.outstanding{color:#2b7a78;background:#2b7a781a}
+/* duplicate check/bill banner (Payables) */
+.dup-banner{border:1px solid #BA751766;background:#BA75170d;padding:10px 12px;margin-bottom:12px;max-width:760px}
+.dup-head{font-weight:800;color:#9a6212;display:flex;align-items:center;gap:7px;margin-bottom:4px}
+.dup-row{display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap}
+.dup-txt{flex:1;min-width:220px;font-size:13px}
 .e-act{margin-left:auto;font-size:11px;font-weight:700;border:none;border-radius:7px;padding:4px 10px;cursor:pointer;color:#fff;background:var(--blue)}
 .e-act:hover{filter:brightness(.94)}
 .bal{font-size:11px;color:var(--text3);margin-left:6px}
@@ -829,6 +835,7 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
 .pill.partial{ color:#9a6212; background:#faf1de; }
 .pill.paid{ color:#1f7d57; background:#e7f4ee; }
 .pill.over{ color:#a32d2d; background:#fbeceb; }
+.pill.outstanding{ color:#22615f; background:#e6f2f1; }
 
 /* ---- AI / primary CTAs use the action green ---- */
 .ai-cta{ /* keep layout, accent handled inline in views */ }
@@ -1349,7 +1356,7 @@ function allEntriesRaw(){
       const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
       const due=o.dueDate||(o.issue?addDays(o.issue,terms):'');
       merged.push({id,type:o.type||'ar',party:canonicalParty(o.party||'—'),ref:o.ref||'',rel:o.rel||'',
-        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null,mailKey:o.mailKey||''});
+        amount:Number(o.amount)||0,payments,paid,terms,issue:o.issue||'',due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,auto:false,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,manual:true,discountTerms:o.discountTerms||'',lineItems:Array.isArray(o.lineItems)?o.lineItems:null,mailKey:o.mailKey||'',checkEntry:!!o.checkEntry,dupIgnore:!!o.dupIgnore});
     }
   });
   return merged;
@@ -1364,12 +1371,16 @@ function statusOf(e){
   // payment line was recorded (e.g. bills withdrawn before auto-payment existed, or via Pay Run).
   if((e.payStatus||'')==='withdrawn') return 'paid';
   if(e.amount!=null && bal<=0.005 && e.amount>0) return 'paid';
+  // An uncashed check isn't late — the money is committed, it just hasn't left the bank
+  // yet. Without this, a "Still outstanding" check goes red "Overdue" the day after it's
+  // written (its due date is the date it was written).
+  if(e.checkEntry && (e.payStatus||'')==='scheduled' && bal>0.005) return 'outstanding';
   const d=daysUntil(e.due);
   if(bal>0.005 && d!==null && d<0) return 'over';
   if(e.paid>0.005) return 'partial';
   return 'open';
 }
-const STATUS_LABEL={open:'Open',partial:'Partial',paid:'Paid',over:'Overdue'};
+const STATUS_LABEL={open:'Open',partial:'Partial',paid:'Paid',over:'Overdue',outstanding:'Outstanding'};
 // An invoice is archived once it's settled — fully paid, or (for payables) withdrawn.
 // Withdrawn bills get a grace window: they stay on the active lists (greyed out on the
 // Cash Flow tab) until 45+ days past their withdrawal date, then file themselves to the
@@ -1524,7 +1535,7 @@ function entryRow(e,opts){
   const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
   const dleft=daysUntil(e.due);
   const dueCls=(st==='over')?' over':'';
-  const dueTxt=e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due';
+  const dueTxt=st==='outstanding'?(e.due?'written '+fmtDate(e.due):'')+' · uncashed':(e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due');
   const amtTxt=e.amount!=null?fmtMoney(e.amount):'<span style="color:var(--text3)">set amt</span>';
   const balTxt=(e.paid>0.005&&e.amount!=null)?` <span class="er-bal">bal ${fmtMoney(bal)}</span>`:'';
   const chk=opts.selectable?`<input type="checkbox" class="er-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
@@ -1542,7 +1553,7 @@ function entryCard(e,opts){
   const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
   const dleft=daysUntil(e.due);
   const dueCls=(st==='over')?' over':'';
-  const dueTxt=e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due date';
+  const dueTxt=st==='outstanding'?(e.due?'written '+fmtDate(e.due):'')+' · uncashed':(e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due date');
   const amtTxt=e.amount!=null?fmtMoney(e.amount):'<span style="color:var(--text3)">set amount</span>';
   const balTxt=(e.paid>0.005&&e.amount!=null)?`<span class="bal">bal ${fmtMoney(bal)}</span>`:'';
   const chk=opts.selectable?`<input type="checkbox" class="e-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
@@ -1847,6 +1858,7 @@ function renderList(entries,side){
   // aging buckets by days overdue (current = not yet due or due today)
   const buckets={cur:0,b30:0,b60:0,b90:0};
   active.forEach(e=>{ const d=daysUntil(e.due); const amt=unpaidOf(e);
+    if(statusOf(e)==='outstanding'){ buckets.cur+=amt; return; } // uncashed check — committed, not late
     if(d==null||d>=0) buckets.cur+=amt;            // not yet due / no date
     else { const od=-d; if(od<=30)buckets.b30+=amt; else if(od<=60)buckets.b60+=amt; else buckets.b90+=amt; }
   });
@@ -1883,6 +1895,15 @@ function renderList(entries,side){
     </div>`:''}
   </div>`:'';
 
+  // duplicate check/bill pairs (Payables only) — same vendor, same open amount
+  const dups=isAR?[]:findCheckDups();
+  const dupBanner=dups.length?`<div class="dup-banner">
+    <div class="dup-head"><i class="ti ti-copy"></i> ${dups.length} check${dups.length!==1?'s':''} look${dups.length===1?'s':''} like a duplicate of an open bill</div>
+    ${dups.map(p=>`<div class="dup-row"><span class="dup-txt"><b>${esc(p.check.ref||'Check')}</b> (${fmtMoney(p.check.amount)}) matches open bill <b>${esc(p.bill.ref||'—')}</b> — ${esc(p.check.party)}</span>
+      <button class="btn sm primary" onclick="mergeCheckIntoBill('${p.check.id}','${p.bill.id}')"><i class="ti ti-arrow-merge"></i> Merge</button>
+      <button class="btn sm" onclick="dismissCheckDup('${p.check.id}')" title="Keep both — this check really is a separate payment">Not a duplicate</button></div>`).join('')}
+  </div>`:'';
+
   $('content').innerHTML=`
     <div class="toolbar">
       <button class="btn ${isAR?'green':'primary'}" onclick="openManual('${side}')"><i class="ti ti-plus"></i> Add ${isAR?'receivable':'payable'}</button>
@@ -1902,6 +1923,7 @@ function renderList(entries,side){
       <div class="list-search"><i class="ti ti-search"></i><input id="list-q" placeholder="Search ${isAR?'customer':'vendor'}, invoice #, description…" value="${esc(S.q)}"></div>
       <div style="margin-left:auto;font-weight:800">${fmtMoney(outstanding)} outstanding · ${all.length} item${all.length!==1?'s':''}</div>
     </div>
+    ${dupBanner}
     ${summary}
     <div style="max-width:760px;padding-bottom:${S.sel.size?'64px':'0'}">${body}</div>
     ${selBar}`;
@@ -4115,10 +4137,23 @@ function ckOfferReconcile(entryId,party,account,amt){
     logAudit('reconcile',{entryId,party,detail:`${acc.name}: ${fmtMoney(cur)} → ${fmtMoney(next)} (−${fmtMoney(amt)})`});
   }
 }
+// A standalone check whose amount exactly matches an open bill for the same vendor is
+// almost always the same money entered twice (the bill from the invoice, the check from
+// the checkbook). Catch it at save time, not after the books are already double-counted.
+function ckFindMatchingBill(party,amt){
+  const vk=vendorKey(canonicalParty(party));
+  return allEntries().find(e=>e.type==='ap'&&!e.checkEntry&&statusOf(e)!=='paid'
+    &&vendorKey(e.party)===vk&&e.amount!=null
+    &&Math.abs(Math.max(0,(e.amount||0)-(e.paid||0))-amt)<=0.01);
+}
 window.saveCheck=()=>{
   const f=ckReadFields();
   if(!f.party){alert('Enter the vendor name');return;}
   if(!(f.amt>0)){alert('Enter the check amount');return;}
+  const dup=ckFindMatchingBill(f.party,f.amt);
+  if(dup&&confirm(`${canonicalParty(f.party)} already has an open bill (${dup.ref||'no ref'}) for exactly ${fmtMoney(f.amt)}.\n\nThis check probably pays that bill — recording it separately would count the same money twice.\n\nOK — apply the check to bill ${dup.ref||''}\nCancel — record it as a separate check anyway`)){
+    applyCheckToBill(dup.id); return;
+  }
   const id='m_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
   const o={manual:true,type:'ap',party:f.party,ref:f.num?('Check #'+f.num):'Check',rel:f.memo,
     amount:f.amt,issue:f.date,terms:0,dueDate:f.date,account:f.account,checkEntry:true};
@@ -4161,6 +4196,54 @@ window.applyCheckToBill=(id)=>{
   logAudit('check',{entryId:id,party:e.party,detail:`${f.num?('Check #'+f.num):'Check'} applied to ${e.ref||'bill'} · ${fmtMoney(f.amt)}${f.cleared?'':' · outstanding (not yet cashed)'}`});
   if(f.cleared) ckOfferReconcile(id,e.party,f.account||e.account,f.amt);
   openEntry(id);
+};
+
+// ── Duplicate check/bill detector ────────────────────────────────────────────
+// A standalone check entry that matches an open bill (same vendor, same open amount)
+// is almost always the same money entered twice — the bill from the invoice, the check
+// from the checkbook. Surfaced as a banner on Payables with a one-click merge; "Not a
+// duplicate" sets dupIgnore on the check so the pair stops flagging.
+function findCheckDups(){
+  const ap=allEntries().filter(e=>e.type==='ap');
+  const bills=ap.filter(e=>!e.checkEntry&&statusOf(e)!=='paid'&&(e.amount||0)-(e.paid||0)>0.005);
+  const used=new Set(),pairs=[];
+  ap.filter(e=>e.checkEntry&&!e.dupIgnore&&(e.amount||0)>0.005).forEach(c=>{
+    const vk=vendorKey(c.party);
+    const b=bills.find(x=>!used.has(x.id)&&vendorKey(x.party)===vk&&Math.abs(Math.max(0,(x.amount||0)-(x.paid||0))-c.amount)<=0.01);
+    if(b){used.add(b.id);pairs.push({check:c,bill:b});}
+  });
+  return pairs;
+}
+window.dismissCheckDup=(id)=>{
+  const e=allEntries().find(x=>x.id===id);
+  const o=ovl(id); o.dupIgnore=true; writeOverlay(id,o);
+  logAudit('check',{entryId:id,party:e?e.party:'',detail:'Marked "not a duplicate" — check kept as its own record'});
+  render();
+};
+window.mergeCheckIntoBill=(checkId,billId)=>{
+  const c=allEntries().find(x=>x.id===checkId), b=allEntries().find(x=>x.id===billId);
+  if(!c||!b)return;
+  if(!confirm(`Merge ${c.ref||'this check'} (${fmtMoney(c.amount||0)}) into bill ${b.ref||'—'} for ${b.party}?\n\nThe check becomes the payment record on the bill, and the separate check entry moves to Trash (you can restore it from there).`))return;
+  const o=ovl(billId);
+  if(!b.auto){o.manual=true;o.type=b.type;o.party=b.party;o.ref=b.ref;o.rel=b.rel;if(o.amount==null)o.amount=b.amount;}
+  if(b.amount==null)o.amount=c.amount;
+  if(o.terms==null)o.terms=b.terms; if(!o.issue&&b.issue)o.issue=b.issue;
+  if(c.account&&!b.account)o.account=c.account;
+  if((c.paid||0)>0.005){
+    // the check already cleared → its payment lines move onto the bill
+    o.payments=[...(b.payments||[]),...(c.payments||[])];
+    if((c.payStatus||'')==='withdrawn'){o.payStatus='withdrawn';o.withdrawnDate=c.withdrawnDate||c.due||'';}
+  }else{
+    // still outstanding → bill goes scheduled with the check # as the paper trail; marking
+    // the bill withdrawn when it clears auto-records the payment (same as applying a check).
+    o.payStatus='scheduled'; o.planMethod='Check';
+    const note=`${c.ref||'Check'} sent ${fmtDate(c.issue||c.due)} — awaiting clearing${c.rel?(' · '+c.rel):''}`;
+    o.notes=[b.notes,note].filter(Boolean).join(' · ');
+  }
+  writeOverlay(billId,o);
+  const co=ovl(checkId); co.trashed=true; co.trashedAt=Date.now(); writeOverlay(checkId,co);
+  logAudit('check',{entryId:billId,party:b.party,detail:`Merged duplicate ${c.ref||'check'} into ${b.ref||'bill'} · ${fmtMoney(c.amount||0)}`});
+  render();
 };
 
 // ── Hand-off from the mail app ───────────────────────────────────────────────
