@@ -276,6 +276,14 @@ body.sb-pinned .dock{left:var(--sb)}
 .av-body iframe{width:100%;height:100%;border:none;background:#fff}
 .av-body img{max-width:100%;max-height:100%;object-fit:contain}
 .av-empty{color:#fff;text-align:center;font-size:13px}
+/* DXF viewer inside the attachment popup */
+.dxf-wrap{position:relative;width:100%;height:100%;overflow:hidden;background:#fff}
+.dxf-wrap canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.dxf-wrap canvas.grabbing{cursor:grabbing}
+.dxf-tools{position:absolute;right:12px;bottom:36px;display:flex;flex-direction:column;gap:6px}
+.dxf-tools button{width:34px;height:34px;border:1px solid var(--border2);background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;color:#23262b;box-shadow:0 2px 6px rgba(16,24,40,.12)}
+.dxf-tools button:hover{border-color:var(--accent);color:var(--accent)}
+.dxf-hint{position:absolute;left:0;right:0;bottom:0;padding:5px 10px;font-size:11px;color:#fff;background:rgba(26,30,36,.55);text-align:center;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reply{padding:0;background:#fbfaf6;border-top:1px solid var(--border);position:sticky;bottom:0;z-index:5;box-shadow:0 -4px 10px -6px rgba(16,24,40,.15)}
 /* full-page (narrow) mode: the app dock is fixed at the viewport bottom — sit above it */
 #v-convo:not(.embedded) .reply{bottom:calc(var(--dock-h) + 6px)}
@@ -1455,10 +1463,13 @@ async function avShow(i){
     }
     if(my!==_avSeq) return;
     _avUrl=_cidCache[ck]; _avName=d.name||'attachment';
-    const mime=(d.mime||'').toLowerCase();
+    const mime=(d.mime||'').toLowerCase(), fn=(d.name||'').toLowerCase();
+    // CAD files ship with junk mimes (octet-stream) — go by the file name
+    if(fn.endsWith('.dxf')) await avShowDxf(body,my);
+    else if(fn.endsWith('.dwg')) await avShowDwg(body,my);
     // toolbar=0 hides Chrome's PDF toolbar — its download button saves blob previews under a
     // random id, so downloads go through the header button, which uses the real file name
-    if(mime.includes('pdf')) body.innerHTML=`<iframe id="av-frame" src="${_avUrl}#toolbar=0&navpanes=0" title="Attachment preview"></iframe>`;
+    else if(mime.includes('pdf')) body.innerHTML=`<iframe id="av-frame" src="${_avUrl}#toolbar=0&navpanes=0" title="Attachment preview"></iframe>`;
     else if(mime.startsWith('image/')) body.innerHTML=`<img src="${_avUrl}" alt="">`;
     else body.innerHTML=`<div class="av-empty"><i class="ti ti-file" style="font-size:32px"></i><div style="margin:8px 0 12px">No preview for this file type</div><button class="btn" onclick="avDownload()"><i class="ti ti-download"></i> Download</button></div>`;
   }catch(e){ if(my===_avSeq) body.innerHTML=`<div class="av-empty">${esc(e.message)}</div>`; }
@@ -1471,11 +1482,316 @@ window.avDownload=()=>{
 };
 window.avPrint=()=>{
   if(!_avUrl){ toast('Nothing loaded yet.',true); return; }
+  // DXF on screen → print the canvas as an image, not the raw text
+  if(_dxfActive&&document.body.contains(_dxfActive.cv)){
+    const w=window.open('','_blank'); if(!w){ toast('Pop-up blocked.',true); return; }
+    w.document.write('<title>'+esc(_avName||'drawing')+'</title><img src="'+_dxfActive.cv.toDataURL('image/png')+'" style="max-width:100%" onload="setTimeout(function(){print()},80)">');
+    w.document.close(); return;
+  }
   const f=document.getElementById('av-frame');
   if(f&&f.contentWindow){ try{ f.contentWindow.focus(); f.contentWindow.print(); return; }catch(e){} }
   window.open(_avUrl,'_blank');
 };
-window.closeAtt=()=>{ $('att-modal').style.display='none'; };
+window.closeAtt=()=>{ $('att-modal').style.display='none'; _dxfActive=null; };
+// ── DXF viewer ───────────────────────────────────────────────────────────────
+// Customers send flat patterns and part drawings as DXF — draw them right in
+// the attachment popup instead of bouncing through CAD. No libraries: DXF is a
+// stream of group-code/value line pairs; ENTITIES (+BLOCKS, for inserts and
+// dimensions) become stroke paths, filled quads, and text on a pan/zoom canvas.
+// DWG is AutoCAD's sealed binary format no browser can draw — that one gets a
+// version readout and a download nudge instead.
+function dxfTagV(tags,c){ for(const t of tags) if(t[0]===c) return t[1]; }
+function dxfTagN(tags,c,d){ const n=parseFloat(dxfTagV(tags,c)); return isNaN(n)?d:n; }
+function dxfTagAll(tags,c){ const o=[]; for(const t of tags) if(t[0]===c) o.push(parseFloat(t[1])); return o; }
+// chop the tag stream into records at every group-code 0
+function dxfRecords(text){
+  const L=text.split(/\r\n|\r|\n/), recs=[]; let cur=null;
+  for(let i=0;i+1<L.length;){
+    const c=parseInt(L[i],10);
+    if(isNaN(c)){ i++; continue; }
+    const v=L[i+1]; i+=2;
+    if(c===0){ cur={name:v.trim().toUpperCase(),tags:[]}; recs.push(cur); }
+    else if(cur) cur.tags.push([c,v]);
+  }
+  return recs;
+}
+function dxfModel(text){
+  const recs=dxfRecords(text), ents=[], blocks={};
+  let section='', blk=null;
+  const eat=(i,out)=>{               // POLYLINE owns its VERTEX records up to SEQEND
+    const r=recs[i];
+    if(r.name==='POLYLINE'){
+      const verts=[]; let j=i+1;
+      for(;j<recs.length&&recs[j].name==='VERTEX';j++) verts.push(recs[j].tags);
+      if(j<recs.length&&recs[j].name==='SEQEND') j++;
+      out.push({name:'POLYLINE',tags:r.tags,verts}); return j;
+    }
+    out.push(r); return i+1;
+  };
+  for(let i=0;i<recs.length;){
+    const r=recs[i];
+    if(r.name==='SECTION'){ section=(dxfTagV(r.tags,2)||'').trim().toUpperCase(); blk=null; i++; continue; }
+    if(r.name==='ENDSEC'){ section=''; blk=null; i++; continue; }
+    if(section==='BLOCKS'){
+      if(r.name==='BLOCK'){ blk={bx:dxfTagN(r.tags,10,0), by:dxfTagN(r.tags,20,0), ents:[]}; blocks[(dxfTagV(r.tags,2)||'').trim().toUpperCase()]=blk; i++; continue; }
+      if(r.name==='ENDBLK'){ blk=null; i++; continue; }
+      if(blk){ i=eat(i,blk.ents); continue; }
+    }
+    if(section==='ENTITIES'){ i=eat(i,ents); continue; }
+    i++;
+  }
+  return {ents,blocks};
+}
+const dxfXfMul=(m,n)=>({a:m.a*n.a+m.c*n.b, b:m.b*n.a+m.d*n.b, c:m.a*n.c+m.c*n.d, d:m.b*n.c+m.d*n.d, e:m.a*n.e+m.c*n.f+m.e, f:m.b*n.e+m.d*n.f+m.f});
+const dxfAp=(xf,x,y)=>[xf.a*x+xf.c*y+xf.e, xf.b*x+xf.d*y+xf.f];
+// arc between two polyline vertices; bulge = tan(sweep/4), + is CCW
+function dxfBulge(p1,p2,b,push){
+  const th=4*Math.atan(b), dx=p2.x-p1.x, dy=p2.y-p1.y, d=Math.hypot(dx,dy);
+  if(!d||Math.abs(th)<1e-6){ push(p2.x,p2.y); return; }
+  const cx=p1.x+dx/2-dy/d*((d/2)/Math.tan(th/2)), cy=p1.y+dy/2+dx/d*((d/2)/Math.tan(th/2));
+  const r=Math.hypot(p1.x-cx,p1.y-cy), a1=Math.atan2(p1.y-cy,p1.x-cx);
+  const n=Math.min(64,Math.max(6,Math.ceil(Math.abs(th)*12)));
+  for(let i=1;i<=n;i++){ const a=a1+th*i/n; push(cx+r*Math.cos(a), cy+r*Math.sin(a)); }
+}
+function dxfDeBoor(t,p,ctrl,knots){
+  let k=knots.length-p-2;
+  for(let i=p;i<knots.length-p-1;i++){ if(t>=knots[i]&&t<knots[i+1]){ k=i; break; } }
+  const d=[];
+  for(let j=0;j<=p;j++){ const c=ctrl[Math.min(ctrl.length-1,Math.max(0,j+k-p))]; d[j]=[c[0],c[1]]; }
+  for(let r=1;r<=p;r++) for(let j=p;j>=r;j--){
+    const i=j+k-p, den=knots[i+p-r+1]-knots[i], al=den?(t-knots[i])/den:0;
+    d[j]=[(1-al)*d[j-1][0]+al*d[j][0], (1-al)*d[j-1][1]+al*d[j][1]];
+  }
+  return d[p];
+}
+function dxfTextDecode(s){ return String(s||'').replace(/%%[cC]/g,'⌀').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[uUoO]/g,'').replace(/%%%/g,'%'); }
+function dxfMtextPlain(s){
+  return dxfTextDecode(String(s||'')
+    .replace(/\\\\/g,'\x01').replace(/\\P/gi,'\n').replace(/\\~/g,' ')
+    .replace(/\\[fFhHwWcCtTqQaA][^;]*;/g,'').replace(/\\[LlOoKk]/g,'')
+    .replace(/\\S([^;]*)[\/#^ ]([^;]*);/g,'$1/$2')
+    .replace(/\\([{}])/g,'$1').replace(/[{}]/g,'').replace(/\x01/g,'\\'));
+}
+// entities → primitives: {k:'p'} stroke path · {k:'s'} filled quad · {k:'t'} text · {k:'x'} point marker
+function dxfPrims(model){
+  const prims=[]; let skipped=0; const skipTypes={};
+  const hScale=xf=>Math.hypot(xf.a,xf.b)||1, xfRot=xf=>Math.atan2(xf.b,xf.a);
+  const emit=(list,xf,depth)=>{
+    for(const en of list){
+      const tags=en.tags, t=en.name;
+      if(dxfTagN(tags,67,0)===1) continue;                          // paperspace
+      if((dxfTagV(tags,8)||'').trim().toUpperCase()==='DEFPOINTS') continue;
+      try{
+        if(t==='LINE'){
+          prims.push({k:'p',pts:[dxfAp(xf,dxfTagN(tags,10,0),dxfTagN(tags,20,0)),dxfAp(xf,dxfTagN(tags,11,0),dxfTagN(tags,21,0))]});
+        } else if(t==='CIRCLE'||t==='ARC'){
+          const cx=dxfTagN(tags,10,0), cy=dxfTagN(tags,20,0), r=dxfTagN(tags,40,0);
+          let a1=0, a2=Math.PI*2;
+          if(t==='ARC'){ a1=dxfTagN(tags,50,0)*Math.PI/180; a2=dxfTagN(tags,51,360)*Math.PI/180; if(a2<=a1) a2+=Math.PI*2; }
+          const n=Math.min(96,Math.max(12,Math.ceil((a2-a1)*14))), pts=[];
+          for(let i=0;i<=n;i++){ const a=a1+(a2-a1)*i/n; pts.push(dxfAp(xf,cx+r*Math.cos(a),cy+r*Math.sin(a))); }
+          prims.push({k:'p',pts,closed:t==='CIRCLE'});
+        } else if(t==='ELLIPSE'){
+          const cx=dxfTagN(tags,10,0), cy=dxfTagN(tags,20,0), mx=dxfTagN(tags,11,1), my=dxfTagN(tags,21,0), k=dxfTagN(tags,40,1);
+          let t1=dxfTagN(tags,41,0), t2=dxfTagN(tags,42,Math.PI*2); if(t2<=t1) t2+=Math.PI*2;
+          const pts=[];
+          for(let i=0;i<=80;i++){ const a=t1+(t2-t1)*i/80; pts.push(dxfAp(xf,cx+mx*Math.cos(a)-my*k*Math.sin(a), cy+my*Math.cos(a)+mx*k*Math.sin(a))); }
+          prims.push({k:'p',pts,closed:(t2-t1)>Math.PI*1.999});
+        } else if(t==='LWPOLYLINE'){
+          const vs=[]; let flags=0;
+          for(const [c,v] of tags){
+            if(c===10) vs.push({x:parseFloat(v),y:0,b:0});
+            else if(c===20&&vs.length) vs[vs.length-1].y=parseFloat(v);
+            else if(c===42&&vs.length) vs[vs.length-1].b=parseFloat(v);
+            else if(c===70) flags=parseInt(v,10)||0;
+          }
+          dxfPushPoly(prims,vs,!!(flags&1),xf);
+        } else if(t==='POLYLINE'){
+          const flags=dxfTagN(tags,70,0);
+          const vs=(en.verts||[]).filter(vt=>!(dxfTagN(vt,70,0)&16))
+            .map(vt=>({x:dxfTagN(vt,10,0),y:dxfTagN(vt,20,0),b:dxfTagN(vt,42,0)}));
+          dxfPushPoly(prims,vs,!!(flags&1),xf);
+        } else if(t==='SPLINE'){
+          const deg=Math.max(1,Math.round(dxfTagN(tags,71,3)));
+          const xs=dxfTagAll(tags,10), ys=dxfTagAll(tags,20), knots=dxfTagAll(tags,40);
+          let ctrl=xs.map((x,i)=>[x,ys[i]||0]);
+          if(ctrl.length<2){ const fx=dxfTagAll(tags,11), fy=dxfTagAll(tags,21); ctrl=fx.map((x,i)=>[x,fy[i]||0]); }
+          if(ctrl.length<2){ skipped++; continue; }
+          let pts;
+          if(knots.length===ctrl.length+deg+1){
+            const t0=knots[deg], t1=knots[knots.length-1-deg], n=Math.min(240,ctrl.length*10); pts=[];
+            for(let i=0;i<=n;i++) pts.push(dxfDeBoor(t0+(t1-t0)*i/n,deg,ctrl,knots));
+          } else pts=ctrl;
+          prims.push({k:'p',pts:pts.map(p=>dxfAp(xf,p[0],p[1]))});
+        } else if(t==='SOLID'||t==='TRACE'){
+          const P=c1=>dxfAp(xf,dxfTagN(tags,c1,0),dxfTagN(tags,c1+10,0));
+          prims.push({k:'s',pts:[P(10),P(11),P(13),P(12)]});         // 3rd/4th corners swap — DXF quirk
+        } else if(t==='3DFACE'){
+          const P=c1=>dxfAp(xf,dxfTagN(tags,c1,0),dxfTagN(tags,c1+10,0));
+          prims.push({k:'p',pts:[P(10),P(11),P(12),P(13)],closed:true});
+        } else if(t==='LEADER'){
+          const xs=dxfTagAll(tags,10), ys=dxfTagAll(tags,20);
+          if(xs.length>1) prims.push({k:'p',pts:xs.map((x,i)=>dxfAp(xf,x,ys[i]||0))});
+        } else if(t==='POINT'){
+          prims.push({k:'x',p:dxfAp(xf,dxfTagN(tags,10,0),dxfTagN(tags,20,0))});
+        } else if(t==='TEXT'||(t==='ATTRIB'&&!(dxfTagN(tags,70,0)&1))){
+          let x=dxfTagN(tags,10,0), y=dxfTagN(tags,20,0);
+          const j72=dxfTagN(tags,72,0), j73=dxfTagN(tags,73,0);
+          if((j72||j73)&&dxfTagV(tags,11)!==undefined){ x=dxfTagN(tags,11,x); y=dxfTagN(tags,21,y); }
+          prims.push({k:'t',p:dxfAp(xf,x,y), h:dxfTagN(tags,40,1)*hScale(xf),
+            rot:dxfTagN(tags,50,0)*Math.PI/180+xfRot(xf),
+            align:j72===1||j72===4?'center':j72===2?'right':'left',
+            valign:j72===4?'middle':j73===1?'bottom':j73===2?'middle':j73===3?'top':'alphabetic',
+            lines:[dxfTextDecode(dxfTagV(tags,1)||'')]});
+        } else if(t==='MTEXT'){
+          let s=''; for(const [c,v] of tags) if(c===3) s+=v; s+=dxfTagV(tags,1)||'';
+          const at=Math.min(9,Math.max(1,dxfTagN(tags,71,1)));
+          let rot=dxfTagN(tags,50,0)*Math.PI/180;
+          if(dxfTagV(tags,11)!==undefined) rot=Math.atan2(dxfTagN(tags,21,0),dxfTagN(tags,11,1));
+          prims.push({k:'t',p:dxfAp(xf,dxfTagN(tags,10,0),dxfTagN(tags,20,0)), h:dxfTagN(tags,40,1)*hScale(xf),
+            rot:rot+xfRot(xf), align:['left','center','right'][(at-1)%3],
+            valign:['top','middle','bottom'][Math.floor((at-1)/3)],
+            lines:dxfMtextPlain(s).split('\n')});
+        } else if(t==='INSERT'&&depth<8){
+          const b=model.blocks[(dxfTagV(tags,2)||'').trim().toUpperCase()];
+          if(!b){ skipped++; continue; }
+          const sx=dxfTagN(tags,41,1)||1, sy=dxfTagN(tags,42,1)||1, r=dxfTagN(tags,50,0)*Math.PI/180;
+          const ix=dxfTagN(tags,10,0), iy=dxfTagN(tags,20,0);
+          const cols=Math.max(1,Math.round(dxfTagN(tags,70,1))), rows=Math.max(1,Math.round(dxfTagN(tags,71,1)));
+          const cdx=dxfTagN(tags,44,0), rdy=dxfTagN(tags,45,0), cos=Math.cos(r), sin=Math.sin(r);
+          for(let ci=0;ci<cols;ci++) for(let ri=0;ri<rows;ri++){
+            const ox=ix+cos*ci*cdx-sin*ri*rdy, oy=iy+sin*ci*cdx+cos*ri*rdy;
+            const m={a:cos*sx,b:sin*sx,c:-sin*sy,d:cos*sy,e:0,f:0};
+            m.e=ox-(m.a*b.bx+m.c*b.by); m.f=oy-(m.b*b.bx+m.d*b.by);
+            emit(b.ents,dxfXfMul(xf,m),depth+1);
+          }
+        } else if(t==='DIMENSION'){
+          const b=model.blocks[(dxfTagV(tags,2)||'').trim().toUpperCase()];
+          if(b) emit(b.ents,xf,depth+1); else skipped++;             // dim blocks sit in world coords
+        } else { skipped++; skipTypes[t]=1; }
+      }catch(e){ skipped++; }
+    }
+  };
+  emit(model.ents,{a:1,b:0,c:0,d:1,e:0,f:0},0);
+  return {prims,skipped,skipTypes:Object.keys(skipTypes)};
+}
+function dxfPushPoly(prims,vs,closed,xf){
+  if(vs.length<2) return;
+  const pts=[dxfAp(xf,vs[0].x,vs[0].y)], n=vs.length, m=closed?n:n-1;
+  for(let i=0;i<m;i++){
+    const a=vs[i], b=vs[(i+1)%n];
+    if(a.b) dxfBulge(a,b,a.b,(x,y)=>pts.push(dxfAp(xf,x,y)));
+    else pts.push(dxfAp(xf,b.x,b.y));
+  }
+  prims.push({k:'p',pts});
+}
+// mounted canvas: pan by drag, wheel zoom at the cursor, double-click refits
+let _dxfActive=null;
+function dxfMount(wrap,out){
+  const cv=wrap.querySelector('canvas'), ctx=cv.getContext('2d');
+  // bounding box: geometry exactly, text loosely (anchor + rough extent)
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+  const grow=(x,y)=>{ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; };
+  for(const pr of out.prims){
+    if(pr.k==='p'||pr.k==='s') for(const p of pr.pts) grow(p[0],p[1]);
+    else if(pr.k==='x') grow(pr.p[0],pr.p[1]);
+    else {
+      const w=pr.h*Math.max(...pr.lines.map(l=>l.length),1)*0.75, x=pr.p[0], y=pr.p[1], hh=pr.h*1.6*pr.lines.length;
+      grow(pr.align==='right'?x-w:pr.align==='center'?x-w/2:x, y-hh);
+      grow(pr.align==='left'?x+w:pr.align==='center'?x+w/2:x, y+hh);
+    }
+  }
+  if(!isFinite(x0)){ x0=y0=0; x1=y1=1; }
+  const st={cv, s:1, ox:0, oy:0};
+  st.fit=()=>{
+    const W=cv.clientWidth||1, H=cv.clientHeight||1, bw=(x1-x0)||1, bh=(y1-y0)||1;
+    st.s=0.92*Math.min(W/bw,H/bh);
+    st.ox=W/2-(x0+bw/2)*st.s; st.oy=H/2+(y0+bh/2)*st.s;
+  };
+  st.draw=()=>{
+    const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight;
+    if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){ cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr); }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+    const X=x=>x*st.s+st.ox, Y=y=>-y*st.s+st.oy;
+    ctx.strokeStyle=ctx.fillStyle='#1c2530'; ctx.lineWidth=1.1; ctx.lineJoin=ctx.lineCap='round';
+    for(const pr of out.prims){
+      if(pr.k==='p'||pr.k==='s'){
+        ctx.beginPath();
+        ctx.moveTo(X(pr.pts[0][0]),Y(pr.pts[0][1]));
+        for(let i=1;i<pr.pts.length;i++) ctx.lineTo(X(pr.pts[i][0]),Y(pr.pts[i][1]));
+        if(pr.closed||pr.k==='s') ctx.closePath();
+        pr.k==='s'?ctx.fill():ctx.stroke();
+      } else if(pr.k==='x'){
+        const x=X(pr.p[0]), y=Y(pr.p[1]);
+        ctx.beginPath(); ctx.moveTo(x-3,y); ctx.lineTo(x+3,y); ctx.moveTo(x,y-3); ctx.lineTo(x,y+3); ctx.stroke();
+      } else {
+        const hpx=pr.h*st.s; if(hpx<2.2) continue;                   // unreadable at this zoom — skip
+        ctx.save(); ctx.translate(X(pr.p[0]),Y(pr.p[1])); ctx.rotate(-pr.rot);
+        ctx.font=(hpx*1.35).toFixed(1)+'px "Hanken Grotesk",system-ui,sans-serif';
+        ctx.textAlign=pr.align; ctx.textBaseline='alphabetic';
+        const lh=hpx*1.6, n=pr.lines.length;
+        const off=pr.valign==='top'?hpx:pr.valign==='middle'?hpx*0.35-lh*(n-1)/2:pr.valign==='bottom'?-lh*(n-1):0;
+        pr.lines.forEach((ln,i)=>ctx.fillText(ln,0,off+i*lh));
+        ctx.restore();
+      }
+    }
+  };
+  st.zoom=(f,mx,my)=>{
+    if(mx===undefined){ mx=cv.clientWidth/2; my=cv.clientHeight/2; }
+    st.ox=mx-(mx-st.ox)*f; st.oy=my-(my-st.oy)*f; st.s*=f; st.draw();
+  };
+  let drag=null;
+  cv.addEventListener('pointerdown',e=>{ drag={x:e.clientX,y:e.clientY}; cv.setPointerCapture(e.pointerId); cv.classList.add('grabbing'); });
+  cv.addEventListener('pointermove',e=>{ if(!drag) return; st.ox+=e.clientX-drag.x; st.oy+=e.clientY-drag.y; drag={x:e.clientX,y:e.clientY}; st.draw(); });
+  cv.addEventListener('pointerup',()=>{ drag=null; cv.classList.remove('grabbing'); });
+  cv.addEventListener('wheel',e=>{ e.preventDefault(); const r=cv.getBoundingClientRect(); st.zoom(e.deltaY<0?1.18:1/1.18, e.clientX-r.left, e.clientY-r.top); },{passive:false});
+  cv.addEventListener('dblclick',()=>{ st.fit(); st.draw(); });
+  wrap.querySelector('.dxf-fit').onclick=()=>{ st.fit(); st.draw(); };
+  wrap.querySelector('.dxf-in').onclick=()=>st.zoom(1.35);
+  wrap.querySelector('.dxf-out').onclick=()=>st.zoom(1/1.35);
+  _dxfActive=st;
+  st.fit(); st.draw();
+}
+window.addEventListener('resize',()=>{ if(_dxfActive&&document.body.contains(_dxfActive.cv)) _dxfActive.draw(); });
+async function avShowDxf(body,seq){
+  let text='';
+  try{ text=await (await fetch(_avUrl)).text(); }catch(e){ if(seq===_avSeq) body.innerHTML='<div class="av-empty">Could not read the file.</div>'; return; }
+  if(seq!==_avSeq) return;
+  if(text.slice(0,64).includes('AutoCAD Binary DXF')){
+    body.innerHTML=`<div class="av-empty"><i class="ti ti-ruler-measure" style="font-size:32px"></i><div style="margin:8px 0 4px;font-weight:800">Binary DXF</div><div style="max-width:420px;line-height:1.5">This DXF was saved in binary form — ask the sender to save it as a regular (ASCII) DXF and it'll draw right here.</div><button class="btn" style="margin-top:12px" onclick="avDownload()"><i class="ti ti-download"></i> Download</button></div>`;
+    return;
+  }
+  let out=null;
+  try{ out=dxfPrims(dxfModel(text)); }catch(e){}
+  if(seq!==_avSeq) return;
+  if(!out||!out.prims.length){
+    body.innerHTML=`<div class="av-empty"><i class="ti ti-ruler-measure" style="font-size:32px"></i><div style="margin:8px 0 12px">Couldn't find anything drawable in this DXF.</div><button class="btn" onclick="avDownload()"><i class="ti ti-download"></i> Download</button></div>`;
+    return;
+  }
+  const skip=out.skipped?` · ${out.skipped} unsupported entit${out.skipped!==1?'ies':'y'} skipped${out.skipTypes.length?' ('+out.skipTypes.slice(0,3).join(', ').toLowerCase()+')':''}`:'';
+  body.innerHTML=`<div class="dxf-wrap"><canvas></canvas>
+    <div class="dxf-tools">
+      <button class="dxf-in" title="Zoom in"><i class="ti ti-plus"></i></button>
+      <button class="dxf-out" title="Zoom out"><i class="ti ti-minus"></i></button>
+      <button class="dxf-fit" title="Fit to window"><i class="ti ti-maximize"></i></button>
+    </div>
+    <div class="dxf-hint">drag to pan · scroll to zoom · double-click to fit${skip}</div></div>`;
+  dxfMount(body.querySelector('.dxf-wrap'),out);
+}
+async function avShowDwg(body,seq){
+  let ver='';
+  try{
+    const buf=await (await fetch(_avUrl)).arrayBuffer();
+    const tag=String.fromCharCode.apply(null,new Uint8Array(buf.slice(0,6)));
+    ver={AC1009:'AutoCAD R12',AC1012:'AutoCAD R13',AC1014:'AutoCAD R14',AC1015:'AutoCAD 2000',AC1018:'AutoCAD 2004',AC1021:'AutoCAD 2007',AC1024:'AutoCAD 2010',AC1027:'AutoCAD 2013',AC1032:'AutoCAD 2018'}[tag.slice(0,6)]||'';
+  }catch(e){}
+  if(seq!==_avSeq) return;
+  body.innerHTML=`<div class="av-empty"><i class="ti ti-ruler-measure" style="font-size:32px"></i>
+    <div style="margin:8px 0 4px;font-weight:800">DWG${ver?' · '+esc(ver)+' format':''}</div>
+    <div style="max-width:430px;line-height:1.5">DWG is AutoCAD's sealed binary format — browsers can't draw it. Download it to open in CAD, or ask the sender for a <b>DXF</b> (every CAD package can Save-As DXF) and it'll preview right here like a PDF does.</div>
+    <button class="btn" style="margin-top:12px" onclick="avDownload()"><i class="ti ti-download"></i> Download</button></div>`;
+}
 const MSG_HTML_WRAP = '<base target="_blank"><style>body{font-family:"Hanken Grotesk",system-ui,-apple-system,sans-serif;font-size:13.5px;color:#23262b;margin:0;line-height:1.5;word-break:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style>';
 // ── quoted-history trimming: every reply drags the whole chain along; hide it
 //    behind a per-message toggle (the earlier messages are shown above anyway).
