@@ -6660,13 +6660,17 @@ function bFrameTotals(){
 // ── Weekly close-out ─────────────────────────────────────────────────────────
 // One click at the end of the week: save a permanent record of how the week went
 // (board/weeks/<monday>), sweep finished cards off the canvas, and carry every
-// unfinished card into the new week with a visible "2nd week / 3rd week" badge.
+// unfinished card into the new week with a badge naming the week it started.
 // Frames, notes, and open-PO cards stay put — they're the standing structure.
-function bNthWeek(carried){
-  const n=(Number(carried)||0)+1;
-  const suf=(n%100>=11&&n%100<=13)?'th':(n%10===1?'st':n%10===2?'nd':n%10===3?'rd':'th');
-  return n+suf+' week';
+// A week's NAME is its Saturday date (weeks are still keyed by Monday in the DB).
+function bWeekSat(ws){ return fmtDate(_sbAddDays(ws,5)); }
+// The Monday of the week a carried card first sat on the board. Stored on the
+// card as `carriedFrom` at carry time; older cards (and old week snapshots)
+// fall back to counting `carried` weeks back from fromWs.
+function bCarryWs(carriedFrom,carried,fromWs){
+  return carriedFrom||_sbAddDays(fromWs,-7*(Number(carried)||0));
 }
+function bCurWs(){ const t=new Date(); return _sbAddDays(_sbISO(t),-((t.getDay()+6)%7)); }
 // Everything the week record needs, computed BEFORE the sweep so it captures the
 // board as it looked. Raw inputs are persisted (invoiced rows, per-card $) so the
 // numbers can always be re-checked later — the show-the-work rule.
@@ -6685,8 +6689,10 @@ function bWeekSnapshot(ws){
     const label=it.type==='order'
       ?((g?g.customer:String(it.gk).split('||')[0])+' · PO '+(g?g.po:String(it.gk).split('||')[1]||''))
       :(rs[0]?(rs[0].part||rs[0].desc||'part'):'(part gone)');
-    return {type:it.type,label,val:Math.round(rs.reduce((t,r)=>t+rowTotal(r),0)),
+    const c={type:it.type,label,val:Math.round(rs.reduce((t,r)=>t+rowTotal(r),0)),
       done:bCardDone(it),gone:!rs.length,carried:Number(it.carried)||0};
+    if(c.carried) c.carriedFrom=bCarryWs(it.carriedFrom,c.carried,ws);
+    return c;
   });
   const doneVal=cards.filter(c=>c.done).reduce((t,c)=>t+c.val,0);
   const live=cards.filter(c=>!c.done&&!c.gone);
@@ -6717,17 +6723,17 @@ window.bCloseWeek=(wsArg)=>{
     }
   });
   const m0=n=>'$'+Math.round(n||0).toLocaleString('en-US');
-  if(BOARD_WEEKS[ws]&&!confirm(`The week of Mon ${fmtDate(ws)} was already closed out. Close it again and overwrite that record?`))return;
-  if(!confirm(`Close out the week of Mon ${fmtDate(ws)}?\n\n`+
+  if(BOARD_WEEKS[ws]&&!confirm(`The week of ${bWeekSat(ws)} was already closed out. Close it again and overwrite that record?`))return;
+  if(!confirm(`Close out the week of ${bWeekSat(ws)} (Mon ${fmtDate(ws)} – Sat ${bWeekSat(ws)})?\n\n`+
     `• Saves the record: ${m0(snap.invoiced)} invoiced of the ${m0(snap.target)} target, plus each frame's result\n`+
     `• Clears ${sweep.length} finished/settled card${sweep.length!==1?'s':''} off the board (${m0(snap.doneVal)} ✓)\n`+
-    `• Carries ${carry.length} unfinished card${carry.length!==1?'s':''} (${m0(snap.carryVal)}) into the new week, marked "${bNthWeek(1)}", "${bNthWeek(2)}"…\n\n`+
+    `• Carries ${carry.length} unfinished card${carry.length!==1?'s':''} (${m0(snap.carryVal)}) into the new week, each marked with the week it started (e.g. "Week of ${bWeekSat(ws)}")\n\n`+
     `The orders and POs themselves are untouched. Frames and notes stay.`))return;
   // save the record FIRST — if the write fails, nothing on the board is touched
   set(ref(db,'board/weeks/'+ws),snap).then(()=>{
     BOARD_WEEKS[ws]=snap;
     sweep.forEach(it=>{ delete BOARD[it.id]; remove(ref(db,'board/items/'+it.id)).catch(()=>{}); });
-    carry.forEach(it=>{ it.carried=(Number(it.carried)||0)+1; it.by=bBy(); it.at=Date.now(); bSave(it); });
+    carry.forEach(it=>{ it.carriedFrom=bCarryWs(it.carriedFrom,it.carried,ws); it.carried=(Number(it.carried)||0)+1; it.by=bBy(); it.at=Date.now(); bSave(it); });
     renderBoardPage();
   }).catch(()=>{
     alert('Could not save the week record — nothing on the board was changed. (Is the "board" database rule published, and is this account on the editor list?)');
@@ -6748,14 +6754,14 @@ window.bShowWeeks=()=>{
       const cards=(w.cards||[]).filter(Boolean);
       const inv=(w.invoicedRows||[]).filter(Boolean);
       return `<details class="bwk-det"><summary>
-        <span class="bwk-when">Week of ${fmtDate(w.weekStart)}</span>
+        <span class="bwk-when">Week of ${bWeekSat(w.weekStart)}</span>
         <span class="${hit?'sbd-hit':'bwk-inv'}">${m0(w.invoiced)} / ${m0(w.target)} (${pct}%)</span>
         <span class="bwk-carry">${w.carryCount?`${m0(w.carryVal)} carried over (${w.carryCount} job${w.carryCount!==1?'s':''})`:'nothing carried over'}</span></summary>
         <div class="bwk-body">
           ${frames.length?'<div class="bwk-h">Frames at close</div>'+frames.map(f=>
             `<div class="bwk-row"><span>${esc2(f.label)}</span><span>${m0(f.done)} ✓ of ${m0((f.done||0)+(f.left||0))} · ${f.nDone||0}/${f.n} jobs</span></div>`).join(''):''}
           ${cards.length?'<div class="bwk-h">Cards at close</div>'+cards.map(c=>
-            `<div class="bwk-row"><span>${c.done?'✓ ':''}${esc2(c.label)}${c.gone?' <small>(order gone)</small>':''}${!c.done&&c.carried?` <small>${bNthWeek(c.carried)}</small>`:''}</span><span>${m0(c.val)}</span></div>`).join(''):''}
+            `<div class="bwk-row"><span>${c.done?'✓ ':''}${esc2(c.label)}${c.gone?' <small>(order gone)</small>':''}${!c.done&&c.carried?` <small>since wk of ${bWeekSat(bCarryWs(c.carriedFrom,c.carried,w.weekStart))}</small>`:''}</span><span>${m0(c.val)}</span></div>`).join(''):''}
           ${inv.length?`<div class="bwk-h">Invoiced that week (${inv.length})</div>`+inv.map(r=>
             `<div class="bwk-row"><span>${fmtDate(r.date)} · ${esc2(r.customer||'—')} · PO ${esc2(r.po||'verbal')}${r.inv?' · #'+esc2(r.inv):''}</span><span>${m0(r.val)}</span></div>`).join(''):'<div class="bwk-h">Nothing invoiced that week</div>'}
           <div class="bwk-note">Closed ${w.closedAt?new Date(w.closedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'} by ${esc2(String(w.closedBy||'').split('@')[0]||'—')}. Each $ = qty × cost/part or PO total; "invoiced" counts every order invoice-dated ${fmtDate(w.weekStart)}–${fmtDate(w.weekEnd)}.</div>
@@ -6873,7 +6879,7 @@ function bItemHtml(it){
       <div class="bc-top"><button class="bc-chk${comp?' on':''}" title="${comp?'Un-check':'Check off — done, ready to invoice'}" onclick="_bChk('${it.id}',event)"><i class="ti ti-check"></i></button><span class="bc-name">${esc2(g.customer)}</span>${g.val?`<span class="bc-amt">${bMoney(g.val)}</span>`:''}</div>
       <div class="bc-sub">PO ${esc2(g.po)}${g.parts.length?` · ${esc2(g.parts[0])}${g.parts.length>1?' +'+(g.parts.length-1):''}`:''}</div>
       <div class="bc-sub">${esc2(g.statuses.join(', '))}${g.n>1?' · '+g.n+' items':''}</div>
-      ${it.carried&&!comp?`<div><span class="bc-carry" title="Carried over from ${it.carried} previous week${it.carried!==1?'s':''}' close-out — still not finished">${bNthWeek(it.carried)} on the board</span></div>`:''}
+      ${it.carried&&!comp?`<div><span class="bc-carry" title="Carried through ${it.carried} close-out${it.carried!==1?'s':''} — on the board since the week of ${bWeekSat(bCarryWs(it.carriedFrom,it.carried,bCurWs()))}, still not finished">since wk of ${bWeekSat(bCarryWs(it.carriedFrom,it.carried,bCurWs()))}</span></div>`:''}
       ${g.gdue?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${comp?'Done ✓':'Due '+fmtDate(g.gdue)+(overdue?' — overdue':'')}</div>`:''}
       <button class="b-x" title="Remove from board (the order itself is untouched)" onclick="_bDel('${it.id}',event)">×</button></div>`;
   }
@@ -6888,7 +6894,7 @@ function bItemHtml(it){
       <div class="bc-top"><button class="bc-chk${comp?' on':''}" title="${comp?'Un-check':'Check off — done, ready to invoice'}" onclick="_bChk('${it.id}',event)"><i class="ti ti-check"></i></button><span class="bc-name">${esc2(r.part||r.desc||'(no part #)')}</span>${val?`<span class="bc-amt">${bMoney(val)}</span>`:''}</div>
       <div class="bc-sub">${esc2(r.job||'')}${r.job?' · ':''}${esc2(r.customer||'')} · PO ${esc2(r.po||'verbal')}</div>
       <div class="bc-sub">${esc2(r.status||'Confirmed')}</div>
-      ${it.carried&&!comp?`<div><span class="bc-carry" title="Carried over from ${it.carried} previous week${it.carried!==1?'s':''}' close-out — still not finished">${bNthWeek(it.carried)} on the board</span></div>`:''}
+      ${it.carried&&!comp?`<div><span class="bc-carry" title="Carried through ${it.carried} close-out${it.carried!==1?'s':''} — on the board since the week of ${bWeekSat(bCarryWs(it.carriedFrom,it.carried,bCurWs()))}, still not finished">since wk of ${bWeekSat(bCarryWs(it.carriedFrom,it.carried,bCurWs()))}</span></div>`:''}
       ${r.due?`<div class="bc-due" style="color:${overdue?'#b03636':'var(--text2)'}">${comp?'Done ✓':'Due '+fmtDate(r.due)+(overdue?' — overdue':'')}</div>`:''}
       <button class="b-x" title="Remove from board (the order itself is untouched)" onclick="_bDel('${it.id}',event)">×</button></div>`;
   }
@@ -7083,7 +7089,7 @@ function renderBoardPage(){
       const t=new Date(), tISO=_sbISO(t);
       const pw=_sbAddDays(_sbAddDays(tISO,-((t.getDay()+6)%7)),-7);
       if(!BOARD_WEEKS[pw])
-        h=`<div class="bwk-banner"><i class="ti ti-flag-check"></i><span>Last week (Mon ${fmtDate(pw)}) hasn't been closed out yet — <a href="#" onclick="bCloseWeek('${pw}');return false">close it now</a> to save its record and roll unfinished work into this week.</span></div>`;
+        h=`<div class="bwk-banner"><i class="ti ti-flag-check"></i><span>Last week (week of ${bWeekSat(pw)}) hasn't been closed out yet — <a href="#" onclick="bCloseWeek('${pw}');return false">close it now</a> to save its record and roll unfinished work into this week.</span></div>`;
     }
     bn.innerHTML=h;
   }
