@@ -7936,11 +7936,16 @@ function drawCellHtml(r){
 }
 window._openInOrders = (id, e) => {
   if(e) e.stopPropagation();
-  showPage('orders');
+  const o = orders.find(r=>r.id===id);
+  if(!o){ showPage('orders'); return; }
+  // open the line's own detail card, then reuse the dashboard jump (clears
+  // filters, switches to card view, selects this order's PO card, renders)
+  expanded.add(id);
+  window._dashOpenOrder(id);
   setTimeout(()=>{
     const el=document.querySelector(`[data-rowid='${id}']`);
     if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('row-flash'); setTimeout(()=>el.classList.remove('row-flash'),1600); }
-  },80);
+  },160);
 };
 // Which Work Queue tab a job belongs in right now (based on its current actionable step).
 function queueForOrder(r){
