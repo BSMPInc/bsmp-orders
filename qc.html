@@ -643,7 +643,16 @@ const I18N = {
     'BALLOONED DRAWING':'PLANO GLOBEADO',
     'Not to scale — balloon numbers match the report rows.':'No a escala — los números de globo corresponden a las filas del reporte.',
     'Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.':'No a escala — gira la hoja en sentido horario para leerlo; los números de globo corresponden a las filas del reporte.',
-    'Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.':'Imprimiendo la imagen globeada guardada (globos a tamaño completo) — vuelve a globear el plano para imprimir los pequeños.'
+    'Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.':'Imprimiendo la imagen globeada guardada (globos a tamaño completo) — vuelve a globear el plano para imprimir los pequeños.',
+    // filled FAI report print
+    'Print report':'Imprimir reporte',
+    'Print the filled report — recorded results, deviations, and pass/fail on BSMP paper.':'Imprime el reporte lleno — resultados registrados, desviaciones y pasa/no pasa en papel BSMP.',
+    'First Article Report':'Reporte de Primer Artículo',
+    'DEVIATION':'DESVIACIÓN','STATUS':'ESTADO','OK':'OK','OUT OF TOL':'FUERA DE TOL',
+    'not measured':'sin medir','measured':'medidas','out of tolerance':'fuera de tolerancia',
+    'measured — no deviations so far':'medidas — sin desviaciones hasta ahora',
+    'All characteristics in tolerance':'Todas las características dentro de tolerancia',
+    'Report status:':'Estado del reporte:'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -2318,6 +2327,7 @@ function viewFair(){
   <div class="toolbar" style="margin-bottom:12px">
     <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
     <button class="btn" onclick="window.qcFairPrintBlank()" title="${esc(t('Print blank FAI sheet: a paper copy with the ballooned drawing — the inspector hand-writes the results.'))}"><i class="ti ti-printer"></i> ${t('Print blank FAI sheet')}</button>
+    <button class="btn" onclick="window.qcFairPrintReport()" title="${esc(t('Print the filled report — recorded results, deviations, and pass/fail on BSMP paper.'))}"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
     <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
   </div>
   <div class="card">
@@ -2388,6 +2398,7 @@ function viewFair(){
       <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
       <button class="btn fair-save-btn" onclick="window.qcSaveFair('Submitted')">${t('Submit for review')}</button>
       <button class="btn" onclick="window.qcFairPrintBlank()"><i class="ti ti-printer"></i> ${t('Print blank FAI sheet')}</button>
+      <button class="btn" onclick="window.qcFairPrintReport()"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
       ${canApprove?`<button class="btn green mgr-only fair-save-btn" onclick="window.qcSaveFair('Approved')"><i class="ti ti-check"></i> ${t('Approve')}</button>
         <button class="btn danger mgr-only fair-save-btn" onclick="window.qcSaveFair('Rejected')">${t('Reject')}</button>`:''}
       <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
@@ -3312,6 +3323,33 @@ async function qcRotateForPortrait(src){
    resolved tolerance filled in; ACTUAL / TOOL / ACC-REJ / NOTES stay blank so
    the inspector writes the results by hand. Works from the live workspace, a
    saved ballooned image, or a fresh composite of the saved bubbles. */
+// shared drawing pipeline for the FAI prints: composite fresh from the CURRENT balloon
+// positions at 40% size (60% smaller, so bubbles don't cover the dimension text), then
+// trim the PDF page's white borders and rotate landscape drawings to portrait so the
+// sheet fills. The saved ballooned image — balloons baked in at full size — is only the
+// legacy fallback when no bubble positions are stored.
+async function qcFairPrintImage(r, bubbles){
+  const PRINT_BALLOON_SCALE=0.4;
+  let src='';
+  const legacy=()=>{ if(r&&r.ballooned&&r.ballooned.url){ src=r.ballooned.url; qcToast(t('Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.'),'err'); } };
+  try{
+    if(_fairImg && bubbles.length) src=(await qcCompositeBalloonsDataUrl(_fairImg,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
+    else{
+      const img=await qcFairDrawingImage();
+      if(img && bubbles.length) src=(await qcCompositeBalloonsDataUrl(img,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
+      else if(r&&r.ballooned&&r.ballooned.url) legacy();
+      else if(img) src=img.dataUrl;
+    }
+  }catch(e){ console.error('FAI sheet drawing failed', e); legacy(); }
+  let rotated=false;
+  if(src){
+    src=await qcTrimWhiteMargins(src);
+    const rs=await qcRotateForPortrait(src);
+    rotated=(rs!==src); src=rs;
+  }
+  return {src, rotated};
+}
+
 window.qcFairPrintBlank=async ()=>{
   const r=editId?INSPECTIONS[editId]:null;
   if($('char-body')) syncChars();
@@ -3325,23 +3363,8 @@ window.qcFairPrintBlank=async ()=>{
   const w=window.open('','_blank','width=780,height=940');
   if(!w){ qcToast(t('The browser blocked the print window — allow popups for this site.'),'err'); return; }
   try{ w.document.write('<body style="font-family:Arial,Helvetica,sans-serif;color:#555;padding:30px">'+esc(t('Preparing sheet…'))+'</body>'); }catch(e){}
-  // print composites fresh from the CURRENT balloon positions at 40% size (60% smaller,
-  // so bubbles don't cover the dimension text). The saved ballooned image — balloons baked
-  // in at full size — is only the legacy fallback when no bubble positions are stored.
-  const PRINT_BALLOON_SCALE=0.4;
-  let imgSrc='';
-  try{
-    if(_fairImg && bubbles.length) imgSrc=(await qcCompositeBalloonsDataUrl(_fairImg,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
-    else{
-      const img=await qcFairDrawingImage();
-      if(img && bubbles.length) imgSrc=(await qcCompositeBalloonsDataUrl(img,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
-      else if(r&&r.ballooned&&r.ballooned.url){ imgSrc=r.ballooned.url; qcToast(t('Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.'),'err'); }
-      else if(img) imgSrc=img.dataUrl;
-    }
-  }catch(e){
-    console.error('FAI sheet drawing failed', e);
-    if(r&&r.ballooned&&r.ballooned.url){ imgSrc=r.ballooned.url; qcToast(t('Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.'),'err'); }
-  }
+  const _pi=await qcFairPrintImage(r,bubbles);
+  let imgSrc=_pi.src; const drawRotated=_pi.rotated;
   // header values — live form fields first, the saved record as the fallback
   const hv=(id,f,d)=>{ const el=$(id); const s=el?String(el.value||'').trim():((r&&r[f]!=null)?String(r[f]):''); return s||d||''; };
   const part=hv('fr-part','partNum'), rev=hv('fr-rev','rev'), cust=hv('fr-customer','customer'),
@@ -3351,14 +3374,6 @@ window.qcFairPrintBlank=async ()=>{
   const fld=(lbl,val,wide)=>`<div style="flex:${wide?2:1};min-width:${wide?140:92}px"><div style="font-size:8px;letter-spacing:.5px;color:#555;text-transform:uppercase">${esc(lbl)}</div><div style="border-bottom:1px solid #888;min-height:16px;font-size:11px;padding:2px 0 1px">${esc(val||'')}&nbsp;</div></div>`;
   const info=`<div style="display:flex;gap:14px;margin-top:10px">${fld(t('Part #'),part)}${fld(t('Rev'),rev)}${fld(t('Customer'),cust,1)}${fld(t('Material'),mat,1)}</div>
     <div style="display:flex;gap:14px;margin-top:8px">${fld(t('PO #'),po)}${fld(t('Job #'),job)}${fld(t('Qty inspected'),'')}${fld(t('Date'),date)}${fld(t('Inspected by'),by,1)}</div>`;
-  // the ballooned drawing gets its own sheet (letterhead repeats on it) so it can be reprinted alone at 11x17;
-  // landscape drawings are rotated 90° so the long side runs down the portrait page — biggest possible print
-  let drawRotated=false;
-  if(imgSrc){
-    imgSrc=await qcTrimWhiteMargins(imgSrc);             // drop the PDF page's empty borders first,
-    const rs=await qcRotateForPortrait(imgSrc);          // then rotate what's left to fill the sheet
-    drawRotated=(rs!==imgSrc); imgSrc=rs;
-  }
   const noDrawNote=imgSrc?'':`<div style="margin-top:12px;border:1px dashed #aaa;padding:14px;text-align:center;font-size:10px;color:#777">${esc(t('No drawing attached — balloon numbers refer to the customer drawing.'))}</div>`;
   const drawNote=drawRotated?t('Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.'):t('Not to scale — balloon numbers match the report rows.');
   const drawPage=imgSrc?`<tr style="page-break-before:always"><td>
@@ -3453,6 +3468,131 @@ window.qcFairPrintBlank=async ()=>{
   // print only after the drawing has actually loaded — an early print ships a blank frame
   const imgs=Array.prototype.slice.call(w.document.images||[]);
   Promise.all(imgs.map(im=>(im.complete&&im.naturalWidth)?Promise.resolve():new Promise(res=>{ im.onload=res; im.onerror=res; })))
+    .then(()=>setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },150));
+};
+
+/* ── filled First Article report: same paper as the blank sheet, but with every recorded
+   result, its deviation, and in/out-of-tolerance printed — plus the computed overall
+   verdict, the report status, and the ballooned drawing on its own last sheet. */
+window.qcFairPrintReport=async ()=>{
+  const r=editId?INSPECTIONS[editId]:null;
+  if($('char-body')) syncChars();
+  let chars=(_chars&&_chars.length)?_chars.slice():(((r&&r.characteristics)||[]).map(c=>({...c})));
+  chars=chars.filter(c=>c&&(String(c.requirement||'').trim()!==''||String(c.result||'').trim()!=='')).sort((a,b)=>(+a.no||0)-(+b.no||0));
+  if(!chars.length){ qcToast(t('Nothing to print yet — balloon the drawing or list characteristics first.'),'err'); return; }
+  const bubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
+  const w=window.open('','_blank','width=780,height=940');
+  if(!w){ qcToast(t('The browser blocked the print window — allow popups for this site.'),'err'); return; }
+  try{ w.document.write('<body style="font-family:Arial,Helvetica,sans-serif;color:#555;padding:30px">'+esc(t('Preparing sheet…'))+'</body>'); }catch(e){}
+  const _pi=await qcFairPrintImage(r,bubbles);
+  const imgSrc=_pi.src, drawRotated=_pi.rotated;
+  const hv=(id,f,d)=>{ const el=$(id); const s=el?String(el.value||'').trim():((r&&r[f]!=null)?String(r[f]):''); return s||d||''; };
+  const part=hv('fr-part','partNum'), rev=hv('fr-rev','rev'), cust=hv('fr-customer','customer'),
+        mat=hv('fr-material','material'), po=hv('fr-po','po'), job=hv('fr-job','job'),
+        date=hv('fr-date','date'), by=hv('fr-by','inspectedBy'), mode=hv('fair-modev','mode','simple');
+  const modeLbl=mode==='as9102'?t('Full AS9102'):t('Simple FAR');
+  const fld=(lbl,val,wide)=>`<div style="flex:${wide?2:1};min-width:${wide?140:92}px"><div style="font-size:8px;letter-spacing:.5px;color:#555;text-transform:uppercase">${esc(lbl)}</div><div style="border-bottom:1px solid #888;min-height:16px;font-size:11px;padding:2px 0 1px">${esc(val||'')}&nbsp;</div></div>`;
+  const info=`<div style="display:flex;gap:14px;margin-top:10px">${fld(t('Part #'),part)}${fld(t('Rev'),rev)}${fld(t('Customer'),cust,1)}${fld(t('Material'),mat,1)}</div>
+    <div style="display:flex;gap:14px;margin-top:8px">${fld(t('PO #'),po)}${fld(t('Job #'),job)}${fld(t('Date'),date)}${fld(t('Inspected by'),by,1)}</div>`;
+  const noDrawNote=imgSrc?'':`<div style="margin-top:12px;border:1px dashed #aaa;padding:14px;text-align:center;font-size:10px;color:#777">${esc(t('No drawing attached — balloon numbers refer to the customer drawing.'))}</div>`;
+  const drawNote=drawRotated?t('Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.'):t('Not to scale — balloon numbers match the report rows.');
+  const drawPage=imgSrc?`<tr style="page-break-before:always"><td>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.4px;margin:4px 0 8px">${esc(t('BALLOONED DRAWING'))}${part?' — '+esc(part):''}${rev?' '+esc(t('Rev'))+' '+esc(rev):''}</div>
+      <div style="border:1px solid #999;padding:4px;text-align:center"><img src="${esc(imgSrc)}" style="max-width:100%;max-height:min(80vh,14in);object-fit:contain"></div>
+      <div style="font-size:9px;color:#555;margin-top:6px">${esc(drawNote)}</div>
+    </td></tr>`:'';
+  const balloonNo=(no)=>(no==null||no==='')?'':`<span style="display:inline-block;width:18px;height:18px;line-height:16px;border:1.6px solid #d40000;border-radius:50%;text-align:center;font-size:10px;font-weight:700;color:#d40000">${esc(String(no))}</span>`;
+  const cell='padding:6px 7px;border:1px solid #999;font-size:10.5px;vertical-align:top';
+  const rows=chars.map(c=>{
+    const eff=resolveTol(c.requirement||'', c.tol||'');
+    const tol=eff.src==='none'?'<span style="color:#999">—</span>':(esc(eff.str)+(eff.src==='title'?' <span style="color:#777">*</span>':''));
+    const typ=(c.type&&c.type!=='Linear')?`<div style="font-size:8.5px;color:#777;margin-top:1px">${esc(t(c.type))}</div>`:'';
+    const hasRes=String(c.result||'').trim()!=='';
+    const dv=hasRes?qcDev(c.requirement,c.tol,c.result):null;
+    const oot=!!(dv&&dv.oot);
+    const dev=(dv&&dv.devStr)?esc(dv.devStr):'<span style="color:#999">—</span>';
+    const status=!hasRes?`<span style="color:#999">${esc(t('not measured'))}</span>`
+      : oot?`<b style="color:#b00020">${esc(t('OUT OF TOL'))}</b>`
+      : `<b style="color:#2c6e2f">${esc(t('OK'))}</b>`;
+    return `<tr${oot?' style="background:#fdecec"':''}>
+      <td style="${cell};text-align:center">${balloonNo(c.no)}</td>
+      <td style="${cell}">${esc(c.requirement||'')}${typ}</td>
+      <td style="${cell};text-align:center;white-space:nowrap">${tol}</td>
+      <td style="${cell};text-align:center;font-weight:700">${esc(c.result||'')}</td>
+      <td style="${cell};text-align:center;white-space:nowrap">${dev}</td>
+      <td style="${cell};text-align:center;white-space:nowrap">${status}</td>
+      <td style="${cell}">${esc(c.notes||'')}</td>
+    </tr>`;
+  }).join('');
+  const th='text-align:left;font-size:9px;letter-spacing:.4px;border:1px solid #999;background:#f2f2f2;padding:5px 7px';
+  const d=_fairTolDefaults||DEFAULT_TOL_DEFAULTS;
+  const tolNote='* '+t('Title-block default — applied where the drawing states no tolerance')+': '
+    +t('Fractional')+' ±'+fmtTolNum(parseFloat(d.frac))+' · .XX ±'+fmtTolNum(parseFloat(d.p2))
+    +' · .XXX ±'+fmtTolNum(parseFloat(d.p3))+' · '+t('Angular')+' ±'+fmtTolNum(parseFloat(d.ang))+'°';
+  const total=chars.length, measured=chars.filter(c=>String(c.result||'').trim()!=='').length;
+  const ootCount=chars.filter(c=>charStatus(c)==='oot').length;
+  const verdict=ootCount?{txt:ootCount+' '+t('out of tolerance')+' · '+measured+' / '+total+' '+t('measured'), c:'#b00020'}
+    : measured<total?{txt:measured+' / '+total+' '+t('measured — no deviations so far'), c:'#9a6a00'}
+    : {txt:t('All characteristics in tolerance')+' ('+total+')', c:'#2c6e2f'};
+  const st=(r&&r.fairStatus)||'Draft';
+  const reviewed=(r&&r.reviewedBy)?(' · '+t(st)+' — '+(r.reviewedBy||'').split('@')[0]+(r.reviewedAt?(' · '+fmtWhen(r.reviewedAt)):'')):(' · '+t('Report status:')+' '+t(st));
+  const resultBox=`<div style="margin-top:16px;border:1.5px solid #000;padding:10px 14px;font-size:11.5px">
+      <b style="letter-spacing:.3px">${esc(t('FIRST ARTICLE RESULT'))}</b>
+      <span style="color:${verdict.c};font-weight:700;margin-left:14px">${esc(verdict.txt)}</span>
+      <span style="color:#555">${esc(reviewed)}</span>
+    </div>`;
+  const sigCol='border-top:1px solid #000;padding-top:5px;font-size:10px;color:#444';
+  const sig=`<div style="display:flex;gap:36px;margin-top:44px">
+      <div style="flex:2;${sigCol}">${esc(t('Inspector signature'))}${by?' — '+esc(by):''}</div>
+      <div style="flex:1;${sigCol}">${esc(t('Date'))}</div>
+      <div style="flex:2;${sigCol}">${esc(t('Approved by (manager)'))}${(r&&r.reviewedBy&&st==='Approved')?' — '+esc((r.reviewedBy||'').split('@')[0]):''}</div>
+      <div style="flex:1;${sigCol}">${esc(t('Date'))}</div>
+    </div>`;
+  const headHtml=`<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #000;padding-bottom:8px">
+      <div>
+        <img src="${BSMP_PRINT_LOGO}" alt="Bert's Sheet Metal Products Inc." style="width:175px;height:auto;display:block">
+        <div style="font-size:9px;color:#333;line-height:1.5;margin-top:4px">9521 Irondale Ave · Chatsworth, CA 91311 · +1 818 775 0104 · info@bertsmp.com</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:21px;font-weight:400;color:#3a3a3a">${esc(t('First Article Inspection'))}</div>
+        <div style="font-size:10.5px;color:#333;margin-top:3px">${esc([part||'—',rev?('Rev '+rev):'',cust].filter(Boolean).join(' · '))}</div>
+        <div style="font-size:9.5px;color:#666;margin-top:2px">${esc(modeLbl)}${job?' · '+esc(t('Job #'))+' '+esc(job):''}${po?' · '+esc(t('PO #'))+' '+esc(po):''}</div>
+      </div>
+    </div>`;
+  const body=`<table style="width:100%;border-collapse:collapse">
+    <thead><tr><td style="padding-bottom:10px">${headHtml}</td></tr></thead>
+    <tbody><tr><td>
+      ${info}
+      ${noDrawNote}
+      <table style="width:100%;border-collapse:collapse;margin-top:12px">
+        <thead><tr>
+          <th style="${th};width:34px;text-align:center">#</th>
+          <th style="${th}">${esc(t('REQUIREMENT'))}</th>
+          <th style="${th};width:14%;text-align:center">${esc(t('TOLERANCE'))}</th>
+          <th style="${th};width:13%;text-align:center">${esc(t('ACTUAL'))}</th>
+          <th style="${th};width:12%;text-align:center">${esc(t('DEVIATION'))}</th>
+          <th style="${th};width:13%;text-align:center">${esc(t('STATUS'))}</th>
+          <th style="${th};width:15%">${esc(t('NOTES'))}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:8px;font-size:9px;color:#555">${esc(tolNote)}</div>
+      ${resultBox}
+      ${sig}
+    </td></tr>${drawPage}</tbody></table>`;
+  const raw=[part||'', rev?('Rev '+rev):'', cust].filter(Boolean).join(' - ');
+  const fileTitle=((raw?raw+' - ':'')+t('First Article Report')).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+  w.document.open();
+  w.document.write(`<html><head><meta charset="utf-8"><title>${esc(fileTitle)}</title><style>
+    @page{ size:letter; margin:12mm 11mm }
+    thead{ display:table-header-group }
+    tr{ page-break-inside:avoid }
+    body{ -webkit-print-color-adjust:exact; print-color-adjust:exact }
+    @media screen{ body{ padding:28px } }
+  </style></head><body style="margin:0;background:#fff;color:#222;font-family:Arial,Helvetica,sans-serif">${body}</body></html>`);
+  w.document.close();
+  const imgs2=Array.prototype.slice.call(w.document.images||[]);
+  Promise.all(imgs2.map(im=>(im.complete&&im.naturalWidth)?Promise.resolve():new Promise(res=>{ im.onload=res; im.onerror=res; })))
     .then(()=>setTimeout(()=>{ try{ w.focus(); w.print(); }catch(e){} },150));
 };
 
