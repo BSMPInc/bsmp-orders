@@ -4017,9 +4017,9 @@ window.printOrderTags=(id)=>{
       <table style="width:100%;border-collapse:collapse;table-layout:fixed;flex:1">
         <colgroup><col style="width:30%"><col style="width:26%"><col style="width:22%"><col style="width:22%"></colgroup>
         <tr><td style="${th}">Customer</td><td style="${th}">PO#</td><td style="${th}">Invoice #</td><td style="${th}">Date</td></tr>
-        <tr style="height:0.5in"><td style="${vc}">${esc2(i.customer||'')}</td><td style="${vc}">${esc2(i.po||'')}</td><td style="${vc}">${esc2(i.invoice||'')}</td><td style="${vc}">${today}</td></tr>
+        <tr style="height:0.5in"><td style="${vc};text-align:center">${esc2(i.customer||'')}</td><td style="${vc};text-align:center">${esc2(i.po||'')}</td><td style="${vc};text-align:center">${esc2(i.invoice||'')}</td><td style="${vc};text-align:center">${today}</td></tr>
         <tr><td style="${gh}" colspan="2">Part Number</td><td style="${gh}">Revision</td><td style="${gh}">Qty.</td></tr>
-        <tr style="height:0.55in"><td style="${vc}" colspan="2">${esc2(i.part||'')}${desc}</td><td style="${vc}">${esc2(i.rev||'')}</td><td style="${vc}">${esc2(i.qty||'')}</td></tr>
+        <tr style="height:0.55in"><td style="${vc};text-align:center" colspan="2">${esc2(i.part||'')}${desc}</td><td style="${vc};text-align:center">${esc2(i.rev||'')}</td><td style="${vc};text-align:center">${esc2(i.qty||'')}</td></tr>
         <tr><td style="${gh}">Packaging Type</td><td style="${gh}">Number of Packages</td><td style="${gh}">Via</td><td style="${gh}">Package By</td></tr>
         <tr style="height:0.34in"><td style="${ck}"><span style="float:right">${box}</span>Boxes</td><td style="${vc}" rowspan="3"></td><td style="${ck}"><span style="float:right">${box}</span>Drop Off</td><td style="${vc}" rowspan="3"></td></tr>
         <tr style="height:0.34in"><td style="${ck}"><span style="float:right">${box}</span>Pallet</td><td style="${ck}"><span style="float:right">${box}</span>Pick Up</td></tr>
