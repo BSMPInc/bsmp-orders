@@ -642,7 +642,8 @@ const I18N = {
     'Caliper':'Vernier','Mic':'Microm.','Tape':'Cinta','Pin gauge':'Pines','Rad gauge':'Galga R','Protractor':'Transportador','Visual':'Visual','Other':'Otro',
     'BALLOONED DRAWING':'PLANO GLOBEADO',
     'Not to scale — balloon numbers match the report rows.':'No a escala — los números de globo corresponden a las filas del reporte.',
-    'Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.':'No a escala — gira la hoja en sentido horario para leerlo; los números de globo corresponden a las filas del reporte.'
+    'Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.':'No a escala — gira la hoja en sentido horario para leerlo; los números de globo corresponden a las filas del reporte.',
+    'Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.':'Imprimiendo la imagen globeada guardada (globos a tamaño completo) — vuelve a globear el plano para imprimir los pequeños.'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -2878,7 +2879,7 @@ async function qcCompositeBalloonsDataUrl(img, bubbles, scale){
   bubbles.forEach(b=>{ const cx=b.bx*w, cy=b.by*h, digits=String(b.no);
     ctx.font='700 '+Math.round(R*(small?(digits.length>1?1.15:1.4):1.1))+'px Arial, sans-serif';
     ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill();
-    ctx.lineWidth=Math.max(small?1:1.4,R*(small?0.12:0.14)); ctx.strokeStyle='#ff0000'; ctx.stroke();
+    ctx.lineWidth=Math.max(1.4,R*0.14); ctx.strokeStyle='#ff0000'; ctx.stroke();
     ctx.fillStyle='#d40000'; ctx.fillText(digits,cx,cy+R*0.04); });
   return {dataUrl:cv.toDataURL('image/jpeg',0.9), w, h};
 }
@@ -3303,12 +3304,12 @@ window.qcFairPrintBlank=async ()=>{
     else{
       const img=await qcFairDrawingImage();
       if(img && bubbles.length) imgSrc=(await qcCompositeBalloonsDataUrl(img,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
-      else if(r&&r.ballooned&&r.ballooned.url) imgSrc=r.ballooned.url;
+      else if(r&&r.ballooned&&r.ballooned.url){ imgSrc=r.ballooned.url; qcToast(t('Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.'),'err'); }
       else if(img) imgSrc=img.dataUrl;
     }
   }catch(e){
     console.error('FAI sheet drawing failed', e);
-    if(r&&r.ballooned&&r.ballooned.url) imgSrc=r.ballooned.url;
+    if(r&&r.ballooned&&r.ballooned.url){ imgSrc=r.ballooned.url; qcToast(t('Printing the saved ballooned image (full-size balloons) — re-balloon the drawing to print the small ones.'),'err'); }
   }
   // header values — live form fields first, the saved record as the fallback
   const hv=(id,f,d)=>{ const el=$(id); const s=el?String(el.value||'').trim():((r&&r[f]!=null)?String(r[f]):''); return s||d||''; };
