@@ -641,7 +641,8 @@ const I18N = {
     'Inspector signature':'Firma del inspector','Approved by (manager)':'Aprobado por (gerente)',
     'Caliper':'Vernier','Mic':'Microm.','Tape':'Cinta','Pin gauge':'Pines','Rad gauge':'Galga R','Protractor':'Transportador','Visual':'Visual','Other':'Otro',
     'BALLOONED DRAWING':'PLANO GLOBEADO',
-    'Not to scale — balloon numbers match the report rows.':'No a escala — los números de globo corresponden a las filas del reporte.'
+    'Not to scale — balloon numbers match the report rows.':'No a escala — los números de globo corresponden a las filas del reporte.',
+    'Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.':'No a escala — gira la hoja en sentido horario para leerlo; los números de globo corresponden a las filas del reporte.'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -3252,6 +3253,23 @@ window.qcFairSaveBallooned=async ()=>{
   }
 };
 
+// rotate a landscape drawing 90° CCW so its long side runs down a portrait sheet
+// (top edge lands on the left — turn the page clockwise to read). Already-portrait
+// images and CORS-blocked canvases come back unchanged.
+async function qcRotateForPortrait(src){
+  try{
+    const im=await loadImg(src, true);
+    const w=im.naturalWidth, h=im.naturalHeight;
+    if(!w||!h||h>=w) return src;
+    const cv=document.createElement('canvas'); cv.width=h; cv.height=w;
+    const ctx=cv.getContext('2d');
+    ctx.fillStyle='#fff'; ctx.fillRect(0,0,h,w);   // jpeg has no alpha — keep transparent PNGs white
+    ctx.translate(0,w); ctx.rotate(-Math.PI/2);
+    ctx.drawImage(im,0,0);
+    return cv.toDataURL('image/jpeg',0.92);
+  }catch(e){ console.warn('rotate for portrait failed — printing unrotated', e); return src; }
+}
+
 /* ── hand-write First Article: printable blank FAI sheet (BSMP paper style) ───
    Ballooned drawing on top, characteristics below with the requirement and the
    resolved tolerance filled in; ACTUAL / TOOL / ACC-REJ / NOTES stay blank so
@@ -3288,12 +3306,16 @@ window.qcFairPrintBlank=async ()=>{
   const fld=(lbl,val,wide)=>`<div style="flex:${wide?2:1};min-width:${wide?140:92}px"><div style="font-size:8px;letter-spacing:.5px;color:#555;text-transform:uppercase">${esc(lbl)}</div><div style="border-bottom:1px solid #888;min-height:16px;font-size:11px;padding:2px 0 1px">${esc(val||'')}&nbsp;</div></div>`;
   const info=`<div style="display:flex;gap:14px;margin-top:10px">${fld(t('Part #'),part)}${fld(t('Rev'),rev)}${fld(t('Customer'),cust,1)}${fld(t('Material'),mat,1)}</div>
     <div style="display:flex;gap:14px;margin-top:8px">${fld(t('PO #'),po)}${fld(t('Job #'),job)}${fld(t('Qty inspected'),'')}${fld(t('Date'),date)}${fld(t('Inspected by'),by,1)}</div>`;
-  // the ballooned drawing gets its own sheet (letterhead repeats on it) so it can be reprinted alone at 11x17
+  // the ballooned drawing gets its own sheet (letterhead repeats on it) so it can be reprinted alone at 11x17;
+  // landscape drawings are rotated 90° so the long side runs down the portrait page — biggest possible print
+  let drawRotated=false;
+  if(imgSrc){ const rs=await qcRotateForPortrait(imgSrc); drawRotated=(rs!==imgSrc); imgSrc=rs; }
   const noDrawNote=imgSrc?'':`<div style="margin-top:12px;border:1px dashed #aaa;padding:14px;text-align:center;font-size:10px;color:#777">${esc(t('No drawing attached — balloon numbers refer to the customer drawing.'))}</div>`;
+  const drawNote=drawRotated?t('Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.'):t('Not to scale — balloon numbers match the report rows.');
   const drawPage=imgSrc?`<tr style="page-break-before:always"><td>
       <div style="font-size:10px;font-weight:700;letter-spacing:.4px;margin:4px 0 8px">${esc(t('BALLOONED DRAWING'))}${part?' — '+esc(part):''}${rev?' '+esc(t('Rev'))+' '+esc(rev):''}</div>
-      <div style="border:1px solid #999;padding:4px;text-align:center"><img src="${esc(imgSrc)}" style="max-width:100%;max-height:8in;object-fit:contain"></div>
-      <div style="font-size:9px;color:#555;margin-top:6px">${esc(t('Not to scale — balloon numbers match the report rows.'))}</div>
+      <div style="border:1px solid #999;padding:4px;text-align:center"><img src="${esc(imgSrc)}" style="max-width:100%;max-height:min(76vh,13.5in);object-fit:contain"></div>
+      <div style="font-size:9px;color:#555;margin-top:6px">${esc(drawNote)}</div>
     </td></tr>`:'';
   const balloonNo=(no)=>(no==null||no==='')?'':`<span style="display:inline-block;width:18px;height:18px;line-height:16px;border:1.6px solid #d40000;border-radius:50%;text-align:center;font-size:10px;font-weight:700;color:#d40000">${esc(String(no))}</span>`;
   const cell='padding:6px 7px;border:1px solid #999;font-size:10.5px;vertical-align:top';
