@@ -2863,18 +2863,23 @@ window.qcFairAutoBubble=async ()=>{
   }finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
 };
 const FAIR_READ_PROMPT='This is a fabrication drawing with numbered red balloons that an inspector has placed next to specific dimensions. For EACH numbered balloon, read the ONE dimension or callout that is nearest to that balloon and return its data. Respond with ONLY valid JSON, no markdown:\n{"items":[{"no":1,"value":"","tol":"","category":""}]}\nvalue=the requirement exactly as printed nearest that balloon (e.g. "304/304L SS", ".060", "\\u00d8.250", "2.500", "R.125", "90\\u00b0"); keep the \\u00d8 diameter symbol for holes. tol=the tolerance if shown next to it (e.g. "\\u00b1.005") else "". category=EXACTLY one of: material, thickness, finish, major, bend, cutout_dia, cutout_linear. Return exactly one item per balloon number visible on the drawing, matching its number.';
-async function qcCompositeBalloonsDataUrl(img, bubbles){
-  img=img||_fairImg; bubbles=bubbles||_fairBubbles;
+async function qcCompositeBalloonsDataUrl(img, bubbles, scale){
+  // scale shrinks the balloons (print uses 0.4 so they don't cover dimension text);
+  // AI read / save paths omit it and keep full-size balloons the model can read
+  img=img||_fairImg; bubbles=bubbles||_fairBubbles; scale=scale||1;
   const im=await loadImg(img.dataUrl);
   const w=im.naturalWidth||img.w, h=im.naturalHeight||img.h;
   const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
   const ctx=cv.getContext('2d'); ctx.drawImage(im,0,0,w,h);
-  const R=Math.max(9, Math.round(Math.min(w,h)*0.012));
-  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.round(R*1.1)+'px Arial, sans-serif';
-  bubbles.forEach(b=>{ const cx=b.bx*w, cy=b.by*h;
-    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.fill();
-    ctx.lineWidth=Math.max(1.4,R*0.14); ctx.strokeStyle='#ff0000'; ctx.stroke();
-    ctx.fillStyle='#d40000'; ctx.fillText(String(b.no),cx,cy+R*0.04); });
+  const R=Math.max(4, Math.round(Math.max(9, Math.min(w,h)*0.012)*scale));
+  // shrunken balloons: near-opaque fill and a larger relative digit, or the number vanishes in print
+  const small=scale<1, fill=small?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.35)';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  bubbles.forEach(b=>{ const cx=b.bx*w, cy=b.by*h, digits=String(b.no);
+    ctx.font='700 '+Math.round(R*(small?(digits.length>1?1.15:1.4):1.1))+'px Arial, sans-serif';
+    ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle=fill; ctx.fill();
+    ctx.lineWidth=Math.max(small?1:1.4,R*(small?0.12:0.14)); ctx.strokeStyle='#ff0000'; ctx.stroke();
+    ctx.fillStyle='#d40000'; ctx.fillText(digits,cx,cy+R*0.04); });
   return {dataUrl:cv.toDataURL('image/jpeg',0.9), w, h};
 }
 // one bubble → its characteristics row, without touching any other row (results, notes, manual edits survive)
@@ -3288,15 +3293,23 @@ window.qcFairPrintBlank=async ()=>{
   const w=window.open('','_blank','width=780,height=940');
   if(!w){ qcToast(t('The browser blocked the print window — allow popups for this site.'),'err'); return; }
   try{ w.document.write('<body style="font-family:Arial,Helvetica,sans-serif;color:#555;padding:30px">'+esc(t('Preparing sheet…'))+'</body>'); }catch(e){}
+  // print composites fresh from the CURRENT balloon positions at 40% size (60% smaller,
+  // so bubbles don't cover the dimension text). The saved ballooned image — balloons baked
+  // in at full size — is only the legacy fallback when no bubble positions are stored.
+  const PRINT_BALLOON_SCALE=0.4;
   let imgSrc='';
   try{
-    if(_fairImg && bubbles.length) imgSrc=(await qcCompositeBalloonsDataUrl(_fairImg,bubbles)).dataUrl;
-    else if(r&&r.ballooned&&r.ballooned.url) imgSrc=r.ballooned.url;
+    if(_fairImg && bubbles.length) imgSrc=(await qcCompositeBalloonsDataUrl(_fairImg,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
     else{
       const img=await qcFairDrawingImage();
-      if(img) imgSrc=bubbles.length?(await qcCompositeBalloonsDataUrl(img,bubbles)).dataUrl:img.dataUrl;
+      if(img && bubbles.length) imgSrc=(await qcCompositeBalloonsDataUrl(img,bubbles,PRINT_BALLOON_SCALE)).dataUrl;
+      else if(r&&r.ballooned&&r.ballooned.url) imgSrc=r.ballooned.url;
+      else if(img) imgSrc=img.dataUrl;
     }
-  }catch(e){ console.error('FAI sheet drawing failed', e); }
+  }catch(e){
+    console.error('FAI sheet drawing failed', e);
+    if(r&&r.ballooned&&r.ballooned.url) imgSrc=r.ballooned.url;
+  }
   // header values — live form fields first, the saved record as the fallback
   const hv=(id,f,d)=>{ const el=$(id); const s=el?String(el.value||'').trim():((r&&r[f]!=null)?String(r[f]):''); return s||d||''; };
   const part=hv('fr-part','partNum'), rev=hv('fr-rev','rev'), cust=hv('fr-customer','customer'),
