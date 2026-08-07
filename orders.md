@@ -93,7 +93,7 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
 - **Cut list / nesting:** `cutlist` page (`clInit`, `clPack`, `clRowHtml`, `clAiExtract`, `clSaveDefaults`, `clWireDrop`).
 - **AI stand-up / briefs:** `aiNarrate`, `renderDailyBrief`, `buildDashSnapshot` / `buildDispatchSnapshot`, `fmtBrief`.
 - **Job numbering:** `jobCounter` with `advanceJobCounter`, `maybeAdvanceCounter`, `suggestJobNumber`, `nextLetter`, `autoIndexCustomer`.
-- **Order Tags (`printOrderTags`):** tag-icon button in the detail actions (next to Customer confirmation). Prints one **4x6 landscape sticky label per part number on the PO** (`@page size:6in 4in`; same customer+po grouping as the confirmation). Prefills customer / PO / invoice # / today's date / part (+desc) / qty; Revision prints blank (orders don't track rev). Packaging Type (Boxes/Pallet/Bagged-Wrapped), Number of Packages, Via (Drop Off/Pick Up/Shipping), and Package By are hand-fill checkboxes/blanks. Black/gray header bands rely on `print-color-adjust:exact`; set the printer to 4x6 stock.
+- **Delivery Tags (`printOrderTags`):** tag-icon button in the detail actions (next to Customer confirmation). Prints one **4x6 landscape sticky label per part number on the PO** (`@page size:6in 4in`; same customer+po grouping as the confirmation). Prefills customer / PO / invoice # / today's date / part (+desc) / qty; Revision prints blank (orders don't track rev). Packaging Type (Boxes/Pallet/Bagged-Wrapped), Number of Packages, Via (Drop Off/Pick Up/Shipping), and Package By are hand-fill checkboxes/blanks. Black/gray header bands rely on `print-color-adjust:exact`; set the printer to 4x6 stock.
 
 ## Order record (rough shape)
 

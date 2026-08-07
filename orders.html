@@ -3455,7 +3455,7 @@ function detailInner(r){
         <button class="act-ico primary" title="Add part to this PO" aria-label="Add part to this PO" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i></button>
         <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
         <button class="act-ico green" title="Customer confirmation" aria-label="Customer confirmation" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i></button>
-        <button class="act-ico" title="Order tags — one 4x6 sticky label per part on this PO" aria-label="Order tags" onclick="window.printOrderTags('${r.id}');event.stopPropagation()"><i class="ti ti-tag"></i></button>
+        <button class="act-ico" title="Delivery tags — one 4x6 sticky label per part on this PO" aria-label="Delivery tags" onclick="window.printOrderTags('${r.id}');event.stopPropagation()"><i class="ti ti-tag"></i></button>
       </div>
       ${r.mailKey?`<div style="margin-top:10px"><a href="mail.html?thread=${encodeURIComponent(r.mailKey)}" onclick="event.stopPropagation()" style="font-size:12px;font-weight:600;color:#0369a1;text-decoration:none" title="Open the email this PO came from"><i class="ti ti-mail"></i> Open the PO email</a></div>`:''}
       <div class="detail-label" style="margin-top:14px">Notes</div>
@@ -3991,7 +3991,7 @@ window.printConfirmation=()=>{
   setTimeout(()=>{ w.focus(); w.print(); }, 250);
 };
 
-// ── Order Tags: one 4x6 sticky label per part number on the PO ───────────────
+// ── Delivery Tags: one 4x6 sticky label per part number on the PO ────────────
 // Printed at packaging time on 4x6 label stock (set the printer to 4x6 / landscape).
 // Customer / PO / invoice / date / part / qty come off the order; Packaging Type,
 // Number of Packages, Via, and Package By are hand-filled checkboxes and blanks.
@@ -4012,7 +4012,7 @@ window.printOrderTags=(id)=>{
           <img src="${BSMP_LOGO_DARK}" alt="Bert's" style="width:1.5in;height:0.52in;object-fit:contain;object-position:left top;display:block">
           <div style="font-size:9px;color:#222;line-height:1.45;padding-top:2px"><b>Berts Sheet Metal Products</b><br>9521 Irondale Ave. Chatsworth, CA<br>818.775.0104<br>bertsmp.com</div>
         </div>
-        <div style="font-size:30px;font-weight:800;color:#111;line-height:1;padding-top:2px">Order Tag</div>
+        <div style="font-size:30px;font-weight:800;color:#111;line-height:1;padding-top:2px">Delivery Tag</div>
       </div>
       <table style="width:100%;border-collapse:collapse;table-layout:fixed;flex:1">
         <colgroup><col style="width:30%"><col style="width:26%"><col style="width:22%"><col style="width:22%"></colgroup>
@@ -4027,7 +4027,7 @@ window.printOrderTags=(id)=>{
       </table>
     </div>`;
   };
-  const raw=[(r.customer||'').trim(), (r.po||'').trim()?('PO '+r.po.trim()):'', 'Order Tags'].filter(Boolean).join(' - ');
+  const raw=[(r.customer||'').trim(), (r.po||'').trim()?('PO '+r.po.trim()):'', 'Delivery Tags'].filter(Boolean).join(' - ');
   const fileTitle=raw.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
   const w=window.open('','_blank','width=680,height=560');
   if(!w){ alert('The browser blocked the print window — allow popups for this site.'); return; }
