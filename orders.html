@@ -3455,6 +3455,7 @@ function detailInner(r){
         <button class="act-ico primary" title="Add part to this PO" aria-label="Add part to this PO" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i></button>
         <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
         <button class="act-ico green" title="Customer confirmation" aria-label="Customer confirmation" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i></button>
+        <button class="act-ico" title="Order tags — one 4x6 sticky label per part on this PO" aria-label="Order tags" onclick="window.printOrderTags('${r.id}');event.stopPropagation()"><i class="ti ti-tag"></i></button>
       </div>
       ${r.mailKey?`<div style="margin-top:10px"><a href="mail.html?thread=${encodeURIComponent(r.mailKey)}" onclick="event.stopPropagation()" style="font-size:12px;font-weight:600;color:#0369a1;text-decoration:none" title="Open the email this PO came from"><i class="ti ti-mail"></i> Open the PO email</a></div>`:''}
       <div class="detail-label" style="margin-top:14px">Notes</div>
@@ -3988,6 +3989,58 @@ window.printConfirmation=()=>{
   w.document.write(`<html><head><meta charset="utf-8"><title>${esc2(fileTitle)}</title></head><body style="margin:0">${node.outerHTML}</body></html>`);
   w.document.close();
   setTimeout(()=>{ w.focus(); w.print(); }, 250);
+};
+
+// ── Order Tags: one 4x6 sticky label per part number on the PO ───────────────
+// Printed at packaging time on 4x6 label stock (set the printer to 4x6 / landscape).
+// Customer / PO / invoice / date / part / qty come off the order; Packaging Type,
+// Number of Packages, Via, and Package By are hand-filled checkboxes and blanks.
+window.printOrderTags=(id)=>{
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  const items=orders.filter(o=>o.customer===r.customer && (o.po||'')===(r.po||''));
+  const d=new Date(), today=(d.getMonth()+1)+'/'+d.getDate()+'/'+String(d.getFullYear()).slice(2);
+  const box='<span style="display:inline-block;width:0.2in;height:0.2in;border:2.5px solid #888;border-radius:3px;vertical-align:middle"></span>';
+  const th='background:#000;color:#fff;font-weight:800;text-align:center;padding:4px 6px;font-size:14px;border:1px solid #000';
+  const gh='background:#9a9a9a;color:#fff;font-weight:800;text-align:center;padding:4px 6px;font-size:14px;border:1px solid #000';
+  const vc='border:1px solid #000;padding:5px 8px;font-size:16px;font-weight:700;color:#111;vertical-align:top';
+  const ck='border:1px solid #000;padding:3px 8px;font-size:13.5px;font-weight:700;color:#111;vertical-align:middle';
+  const tag=(i)=>{
+    const desc=(i.desc&&i.desc!==i.part)?`<div style="font-size:11px;font-weight:400;color:#444;margin-top:1px">${esc2(i.desc)}</div>`:'';
+    return `<div class="tag">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:0.09in">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <img src="${BSMP_LOGO_DARK}" alt="Bert's" style="width:1.5in;height:0.52in;object-fit:contain;object-position:left top;display:block">
+          <div style="font-size:9px;color:#222;line-height:1.45;padding-top:2px"><b>Berts Sheet Metal Products</b><br>9521 Irondale Ave. Chatsworth, CA<br>818.775.0104<br>bertsmp.com</div>
+        </div>
+        <div style="font-size:30px;font-weight:800;color:#111;line-height:1;padding-top:2px">Order Tag</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;flex:1">
+        <colgroup><col style="width:30%"><col style="width:26%"><col style="width:22%"><col style="width:22%"></colgroup>
+        <tr><td style="${th}">Customer</td><td style="${th}">PO#</td><td style="${th}">Invoice #</td><td style="${th}">Date</td></tr>
+        <tr style="height:0.5in"><td style="${vc}">${esc2(i.customer||'')}</td><td style="${vc}">${esc2(i.po||'')}</td><td style="${vc}">${esc2(i.invoice||'')}</td><td style="${vc}">${today}</td></tr>
+        <tr><td style="${gh}" colspan="2">Part Number</td><td style="${gh}">Revision</td><td style="${gh}">Qty.</td></tr>
+        <tr style="height:0.55in"><td style="${vc}" colspan="2">${esc2(i.part||'')}${desc}</td><td style="${vc}">${esc2(i.rev||'')}</td><td style="${vc}">${esc2(i.qty||'')}</td></tr>
+        <tr><td style="${gh}">Packaging Type</td><td style="${gh}">Number of Packages</td><td style="${gh}">Via</td><td style="${gh}">Package By</td></tr>
+        <tr style="height:0.34in"><td style="${ck}"><span style="float:right">${box}</span>Boxes</td><td style="${vc}" rowspan="3"></td><td style="${ck}"><span style="float:right">${box}</span>Drop Off</td><td style="${vc}" rowspan="3"></td></tr>
+        <tr style="height:0.34in"><td style="${ck}"><span style="float:right">${box}</span>Pallet</td><td style="${ck}"><span style="float:right">${box}</span>Pick Up</td></tr>
+        <tr style="height:0.34in"><td style="${ck}"><span style="float:right">${box}</span>Bagged/ Wrapped</td><td style="${ck}"><span style="float:right">${box}</span>Shipping</td></tr>
+      </table>
+    </div>`;
+  };
+  const raw=[(r.customer||'').trim(), (r.po||'').trim()?('PO '+r.po.trim()):'', 'Order Tags'].filter(Boolean).join(' - ');
+  const fileTitle=raw.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
+  const w=window.open('','_blank','width=680,height=560');
+  if(!w){ alert('The browser blocked the print window — allow popups for this site.'); return; }
+  w.document.write(`<html><head><meta charset="utf-8"><title>${esc2(fileTitle)}</title><style>
+    @page{ size:6in 4in; margin:0.15in }
+    html,body{ margin:0; background:#fff }
+    .tag{ width:5.7in; height:3.68in; display:flex; flex-direction:column; font-family:Arial,Helvetica,sans-serif;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact; page-break-after:always; overflow:hidden }
+    .tag:last-child{ page-break-after:auto }
+    @media screen{ body{ padding:20px; background:#e8e8e8 } .tag{ background:#fff; margin:0 auto 20px; box-shadow:0 1px 6px rgba(0,0,0,.25); padding:10px } }
+  </style></head><body>${items.map(tag).join('')}</body></html>`);
+  w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 300);
 };
 
 // ── Email the confirmation straight from here — one less trip through Mail ────
