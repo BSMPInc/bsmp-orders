@@ -10033,10 +10033,20 @@ function renderCostMix(){
   var known=segs.reduce(function(a,s){return a+s.v;},0);
   if(cost-known>0.01){ segs.push({k:'Other',v:cost-known,c:'#cfc7b5'}); }
   if(cost<=0.005){ el.innerHTML='<div style="font-size:12px;color:var(--text3)">Fill in the quote to see where the cost goes.</div>'; return; }
-  var bar='<div class="mix-bar">'+segs.map(function(s){return '<span style="width:'+(s.v/cost*100).toFixed(2)+'%;background:'+s.c+'" title="'+s.k+' '+fmt(s.v)+'"></span>';}).join('')+'</div>';
-  var legend='<div class="mix-legend">'+segs.map(function(s){return '<div class="mix-row"><span class="mix-dot" style="background:'+s.c+'"></span><span class="mix-k">'+s.k+'</span><span class="mix-v">'+fmt(s.v)+'</span><span class="mix-pct">'+Math.round(s.v/cost*100)+'%</span></div>';}).join('')+'</div>';
+  // margin joins the breakdown so the bar reads as the full price/part:
+  // cost segments + margin (+ the round-up sliver from the pricing tiers)
+  var marginV=d.markupCost||0;
+  var price=(d.finalPrice!=null&&d.finalPrice>0)?d.finalPrice:cost+marginV;
+  var roundUp=price-cost-marginV; if(roundUp<0.005) roundUp=0;
+  if(marginV>0.005) segs.push({k:'Margin ('+Math.round((d.markup||0)*100)+'% markup)',v:marginV,c:'#4a8a1a'});
+  if(roundUp>0) segs.push({k:'Round-up',v:roundUp,c:'#b08d2e'});
+  var total=price>0?price:cost;
+  var bar='<div class="mix-bar">'+segs.map(function(s){return '<span style="width:'+(s.v/total*100).toFixed(2)+'%;background:'+s.c+'" title="'+s.k+' '+fmt(s.v)+'"></span>';}).join('')+'</div>';
+  var legend='<div class="mix-legend">'+segs.map(function(s){return '<div class="mix-row"><span class="mix-dot" style="background:'+s.c+'"></span><span class="mix-k">'+s.k+'</span><span class="mix-v">'+fmt(s.v)+'</span><span class="mix-pct">'+Math.round(s.v/total*100)+'%</span></div>';}).join('')+'</div>';
   var foot='<div class="mix-foot"><span>Cost / part</span><span>'+fmt(cost)+'</span></div>'+
-           '<div class="mix-foot"><span>Margin added</span><span>'+fmt(d.markupCost)+'</span></div>';
+           '<div class="mix-foot"><span>Margin added</span><span>'+fmt(marginV)+'</span></div>'+
+           (roundUp>0?'<div class="mix-foot"><span>Round-up (pricing tier)</span><span>'+fmt(roundUp)+'</span></div>':'')+
+           '<div class="mix-foot"><span>Price / part</span><span>'+fmt(price)+'</span></div>';
   el.innerHTML=bar+legend+foot;
 }
 window.syncOptCards=function(){
