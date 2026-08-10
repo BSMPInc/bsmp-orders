@@ -2518,49 +2518,60 @@ window.deleteAccount=(id,name)=>{
   if(!confirm(`Delete account "${name}"? Bills assigned to it will move to Unassigned.`))return;
   dbRemove('apar/accounts/'+id);
 };
+// Row edits (method / account / status / dates) write ONLY the fields they
+// change, via update() — never a whole-object set(). A whole-object write from
+// a device holding a stale copy silently reverts fields a teammate (or the
+// auto-generator) just saved — the same clobber class that once ate order
+// edits. A `null` in the patch deletes that field. The identity stamp for
+// derived (non-manual-yet) entries rides along in the same update.
+function ovlPatch(id,e,patch,stampAmount){
+  const base={};
+  if(!overlay[id] && !e.auto){
+    base.manual=true; base.type=e.type; base.party=e.party; base.ref=e.ref; base.rel=e.rel;
+    if(stampAmount && e.amount!=null) base.amount=e.amount;
+  }
+  const merged={...base,...patch};
+  const o={...ovl(id),...merged};
+  Object.keys(o).forEach(k=>{ if(o[k]===null||o[k]===undefined) delete o[k]; });
+  overlay[id]=o;                       // keep the local copy in step with the write
+  dbUpdate('apar/entries/'+id,merged);
+}
 window.setPlanMethod=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
-  const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-  o.planMethod=val||'';
-  writeOverlay(id,o); render();
+  ovlPatch(id,e,{planMethod:val||''}); render();
 };
 window.setRowAccount=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
-  const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-  o.account=val||'';
-  writeOverlay(id,o); render();
+  ovlPatch(id,e,{account:val||''}); render();
 };
 window.setPayStatus=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
-  const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;if(o.amount==null)o.amount=e.amount;}
   const prev=e.payStatus||'open';
-  o.payStatus=val||'open';
+  const patch={payStatus:val||'open'};
   // remaining balance BEFORE we touch payments (used for both auto-pay and reconcile)
   const remainBefore=Math.max(0,(e.amount||0)-(e.paid||0));
   if(val==='withdrawn'){
     // a planned withdrawal date becomes the default actual date (still editable inline)
-    if(!o.withdrawnDate) o.withdrawnDate=e.planDate||toISO(new Date());
-    delete o.planDate;
+    const wd=(overlay[id]&&overlay[id].withdrawnDate)||e.planDate||toISO(new Date());
+    patch.withdrawnDate=wd;
+    patch.planDate=null;
     // Auto-record a full payment so the bill reads as Paid (and drops the "Record payment" button).
     // Tagged autoWithdraw so we can cleanly reverse it if the status changes back.
     const pays=[...(e.payments||[])];
     const alreadyAuto=pays.some(p=>p&&p.autoWithdraw);
     if(remainBefore>0.005 && !alreadyAuto){
-      pays.push({date:o.withdrawnDate,amount:remainBefore,method:e.planMethod||'',note:'Auto-recorded on withdrawal',autoWithdraw:true});
-      o.payments=pays;
+      pays.push({date:wd,amount:remainBefore,method:e.planMethod||'',note:'Auto-recorded on withdrawal',autoWithdraw:true});
+      patch.payments=pays;
     }
   } else {
-    delete o.withdrawnDate;
-    if(val!=='scheduled') delete o.planDate;   // the plan belonged to that scheduling
+    patch.withdrawnDate=null;
+    if(val!=='scheduled') patch.planDate=null;   // the plan belonged to that scheduling
     // Reverse only the payment WE auto-added; never touch manually recorded payments.
     if((e.payments||[]).some(p=>p&&p.autoWithdraw)){
-      o.payments=(e.payments||[]).filter(p=>!(p&&p.autoWithdraw));
+      patch.payments=(e.payments||[]).filter(p=>!(p&&p.autoWithdraw));
     }
   }
-  writeOverlay(id,o); render();
+  ovlPatch(id,e,patch,true); render();
   if(prev!==(val||'open')) logAudit('status', {entryId:id, party:e.party,
     detail:`${statusLabel(prev)} → ${statusLabel(val||'open')} · ${fmtMoney(remainBefore)}`});
   // One-click reconcile: when a bill is newly withdrawn from an assigned account,
@@ -2579,17 +2590,11 @@ window.setPayStatus=(id,val)=>{
 };
 window.setWithdrawnDate=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
-  const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-  o.withdrawnDate=val||'';
-  writeOverlay(id,o); render();
+  ovlPatch(id,e,{withdrawnDate:val||''}); render();
 };
 window.setPlanDate=(id,val)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
-  const o=ovl(id);
-  if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-  o.planDate=val||'';
-  writeOverlay(id,o); render();
+  ovlPatch(id,e,{planDate:val||''}); render();
 };
 window.unarchiveBill=(id)=>{
   const e=allEntries().find(x=>x.id===id); if(!e)return;
