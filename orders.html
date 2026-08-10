@@ -974,6 +974,12 @@ tr.inv-low td{background:#fdf6ee}
 .split-chip.bal{color:#8a5c00;background:#f7ecd4;border:1px solid #e8d5a8}
 .split-hist{display:flex;align-items:flex-start;gap:7px;font-size:11.5px;color:var(--text2);background:var(--inset-bg);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-top:10px;line-height:1.45}
 .split-hist i{font-size:13px;flex-shrink:0;margin-top:1px}
+.split-mode-opt{flex:1;min-width:150px;display:flex;align-items:center;gap:9px;border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer;background:#fff}
+.split-mode-opt:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:var(--inset-bg)}
+.split-mode-opt input{width:15px;height:15px;flex-shrink:0;margin:0}
+.split-mode-opt span{display:flex;flex-direction:column;line-height:1.3}
+.split-mode-opt b{font-size:12.5px}
+.split-mode-opt small{font-size:10.5px;color:var(--text3)}
 .ci-row.build-only{background:#fafbfc}
 .ci-row.build-only .ci-desc-main{color:var(--text2)}
 .inv-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 12px;padding:8px 12px;background:#eef7e3;border:1px solid #d4e8bd;border-radius:8px;font-size:12px;color:#33500f}
@@ -2271,21 +2277,30 @@ body.sb-hidden .topbar{padding-left:24px}
   <div class="modal" style="max-width:470px;padding:22px">
     <div style="font-size:17px;font-weight:800;margin-bottom:3px"><i class="ti ti-scissors"></i> Split order — partial delivery</div>
     <div style="font-size:12.5px;color:var(--text2);margin-bottom:14px" id="split-sub"></div>
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">What's happening with these parts?</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <label class="split-mode-opt"><input type="radio" name="split-mode" value="delivered" checked onchange="window._splitModeChanged()"><span><b>Turning in now</b><small>delivered — ready to bill</small></span></label>
+      <label class="split-mode-opt"><input type="radio" name="split-mode" value="production" onchange="window._splitModeChanged()"><span><b>Still in production</b><small>track this run separately</small></span></label>
+    </div>
     <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
       <div>
-        <label style="font-size:11px;font-weight:600;color:var(--text2)">Qty going out now</label>
+        <label style="font-size:11px;font-weight:600;color:var(--text2)" id="split-qty-label">Qty going out now</label>
         <input id="split-qty" type="number" min="1" step="1" inputmode="numeric" placeholder="0" oninput="window._updateSplitMath()" onkeydown="if(event.key==='Enter')window._confirmSplit()" style="display:block;width:120px;box-sizing:border-box;font-size:16px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-top:5px">
       </div>
-      <div style="flex:1;min-width:170px">
+      <div style="flex:1;min-width:170px" id="split-status-wrap">
         <label style="font-size:11px;font-weight:600;color:var(--text2)">Status for the delivered line</label>
         <select id="split-status" style="display:block;width:100%;box-sizing:border-box;font-size:14px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-top:5px;font-family:inherit">
           <option>Ready for Invoice</option>
           <option>Completed</option>
         </select>
       </div>
+      <div style="flex:1;min-width:170px;display:none" id="split-due-wrap">
+        <label style="font-size:11px;font-weight:600;color:var(--text2)">Due date for this run</label>
+        <input id="split-due" type="date" style="display:block;width:100%;box-sizing:border-box;font-size:14px;padding:10px;border:1px solid var(--border);border-radius:8px;margin-top:5px;font-family:inherit">
+      </div>
     </div>
     <div id="split-math" style="font-size:13px;color:var(--text2);background:var(--inset-bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:12px;line-height:1.55"></div>
-    <div style="font-size:11px;color:var(--text3);margin-top:8px">Both lines keep the same PO #. The delivered line can be invoiced on its own right away; the balance line keeps the production schedule and shows the quantity still due.</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px" id="split-note">Both lines keep the same PO #. The delivered line can be invoiced on its own right away; the balance line keeps the production schedule and shows the quantity still due.</div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
       <button class="btn" onclick="window._cancelSplit()">Cancel</button>
       <button class="btn green" id="split-go" onclick="window._confirmSplit()"><i class="ti ti-scissors"></i> Split order</button>
@@ -3101,26 +3116,37 @@ function cardDaysLabel(days){
 // RTDB can hand the log back object-shaped with null holes — normalize first.
 function splitLogOf(r){ return Object.values(r.splitLog||{}).filter(Boolean); }
 function splitChip(r){
+  // a line can be both (a split run that was later split again) — the balance
+  // chip is the current picture, so it wins
+  const log=splitLogOf(r);
+  if(log.length){
+    const orig=parseFloat(r.origQty)||0;
+    const out=log.reduce((s,x)=>s+(parseFloat(x.qty)||0),0);
+    const hist=log.map(x=>`${x.qty} on ${fmtDate(x.at)}`).join(', ');
+    return `<span class="split-chip bal" title="Balance after splitting this line: ${orig||'?'} ordered − ${out} split off (${hist}) = ${r.qty} still due on this PO."><i class="ti ti-scale"></i>Balance ${r.qty}${orig?` of ${orig}`:''}</span>`;
+  }
   if(r.splitFrom){
+    if(r.splitMode==='production')
+      return `<span class="split-chip part" title="Split production run — ${r.qty} of the ${r.splitOf||'?'} ordered on this PO line, split off ${fmtDate(r.splitAt)||'earlier'} to track its progress separately. The balance is its own line on the same PO."><i class="ti ti-scissors"></i>Run ${r.qty}${r.splitOf?` of ${r.splitOf}`:''}</span>`;
     return `<span class="split-chip part" title="Partial delivery — ${r.qty} of the ${r.splitOf||'?'} ordered on this PO line, split off ${fmtDate(r.splitAt)||'earlier'}. The balance is its own line on the same PO."><i class="ti ti-scissors"></i>Partial ${r.qty}${r.splitOf?` of ${r.splitOf}`:''}</span>`;
   }
-  const log=splitLogOf(r);
-  if(!log.length) return '';
-  const orig=parseFloat(r.origQty)||0;
-  const out=log.reduce((s,x)=>s+(parseFloat(x.qty)||0),0);
-  const hist=log.map(x=>`${x.qty} on ${fmtDate(x.at)}`).join(', ');
-  return `<span class="split-chip bal" title="Balance after partial delivery: ${orig||'?'} ordered − ${out} split off (${hist}) = ${r.qty} still due on this PO."><i class="ti ti-scale"></i>Balance ${r.qty}${orig?` of ${orig}`:''}</span>`;
+  return '';
 }
 // Shown in the expanded detail — spells out the split math in full.
 function splitHistoryHtml(r){
+  const blocks=[];
   if(r.splitFrom){
-    return `<div class="split-hist"><i class="ti ti-scissors"></i><span>Partial delivery: <b>${r.qty}</b> of the <b>${r.splitOf||'?'}</b> ordered, split off ${fmtDate(r.splitAt)||'—'}. The remaining balance is a separate line on this PO.</span></div>`;
+    blocks.push(r.splitMode==='production'
+      ?`<div class="split-hist"><i class="ti ti-scissors"></i><span>Split production run: <b>${r.qty}</b> of the <b>${r.splitOf||'?'}</b> ordered, split off ${fmtDate(r.splitAt)||'—'} to track its progress separately. The rest is a separate line on this PO.</span></div>`
+      :`<div class="split-hist"><i class="ti ti-scissors"></i><span>Partial delivery: <b>${r.qty}</b> of the <b>${r.splitOf||'?'}</b> ordered, split off ${fmtDate(r.splitAt)||'—'}. The remaining balance is a separate line on this PO.</span></div>`);
   }
   const log=splitLogOf(r);
-  if(!log.length) return '';
-  const orig=parseFloat(r.origQty)||0;
-  const out=log.reduce((s,x)=>s+(parseFloat(x.qty)||0),0);
-  return `<div class="split-hist"><i class="ti ti-scale"></i><span>Balance line: <b>${orig||'?'}</b> ordered − <b>${out}</b> delivered as partial${log.length!==1?'s':''} (${log.map(x=>`${x.qty} on ${fmtDate(x.at)}`).join(', ')}) = <b>${r.qty}</b> still due.</span></div>`;
+  if(log.length){
+    const orig=parseFloat(r.origQty)||0;
+    const out=log.reduce((s,x)=>s+(parseFloat(x.qty)||0),0);
+    blocks.push(`<div class="split-hist"><i class="ti ti-scale"></i><span>Balance line: <b>${orig||'?'}</b> ordered − <b>${out}</b> split off (${log.map(x=>`${x.qty}${x.mode==='production'?' to a run':''} on ${fmtDate(x.at)}`).join(', ')}) = <b>${r.qty}</b> still due.</span></div>`);
+  }
+  return blocks.join('');
 }
 
 function poItemsHtml(g){
@@ -3515,7 +3541,7 @@ function detailInner(r){
       <div class="detail-actions">
         <button class="act-ico" title="Edit full details" aria-label="Edit full details" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i></button>
         <button class="act-ico primary" title="Add part to this PO" aria-label="Add part to this PO" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i></button>
-        <button class="act-ico" title="Split order — turn in a partial qty now, keep the balance due on the same PO" aria-label="Split order" onclick="window.openSplit('${r.id}');event.stopPropagation()"><i class="ti ti-scissors"></i></button>
+        <button class="act-ico" title="Split order — turn in a partial qty now, or split off a production run to track separately; the balance stays due on the same PO" aria-label="Split order" onclick="window.openSplit('${r.id}');event.stopPropagation()"><i class="ti ti-scissors"></i></button>
         <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
         <button class="act-ico green" title="Customer confirmation" aria-label="Customer confirmation" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i></button>
         <button class="act-ico" title="Delivery tags — one 4x6 sticky label per part on this PO" aria-label="Delivery tags" onclick="window.printOrderTags('${r.id}');event.stopPropagation()"><i class="ti ti-tag"></i></button>
@@ -3689,8 +3715,8 @@ function _renderInvoiceItems(r){
     let chip='';
     if(o.buildOnly) chip=`<span style="font-size:10.5px;font-weight:600;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 6px;flex-shrink:0" title="Build-only sub-component — not invoiced separately">Build only</span>`;
     else if(o.status==='Invoiced'&&o.invoice) chip=`<span style="font-size:10.5px;font-weight:600;color:var(--text3);background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:1px 6px;flex-shrink:0" title="Already invoiced — checking it moves it onto this invoice">Inv ${esc2(o.invoice)}</span>`;
-    else if(o.splitFrom) chip=`<span class="split-chip part" style="margin-left:0;flex-shrink:0" title="Partial delivery — ${o.qty} of the ${o.splitOf||'?'} ordered on this PO line">Partial ${o.qty}${o.splitOf?(' of '+o.splitOf):''}</span>`;
-    else if(splitLogOf(o).length) chip=`<span class="split-chip bal" style="margin-left:0;flex-shrink:0" title="Balance still due after partial delivery — invoicing this line bills only the remaining ${o.qty}">Balance ${o.qty}${o.origQty?(' of '+o.origQty):''}</span>`;
+    else if(splitLogOf(o).length) chip=`<span class="split-chip bal" style="margin-left:0;flex-shrink:0" title="Balance still due after splitting this line — invoicing it bills only the remaining ${o.qty}">Balance ${o.qty}${o.origQty?(' of '+o.origQty):''}</span>`;
+    else if(o.splitFrom) chip=`<span class="split-chip part" style="margin-left:0;flex-shrink:0" title="${o.splitMode==='production'?'Split production run':'Partial delivery'} — ${o.qty} of the ${o.splitOf||'?'} ordered on this PO line">${o.splitMode==='production'?'Run':'Partial'} ${o.qty}${o.splitOf?(' of '+o.splitOf):''}</span>`;
     return `<label style="display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid var(--border);cursor:pointer">
       <input type="checkbox" class="inv-item-cb" data-id="${o.id}" ${checked?'checked':''} onchange="window._updateInvItemsSummary()" style="width:15px;height:15px;flex-shrink:0">
       <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc2(lbl)}</span>
@@ -3754,8 +3780,8 @@ window._renderCombineList=()=>{
     const rows=groups[cust].map(o=>{
       const lbl=[o.po&&('PO '+o.po), o.job&&('Job '+o.job), o.part].filter(Boolean).join(' · ')||'(no detail)';
       const t=rowTotal(o);
-      const splitTag=o.splitFrom?`<span class="split-chip part" style="margin-left:0;flex-shrink:0">Partial ${o.qty}${o.splitOf?(' of '+o.splitOf):''}</span>`
-                    :(splitLogOf(o).length?`<span class="split-chip bal" style="margin-left:0;flex-shrink:0">Balance ${o.qty}${o.origQty?(' of '+o.origQty):''}</span>`:'');
+      const splitTag=splitLogOf(o).length?`<span class="split-chip bal" style="margin-left:0;flex-shrink:0">Balance ${o.qty}${o.origQty?(' of '+o.origQty):''}</span>`
+                    :(o.splitFrom?`<span class="split-chip part" style="margin-left:0;flex-shrink:0">${o.splitMode==='production'?'Run':'Partial'} ${o.qty}${o.splitOf?(' of '+o.splitOf):''}</span>`:'');
       return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer">
         <input type="checkbox" class="combine-cb" data-id="${o.id}" data-cust="${esc2(cust)}" data-total="${t}" onchange="window._updateCombineSummary()" style="width:16px;height:16px;flex-shrink:0">
         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">${esc2(lbl)}</span>
@@ -4294,28 +4320,41 @@ window.addPartToPO = (id) => {
 let _splitId=null;
 window.openSplit=(id)=>{
   const r=orders.find(o=>o.id===id); if(!r) return;
-  if(r.splitFrom){ alert('This line is already a split-off partial delivery. Split the balance line instead if more is going out.'); return; }
   if(!(parseFloat(r.qty)>=2)){ alert('This line needs a quantity of at least 2 before it can be split.'); return; }
   _splitId=id;
   document.getElementById('split-sub').textContent=[r.customer, r.po?('PO '+r.po):'verbal PO', r.job&&('Job '+r.job), r.part||r.desc].filter(Boolean).join(' · ');
   const inp=document.getElementById('split-qty');
   inp.value=''; inp.max=(parseFloat(r.qty)||0)-1;
   document.getElementById('split-status').value='Ready for Invoice';
-  window._updateSplitMath();
+  document.getElementById('split-due').value=r.due||'';
+  document.querySelector('input[name="split-mode"][value="delivered"]').checked=true;
+  window._splitModeChanged();
   document.getElementById('split-modal').style.display='flex';
   setTimeout(()=>inp.focus(),30);
 };
+function _splitMode(){ const el=document.querySelector('input[name="split-mode"]:checked'); return el?el.value:'delivered'; }
+window._splitModeChanged=()=>{
+  const prod=_splitMode()==='production';
+  document.getElementById('split-status-wrap').style.display=prod?'none':'';
+  document.getElementById('split-due-wrap').style.display=prod?'':'none';
+  document.getElementById('split-qty-label').textContent=prod?'Qty on this run':'Qty going out now';
+  document.getElementById('split-note').textContent=prod
+    ?'Both lines keep the same PO #. Each run gets its own production schedule and due date so its progress is tracked separately — parts already completed on a step carry with this run first, and the balance line always shows the quantity still due.'
+    :'Both lines keep the same PO #. The delivered line can be invoiced on its own right away; the balance line keeps the production schedule and shows the quantity still due.';
+  window._updateSplitMath();
+};
 window._updateSplitMath=()=>{
   const r=orders.find(o=>o.id===_splitId); const el=document.getElementById('split-math'); if(!r||!el) return;
+  const prod=_splitMode()==='production';
   const total=parseFloat(r.qty)||0;
   const q=parseFloat(document.getElementById('split-qty').value)||0;
   const rem=total-q, ok=q>=1&&rem>=1;
   const go=document.getElementById('split-go'); if(go) go.disabled=!ok;
-  if(!q){ el.innerHTML=`<b>${total}</b> on this line — enter how many are going out now.`; return; }
+  if(!q){ el.innerHTML=`<b>${total}</b> on this line — enter how many are ${prod?'on this run':'going out now'}.`; return; }
   if(!ok){ el.innerHTML=`<span style="color:var(--red)">Enter a quantity between 1 and ${total-1} — at least 1 part has to stay on the balance line.</span>`; return; }
   const cost=parseFloat(r.cost)||0;
-  el.innerHTML=`<b>${q}</b> going out now + <b>${rem}</b> remaining = ${total} on the line`
-    +(cost?`<br>${fmtMoney(cost)}/ea → <b>${fmtMoney(q*cost)}</b> to invoice now · <b>${fmtMoney(rem*cost)}</b> balance still due`:'');
+  el.innerHTML=`<b>${q}</b> ${prod?'on this run':'going out now'} + <b>${rem}</b> remaining = ${total} on the line`
+    +(cost?`<br>${fmtMoney(cost)}/ea → <b>${fmtMoney(q*cost)}</b> ${prod?'on this run':'to invoice now'} · <b>${fmtMoney(rem*cost)}</b> balance still due`:'');
 };
 window._cancelSplit=()=>{ document.getElementById('split-modal').style.display='none'; _splitId=null; };
 window._confirmSplit=()=>{
@@ -4323,25 +4362,45 @@ window._confirmSplit=()=>{
   const total=parseFloat(r.qty)||0;
   const q=parseFloat(document.getElementById('split-qty').value)||0;
   if(!(q>=1 && total-q>=1)){ alert('Enter a quantity between 1 and '+(total-1)+'.'); return; }
-  const status=document.getElementById('split-status').value||'Ready for Invoice';
+  const mode=_splitMode();
   const today=new Date().toISOString().slice(0,10);
   const cost=parseFloat(r.cost)||0;
   const origQty=parseFloat(r.origQty)||total;   // original full qty survives repeat splits
-  // snapshot for undo
-  const prior={qty:r.qty, total:r.total, origQty:r.origQty, splitLog:r.splitLog?JSON.parse(JSON.stringify(r.splitLog)):null};
-  // the delivered line: same PO/job/part, its own qty & status, no production state
-  const child={...r, id:uid(), qty:q, total:q&&cost?q*cost:0, status,
-    splitFrom:r.id, splitOf:origQty, splitAt:today,
-    currentProcess:'', completedProcesses:[], schedule:null,
+  // snapshot for undo (schedule too — a production split moves step progress)
+  const prior={qty:r.qty, total:r.total, origQty:r.origQty,
+    splitLog:r.splitLog?JSON.parse(JSON.stringify(r.splitLog)):null,
+    schedule:r.schedule?JSON.parse(JSON.stringify(r.schedule)):null};
+  // the split-off line: same PO/job/part, its own qty
+  const child={...r, id:uid(), qty:q, total:q&&cost?q*cost:0,
+    splitFrom:r.id, splitOf:origQty, splitAt:today, splitMode:mode,
     invoice:'', invoiceDate:'', payment:'Unpaid'};
   delete child.splitLog; delete child.origQty;
+  if(mode==='production'){
+    // still being built: keep a normal working status, its own due date, and its
+    // own copy of the schedule so each run's progress is tracked separately.
+    child.status=['Received','Confirmed','In Progress','Need Purchase Order'].includes(r.status)?r.status:'In Progress';
+    child.due=document.getElementById('split-due').value||r.due||'';
+    if(r.schedule&&Array.isArray(r.schedule.steps)){
+      // parts already completed on a step ride with the split run first;
+      // the balance line keeps whatever is left (e.g. 60 done of 100, split 60
+      // → this run shows 60 done, the balance line shows 0 done of 40)
+      const cs=JSON.parse(JSON.stringify(r.schedule.steps));
+      cs.forEach(s=>{ if(s&&s.qtyDone!=null&&s.qtyDone!==''){ s.qtyDone=Math.min(parseFloat(s.qtyDone)||0, q); } });
+      child.schedule={steps:cs};
+      r.schedule.steps.forEach(s=>{ if(s&&s.qtyDone!=null&&s.qtyDone!==''){ s.qtyDone=Math.max(0,(parseFloat(s.qtyDone)||0)-q); } });
+    }
+  } else {
+    // delivered: chosen billing status, no production state left to track
+    child.status=document.getElementById('split-status').value||'Ready for Invoice';
+    child.currentProcess=''; child.completedProcesses=[]; child.schedule=null;
+  }
   // share an uploaded drawing by URL only — removing the drawing from one line
   // must never delete the file the other line still points at
   if(r.drawing&&r.drawing.url) child.drawing={url:r.drawing.url, label:r.drawing.label||r.drawing.name||'Drawing', name:r.drawing.name||'', ctype:r.drawing.ctype||''};
   // the original line becomes the balance still due
   r.origQty=origQty;
   r.qty=total-q; r.total=r.qty&&cost?r.qty*cost:0;
-  r.splitLog=[...splitLogOf(r), {at:today, qty:q, toId:child.id}];
+  r.splitLog=[...splitLogOf(r), {at:today, qty:q, toId:child.id, mode}];
   const i=orders.findIndex(o=>o.id===r.id);
   orders.splice(i+1,0,child);
   saveDB(); render();
@@ -4353,6 +4412,7 @@ window._confirmSplit=()=>{
       p.qty=prior.qty; p.total=prior.total;
       if(prior.origQty==null) delete p.origQty; else p.origQty=prior.origQty;
       if(prior.splitLog==null) delete p.splitLog; else p.splitLog=prior.splitLog;
+      p.schedule=prior.schedule;
     }
     orders=orders.filter(o=>o.id!==child.id); expanded.delete(child.id);
     deleteDB(child.id); saveDB(); render();
