@@ -501,6 +501,16 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .mix-foot { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; border-top: 1px solid var(--border); }
 .mix-foot:first-of-type { margin-top: 10px; }
 .mix-foot span:last-child { font-weight: 700; }
+/* per-quantity composition bars under the price breaks */
+.qbm { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.qbm-title { font-size: 12px; font-weight: 700; color: var(--text2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.qbm-hint { font-size: 11px; font-weight: 400; color: var(--text3); }
+.qbm-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 4px; }
+.qbm-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text2); }
+.qbm-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.qbm-qty { flex: 0 0 52px; font-size: 12px; font-weight: 700; text-align: right; font-family: 'DM Mono', monospace; }
+.qbm-bar { flex: 1; min-width: 120px; }
+.qbm-price { flex: 0 0 76px; font-size: 12px; font-weight: 600; text-align: right; font-family: 'DM Mono', monospace; }
 
 /* ── Quote History (clean rebuild) ── */
 .hist-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
@@ -6444,7 +6454,53 @@ function calcBreakForQty(qty){
   const expediteFee=(expAmt>0&&expType==='pct')?Math.round(baseJobTotal*expAmt/100*100)/100:(expAmt>0&&expType==='flat')?expAmt:0;
   const jobTotal=baseJobTotal+expediteFee;
   const margin=finalPrice>0?((finalPrice-totalCostPart)/finalPrice*100):0;
-  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,weldCostPart,cncCostPart,totalCostPart,markup,markupCost,expediteFee,finalPrice,jobTotal,margin};
+  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,inspCostPart,progCostPart,weldCostPart,cncCostPart,totalCostPart,markup,markupCost,expediteFee,finalPrice,jobTotal,margin};
+}
+
+// ── Cost-mix segments, shared by the main Cost composition panel and the
+// per-quantity bars under the price breaks. Margin and the pricing-tier
+// round-up are part of the breakdown, so a full bar = price/part.
+function mixSegsFor(d){
+  var segs=[
+    {k:'Material',v:d.matCostPart||0,c:'#1e3a5f'},
+    {k:'Labor / ops',v:d.laborCostPart||0,c:'#335982'},
+    {k:'Welding',v:d.weldCostPart||0,c:'#4b76a0'},
+    {k:'CNC mill',v:d.cncCostPart||0,c:'#6790ba'},
+    {k:'Inspection',v:d.inspCostPart||0,c:'#86abce'},
+    {k:'Programming',v:d.progCostPart||0,c:'#a6c3dd'},
+    {k:'Hardware',v:d.hwCostPart||0,c:'#c2d6e8'},
+    {k:'Outsource',v:d.outCostPart||0,c:'#d8e4ef'},
+    {k:'Purchasing',v:d.purchasing||0,c:'#b9b29c'}
+  ].filter(function(s){return s.v>0.005;});
+  var cost=(d.totalCostPart!=null)?d.totalCostPart:segs.reduce(function(a,s){return a+s.v;},0);
+  var known=segs.reduce(function(a,s){return a+s.v;},0);
+  if(cost-known>0.01){ segs.push({k:'Other',v:cost-known,c:'#cfc7b5'}); }
+  var marginV=d.markupCost||0;
+  var price=(d.finalPrice!=null&&d.finalPrice>0)?d.finalPrice:cost+marginV;
+  var roundUp=price-cost-marginV; if(roundUp<0.005) roundUp=0;
+  if(marginV>0.005) segs.push({k:'Margin ('+Math.round((d.markup||0)*100)+'% markup)',v:marginV,c:'#4a8a1a'});
+  if(roundUp>0) segs.push({k:'Round-up',v:roundUp,c:'#b08d2e'});
+  return {segs:segs,cost:cost,price:price,marginV:marginV,roundUp:roundUp};
+}
+
+// One composition bar per price break, so the mix shift across quantities is
+// visible at a glance (setup/one-time costs shrink, margin share grows).
+function qbMixHtml(results){
+  if(!results||!results.length) return '';
+  var fmt=function(v){return '$'+(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
+  var mixes=results.map(function(r){return {qty:r.qty,mix:mixSegsFor(r)};});
+  var seen={}, legend=[];
+  mixes.forEach(function(m){ m.mix.segs.forEach(function(s){ if(!seen[s.k]){seen[s.k]=1; legend.push(s);} }); });
+  var legendHtml='<div class="qbm-legend">'+legend.map(function(s){return '<span class="qbm-chip"><span class="mix-dot" style="background:'+s.c+'"></span>'+s.k+'</span>';}).join('')+'</div>';
+  var rows=mixes.map(function(m){
+    var p=m.mix.price||1;
+    var bar='<div class="mix-bar qbm-bar">'+m.mix.segs.map(function(s){
+      return '<span style="width:'+(s.v/p*100).toFixed(2)+'%;background:'+s.c+'" title="Qty '+m.qty.toLocaleString()+' — '+s.k+': '+fmt(s.v)+' ('+Math.round(s.v/p*100)+'% of price)"></span>';
+    }).join('')+'</div>';
+    return '<div class="qbm-row"><span class="qbm-qty">'+m.qty.toLocaleString()+'</span>'+bar+
+      '<span class="qbm-price" title="Cost '+fmt(m.mix.cost)+' + margin '+fmt(m.mix.marginV)+(m.mix.roundUp>0?' + round-up '+fmt(m.mix.roundUp):'')+' = '+fmt(m.mix.price)+'">'+fmt(m.mix.price)+'</span></div>';
+  }).join('');
+  return '<div class="qbm"><div class="qbm-title"><i class="ti ti-chart-pie"></i> Cost composition by quantity <span class="qbm-hint">each bar is that break’s price/part — hover a segment for the $ amount; green is margin</span></div>'+legendHtml+rows+'</div>';
 }
 
 function calcQtyBreaks(){
@@ -6500,6 +6556,7 @@ function calcQtyBreaks(){
     </tr>`;
   });
   html+=`</tbody></table>`;
+  html+=qbMixHtml(results);
   html+=qbCliffCheckHtml(results);
   document.getElementById('qty-breaks-result').innerHTML=html;
   window._qtyBreaks=results;
@@ -10018,35 +10075,17 @@ function toggleOptCard(btn,id){
 function renderCostMix(){
   var d=window._calc, el=document.getElementById('cost-mix'); if(!el)return; if(!d){return;}
   var fmt=function(v){return '$'+(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
-  var segs=[
-    {k:'Material',v:d.matCostPart||0,c:'#1e3a5f'},
-    {k:'Labor / ops',v:d.laborCostPart||0,c:'#335982'},
-    {k:'Welding',v:d.weldCostPart||0,c:'#4b76a0'},
-    {k:'CNC mill',v:d.cncCostPart||0,c:'#6790ba'},
-    {k:'Inspection',v:d.inspCostPart||0,c:'#86abce'},
-    {k:'Programming',v:d.progCostPart||0,c:'#a6c3dd'},
-    {k:'Hardware',v:d.hwCostPart||0,c:'#c2d6e8'},
-    {k:'Outsource',v:d.outCostPart||0,c:'#d8e4ef'},
-    {k:'Purchasing',v:d.purchasing||0,c:'#b9b29c'}
-  ].filter(function(s){return s.v>0.005;});
-  var cost=(d.totalCostPart!=null)?d.totalCostPart:segs.reduce(function(a,s){return a+s.v;},0);
-  var known=segs.reduce(function(a,s){return a+s.v;},0);
-  if(cost-known>0.01){ segs.push({k:'Other',v:cost-known,c:'#cfc7b5'}); }
-  if(cost<=0.005){ el.innerHTML='<div style="font-size:12px;color:var(--text3)">Fill in the quote to see where the cost goes.</div>'; return; }
-  // margin joins the breakdown so the bar reads as the full price/part:
-  // cost segments + margin (+ the round-up sliver from the pricing tiers)
-  var marginV=d.markupCost||0;
-  var price=(d.finalPrice!=null&&d.finalPrice>0)?d.finalPrice:cost+marginV;
-  var roundUp=price-cost-marginV; if(roundUp<0.005) roundUp=0;
-  if(marginV>0.005) segs.push({k:'Margin ('+Math.round((d.markup||0)*100)+'% markup)',v:marginV,c:'#4a8a1a'});
-  if(roundUp>0) segs.push({k:'Round-up',v:roundUp,c:'#b08d2e'});
-  var total=price>0?price:cost;
-  var bar='<div class="mix-bar">'+segs.map(function(s){return '<span style="width:'+(s.v/total*100).toFixed(2)+'%;background:'+s.c+'" title="'+s.k+' '+fmt(s.v)+'"></span>';}).join('')+'</div>';
-  var legend='<div class="mix-legend">'+segs.map(function(s){return '<div class="mix-row"><span class="mix-dot" style="background:'+s.c+'"></span><span class="mix-k">'+s.k+'</span><span class="mix-v">'+fmt(s.v)+'</span><span class="mix-pct">'+Math.round(s.v/total*100)+'%</span></div>';}).join('')+'</div>';
-  var foot='<div class="mix-foot"><span>Cost / part</span><span>'+fmt(cost)+'</span></div>'+
-           '<div class="mix-foot"><span>Margin added</span><span>'+fmt(marginV)+'</span></div>'+
-           (roundUp>0?'<div class="mix-foot"><span>Round-up (pricing tier)</span><span>'+fmt(roundUp)+'</span></div>':'')+
-           '<div class="mix-foot"><span>Price / part</span><span>'+fmt(price)+'</span></div>';
+  // segments (incl. margin + tier round-up) come from the same helper the
+  // per-quantity price-break bars use, so the two views can't disagree
+  var mix=mixSegsFor(d);
+  if(mix.cost<=0.005){ el.innerHTML='<div style="font-size:12px;color:var(--text3)">Fill in the quote to see where the cost goes.</div>'; return; }
+  var total=mix.price>0?mix.price:mix.cost;
+  var bar='<div class="mix-bar">'+mix.segs.map(function(s){return '<span style="width:'+(s.v/total*100).toFixed(2)+'%;background:'+s.c+'" title="'+s.k+' '+fmt(s.v)+'"></span>';}).join('')+'</div>';
+  var legend='<div class="mix-legend">'+mix.segs.map(function(s){return '<div class="mix-row"><span class="mix-dot" style="background:'+s.c+'"></span><span class="mix-k">'+s.k+'</span><span class="mix-v">'+fmt(s.v)+'</span><span class="mix-pct">'+Math.round(s.v/total*100)+'%</span></div>';}).join('')+'</div>';
+  var foot='<div class="mix-foot"><span>Cost / part</span><span>'+fmt(mix.cost)+'</span></div>'+
+           '<div class="mix-foot"><span>Margin added</span><span>'+fmt(mix.marginV)+'</span></div>'+
+           (mix.roundUp>0?'<div class="mix-foot"><span>Round-up (pricing tier)</span><span>'+fmt(mix.roundUp)+'</span></div>':'')+
+           '<div class="mix-foot"><span>Price / part</span><span>'+fmt(mix.price)+'</span></div>';
   el.innerHTML=bar+legend+foot;
 }
 window.syncOptCards=function(){
