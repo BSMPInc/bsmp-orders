@@ -494,7 +494,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="toolbar">
         <button class="btn primary" title="New email — keyboard: Ctrl+M" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
         <span class="fchips" id="mbxpick" style="margin:0" title="Show one mailbox at a time"></span>
-        <input class="search" id="search" placeholder="Search — Enter searches all mail history…" oninput="window.searchInput()" onkeydown="if(event.key==='Enter')window.searchAll()">
+        <input class="search" id="search" placeholder="Search — Enter searches all history, incl. text inside PDF/Word attachments…" oninput="window.searchInput()" onkeydown="if(event.key==='Enter')window.searchAll()">
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
       <div class="fchips" id="fchips"></div>
@@ -1272,8 +1272,13 @@ function visibleThreads(){
   }
   // local typing filter — but NOT on top of an all-history Gmail search:
   // Gmail matches inside message bodies, which the card text can't see.
+  // Attachment FILENAMES of already-loaded conversations count as matches too
+  // (contents need the Enter search — Gmail's index reads inside PDFs/docs).
   const q=($('search').value||'').toLowerCase();
-  if(q && !_searchQ) list=list.filter(t=>[t.subject,t.fromName,t.fromEmail,t.snippet].join(' ').toLowerCase().includes(q));
+  if(q && !_searchQ) list=list.filter(t=>{
+    const names=(t.messages||[]).flatMap(m=>(m.attachments||[]).map(a=>a.filename||''));
+    return [t.subject,t.fromName,t.fromEmail,t.snippet,...names].join(' ').toLowerCase().includes(q);
+  });
   return list;
 }
 window.renderList=()=>{
@@ -1302,7 +1307,7 @@ window.renderList=()=>{
   // typing only filters what's loaded — offer the all-history search right in the list
   const typed=($('search').value||'').trim();
   const searchBar=(typed && !_searchQ)
-    ? `<div class="searchmore" onclick="window.searchAll()"><i class="ti ti-search"></i>Searching everything ever received for “${esc(typed)}” — click here or press <span class="key">Enter</span></div>`
+    ? `<div class="searchmore" onclick="window.searchAll()"><i class="ti ti-search"></i>Searching everything ever received for “${esc(typed)}” — including text inside PDF &amp; Word attachments — click here or press <span class="key">Enter</span></div>`
     : '';
   if(!list.length){
     rows.innerHTML=searchBar+`<div class="empty"><i class="ti ti-mail-off"></i>${_searchQ?`Nothing in all mail history matches “${esc(_searchQ)}”`:(THREADS.length?'Nothing matches this view':'No mail loaded yet')}</div>`;
