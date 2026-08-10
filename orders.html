@@ -4096,7 +4096,7 @@ window.printOrderTags=(id)=>{
   const box='<span style="display:inline-block;width:0.2in;height:0.2in;border:2.5px solid #888;border-radius:3px;vertical-align:middle"></span>';
   const th='background:#000;color:#fff;font-weight:800;text-align:center;padding:4px 6px;font-size:14px;border:1px solid #000';
   const gh='background:#9a9a9a;color:#fff;font-weight:800;text-align:center;padding:4px 6px;font-size:14px;border:1px solid #000';
-  const vc='border:1px solid #000;padding:5px 8px;font-size:16px;font-weight:700;color:#111;vertical-align:top';
+  const vc='border:1px solid #000;padding:5px 8px;font-size:16px;font-weight:700;color:#111;vertical-align:middle';
   const ck='border:1px solid #000;padding:3px 8px;font-size:13.5px;font-weight:700;color:#111;vertical-align:middle';
   const tag=(i)=>{
     const desc=(i.desc&&i.desc!==i.part)?`<div style="font-size:11px;font-weight:400;color:#444;margin-top:1px">${esc2(i.desc)}</div>`:'';
@@ -4123,16 +4123,51 @@ window.printOrderTags=(id)=>{
   };
   const raw=[(r.customer||'').trim(), (r.po||'').trim()?('PO '+r.po.trim()):'', 'Delivery Tags'].filter(Boolean).join(' - ');
   const fileTitle=raw.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim();
-  const w=window.open('','_blank','width=680,height=560');
+  const w=window.open('','_blank','width=720,height=620');
   if(!w){ alert('The browser blocked the print window — allow popups for this site.'); return; }
-  w.document.write(`<html><head><meta charset="utf-8"><title>${esc2(fileTitle)}</title><style>
-    @page{ size:6in 4in; margin:0.15in }
+  // Two paper modes: 4x6 label stock (the packaging-station printer) or Letter
+  // (a regular office/laptop printer — the tag prints at true size, centered,
+  // one per sheet, so a mismatched paper setting can never crop it).
+  w.document.write(`<html><head><meta charset="utf-8"><title>${esc2(fileTitle)}</title><style id="pg"></style><style>
     html,body{ margin:0; background:#fff }
     .tag{ width:5.7in; height:3.68in; display:flex; flex-direction:column; font-family:Arial,Helvetica,sans-serif;
       -webkit-print-color-adjust:exact; print-color-adjust:exact; page-break-after:always; overflow:hidden }
     .tag:last-child{ page-break-after:auto }
+    .bar{ font-family:Arial,Helvetica,sans-serif; font-size:12.5px; color:#333; background:#fff; border:1px solid #ccc; border-radius:10px;
+      padding:10px 14px; margin:0 auto 16px; max-width:5.9in; display:flex; align-items:center; gap:8px; flex-wrap:wrap }
+    .bar b{ font-size:12px }
+    .bar button{ font-family:inherit; font-size:12.5px; font-weight:700; padding:6px 12px; border:1.5px solid #bbb; background:#f5f5f5; border-radius:8px; cursor:pointer }
+    .bar button.on{ background:#1e3a5f; border-color:#1e3a5f; color:#fff }
+    .bar .go{ margin-left:auto; background:#2d6010; border-color:#2d6010; color:#fff }
+    .bar .tip{ flex-basis:100%; font-size:11px; color:#666; line-height:1.45 }
     @media screen{ body{ padding:20px; background:#e8e8e8 } .tag{ background:#fff; margin:0 auto 20px; box-shadow:0 1px 6px rgba(0,0,0,.25); padding:10px } }
-  </style></head><body>${items.map(tag).join('')}</body></html>`);
+    @media print{ .bar{ display:none } }
+  </style></head><body>
+    <div class="bar">
+      <b>Paper:</b>
+      <button id="m-label">4×6 label</button>
+      <button id="m-letter">Letter</button>
+      <button class="go" onclick="window.print()">🖨 Print</button>
+      <span class="tip">Cropped print? The printer dialog has to match: on 4×6 label stock pick paper size “4 x 6 in”, landscape, scale 100%. On a regular printer choose <b>Letter</b> here instead — the tag prints centered at its real 4×6 size.</span>
+    </div>
+    ${items.map(tag).join('')}
+  <script>
+    var MODES={
+      label:'@page{ size:6in 4in; margin:0.15in }',
+      letter:'@page{ size:8.5in 11in; margin:0.5in } @media print{ .tag{ margin:0 auto } }'
+    };
+    function setMode(m){
+      if(!MODES[m]) m='label';
+      document.getElementById('pg').textContent=MODES[m];
+      document.getElementById('m-label').className=(m==='label')?'on':'';
+      document.getElementById('m-letter').className=(m==='letter')?'on':'';
+      try{ localStorage.setItem('bsmp_tag_paper', m); }catch(e){}
+    }
+    document.getElementById('m-label').onclick=function(){ setMode('label'); };
+    document.getElementById('m-letter').onclick=function(){ setMode('letter'); };
+    var saved='label'; try{ saved=localStorage.getItem('bsmp_tag_paper')||'label'; }catch(e){}
+    setMode(saved);
+  <\/script></body></html>`);
   w.document.close();
   setTimeout(()=>{ w.focus(); w.print(); }, 300);
 };
