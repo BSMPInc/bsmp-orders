@@ -643,6 +643,9 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .li-foot span:first-child{font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--text3)}
 .combo-badge{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ap);background:#A8443A1a;border-radius:4px;padding:2px 6px;margin-left:6px;vertical-align:middle}
 .combo-help{font-size:12px;color:var(--text2);line-height:1.5;margin:0 0 10px}
+/* a bill amount that arrived from the vendor invoice captured at PO receipt */
+.inv-src{font-size:8px;font-weight:700;text-transform:uppercase;color:var(--green);background:#2f8f6b1a;border-radius:3px;padding:1px 4px;margin-left:5px;vertical-align:middle}
+.po-inv-note{font-size:12px;background:#2f8f6b0d;border:1px solid #2f8f6b33;border-left:3px solid var(--green);border-radius:8px;padding:8px 10px;margin:6px 0 10px;line-height:1.45}
 .rc-smnote{font-size:11.5px;color:#8a4a00;background:#BA75170f;border:1px solid #BA751733;border-radius:7px;padding:7px 10px;margin-top:8px;line-height:1.45}
 .pr-emp-head{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--text3);margin-bottom:6px}
 .pr-emp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px}
@@ -1185,6 +1188,7 @@ function watchConnection(){
 
 // ── State ────────────────────────────────────────────────────────────────────
 let orders = {};          // raw orders node (shared with the order tracker)
+let poRecs = {};          // raw pos node: purchase orders from the Need PO pipeline - carries the vendor-invoice total
 let overlay = {};         // apar/entries node: payments + manual entries + edits
 let accounts = {};        // apar/accounts node: {id:{name,balance}} bank sub-accounts
 let recurring = {};       // apar/recurring node: recurring bill templates
@@ -1261,7 +1265,44 @@ function deriveAR(){
       amount,issue,auto:true};
   });
 }
+// -- Vendor-invoice totals from the Need PO pipeline -------------------------
+// The order tracker keeps every purchase order as its own record in `pos/<id>`. When the
+// PO is received, the vendor invoice is read in (AI off the PDF, or typed) and lands on
+// pos/<id>.invoiceInfo = {no,date,total,lines[],invoiceGrandTotal}. `total` is the sum of
+// the invoice lines that belong to that PO - exactly what the vendor bills us - so it is
+// the amount for the bill this PO derives into. Before this, every migrated PO arrived
+// blank and the amount had to be retyped by hand.
+function poInvoiceIndex(){
+  const byKey={}, byPO={}, vendorsPerPO={};
+  Object.values(poRecs||{}).forEach(p=>{
+    if(!p||!p.po) return;
+    const info=p.invoiceInfo; if(!info) return;
+    const total=(info.total==null||info.total==='')?null:Number(info.total);
+    if(total==null||!isFinite(total)) return;
+    const po=String(p.po).trim().toLowerCase(); if(!po) return;
+    const rec={total, no:info.no||'', date:info.date||'', extracted:info.extracted||'',
+      lines:Array.isArray(info.lines)?info.lines.filter(Boolean):null,
+      grandTotal:(info.invoiceGrandTotal==null)?null:Number(info.invoiceGrandTotal),
+      vendor:p.vendor||'', po:String(p.po).trim(), receivedAt:p.receivedAt||''};
+    byKey[vendorKey(p.vendor)+'__'+po]=rec;
+    byPO[po]=rec;
+    (vendorsPerPO[po]=vendorsPerPO[po]||new Set()).add(vendorKey(p.vendor));
+  });
+  return {byKey,byPO,vendorsPerPO};
+}
+// Vendor + PO is the exact match (the same key deriveAP groups on). PO alone is the
+// fallback for when the vendor name was spelled differently on the step and on the PO
+// record - only safe when a single vendor owns that PO number, otherwise we would hang
+// one vendor's invoice on another vendor's bill.
+function poInvoiceFor(idx,vendor,po){
+  const k=String(po||'').trim().toLowerCase(); if(!k||!idx) return null;
+  const exact=idx.byKey[vendorKey(vendor)+'__'+k];
+  if(exact) return exact;
+  const vs=idx.vendorsPerPO[k];
+  return (vs&&vs.size===1)?(idx.byPO[k]||null):null;
+}
 function deriveAP(){
+  const poIdx=poInvoiceIndex();
   // Gather every PO step across all orders.
   const steps=[];
   Object.values(orders).filter(r=>r&&!r.archived).forEach(r=>{
@@ -1305,19 +1346,23 @@ function deriveAP(){
         qty:1, unit:null, total:null,
         srcOrder:s.orderId, srcStep:s.stepName
       }));
+      const inv=poInvoiceFor(poIdx,v.vendor,v.po);
       out.push({id:combineId,type:'ap',
         party:v.vendor, ref:'PO '+v.po,
         rel:rel, process:gsteps.map(s=>s.proc).filter(Boolean).join(', '),
-        detail:'', amount:null, issue:earliest, auto:true,
+        detail:'', amount:inv?inv.total:null, issue:earliest, auto:true,
+        poInv:inv||null,
         combined:true, comboCount:gsteps.length, lineItems});
     } else {
       // Single step (or user split this PO) -> one bill per step, original behavior.
       gsteps.forEach(s=>{
+        const inv=poInvoiceFor(poIdx,s.vendor,s.po);
         out.push({id:'ap_'+s.orderId+'_'+hash(s.stepName||''),type:'ap',
           party:s.vendor, ref:'PO '+s.po,
           rel:(s.part||'')+(s.customer?(' · '+s.customer):''),
           process:s.proc, detail:s.detail||'',
-          amount:null, issue:s.sentAt||'', auto:true,
+          amount:inv?inv.total:null, issue:s.sentAt||'', auto:true,
+          poInv:inv||null,
           splitFrom: gsteps.length>1?gkey:undefined});
       });
     }
@@ -1341,12 +1386,15 @@ function allEntriesRaw(){
     }
     const amount=(lineSum!=null)?lineSum
       :((e.type==='ap'||o.amount!=null)?(o.amount!=null?Number(o.amount):e.amount):e.amount);
+    // true only when nothing hand-entered beat it - so the badge never takes credit for
+    // a number the user typed in themselves.
+    const amountFromPO=!!(e.poInv && lineSum==null && o.amount==null && amount!=null);
     const payments=Array.isArray(o.payments)?o.payments:[];
     const paid=payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
     const issue=o.issue||e.issue;
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0};
+    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0,poInv:e.poInv||null,amountFromPO};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -1530,6 +1578,41 @@ function updateBadges(entries){
 // list view state (per side): search text, group-by-vendor, selected ids
 const listState={ar:{q:'',group:false,sort:'due',dir:1,sel:new Set(),focus:'all',compact:false},ap:{q:'',group:false,sort:'due',dir:1,sel:new Set(),focus:'all',compact:false}};
 let _curSide='ap';
+// Hover text for a bill whose amount was filled in from the received vendor invoice.
+function poInvTip(e){
+  if(!e.amountFromPO||!e.poInv) return '';
+  const inv=e.poInv;
+  const bits=['Amount from vendor invoice'+(inv.no?' #'+inv.no:'')];
+  if(inv.date) bits.push('dated '+fmtDate(inv.date));
+  bits.push('captured when PO '+inv.po+' was received');
+  return ' title="'+esc(bits.join(' · ')).replace(/"/g,'&quot;')+'"';
+}
+// The math behind an auto-filled bill amount: which invoice it came from and, when that
+// invoice had several lines, exactly which ones were counted toward this PO.
+function poInvNote(e){
+  const inv=e&&e.poInv; if(!inv) return '';
+  const lines=(inv.lines||[]).filter(l=>l&&l.sel!==false);
+  const skipped=(inv.lines||[]).length-lines.length;
+  const math=lines.length
+    ? '<div style="margin-top:5px;font-size:11.5px;color:var(--text2)">'
+      +lines.map(l=>esc(String(l.desc||'line'))+' &mdash; '+fmtMoney(Number(l.amount)||0)).join('<br>')
+      +'<div style="margin-top:3px">'+lines.map(l=>fmtMoney(Number(l.amount)||0)).join(' + ')
+      +' = <b>'+fmtMoney(inv.total)+'</b></div></div>'
+    : '';
+  const skip=skipped>0
+    ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">'+skipped+' line'+(skipped>1?'s':'')
+      +' on that invoice were left off this PO'
+      +(inv.grandTotal!=null?' &mdash; the invoice grand total is '+fmtMoney(inv.grandTotal):'')+'.</div>'
+    : '';
+  const overridden=!e.amountFromPO
+    ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">Your own amount is being used instead &mdash; this is here for reference.</div>'
+    : '';
+  return `<div class="po-inv-note">
+    <div style="font-size:12px"><b>${fmtMoney(inv.total)}</b> came from vendor invoice ${inv.no?'#'+esc(inv.no):'(no number)'}${inv.date?' dated '+fmtDate(inv.date):''}, captured when <b>PO ${esc(inv.po)}</b> was received in the Order Tracker${inv.extracted==='ai'?' (read off the invoice PDF)':''}.</div>
+    ${math}${skip}${overridden}
+    <div style="margin-top:5px;font-size:11.5px;color:var(--text3)">Typing an amount here overrides it${e.combined?'; on a combined PO, enter the line amounts above instead':''}.</div>
+  </div>`;
+}
 function entryRow(e,opts){
   opts=opts||{};
   const st=statusOf(e), bal=(e.amount||0)-(e.paid||0);
@@ -1538,13 +1621,14 @@ function entryRow(e,opts){
   const dueTxt=st==='outstanding'?(e.due?'written '+fmtDate(e.due):'')+' · uncashed':(e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due');
   const amtTxt=e.amount!=null?fmtMoney(e.amount):'<span style="color:var(--text3)">set amt</span>';
   const balTxt=(e.paid>0.005&&e.amount!=null)?` <span class="er-bal">bal ${fmtMoney(bal)}</span>`:'';
+  const amtTip=poInvTip(e);
   const chk=opts.selectable?`<input type="checkbox" class="er-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
   return `<div class="erow ${e.type}${st==='paid'?' paid':''}${opts.checked?' sel':''}" onclick="openEntry('${e.id}')">
     ${chk}
     <span class="er-party">${esc(e.party)}</span>
     <span class="er-ref">${esc(e.ref||'')}${e.auto?'<span class="er-auto">auto</span>':''}</span>
     <span class="er-due${dueCls}">${dueTxt}</span>
-    <span class="er-amt">${amtTxt}${balTxt}</span>
+    <span class="er-amt"${amtTip}>${amtTxt}${balTxt}${e.amountFromPO?`<span class="inv-src">inv</span>`:''}</span>
     <span class="pill ${st} er-pill">${STATUS_LABEL[st]}</span>
   </div>`;
 }
@@ -1556,10 +1640,11 @@ function entryCard(e,opts){
   const dueTxt=st==='outstanding'?(e.due?'written '+fmtDate(e.due):'')+' · uncashed':(e.due?fmtDate(e.due)+(dleft!=null?` (${dleft<0?Math.abs(dleft)+'d late':dleft+'d'})`:''):'no due date');
   const amtTxt=e.amount!=null?fmtMoney(e.amount):'<span style="color:var(--text3)">set amount</span>';
   const balTxt=(e.paid>0.005&&e.amount!=null)?`<span class="bal">bal ${fmtMoney(bal)}</span>`:'';
+  const amtTip=poInvTip(e);
   const chk=opts.selectable?`<input type="checkbox" class="e-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
   return `<div class="entry ${e.type}${st==='paid'?' paid':''}${opts.checked?' sel':''}${opts.selectable?' has-chk':''}" onclick="openEntry('${e.id}')">
     ${chk}
-    <div class="e-top"><span class="e-party">${esc(e.party)}</span><span class="e-ref">${esc(e.ref)}</span><span class="e-amt">${amtTxt}${balTxt}</span></div>
+    <div class="e-top"><span class="e-party">${esc(e.party)}</span><span class="e-ref">${esc(e.ref)}</span><span class="e-amt"${amtTip}>${amtTxt}${balTxt}${e.amountFromPO?`<span class="inv-src">inv</span>`:''}</span></div>
     <div class="e-mid"><span class="e-rel">${esc(e.rel||(e.process||''))}</span>${e.auto?'<span class="auto-tag">auto</span>':''}</div>
     <div class="e-bot">
       <span class="e-due${dueCls}">${dueTxt}</span>
@@ -3946,6 +4031,7 @@ window.openEntry=(id)=>{
       ${e.splitFrom?`<div class="m-row"><span class="k"></span><span class="v"><button class="btn sm" onclick="recombineCombo('${esc(e.splitFrom).replace(/'/g,"\\'")}')" title="Combine this PO's steps back into one bill"><i class="ti ti-arrow-merge"></i> Re-combine this PO</button></span></div>`:''}
 
       <div class="m-sect">Invoice / terms</div>
+      ${poInvNote(e)}
       <div class="fld"><label>${isAR?'Invoice #':'Vendor invoice #'}</label><input id="d-ref" type="text" value="${esc(e.ref||'')}" placeholder="${isAR?'e.g. INV-1042':'e.g. 62366512'}"></div>
       <div class="frow">
         <div class="fld"><label>${isAR?'Invoice':'Bill'} amount${e.combined?' (from line items)':''}</label><input id="d-amt" type="number" step="0.01" value="${e.amount!=null?e.amount:''}" ${e.combined?'readonly title="Set by the line-item amounts above"':''}></div>
@@ -4825,6 +4911,7 @@ onAuthStateChanged(auth,(user)=>{
     $('login').style.display='none'; $('app').style.display='flex';
     watchConnection();
     onValue(ref(db,'orders'),snap=>{ orders=snap.val()||{}; render(); });
+    onValue(ref(db,'pos'),snap=>{ poRecs=snap.val()||{}; render(); });   // PO records: where the vendor-invoice totals live
     onValue(ref(db,'apar/entries'),snap=>{ overlay=snap.val()||{}; _entriesLoaded=true; autoGenerateDue(); autoArchiveOld(); render(); maybeAutoBackupOnce(); tryOpenDeepEntry(); });
     handleMailParams();
     onValue(ref(db,'apar/accounts'),snap=>{ accounts=snap.val()||{}; render(); });
