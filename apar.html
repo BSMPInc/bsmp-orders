@@ -1301,6 +1301,19 @@ function poInvoiceFor(idx,vendor,po){
   const vs=idx.vendorsPerPO[k];
   return (vs&&vs.size===1)?(idx.byPO[k]||null):null;
 }
+// The invoice date is what the terms actually run from - a vendor bills on their invoice
+// date, not the day we sent the PO - so it becomes the bill's issue date and the due date
+// counts from there. Only a real ISO date is accepted; the capture field is <input
+// type="date">, but a hand-edited record could hold anything.
+const ISO_DAY=/^\d{4}-\d{2}-\d{2}$/;
+function poInvDate(inv){ return (inv&&ISO_DAY.test(String(inv.date||'')))?String(inv.date):''; }
+// And the vendor's own invoice number is what a bill is identified by - it is what they
+// put on their statement and what a check stub has to quote. The PO number stays on the
+// entry as `poRef` so it is still searchable, exported, and shown in the bill window.
+function poInvRef(inv,po){
+  const no=inv&&inv.no?String(inv.no).trim():'';
+  return no?('Inv '+no):('PO '+po);
+}
 function deriveAP(){
   const poIdx=poInvoiceIndex();
   // Gather every PO step across all orders.
@@ -1347,22 +1360,24 @@ function deriveAP(){
         srcOrder:s.orderId, srcStep:s.stepName
       }));
       const inv=poInvoiceFor(poIdx,v.vendor,v.po);
+      const invDate=poInvDate(inv);
       out.push({id:combineId,type:'ap',
-        party:v.vendor, ref:'PO '+v.po,
+        party:v.vendor, ref:poInvRef(inv,v.po), poRef:'PO '+v.po,
         rel:rel, process:gsteps.map(s=>s.proc).filter(Boolean).join(', '),
-        detail:'', amount:inv?inv.total:null, issue:earliest, auto:true,
-        poInv:inv||null,
+        detail:'', amount:inv?inv.total:null, issue:invDate||earliest, baseIssue:earliest, auto:true,
+        poInv:inv||null, refFromPO:!!(inv&&inv.no), issueFromPO:!!invDate,
         combined:true, comboCount:gsteps.length, lineItems});
     } else {
       // Single step (or user split this PO) -> one bill per step, original behavior.
       gsteps.forEach(s=>{
         const inv=poInvoiceFor(poIdx,s.vendor,s.po);
+        const invDate=poInvDate(inv);
         out.push({id:'ap_'+s.orderId+'_'+hash(s.stepName||''),type:'ap',
-          party:s.vendor, ref:'PO '+s.po,
+          party:s.vendor, ref:poInvRef(inv,s.po), poRef:'PO '+s.po,
           rel:(s.part||'')+(s.customer?(' · '+s.customer):''),
           process:s.proc, detail:s.detail||'',
-          amount:inv?inv.total:null, issue:s.sentAt||'', auto:true,
-          poInv:inv||null,
+          amount:inv?inv.total:null, issue:invDate||s.sentAt||'', baseIssue:s.sentAt||'', auto:true,
+          poInv:inv||null, refFromPO:!!(inv&&inv.no), issueFromPO:!!invDate,
           splitFrom: gsteps.length>1?gkey:undefined});
       });
     }
@@ -1389,12 +1404,21 @@ function allEntriesRaw(){
     // true only when nothing hand-entered beat it - so the badge never takes credit for
     // a number the user typed in themselves.
     const amountFromPO=!!(e.poInv && lineSum==null && o.amount==null && amount!=null);
+    // A PO bill used to be labelled "PO 1234" and dated the day the PO went out, and the
+    // bill window writes both fields back on every save - so plenty of stored overlays are
+    // just an echo of what this app put there, not something anyone typed. An overlay that
+    // still equals the old derived value is not an override, so the vendor invoice may
+    // replace it. Anything a person actually changed still wins.
+    const refTyped=(o.ref!=null&&o.ref!=='')&&o.ref!==e.poRef;
+    const issueTyped=!!o.issue&&o.issue!==e.baseIssue;
+    const refFromPO=!!(e.refFromPO&&!refTyped);
+    const issueFromPO=!!(e.issueFromPO&&!issueTyped);
     const payments=Array.isArray(o.payments)?o.payments:[];
     const paid=payments.reduce((s,p)=>s+(Number(p.amount)||0),0);
     const terms=o.terms!=null?Number(o.terms):DEFAULT_TERMS;
-    const issue=o.issue||e.issue;
+    const issue=issueTyped?o.issue:(e.issue||o.issue||'');
     const due=o.dueDate||(issue?addDays(issue,terms):'');
-    return {...e,party:canonicalParty(e.party),ref:(o.ref!=null&&o.ref!=='')?o.ref:e.ref,amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0,poInv:e.poInv||null,amountFromPO};
+    return {...e,party:canonicalParty(e.party),ref:refTyped?o.ref:(e.ref||o.ref||''),amount,payments,paid,terms,issue,due,notes:o.notes||'',account:o.account||'',planMethod:o.planMethod||'',payStatus:o.payStatus||'open',planDate:o.planDate||'',withdrawnDate:o.withdrawnDate||'',archived:!!o.archived,void:!!o.void,trashed:!!o.trashed,trashedAt:o.trashedAt||0,discountTerms:o.discountTerms||e.discountTerms||'',lineItems:oLines,combined:!!e.combined,comboCount:e.comboCount||0,poInv:e.poInv||null,amountFromPO,refFromPO,issueFromPO};
   });
   // manual entries stored in overlay (not derived)
   Object.entries(overlay).forEach(([id,o])=>{
@@ -1601,17 +1625,31 @@ function poInvNote(e){
     : '';
   const skip=skipped>0
     ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">'+skipped+' line'+(skipped>1?'s':'')
-      +' on that invoice were left off this PO'
+      +' on that invoice '+(skipped>1?'were':'was')+' left off this PO'
       +(inv.grandTotal!=null?' &mdash; the invoice grand total is '+fmtMoney(inv.grandTotal):'')+'.</div>'
     : '';
   const overridden=!e.amountFromPO
     ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">Your own amount is being used instead &mdash; this is here for reference.</div>'
     : '';
+  // The invoice date and number ride in on the same record as the amount, and each can be
+  // in use while another is overridden, so each says so for itself.
+  const dated=e.issueFromPO
+    ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text2)">Dated <b>'+fmtDate(inv.date)+'</b>, the invoice date &mdash; the due date counts from there, not from the day the PO went out.</div>'
+    : (poInvDate(inv)?'<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">The invoice is dated '+fmtDate(inv.date)+'; your own issue date is being used instead.</div>':'');
+  const numbered=e.refFromPO
+    ? '<div style="margin-top:4px;font-size:11.5px;color:var(--text2)">Filed under the vendor’s invoice number <b>'+esc(inv.no)+'</b>. This bill came from <b>PO '+esc(inv.po)+'</b>.</div>'
+    : (inv.no?'<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">Vendor invoice number '+esc(inv.no)+'; your own reference is being used instead.</div>':'');
   return `<div class="po-inv-note">
     <div style="font-size:12px"><b>${fmtMoney(inv.total)}</b> came from vendor invoice ${inv.no?'#'+esc(inv.no):'(no number)'}${inv.date?' dated '+fmtDate(inv.date):''}, captured when <b>PO ${esc(inv.po)}</b> was received in the Order Tracker${inv.extracted==='ai'?' (read off the invoice PDF)':''}.</div>
-    ${math}${skip}${overridden}
-    <div style="margin-top:5px;font-size:11.5px;color:var(--text3)">Typing an amount here overrides it${e.combined?'; on a combined PO, enter the line amounts above instead':''}.</div>
+    ${math}${skip}${overridden}${dated}${numbered}
+    <div style="margin-top:5px;font-size:11.5px;color:var(--text3)">Typing your own amount, date or invoice # here overrides it${e.combined?'; on a combined PO, enter the line amounts above instead':''}.</div>
   </div>`;
+}
+// A PO bill now reads as the vendor's invoice number, so the PO it came from needs
+// somewhere else to show: hover text in the lists, its own row in the bill window.
+function refTip(e){
+  if(!e.poRef||e.ref===e.poRef) return '';
+  return ' title="'+esc(e.poRef).replace(/"/g,'&quot;')+'"';
 }
 function entryRow(e,opts){
   opts=opts||{};
@@ -1626,7 +1664,7 @@ function entryRow(e,opts){
   return `<div class="erow ${e.type}${st==='paid'?' paid':''}${opts.checked?' sel':''}" onclick="openEntry('${e.id}')">
     ${chk}
     <span class="er-party">${esc(e.party)}</span>
-    <span class="er-ref">${esc(e.ref||'')}${e.auto?'<span class="er-auto">auto</span>':''}</span>
+    <span class="er-ref"${refTip(e)}>${esc(e.ref||'')}${e.auto?'<span class="er-auto">auto</span>':''}</span>
     <span class="er-due${dueCls}">${dueTxt}</span>
     <span class="er-amt"${amtTip}>${amtTxt}${balTxt}${e.amountFromPO?`<span class="inv-src">inv</span>`:''}</span>
     <span class="pill ${st} er-pill">${STATUS_LABEL[st]}</span>
@@ -1644,7 +1682,7 @@ function entryCard(e,opts){
   const chk=opts.selectable?`<input type="checkbox" class="e-chk" ${opts.checked?'checked':''} onclick="event.stopPropagation();toggleSel('${e.id}')">`:'';
   return `<div class="entry ${e.type}${st==='paid'?' paid':''}${opts.checked?' sel':''}${opts.selectable?' has-chk':''}" onclick="openEntry('${e.id}')">
     ${chk}
-    <div class="e-top"><span class="e-party">${esc(e.party)}</span><span class="e-ref">${esc(e.ref)}</span><span class="e-amt"${amtTip}>${amtTxt}${balTxt}${e.amountFromPO?`<span class="inv-src">inv</span>`:''}</span></div>
+    <div class="e-top"><span class="e-party">${esc(e.party)}</span><span class="e-ref"${refTip(e)}>${esc(e.ref)}</span><span class="e-amt"${amtTip}>${amtTxt}${balTxt}${e.amountFromPO?`<span class="inv-src">inv</span>`:''}</span></div>
     <div class="e-mid"><span class="e-rel">${esc(e.rel||(e.process||''))}</span>${e.auto?'<span class="auto-tag">auto</span>':''}</div>
     <div class="e-bot">
       <span class="e-due${dueCls}">${dueTxt}</span>
@@ -1863,7 +1901,7 @@ function renderList(entries,side){
   S.sel.forEach(id=>{ if(!ids.has(id)) S.sel.delete(id); });
   // apply search filter
   const q=S.q.trim().toLowerCase();
-  const match=e=>!q||[e.party,e.ref,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q));
+  const match=e=>!q||[e.party,e.ref,e.poRef,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q));
   // quick-focus filter (overdue / due in 7 days), driven by the summary figures
   const focus=S.focus||'all';
   const focusMatch=e=>{
@@ -2030,7 +2068,7 @@ window.toggleCollapseAll=()=>{
   const S=listState[_curSide]; S.collapsed=S.collapsed||{};
   // determine current group names from the live list
   const list=sortListBy(allEntries().filter(e=>e.type===_curSide&&!isArchived(e)),S.sort)
-    .filter(e=>{ const q=S.q.trim().toLowerCase(); return !q||[e.party,e.ref,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q)); });
+    .filter(e=>{ const q=S.q.trim().toLowerCase(); return !q||[e.party,e.ref,e.poRef,e.rel,e.process].some(x=>(x||'').toLowerCase().includes(q)); });
   const names=[...new Set(list.map(e=>e.party||'—'))];
   const allCollapsed = names.length>0 && names.every(n=>S.collapsed[n]);
   names.forEach(n=>{ S.collapsed[n]=!allCollapsed; }); // if all collapsed -> expand all, else collapse all
@@ -3699,7 +3737,7 @@ function renderTrash(){
   const acctName=e=>e.account&&accounts[e.account]?accounts[e.account].name:'—';
   const when=ts=>ts?relTime(ts):'—';
   const row=e=>{
-    const hay=[e.party,e.ref,e.rel,acctName(e)].filter(Boolean).join(' ').toLowerCase();
+    const hay=[e.party,e.ref,e.poRef,e.rel,acctName(e)].filter(Boolean).join(' ').toLowerCase();
     return `<div class="trash-row" data-search="${esc(hay)}">
       <span class="trash-type ${e.type}">${e.type==='ar'?'AR':'AP'}</span>
       <span class="trash-party">${esc(e.party)}${e.ref?`<span class="trash-ref">#${esc(e.ref)}</span>`:''}</span>
@@ -3988,6 +4026,7 @@ window.openEntry=(id)=>{
     <div class="m-body">
       <div class="m-sect">Details</div>
       <div class="m-row"><span class="k">${isAR?'Invoice #':'Invoice #'}</span><span class="v">${e.ref?esc(e.ref):'—'}</span></div>
+      ${(e.poRef&&e.ref!==e.poRef)?`<div class="m-row"><span class="k">Purchase order</span><span class="v">${esc(e.poRef)}</span></div>`:''}
       ${e.rel?`<div class="m-row"><span class="k">${isAR?'Items':'For'}</span><span class="v">${esc(e.rel)}</span></div>`:''}
       ${e.process?`<div class="m-row"><span class="k">Process</span><span class="v">${esc(e.process)}</span></div>`:''}
       ${e.detail?`<div class="m-row"><span class="k">Spec</span><span class="v">${esc(e.detail)}</span></div>`:''}
@@ -4014,8 +4053,8 @@ window.openEntry=(id)=>{
       </div>`:''}
 
       ${(e.combined && Array.isArray(e.lineItems) && e.lineItems.length)?`
-      <div class="m-sect">Combined PO · ${e.comboCount||e.lineItems.length} items <span class="combo-badge" title="These steps were combined because they share PO ${esc((e.ref||'').replace(/^PO /,''))} and the same vendor">auto-combined</span></div>
-      <p class="combo-help">This bill combines ${e.comboCount||e.lineItems.length} order steps that share <b>${esc(e.ref)}</b> from <b>${esc(e.party)}</b>. Enter each line's amount and the bill total adds up automatically.</p>
+      <div class="m-sect">Combined PO · ${e.comboCount||e.lineItems.length} items <span class="combo-badge" title="These steps were combined because they share ${esc(e.poRef||e.ref||'this PO')} and the same vendor">auto-combined</span></div>
+      <p class="combo-help">This bill combines ${e.comboCount||e.lineItems.length} order steps that share <b>${esc(e.poRef||e.ref)}</b> from <b>${esc(e.party)}</b>. Enter each line's amount and the bill total adds up automatically.</p>
       <div class="li-edit">
         <div class="li-ehead"><span>Item</span><span>Amount</span></div>
         ${e.lineItems.map((li,i)=>`<div class="li-erow">
@@ -4113,9 +4152,16 @@ window.recombineCombo=(gkey)=>{
 window.saveMeta=()=>{
   if(!_cur)return; const e=_cur; const o=ovl(e.id);
   if(!e.auto){o.manual=true;o.type=e.type;o.party=e.party;o.ref=e.ref;o.rel=e.rel;}
-  const refEl=$('d-ref'); if(refEl) o.ref=refEl.value.trim();
-  const amt=$('d-amt').value; if(amt!=='') o.amount=Number(amt); else if(e.type==='ap'||e.manual) o.amount=0;
-  o.issue=$('d-issue').value||'';
+  // Saving this window writes every field back, so a field left untouched would store an
+  // override that is really just the derived value echoed back - and would then stop
+  // tracking the source. On a derived bill, a value equal to what was shown is stored as
+  // blank so it keeps following the PO / vendor invoice. A manual entry owns its fields.
+  const asTyped=(v,derived)=>(e.auto&&v===(derived||''))?'':v;
+  const refEl=$('d-ref'); if(refEl) o.ref=asTyped(refEl.value.trim(),e.ref);
+  const amt=$('d-amt').value;
+  if(amt!=='') o.amount=(e.auto&&e.amount!=null&&Number(amt)===Number(e.amount))?null:Number(amt);
+  else if(e.type==='ap'||e.manual) o.amount=0;
+  o.issue=asTyped($('d-issue').value||'',e.issue);
   const termsRaw=$('d-terms').value;
   o.terms=termsRaw===''?DEFAULT_TERMS:Number(termsRaw); // 0 is valid (COD), don't fall back to 30
   const dueVal=$('d-due').value;
@@ -4502,12 +4548,12 @@ window.restoreBackup=(file)=>{
 
 window.exportCSV=()=>{
   const rows=sortEntries(allEntries());
-  const head=['Type','Party','Reference','Description','Amount','Paid','Balance','Issue','Due','Status','Source','Account','Last Payment Method','Last Payment Ref #'];
+  const head=['Type','Party','Reference','PO','Description','Amount','Paid','Balance','Issue','Due','Status','Source','Account','Last Payment Method','Last Payment Ref #'];
   const lines=[head.join(',')].concat(rows.map(e=>{
     const bal=(e.amount||0)-(e.paid||0);
     const lastPay=(e.payments&&e.payments.length)?e.payments[e.payments.length-1]:null;
     const acctName=e.account&&accounts[e.account]?accounts[e.account].name:'';
-    return [e.type.toUpperCase(),e.party,e.ref,e.rel||e.process||'',e.amount||0,e.paid||0,bal,e.issue||'',e.due||'',STATUS_LABEL[statusOf(e)],e.auto?'auto':'manual',acctName,lastPay?(lastPay.method||''):'',lastPay?(lastPay.refNo||''):'']
+    return [e.type.toUpperCase(),e.party,e.ref,e.poRef||'',e.rel||e.process||'',e.amount||0,e.paid||0,bal,e.issue||'',e.due||'',STATUS_LABEL[statusOf(e)],e.auto?'auto':'manual',acctName,lastPay?(lastPay.method||''):'',lastPay?(lastPay.refNo||''):'']
       .map(v=>`"${String(v==null?'':v).replace(/"/g,'""')}"`).join(',');
   }));
   const blob=new Blob([lines.join('\n')],{type:'text/csv'});

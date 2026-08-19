@@ -53,6 +53,8 @@ orders={
   o10:order('o10','WS-1',[step({name:'Outsource- Laser',vendor:'Laser LLC',vendorPO:' 2200 '})]),
   o11:order('o11','ST-1',[step({name:'Purchasing- Steel',vendor:'Metal Supply',vendorPO:'1100'})]),
   o12:order('o12','AR-1',[]),
+  o13:order('o13','NN-1',[step({name:'Outsource- Deburr',vendor:'No Number Co',vendorPO:'9900'})]),
+  o14:order('o14','BD-1',[step({name:'Outsource- Bend',vendor:'Bad Date Co',vendorPO:'9910'})]),
 };
 poRecs={
   p1:poRec('p1','8891','Anodize Inc.',{no:'A-77',date:'2026-08-05',total:1234.56,extracted:'ai'}),
@@ -68,13 +70,15 @@ poRecs={
   p9:poRec('p9','3300','Paint Pros',{no:'PP-1',date:'2026-08-02',total:null,extracted:'manual'}),
   p10:poRec('p10','2200','Laser LLC',{no:'L-1',date:'2026-08-02',total:'999.99',extracted:'ai'}),
   p11:poRec('p11','1100','Metal Supply',{no:'MS-1',date:'2026-08-01',total:3050,extracted:'ai'}),
+  p12:poRec('p12','9900','No Number Co',{no:'',date:'2026-08-06',total:250,extracted:'manual'}),
+  p13:poRec('p13','9910','Bad Date Co',{no:'BD-1',date:'08/12/2026',total:100,extracted:'ai'}),
   hole:null,                                              // RTDB null hole
   nopo:poRec('nopo','','No PO Vendor',{no:'x',total:5}),   // record with no PO number
   noinfo:{id:'ni',po:'1100',vendor:'Metal Supply'},        // issued, not yet received
 };
 AR_STUB=[{id:'ar_x',type:'ar',party:'Customer Co',ref:'Inv 5001',rel:'',amount:4200,issue:'2026-08-01',auto:true}];
 
-const byRef=(r)=>allEntriesRaw().filter(e=>e.ref===r);
+const byRef=(r)=>allEntriesRaw().filter(e=>e.ref===r||e.poRef===r);
 const one=(r)=>byRef(r)[0];
 
 // ── 1 · the bug being fixed: a received PO carries its invoice amount over ───
@@ -160,6 +164,60 @@ ok('records without a total are not indexed', !poInvoiceFor(idx,'Paint Pros','33
 ok('records without a PO number are not indexed', !poInvoiceFor(idx,'No PO Vendor',''));
 ok('unknown PO returns null, not a throw', poInvoiceFor(idx,'Nobody','0000')===null);
 
+// -- 11 - the vendor's own invoice date and number ------------------------
+e=one('PO 8891');
+ok('bill is referenced by the vendor invoice number', e && e.ref==='Inv A-77', e&&e.ref);
+ok('the PO number is kept as poRef', e && e.poRef==='PO 8891', e&&e.poRef);
+ok('bill is dated the invoice date, not the PO send date', e && e.issue==='2026-08-05', e&&e.issue);
+ok('terms count from the invoice date', e && e.due==='2026-09-04', e&&e.due);
+ok('flagged as invoice-dated / invoice-numbered', e && e.issueFromPO===true && e.refFromPO===true);
+e=one('PO 7700');
+ok('combined bill takes the invoice date over the earliest PO', e && e.issue==='2026-08-04', e&&e.issue);
+ok('combined bill takes the invoice number', e && e.ref==='Inv PW-9', e&&e.ref);
+e=one('PO 9002');
+ok('no PO record -> still reads PO number', e && e.ref==='PO 9002', e&&e.ref);
+ok('no PO record -> still dated the PO send date', e && e.issue==='2026-08-01', e&&e.issue);
+ok('no PO record -> neither flag set', e && e.refFromPO===false && e.issueFromPO===false);
+ok('no PO record -> no hover text for a PO', refTip(e)==='');
+e=one('PO 9900');
+ok('invoice with no number keeps the PO as the reference', e && e.ref==='PO 9900', e&&e.ref);
+ok('invoice with no number still supplies date + amount', e && e.issue==='2026-08-06' && e.amount===250, e&&e.issue);
+ok('invoice with no number is not flagged invoice-numbered', e && e.refFromPO===false);
+e=one('PO 9910');
+ok('a non-ISO invoice date is refused', e && e.issue==='2026-08-01', e&&e.issue);
+ok('refused date is not flagged invoice-dated', e && e.issueFromPO===false);
+ok('a bad date does not block the number or amount', e && e.ref==='Inv BD-1' && e.amount===100);
+ok('hover text carries the PO number', refTip(one('PO 8891')).indexOf('PO 8891')>=0);
+
+// typed values still win, echoed-back derived values do not
+const id8=one('PO 8891').id;
+overlay={}; overlay[id8]={ref:'MY-REF',issue:'2026-09-01'};
+e=one('PO 8891');
+ok('a typed reference beats the invoice number', e && e.ref==='MY-REF', e&&e.ref);
+ok('a typed issue date beats the invoice date', e && e.issue==='2026-09-01', e&&e.issue);
+ok('typed values drop both flags', e && e.refFromPO===false && e.issueFromPO===false);
+ok('the invoice is still there for reference', !!(e&&e.poInv));
+overlay={}; overlay[id8]={ref:'PO 8891',issue:'2026-08-01'};   // what old saves stored
+e=one('PO 8891');
+ok('an old stored "PO 1234" reference is not an override', e && e.ref==='Inv A-77', e&&e.ref);
+ok('an old stored PO-send issue date is not an override', e && e.issue==='2026-08-05', e&&e.issue);
+ok('and the flags survive it', e && e.refFromPO===true && e.issueFromPO===true);
+overlay={};
+ok('AR entries have no PO reference', one('Inv 5001').poRef===undefined);
+overlay={ar_x:{ref:'Custom AR'}};
+ok('an AR reference override still works', one('Custom AR')&&one('Custom AR').amount===4200);
+overlay={};
+
+// the note explains the date and the number too
+note=poInvNote(one('PO 8891'));
+ok('note says the due date counts from the invoice date', note.indexOf('due date counts from there')>=0);
+ok('note names the invoice number it filed under', note.indexOf('A-77')>=0 && note.indexOf('invoice number')>=0);
+ok('note still names the PO the bill came from', note.indexOf('PO 8891')>=0);
+overlay={}; overlay[id8]={issue:'2026-09-01'};
+ok('note admits the date was overridden', poInvNote(one('PO 8891')).indexOf('your own issue date')>=0);
+overlay={};
+ok('a refused invoice date is never claimed in the note', poInvNote(one('PO 9910')).indexOf('due date counts from there')<0);
+
 const fails=out.filter(l=>l.indexOf('FAIL')===0).length;
 document.getElementById('out').textContent=out.join('\\n')+'\\n\\n'+(out.length-fails)+' / '+out.length+' assertions';
 document.title=fails?('FAILURES ('+fails+')'):'all pass';
@@ -170,31 +228,34 @@ io.open('C:/Users/info/bsmp-orders/_apartest.html', 'w', encoding='utf-8', newli
 print('wrote _apartest.html (%d chars of sliced source)' % len(block))
 
 # ── second page: the new UI bits under the real stylesheet, at laptop width ──
+# The note is rendered by the REAL poInvNote() so this page cannot drift from the code.
 style = grab('<style>', '</style>') + '</style>'
 view = u'''<!doctype html><meta charset="utf-8"><title>apar PO note view</title>
 __STYLE__
 <div style="width:700px;padding:14px;background:var(--bg,#fff)">
   <div class="erow ap" style="cursor:default">
     <span class="er-party">Plate Works</span>
-    <span class="er-ref">PO 7700<span class="er-auto">auto</span></span>
+    <span class="er-ref" title="PO 7700">Inv PW-9<span class="er-auto">auto</span></span>
     <span class="er-due">09/03/26 (16d)</span>
     <span class="er-amt" title="Amount from vendor invoice #PW-9">$2,500.00<span class="inv-src">inv</span></span>
     <span class="pill open er-pill">Open</span>
   </div>
   <div id="note"></div>
+  <div id="note2" style="margin-top:14px"></div>
 </div>
-<script>__BLOCK__</script>
 <script>
 let orders={},poRecs={},apSplit={},overlay={};const DEFAULT_TERMS=30;
-</script>'''
-# the note markup is static here — no need to re-run the derivation
-note = u'''<script>
-document.getElementById('note').innerHTML = `<div class="po-inv-note">
-    <div style="font-size:12px"><b>$2,500.00</b> came from vendor invoice #PW-9 dated 08/04/26, captured when <b>PO 7700</b> was received in the Order Tracker (read off the invoice PDF).</div>
-    <div style="margin-top:5px;font-size:11.5px;color:var(--text2)">Grind &mdash; $1,500.00<br>Plate &mdash; $1,000.00<div style="margin-top:3px">$1,500.00 + $1,000.00 = <b>$2,500.00</b></div></div><div style="margin-top:4px;font-size:11.5px;color:var(--text3)">1 line on that invoice was left off this PO &mdash; the invoice grand total is $2,575.00.</div>
-    <div style="margin-top:5px;font-size:11.5px;color:var(--text3)">Typing an amount here overrides it; on a combined PO, enter the line amounts above instead.</div>
-  </div>`;
+function deriveAR(){return[]}function canonicalParty(p){return p}
+function addDays(iso,n){const d=new Date(iso+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)}
+/*__BLOCK__*/
+const inv={total:2500,no:'PW-9',date:'2026-08-04',extracted:'ai',po:'7700',
+  grandTotal:2575,lines:[{desc:'Grind',amount:1500,sel:true},{desc:'Plate',amount:1000,sel:true},
+                         {desc:'Freight',amount:75,sel:false}]};
+document.getElementById('note').innerHTML =
+  poInvNote({poInv:inv,amountFromPO:true,issueFromPO:true,refFromPO:true,combined:true});
+document.getElementById('note2').innerHTML =
+  poInvNote({poInv:inv,amountFromPO:false,issueFromPO:false,refFromPO:false,combined:false});
 </script>'''
 io.open('C:/Users/info/bsmp-orders/_apartest_view.html','w',encoding='utf-8',newline='').write(
-    view.replace('__STYLE__', style).replace('<script>__BLOCK__</script>','') + note)
+    view.replace('__STYLE__', style).replace('/*__BLOCK__*/', block))
 print('wrote _apartest_view.html')
