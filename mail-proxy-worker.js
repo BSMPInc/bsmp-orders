@@ -34,7 +34,8 @@
 */
 
 const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send';
-const ALLOWED_ORIGINS = ['https://bsmpinc.github.io', 'http://localhost:8742', 'http://127.0.0.1:8742'];
+const ALLOWED_ORIGINS = ['https://bsmpinc.github.io', 'http://localhost:8742', 'http://127.0.0.1:8742',
+                         'https://bertsmp.com', 'https://www.bertsmp.com', 'http://localhost:8791'];
 
 export default {
   async fetch(request, env) {
@@ -51,6 +52,65 @@ export default {
       new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...cors } });
 
     try {
+      // ---- public: quote request from bertsmp.com -----------------------
+      // Handled BEFORE the sign-in gate below, because website visitors have
+      // no Firebase account. Everything here is untrusted input: it is length
+      // capped, stripped of CR/LF so no extra mail headers can be injected,
+      // and only ever mailed to our own mailbox -- never to an address the
+      // sender picks.
+      if (new URL(request.url).pathname === '/quote' && request.method === 'POST') {
+        const q = await request.json().catch(() => null);
+        if (!q) return json({ error: 'bad request' }, 400);
+
+        // Honeypot: bots fill the hidden "website" field, people never see it.
+        // Answer 200 so the bot believes it worked and does not retry.
+        if (String(q.website || '').trim()) return json({ ok: true });
+
+        const one = (v, n) => String(v == null ? '' : v).replace(/[\r\n]+/g, ' ').trim().slice(0, n);
+        const name    = one(q.name, 120);
+        const email   = one(q.email, 160);
+        const company = one(q.company, 120);
+        const phone   = one(q.phone, 40);
+        const message = String(q.message == null ? '' : q.message).trim().slice(0, 4000);
+
+        if (!name || !email || !message) return json({ error: 'name, email and message are required' }, 400);
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: 'that email address is not valid' }, 400);
+
+        const qBoxes = (env.MAILBOXES || '').split(',').map(x => x.trim()).filter(Boolean);
+        if (!qBoxes.length) return json({ error: 'MAILBOXES not configured' }, 500);
+        const qBox = qBoxes[0];
+
+        // Optional rate limit -- active only if a KV namespace called QUOTE_KV
+        // is bound to the worker. Without it the honeypot carries the load.
+        if (env.QUOTE_KV) {
+          const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+          const n = parseInt(await env.QUOTE_KV.get('q:' + ip) || '0', 10);
+          if (n >= 5) return json({ error: 'too many requests -- please call us at 818.775.0104' }, 429);
+          await env.QUOTE_KV.put('q:' + ip, String(n + 1), { expirationTtl: 3600 });
+        }
+
+        const qBody =
+          'New quote request from bertsmp.com\n' +
+          '--------------------------------------------\n' +
+          'Name:    ' + name + '\n' +
+          (company ? 'Company: ' + company + '\n' : '') +
+          'Email:   ' + email + '\n' +
+          (phone ? 'Phone:   ' + phone + '\n' : '') +
+          '--------------------------------------------\n\n' +
+          message + '\n\n' +
+          '--------------------------------------------\n' +
+          'Hit Reply to answer ' + name + ' directly.\n';
+
+        await sendMail(env, qBoxes, {
+          replyAs: qBox,
+          to: qBox,
+          subject: 'Quote request -- ' + (company || name),
+          replyTo: email,
+          body: qBody,
+        });
+        return json({ ok: true });
+      }
+
       // ── gate: caller must be a signed-in, non-operator BSMP user ──────────
       const idToken = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
       if (!idToken) return json({ error: 'missing token' }, 401);
@@ -373,6 +433,9 @@ async function sendMail(env, mailboxes, p) {
       '</div>'
     : '';
 
+  // Reply-To -- set by the public /quote endpoint so that hitting Reply in
+  // Gmail answers the customer rather than our own mailbox.
+  if (p.replyTo) headers += 'Reply-To: ' + String(p.replyTo).replace(/[\r\n<>,]/g, '') + '\r\n';
   const ccLine = cc.length ? `Cc: ${cc.join(', ')}\r\n` : '';
   const top = `From: ${from}\r\nTo: ${to}\r\n${ccLine}Subject: ${encodeHeader(subject)}\r\n${headers}MIME-Version: 1.0\r\n`;
   const utf8 = (s) => unescape(encodeURIComponent(s));   // text → binary string for btoa
