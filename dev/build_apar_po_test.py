@@ -218,6 +218,54 @@ ok('note admits the date was overridden', poInvNote(one('PO 8891')).indexOf('you
 overlay={};
 ok('a refused invoice date is never claimed in the note', poInvNote(one('PO 9910')).indexOf('due date counts from there')<0);
 
+// ── 12 · purchase lines: one step bought from two vendors = two bills ────────
+// The step's roll-up vendor is blank and its vendorPO is "5001, 5002" - reading
+// those instead of the lines would invent one bogus bill for a vendor that
+// doesn't exist, and neither real invoice would ever match.
+{
+  const savedO=orders, savedP=poRecs, savedS=apSplit;
+  const hwStep=(lines)=>({name:'Purchasing- Hardware',enabled:true,detail:'hardware',
+    vendor:'',vendorPO:'5001, 5002',sentAt:'2026-08-10',lines:lines});
+  orders={ h1:{id:'h1',customer:'Acme',part:'BRK-1',schedule:{steps:[hwStep([
+      {id:'l1',desc:'PEM nut',qty:800,vendor:'Fastenal',vendorPO:'5001',sentAt:'2026-08-10'},
+      {id:'l2',desc:'standoff',qty:400,vendor:'McMaster',vendorPO:'5002',sentAt:'2026-08-11'}])]}} };
+  poRecs={ q1:poRec('q1','5001','Fastenal',{no:'F-1',date:'2026-08-12',total:168,extracted:'ai'}),
+           q2:poRec('q2','5002','McMaster',{no:'M-1',date:'2026-08-13',total:96,extracted:'ai'}) };
+  apSplit={};
+  const aps=allEntriesRaw().filter(e=>e.type==='ap');
+  ok('a two-vendor step derives two bills', aps.length===2, aps.length);
+  ok('no bogus merged "5001, 5002" bill', !aps.some(e=>String(e.poRef||'').indexOf(',')>=0),
+     aps.map(e=>e.poRef).join(' / '));
+  ok('no "(vendor)" placeholder bill', !aps.some(e=>e.party==='(vendor)'), aps.map(e=>e.party).join(' / '));
+  const f=aps.find(e=>e.party==='Fastenal'), m=aps.find(e=>e.party==='McMaster');
+  ok('each vendor gets its own invoice amount', f&&f.amount===168 && m&&m.amount===96, (f&&f.amount)+' / '+(m&&m.amount));
+  ok('each bill is referenced by its own invoice number', f&&f.ref==='Inv F-1' && m&&m.ref==='Inv M-1');
+  ok('each bill dates from its own invoice', f&&f.issue==='2026-08-12' && m&&m.issue==='2026-08-13');
+
+  // object-shaped lines with a null hole (how RTDB hands lists back)
+  orders={ h2:{id:'h2',customer:'Acme',part:'BRK-2',schedule:{steps:[hwStep(
+    {a:{id:'l1',desc:'PEM nut',qty:800,vendor:'Fastenal',vendorPO:'5001',sentAt:'2026-08-10'},
+     b:null,
+     c:{id:'l2',desc:'standoff',qty:400,vendor:'McMaster',vendorPO:'5002',sentAt:'2026-08-11'}})]}} };
+  ok('object-shaped lines with holes still derive two bills',
+     allEntriesRaw().filter(e=>e.type==='ap').length===2);
+
+  // a line not yet on a PO is not a bill
+  orders={ h3:{id:'h3',customer:'Acme',part:'BRK-3',schedule:{steps:[Object.assign(hwStep([
+      {id:'l1',desc:'PEM nut',qty:800,vendor:'Fastenal',vendorPO:'5001',sentAt:'2026-08-10'},
+      {id:'l2',desc:'standoff',qty:400,vendor:'McMaster',vendorPO:'',sentAt:''}]),{vendorPO:''})]}} };
+  const partial=allEntriesRaw().filter(e=>e.type==='ap');
+  ok('a line still waiting on a PO is not a bill', partial.length===1 && partial[0].party==='Fastenal', partial.length);
+
+  // legacy step (no lines at all) is unchanged
+  orders={ h4:{id:'h4',customer:'Acme',part:'BRK-4',schedule:{steps:[
+    {name:'Outsource- Plating',enabled:true,vendor:'Fastenal',vendorPO:'5001',sentAt:'2026-08-10',detail:''}]}} };
+  const legacy=allEntriesRaw().filter(e=>e.type==='ap');
+  ok('a step with no lines still derives its one bill', legacy.length===1 && legacy[0].amount===168, legacy.length);
+
+  orders=savedO; poRecs=savedP; apSplit=savedS;
+}
+
 const fails=out.filter(l=>l.indexOf('FAIL')===0).length;
 document.getElementById('out').textContent=out.join('\\n')+'\\n\\n'+(out.length-fails)+' / '+out.length+' assertions';
 document.title=fails?('FAILURES ('+fails+')'):'all pass';

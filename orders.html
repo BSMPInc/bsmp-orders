@@ -413,6 +413,13 @@ tr:hover .del-btn{opacity:1}
 .iod-row{display:flex;gap:12px;padding:3px 0;font-size:13px}
 .iod-k{width:118px;flex-shrink:0;color:var(--text2)}
 .iod-v{flex:1;min-width:0;color:var(--text);font-weight:600;word-break:break-word}
+.iod-lines{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:4px 0}
+.iod-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;font-size:12px;border-bottom:1px solid var(--border)}
+.iod-line:last-child{border-bottom:0}
+.iod-line .il-d{flex:1 1 150px;min-width:0}
+.iod-line .il-v{flex:0 1 auto;color:var(--text2)}
+.iod-line .il-s{margin-left:auto;font-size:11px;font-weight:700;white-space:nowrap}
+.iod-linehint{font-size:11px;color:var(--text3);margin:6px 0 2px;line-height:1.4}
 .iod-field{margin:9px 0}
 .iod-field label{display:block;font-size:11px;font-weight:600;color:var(--text2);margin-bottom:4px}
 .iod-field input{width:100%;box-sizing:border-box}
@@ -473,8 +480,11 @@ tr:hover .del-btn{opacity:1}
 .npv-inrow{display:flex;gap:6px;margin-top:5px;flex-wrap:wrap}
 .npq-in{font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;background:#fff;min-width:0}
 .npq-item{flex:2 1 180px}
-.npq-qty{width:64px}
+.npq-qty{width:74px}
 .npq-detail{flex:3 1 220px}
+.npq-pn{width:104px}
+.npq-per{width:56px}
+.npv-math{display:block;font-size:10.5px;color:var(--text3);margin-top:3px}
 .npv-needby{font-size:11px;font-weight:700;color:var(--text2);background:#f3f5f9;border:1px solid var(--border2);border-radius:20px;padding:3px 10px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
 .npv-needby.late{color:var(--red);background:#fdecec;border-color:#f3c1c1}
 /* issued-PO cards (waiting to come back) */
@@ -614,6 +624,26 @@ tr:hover .del-btn{opacity:1}
 .ss-vin::placeholder{color:var(--text3)}
 .ss-vpo{font-size:10px;font-weight:700;color:#3B6D11;background:#eaf5d8;border-radius:6px;padding:2px 7px;white-space:nowrap;flex-shrink:0}
 select.ss-vin{width:170px;flex-shrink:0}
+/* purchase lines — one row per thing to buy on an external step */
+/* pulled left of the step row's 94px gutter — five controls per line need the
+   room at the owner's ~700px panel width */
+.ss-vwrap{padding:0 8px 4px 60px;margin-top:-3px}
+.ss-vwrap .ss-vrow{padding:0}
+.ss-lines{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.ss-line{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:3px 0 3px 16px;border-left:2px solid var(--border2)}
+.ss-line .ss-pn{width:96px;flex-shrink:0}
+/* min-width so a long item name wraps the row instead of being crushed */
+.ss-line .ss-vin.grow{flex:1 1 160px;min-width:150px}
+.ss-line select.ss-vin{width:140px}
+.ss-line .ss-per{width:52px;flex-shrink:0}
+.ss-line .ss-qty{width:66px;flex-shrink:0}
+.ss-lnmath{flex-basis:100%;font-size:10px;color:var(--text3);padding-left:2px}
+.ss-lnrm{cursor:pointer;color:var(--red);font-size:13px;flex-shrink:0;opacity:.55}
+.ss-lnrm:hover{opacity:1}
+.ss-lnadd{font-size:10.5px;font-weight:600;color:var(--blue);background:#e7f0fb;border:1px solid #cfe0f4;border-radius:6px;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:3px}
+.ss-lnadd:hover{background:#d8e7f8}
+.ss-lnadd .ti{font-size:12px;color:var(--blue)}
+@media(max-width:700px){.ss-vwrap{padding-left:8px}.ss-line{padding-left:10px}.ss-line .ss-pn,.ss-line select.ss-vin{width:100%}}
 /* approved vendor list rows (Settings) */
 .vs-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--border2);font-size:13px;font-weight:600}
 .vs-row:last-child{border-bottom:none}
@@ -2338,6 +2368,86 @@ const PROCESSES = [...INTERNAL_PROCESSES, ...EXTERNAL_PROCESSES];
 const EXTERNAL_SET = new Set(EXTERNAL_PROCESSES);
 function isExternal(name){ return EXTERNAL_SET.has(name); }
 function procUnit(name){ return isExternal(name) ? 'd' : 'h'; }
+
+// ══════════════ PURCHASE LINES on an external step ══════════════
+// One step often covers several things to buy — hardware especially: PEM nuts
+// from one vendor, standoffs from another, rivnuts from a third. Each line
+// carries its own vendor + PO, so a step counts as covered only once EVERY line
+// is on a PO, and it's only back when every line is received.
+//
+// Steps written before this existed have no `lines`; stepLines() reads their
+// single itemsPurchased/qtyNeeded as one line, so nothing needs backfilling and
+// every old reader (schedule, dispatch, Issued POs, AI PO import) keeps seeing
+// the roll-up fields it always did — syncStepFromLines() keeps those honest.
+function normList(v){
+  if(Array.isArray(v)) return v.filter(Boolean);
+  if(v && typeof v==='object') return Object.values(v).filter(Boolean);   // RTDB hands lists back object-shaped
+  return [];
+}
+function newStepLine(o){
+  return Object.assign({ id:'ln_'+uid(), desc:'', pn:'', qtyPer:'', qty:'', uom:'',
+    vendor:'', vendorPO:'', poId:'', poAt:'', sentAt:'', receivedAt:'' }, o||{});
+}
+// Read-only view: always an array, legacy steps included. Never writes.
+function stepLines(s){
+  if(!s) return [];
+  const L=normList(s.lines);
+  if(L.length) return L;
+  return [{ id:'ln_only', desc:s.itemsPurchased||'', pn:'', qtyPer:'', qty:(s.qtyNeeded===0?0:(s.qtyNeeded||'')), uom:'',
+    vendor:(s.vendor||'').trim(), vendorPO:String(s.vendorPO||'').trim(), poId:'',
+    poAt:s.poAt||'', sentAt:s.sentAt||'', receivedAt:s.receivedAt||'' }];
+}
+// Materialize the lines on the step so they can be edited/persisted.
+function ensureStepLines(s){
+  const L=normList(s.lines);
+  s.lines = L.length ? L : stepLines(s).map(l=>Object.assign({}, l, {id:'ln_'+uid()}));
+  return s.lines;
+}
+function stepLine(s, lineId){ return stepLines(s).find(l=>l.id===lineId) || null; }
+function lineCovered(l){ return !!(l && String(l.vendorPO||'').trim()); }
+// Buy qty: a typed qty always wins; otherwise per-piece × the order qty, rounded up.
+function lineBuyQty(l, ordQty){
+  if(l.qty!=='' && l.qty!=null) return Number(l.qty)||0;
+  const per=Number(l.qtyPer)||0, n=Number(ordQty)||0;
+  return (per&&n) ? Math.ceil(per*n) : 0;
+}
+// Show the work — the per-piece math behind a buy qty (owner rule: calculations
+// display their math and keep the raw inputs).
+function lineQtyMath(l, ordQty){
+  const per=Number(l.qtyPer)||0, n=Number(ordQty)||0;
+  if(!per||!n) return '';
+  const calc=Math.ceil(per*n);
+  const typed=(l.qty!==''&&l.qty!=null)?Number(l.qty):null;
+  return per+'/pc × '+n+' pcs = '+calc + ((typed!=null&&typed!==calc)?' · buying '+typed:'');
+}
+function lineLabel(l, ordQty){
+  const q=lineBuyQty(l, ordQty);
+  const d=[l.pn,l.desc].filter(Boolean).join(' — ') || 'item';
+  return d + (q?' ×'+q:'');
+}
+// Recompute the step-level roll-ups from its lines. Called after ANY line edit.
+function syncStepFromLines(s, ordQty){
+  const L=stepLines(s); if(!L.length) return;
+  s.itemsPurchased = L.length===1 ? [L[0].pn,L[0].desc].filter(Boolean).join(' — ')
+                                  : L.map(l=>lineLabel(l, ordQty)).join('; ');
+  const q0=lineBuyQty(L[0], ordQty);
+  s.qtyNeeded = (L.length===1 && q0) ? q0 : '';
+  const vs=[...new Set(L.map(l=>(l.vendor||'').trim()).filter(Boolean))];
+  s.vendor = vs.length===1 ? vs[0] : '';
+  const pos=[...new Set(L.map(l=>String(l.vendorPO||'').trim()).filter(Boolean))];
+  // covered ONLY when every line is on a PO — a half-bought step still needs one
+  s.vendorPO = (pos.length && L.every(lineCovered)) ? pos.join(', ') : '';
+  if(s.vendorPO){ const ats=L.map(l=>l.poAt).filter(Boolean).sort(); s.poAt = ats[0] || s.poAt || toISO(new Date()); }
+  else delete s.poAt;
+  // the step's lead time runs from the LAST thing that went out, so the back-by
+  // date reflects the slowest line rather than the first one ordered
+  const ships=L.map(l=>l.sentAt).filter(Boolean).sort();
+  if(ships.length) s.start=ships[ships.length-1];
+  s.sentAt = (ships.length && ships.length===L.length) ? ships[ships.length-1] : null;
+  const rec=L.map(l=>l.receivedAt).filter(Boolean).sort();
+  if(rec.length && rec.length===L.length){ s.receivedAt=rec[rec.length-1]; s.done=true; s.doneAt=s.doneAt||s.receivedAt; }
+  else if(rec.length){ s.receivedAt=''; }   // partially in — the step isn't back yet
+}
 // Colors are grouped (not per-process) to keep the calendar, queues and cards calm:
 // one tone for all in-house work, one for purchasing, one for outsourcing.
 const GROUP_COLORS = { internal:'#64748B', purchasing:'#C08A2E', outsource:'#A8443A', delivery:'#2C7A7B' };
@@ -3226,8 +3336,13 @@ function vendorPOsHtml(g){
   const rows=[];
   g.items.forEach(r=>{
     ((r.schedule&&r.schedule.steps)||[]).forEach(s=>{
-      if(s&&s.vendorPO&&String(s.vendorPO).trim())
-        rows.push({name:s.name,vendor:s.vendor||'',po:String(s.vendorPO).trim(),detail:s.detail||'',item:s.itemsPurchased||'',qty:s.qtyNeeded||''});
+      if(!s) return;
+      // one row per line that's on a PO — a step split across two vendors shows
+      // both, instead of a single merged "1234, 1235"
+      stepLines(s).filter(lineCovered).forEach(l=>{
+        rows.push({name:s.name, vendor:l.vendor||s.vendor||'', po:String(l.vendorPO).trim(), detail:s.detail||'',
+          item:[l.pn,l.desc].filter(Boolean).join(' — '), qty:lineBuyQty(l, r.qty)||''});
+      });
     });
   });
   if(!rows.length) return '';
@@ -3461,12 +3576,32 @@ function detailInner(r){
          <span style="font-size:10px;color:var(--text3)">of ${qtyNeeded||'—'}</span>`);
     // outsourced steps get a vendor/details line so whoever enters the order can hand
     // purchasing everything it needs — the same fields the Need PO tab reads and pools on
-    const vendorRow = (ext && !done) ? `<div class="ss-vrow" onclick="event.stopPropagation()">
-      <i class="ti ti-truck-delivery" title="Vendor info for the PO"></i>
-      ${vendorSelectHtml(step.vendor, `class="ss-vin" title="Approved vendor for this step" onchange="window._stepVendorSel(this,'${r.id}','${pJs}')"`)}
-      <input class="ss-vin grow" placeholder="${extKind(p).group==='outsource'?'Item(s) sent out — e.g. (15) brackets':'Item(s) to purchase — e.g. 14ga 304 sheet'}" value="${esc2(step.itemsPurchased||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','itemsPurchased',this.value)">
-      <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black" value="${esc2(step.detail||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','detail',this.value)">
-      ${step.vendorPO?`<span class="ss-vpo" title="PO already assigned">PO ${esc2(step.vendorPO)}</span>`:''}
+    // One external step can cover several things to buy, each with its own
+    // vendor and PO — so the row below is a list of purchase lines, not a
+    // single item box. Each uncovered line becomes its own card on Need PO.
+    const isOutStep = extKind(p).group==='outsource';
+    const lineRows = (ext && !done) ? stepLines(step).map(l=>{
+      const li=`'${r.id}','${pJs}','${l.id}'`;
+      const math=lineQtyMath(l, qtyNeeded);
+      return `<div class="ss-line">
+        <input class="ss-vin ss-pn" placeholder="Part #" value="${esc2(l.pn||'')}" title="Vendor part number" onchange="window._slEdit(${li},'pn',this.value)">
+        <input class="ss-vin grow" placeholder="${isOutStep?'Item(s) sent out — e.g. (15) brackets':'What to buy — e.g. PEM flush nut 6-32'}" value="${esc2(l.desc||'')}" onchange="window._slEdit(${li},'desc',this.value)">
+        <input class="ss-vin ss-per" type="number" min="0" step="any" placeholder="/pc" value="${esc2(l.qtyPer)}" title="How many per finished piece — the buy qty follows from the order qty" onchange="window._slEdit(${li},'qtyPer',this.value)">
+        <input class="ss-vin ss-qty" type="number" min="0" placeholder="${lineBuyQty(l,qtyNeeded)||'Qty'}" value="${esc2(l.qty)}" title="Quantity to buy — leave blank to use the per-piece math" onchange="window._slEdit(${li},'qty',this.value)">
+        ${vendorSelectHtml(l.vendor, `class="ss-vin" title="Vendor for this item" onchange="window._slVendor(this,${li})"`)}
+        ${lineCovered(l)
+          ? `<span class="ss-vpo" title="Already on a PO">PO ${esc2(l.vendorPO)}</span>`
+          : `<i class="ti ti-x ss-lnrm" title="Remove this item" onclick="window._slDel(${li},event)"></i>`}
+        ${math?`<span class="ss-lnmath" title="How the buy qty was worked out">${esc2(math)}</span>`:''}
+      </div>`;
+    }).join('') : '';
+    const vendorRow = (ext && !done) ? `<div class="ss-vwrap" onclick="event.stopPropagation()">
+      <div class="ss-vrow">
+        <i class="ti ti-truck-delivery" title="What this step buys / sends out"></i>
+        <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black" value="${esc2(step.detail||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','detail',this.value)">
+        <button type="button" class="ss-lnadd" onclick="window._slAdd('${r.id}','${pJs}',event)" title="Another thing to buy on this step — it gets its own vendor and PO"><i class="ti ti-plus"></i> Add item</button>
+      </div>
+      <div class="ss-lines">${lineRows}</div>
     </div>` : '';
     return`<div class="sched-step ss-on${done?' ss-done':''}">
       <i class="ti ti-${done?'circle-check-filled':'circle'} ss-check" style="cursor:pointer;color:${done?'var(--text3)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${p}',event)"></i>
@@ -6741,24 +6876,36 @@ function _extStep(id, name){
   const sch = ensureSchedule(r);
   return sch.steps.find(s=>s.name===name) || null;
 }
+// These act on the whole step — every line on it — since that's what the
+// Incoming/Outgoing board rows represent. Per-line receipt happens when a
+// single vendor's PO is received on the Need PO page.
 window.markSent = (id, name, e) => {
   if(e) e.stopPropagation();
+  const r=orders.find(o=>o.id===id);
   const s=_extStep(id,name); if(!s) return;
   const t=toISO(new Date());
+  ensureStepLines(s).forEach(l=>{ if(!l.sentAt) l.sentAt=t; });
+  syncStepFromLines(s, r&&r.qty);
   s.sentAt=t; s.start=t;            // anchor lead-time to the actual send/order date
   saveDB(); invalidateSched(); render(); renderSchedule();
 };
 window.markReceived = (id, name, e) => {
   if(e) e.stopPropagation();
+  const r=orders.find(o=>o.id===id);
   const s=_extStep(id,name); if(!s) return;
   const t=toISO(new Date());
+  ensureStepLines(s).forEach(l=>{ if(!l.receivedAt) l.receivedAt=t; if(!l.sentAt) l.sentAt=t; });
+  syncStepFromLines(s, r&&r.qty);
   s.receivedAt=t; s.done=true; s.doneAt=t;   // received completes the external step
-  { const r=orders.find(o=>o.id===id); if(r) autoAdvanceStatus(r); }
+  if(r) autoAdvanceStatus(r);
   saveDB(); invalidateSched(); render(); renderSchedule();
 };
 window.undoSent = (id, name, e) => {
   if(e) e.stopPropagation();
+  const r=orders.find(o=>o.id===id);
   const s=_extStep(id,name); if(!s) return;
+  ensureStepLines(s).forEach(l=>{ l.sentAt=''; });
+  syncStepFromLines(s, r&&r.qty);
   s.sentAt=null;
   saveDB(); invalidateSched(); render(); renderSchedule();
 };
@@ -6773,6 +6920,7 @@ window.openStepDetail = (orderId, stepName) => {
   const today=new Date(); today.setHours(0,0,0,0);
   const st = c.start ? ioStatus({start:c.start,end:c.end,sentAt:step.sentAt,kind:k}, today) : {label:'Not scheduled',c:'#888'};
   const esc=s=>(s==null?'':String(s)).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const _iodLines = stepLines(step);
   const sentWord=isOut?'Sent':'Ordered', backWord=isOut?'Back':'In', sendVerb=isOut?'Sent':'Ordered';
   const outDate = step.sentAt ? fmtDate(step.sentAt) : (c.start?fmtDate(toISO(c.start)):'—');
   const backDate = c.end ? fmtDate(toISO(c.end)) : '—';
@@ -6818,14 +6966,24 @@ window.openStepDetail = (orderId, stepName) => {
       ${info(isOut?'Out / Back':'Order / In', `${sendVerb} ${outDate} → ${backWord} ${backDate}`)}
 
       <div class="iod-sect">Vendor — our PO to them</div>
-      <div class="iod-field"><label>Vendor performing this process</label>
+      ${_iodLines.length>1
+        // more than one thing to buy on this step: each line has its own vendor
+        // and PO, so show them as a read-only list — they're edited on the
+        // order card and put on POs from the Need PO page
+        ? `<div class="iod-lines">${_iodLines.map(l=>`<div class="iod-line">
+             <span class="il-d">${esc([l.pn,l.desc].filter(Boolean).join(' — '))||'—'}${lineBuyQty(l,r.qty)?` <b>×${lineBuyQty(l,r.qty)}</b>`:''}</span>
+             <span class="il-v">${esc(l.vendor)||'<span style="color:var(--text3)">no vendor</span>'}</span>
+             <span class="il-s">${l.receivedAt?`<span style="color:#3B6D11">in ${fmtDate(l.receivedAt)}</span>`:(lineCovered(l)?`PO ${esc(l.vendorPO)}`:'<span style="color:var(--red)">needs a PO</span>')}</span>
+           </div>`).join('')}</div>
+           <div class="iod-linehint">${_iodLines.filter(l=>!lineCovered(l)).length} of ${_iodLines.length} still need a PO — add or change items on the order card, then raise the POs on the <b>Need PO</b> page.</div>`
+        : `<div class="iod-field"><label>Vendor performing this process</label>
         <input id="iod-vendor" type="text" placeholder="e.g. Acme Plating" value="${esc(step.vendor)}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
       <div class="iod-field"><label>Our PO # to ${isOut?'vendor':'supplier'}</label>
         <input id="iod-vpo" type="text" placeholder="PO we issued to them" value="${esc(step.vendorPO)}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
       <div class="iod-field"><label>${isOut?'Item(s) sent out':'Item(s) to purchase'}</label>
-        <input id="iod-item" type="text" placeholder="${isOut?'e.g. (15) brackets, B-66735':'e.g. 14ga 304 stainless sheet'}" value="${esc(step.itemsPurchased)}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
+        <input id="iod-item" type="text" placeholder="${isOut?'e.g. (15) brackets, B-66735':'e.g. 14ga 304 stainless sheet'}" value="${esc(_iodLines[0]&&_iodLines[0].desc||'')}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
       <div class="iod-field"><label>Qty needed</label>
-        <input id="iod-qty" type="number" min="0" placeholder="0" value="${esc(step.qtyNeeded)}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>
+        <input id="iod-qty" type="number" min="0" placeholder="0" value="${esc(lineBuyQty(_iodLines[0]||{}, r.qty)||'')}" onchange="_iodSaveVendor('${orderId}','${stepName}')"></div>`}
       <div class="iod-field"><label>Process / details</label>
         <textarea id="iod-detail" rows="2" placeholder="e.g. Type II anodize, black per MIL-A-8625" onchange="_iodSaveVendor('${orderId}','${stepName}')">${esc(step.detail)}</textarea></div>
       <div id="iod-saved" class="iod-saved">Saved ✓</div>
@@ -6840,13 +6998,20 @@ window.openStepDetail = (orderId, stepName) => {
   document.getElementById('io-detail-modal').style.display='flex';
 };
 window._iodSaveVendor = (id,name)=>{
+  const r=orders.find(o=>o.id===id);
   const s=_extStep(id,name); if(!s) return;
-  s.vendor=(document.getElementById('iod-vendor').value||'').trim();
-  s.vendorPO=(document.getElementById('iod-vpo').value||'').trim();
-  const it=document.getElementById('iod-item'); if(it) s.itemsPurchased=(it.value||'').trim();
-  const qn=document.getElementById('iod-qty'); if(qn) s.qtyNeeded=(qn.value!==''?Number(qn.value):'');
   const dt=document.getElementById('iod-detail'); if(dt) s.detail=(dt.value||'').trim();
-  if(s.vendorPO && !s.poAt) s.poAt=toISO(new Date()); if(!s.vendorPO) delete s.poAt;
+  // multi-line steps are shown read-only here — their vendor/PO live per line
+  const vin=document.getElementById('iod-vendor');
+  if(vin){
+    const L=ensureStepLines(s), l=L[0];
+    l.vendor=(vin.value||'').trim();
+    l.vendorPO=(document.getElementById('iod-vpo').value||'').trim();
+    const it=document.getElementById('iod-item'); if(it) l.desc=(it.value||'').trim();
+    const qn=document.getElementById('iod-qty'); if(qn) l.qty=(qn.value!==''?Number(qn.value):'');
+    if(l.vendorPO && !l.poAt) l.poAt=toISO(new Date()); if(!l.vendorPO) l.poAt='';
+    syncStepFromLines(s, r&&r.qty);
+  }
   saveDB(); render(); renderSchedule();
   const tick=document.getElementById('iod-saved'); if(tick){ tick.style.opacity='1'; setTimeout(()=>tick.style.opacity='0',1200); }
 };
@@ -7417,21 +7582,27 @@ function savePOrec(rec){
   });
 }
 
-// The pool: every outside / purchasing step on a "Need Purchase Order" order
-// that doesn't have a PO yet. One entry per step = one selectable item card.
+// The pool: every purchase LINE on an outside / purchasing step of a "Need
+// Purchase Order" order that isn't on a PO yet. One entry per line, not per
+// step — so an order needing hardware from three vendors puts three cards in
+// the pool and each lands in its own vendor bucket below.
 function npPoolItems(){
   const items=[];
   orders.filter(r=>!r.archived && r.status==='Need Purchase Order').forEach(r=>{
     const ext=enabledOrdered(ensureSchedule(r)).filter(s=>isExternal(s.name));
     const sched=computeStepDates(r);
     ext.forEach(s=>{
-      if(s.vendorPO&&String(s.vendorPO).trim()) return;
       const sd=sched.find(x=>x.name===s.name);
-      items.push({ orderId:r.id, name:s.name, vendor:(s.vendor||'').trim(),
-        item:s.itemsPurchased||'', qty:s.qtyNeeded||'', ordQty:r.qty||'', detail:s.detail||'',
-        customer:r.customer||'', job:r.job||'', part:r.part||r.desc||'', due:r.due||'',
-        sendBy:sd?toISO(sd.start):'', backBy:sd?toISO(sd.end):'', lead:s.duration||defDur(s.name),
-        priority:(r.priority==null?2:r.priority) });
+      stepLines(s).forEach(l=>{
+        if(lineCovered(l)) return;
+        items.push({ orderId:r.id, name:s.name, lineId:l.id, vendor:(l.vendor||s.vendor||'').trim(),
+          item:[l.pn,l.desc].filter(Boolean).join(' — '), pn:l.pn||'', desc:l.desc||'',
+          qtyPer:l.qtyPer||'', qty:lineBuyQty(l, r.qty)||'', qtyMath:lineQtyMath(l, r.qty),
+          ordQty:r.qty||'', detail:s.detail||'',
+          customer:r.customer||'', job:r.job||'', part:r.part||r.desc||'', due:r.due||'',
+          sendBy:sd?toISO(sd.start):'', backBy:sd?toISO(sd.end):'', lead:s.duration||defDur(s.name),
+          priority:(r.priority==null?2:r.priority) });
+      });
     });
   });
   return items;
@@ -7446,6 +7617,11 @@ function npOpenPOs(){
   orders.filter(r=>!r.archived).forEach(r=>{
     ((r.schedule&&r.schedule.steps)||[]).forEach(s=>{
       if(!s||!s.enabled||!isExternal(s.name)) return;
+      // multi-line steps are governed by their lines' own POs, and the only way
+      // to give a line a PO is Make PO — which always writes a real `pos`
+      // record. So they can never be "loose", and a rolled-up "1234, 1235"
+      // vendorPO must not be mistaken for a single PO number here.
+      if(normList(s.lines).length>1) return;
       if(!(s.vendorPO&&String(s.vendorPO).trim())) return;
       if(s.receivedAt||s.done) return;
       const key=((s.vendor||'')+'|'+String(s.vendorPO).trim()).toLowerCase();
@@ -7486,15 +7662,19 @@ function renderNeedPO(){
       const late=needBy&&needBy<today;
       const rowsHtml=g.rows.map((x,ri)=>{
         const over=x.sendBy&&x.sendBy<today;
+        const ln=`'${x.orderId}','${esc(x.name)}','${x.lineId}'`;
         return `<div class="npv-row">
           <input type="checkbox" class="npv-pick" data-gi="${gi}" data-ri="${ri}" checked onchange="window._npPick(this)" title="Goes on this PO — untick to leave it for a separate PO">
           <span class="npv-main">
             <span class="npv-l1"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${PRIORITY_COLOR[x.priority]};margin-right:6px" title="${PRIORITY_LABEL[x.priority]}"></span>${esc(x.part)||'—'} <small>· ${esc(x.customer)}${x.job?' · '+esc(x.job):''}${x.due?' · due '+fmtDate(x.due):''}</small></span>
             <span class="npv-inrow">
-              <input class="npq-in npq-item" placeholder="${k.group==='outsource'?'What goes out — e.g. (15) brackets':'What to buy — e.g. 14ga 304 sheet'}" value="${esc(x.item)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','itemsPurchased',this.value)">
-              <input class="npq-in npq-qty" type="number" min="0" placeholder="Qty" value="${esc(x.qty)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','qtyNeeded',this.value)">
+              <input class="npq-in npq-pn" placeholder="Part #" value="${esc(x.pn)}" onchange="_npEditLine(${ln},'pn',this.value)" title="Vendor part number — goes on the PO">
+              <input class="npq-in npq-item" placeholder="${k.group==='outsource'?'What goes out — e.g. (15) brackets':'What to buy — e.g. PEM flush nut 6-32'}" value="${esc(x.desc)}" onchange="_npEditLine(${ln},'desc',this.value)">
+              <input class="npq-in npq-per" type="number" min="0" step="any" placeholder="/pc" value="${esc(x.qtyPer)}" onchange="_npEditLine(${ln},'qtyPer',this.value)" title="How many per finished piece — buy qty follows from the order qty">
+              <input class="npq-in npq-qty" type="number" min="0" placeholder="Buy qty" value="${esc(x.qty)}" onchange="_npEditLine(${ln},'qty',this.value)" title="Quantity to buy — typed here it overrides the per-piece math">
               <input class="npq-in npq-detail" placeholder="Process / spec — e.g. Type II anodize black" value="${esc(x.detail)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','detail',this.value)">
             </span>
+            ${x.qtyMath?`<span class="npv-math" title="How the buy qty was worked out">${esc(x.qtyMath)}</span>`:''}
           </span>
           <span class="npv-nums">${x.ordQty?`<span class="npv-num" title="Quantity the order requires"><small>order</small><b>${esc(x.ordQty)}</b></span>`:''}</span>
           <span class="npv-due${over?' over':''}" title="${k.a==='order'?'Order by':'Send by'} → ${k.b==='in'?'in by':'back by'}">${x.sendBy?fmtDate(x.sendBy):'—'}${x.backBy?' → '+fmtDate(x.backBy):''}</span>
@@ -7566,12 +7746,30 @@ window._npPick=(cb)=>{
   const btn=document.getElementById('npv-btn-'+gi);
   if(btn) btn.innerHTML=`<i class="ti ti-file-plus"></i> Make PO for selected (${n})`;
 };
-// inline edits on an item card write straight to the step (no re-render mid-typing)
+// step-level inline edits (process/spec) — no re-render mid-typing
 window._npEdit=(id,name,field,val)=>{
   const s=_extStep(id,name); if(!s) return;
   if(field==='qtyNeeded') s.qtyNeeded=(val!==''?Number(val):'');
   else s[field]=String(val||'').trim();
   saveDB();
+};
+// line-level inline edits. Writes the line, re-rolls the step's summary fields,
+// and refreshes just this row's math hint so the page doesn't jump under a
+// half-finished entry.
+window._npEditLine=(id,name,lineId,field,val)=>{
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  const s=_extStep(id,name); if(!s) return;
+  const L=ensureStepLines(s);
+  const l=L.find(x=>x.id===lineId); if(!l) return;
+  if(field==='qty'||field==='qtyPer') l[field]=(val!==''?Number(val):'');
+  else l[field]=String(val||'').trim();
+  syncStepFromLines(s, r.qty);
+  saveDB();
+  const row=(typeof event!=='undefined'&&event&&event.target)?event.target.closest('.npv-row'):null;
+  const m=row?row.querySelector('.npv-math'):null;
+  const txt=lineQtyMath(l, r.qty);
+  if(m) m.textContent=txt;
+  else if(row&&txt){ const sp=document.createElement('span'); sp.className='npv-math'; sp.textContent=txt; row.querySelector('.npv-main')?.appendChild(sp); }
 };
 
 // ── make a PO from the ticked items of one vendor group ──────────────────────
@@ -7580,8 +7778,14 @@ window.openMakePO=(gi)=>{
   const picks=[...document.querySelectorAll(`.npv-pick[data-gi="${gi}"]`)];
   const rows=(picks.length?picks.filter(c=>c.checked).map(c=>g.rows[Number(c.dataset.ri)]):g.rows).filter(Boolean);
   if(!rows.length){ alert('Tick at least one item to put on this PO.'); return; }
-  // pull the freshest inline-typed item/qty/detail off the steps
-  rows.forEach(x=>{ const s=_extStep(x.orderId,x.name); if(s){ x.item=s.itemsPurchased||''; x.qty=s.qtyNeeded||''; x.detail=s.detail||''; } });
+  // pull the freshest inline-typed item/qty/detail off the lines
+  rows.forEach(x=>{
+    const r=orders.find(o=>o.id===x.orderId), s=_extStep(x.orderId,x.name); if(!s) return;
+    const l=stepLine(s, x.lineId); if(!l) return;
+    x.pn=l.pn||''; x.desc=l.desc||'';
+    x.item=[l.pn,l.desc].filter(Boolean).join(' — ');
+    x.qty=lineBuyQty(l, r&&r.qty)||''; x.qtyMath=lineQtyMath(l, r&&r.qty); x.detail=s.detail||'';
+  });
   window._mkpo={rows, proc:g.proc, vendor:g.vendor};
   const k=extKind(g.proc), procCol=PROCESS_COLORS[g.proc]||'#888';
   const today=toISO(new Date());
@@ -7591,7 +7795,7 @@ window.openMakePO=(gi)=>{
   document.getElementById('mkpo-body').innerHTML=`
     <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-file-plus"></i> Make PO ${g.vendor?'— '+esc(g.vendor):''}</h3>
     <div style="font-size:12px;color:var(--text3);margin-bottom:13px"><span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(g.proc,12)} ${shortProc(g.proc)}</span> · ${rows.length} item${rows.length!==1?'s':''} on this PO</div>
-    <div class="mkpo-items">${rows.map(x=>`<div class="mkpo-it"><b>${esc(x.part)||'—'}</b><span class="sub">${esc(x.customer)}</span><span>${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.qty?` ×${esc(x.qty)}`:''}</span></div>`).join('')}</div>
+    <div class="mkpo-items">${rows.map(x=>`<div class="mkpo-it"><b>${esc(x.part)||'—'}</b><span class="sub">${esc(x.customer)}${x.job?' · '+esc(x.job):''}</span><span>${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.qty?` <b>×${esc(x.qty)}</b>`:''}${x.qtyMath?`<small style="display:block;color:var(--text3);font-size:10.5px">${esc(x.qtyMath)}</small>`:''}</span></div>`).join('')}</div>
     ${g.vendor?'':`<div class="mkpo-field"><label>Vendor</label>${vendorSelectHtml('', 'id="mkpo-vendor" onchange="window._resolveVendorSel(this)"')}</div>`}
     <div class="mkpo-grid">
       <div class="mkpo-field"><label>Our PO #</label><input id="mkpo-po" placeholder="PO number"></div>
@@ -7615,44 +7819,63 @@ window._mkpoCreate=()=>{
   const ship=(document.getElementById('mkpo-ship').value||'')||toISO(new Date());
   const detail=(document.getElementById('mkpo-detail').value||'').trim();
   const today=toISO(new Date());
-  const items=[];
+  const items=[], poId='po_'+uid();
+  const touched=new Set();
   m.rows.forEach(x=>{
+    const r=orders.find(o=>o.id===x.orderId);
     const s=_extStep(x.orderId,x.name); if(!s) return;
-    s.vendor=vendor; s.vendorPO=po; if(!s.poAt) s.poAt=today;
-    s.sentAt=ship; s.start=ship;   // anchor the lead time to the real ship/order date
+    const L=ensureStepLines(s);
+    const l=L.find(y=>y.id===x.lineId) || L[0]; if(!l) return;
+    l.vendor=vendor; l.vendorPO=po; l.poId=poId; if(!l.poAt) l.poAt=today;
+    l.sentAt=ship;                 // anchor this line's lead time to the real ship/order date
     if(detail&&!s.detail) s.detail=detail;
-    items.push({orderId:x.orderId, step:x.name, part:x.part, customer:x.customer, job:x.job, item:s.itemsPurchased||'', qty:s.qtyNeeded||''});
+    syncStepFromLines(s, r&&r.qty);
+    touched.add(x.orderId);
+    items.push({orderId:x.orderId, step:x.name, lineId:l.id, part:x.part, customer:x.customer, job:x.job,
+      item:[l.pn,l.desc].filter(Boolean).join(' — '), qty:lineBuyQty(l, r&&r.qty)||''});
   });
   if(!items.length){ closeModal('mkpo-modal'); return; }
-  // the Need PO designation clears once every outside step on the order has its PO
-  [...new Set(m.rows.map(x=>x.orderId))].forEach(id=>{
+  // the Need PO designation clears once EVERY line of every outside step has a PO
+  [...touched].forEach(id=>{
     const r=orders.find(o=>o.id===id); if(!r||r.status!=='Need Purchase Order') return;
     const ext=enabledOrdered(ensureSchedule(r)).filter(s=>isExternal(s.name));
-    if(ext.every(s=>s.vendorPO&&String(s.vendorPO).trim())) r.status='Confirmed';
+    if(ext.every(s=>stepLines(s).every(lineCovered))) r.status='Confirmed';
   });
-  savePOrec({ id:'po_'+uid(), po, vendor, proc:m.proc, detail, shipDate:ship, items,
+  savePOrec({ id:poId, po, vendor, proc:m.proc, detail, shipDate:ship, items,
     status:'open', createdAt:today, by:(auth.currentUser&&auth.currentUser.email)||'' });
   saveDB(); invalidateSched(); closeModal('mkpo-modal');
   renderNeedPO(); updateNavBadges(); render(); renderSchedule();
 };
 
 // ── open-PO actions: move the ship date, void, receive ────────────────────────
+// Walk the lines a PO record covers. Older records have no lineId — those
+// predate purchase lines, so they cover the step's single line.
+function _poLines(rec, fn){
+  normList(rec&&rec.items).forEach(it=>{
+    const r=orders.find(x=>x.id===it.orderId);
+    const s=_extStep(it.orderId,it.step); if(!s) return;
+    const L=ensureStepLines(s);
+    const targets = it.lineId ? L.filter(l=>l.id===it.lineId) : L;
+    targets.forEach(l=>fn(l, s, r));
+    syncStepFromLines(s, r&&r.qty);
+  });
+}
 window._polShip=(oi,val)=>{
   const o=window._npOpen&&window._npOpen[oi]; if(!o||!val) return;
   o.rec.shipDate=val;
-  (o.rec.items||[]).forEach(it=>{ const s=_extStep(it.orderId,it.step); if(s){ s.sentAt=val; s.start=val; } });
+  _poLines(o.rec, l=>{ l.sentAt=val; });
   if(!o.legacy) savePOrec(o.rec);
   saveDB(); invalidateSched(); renderNeedPO(); renderSchedule();
 };
 window._polVoid=(oi)=>{
   const o=window._npOpen&&window._npOpen[oi]; if(!o||o.legacy) return;
   if(!confirm('Void PO '+o.rec.po+'? The items go back to the Needs-a-PO list.')) return;
-  (o.rec.items||[]).forEach(it=>{
-    const s=_extStep(it.orderId,it.step); if(!s) return;
-    s.vendorPO=''; delete s.poAt; s.sentAt=null;
-    const r=orders.find(x=>x.id===it.orderId);
-    if(r&&r.status==='Confirmed') r.status='Need Purchase Order';   // back on the list
+  const back=new Set();
+  _poLines(o.rec, (l,s,r)=>{
+    l.vendorPO=''; l.poId=''; l.poAt=''; l.sentAt='';
+    if(r) back.add(r);
   });
+  back.forEach(r=>{ if(r.status==='Confirmed') r.status='Need Purchase Order'; });   // back on the list
   delete POS[o.rec.id];
   remove(ref(db,'pos/'+o.rec.id)).catch(()=>{});
   saveDB(); invalidateSched(); renderNeedPO(); updateNavBadges(); render(); renderSchedule();
@@ -7661,9 +7884,17 @@ window.openReceivePO=(oi)=>{
   const o=window._npOpen&&window._npOpen[oi]; if(!o) return;
   const p=o.rec, esc=esc2, kk=extKind(p.proc);
   window._rcv={open:o, invoice:null, ai:false};
+  // a step split across vendors only completes when its LAST line lands — say so
+  let waiting=0;
+  normList(p.items).forEach(it=>{
+    const s=_extStep(it.orderId,it.step); if(!s) return;
+    const L=stepLines(s), mine=new Set(normList(p.items).filter(y=>y.orderId===it.orderId&&y.step===it.step).map(y=>y.lineId).filter(Boolean));
+    if(mine.size) waiting += L.filter(l=>!mine.has(l.id) && !l.receivedAt).length;
+  });
+  const nIt=normList(p.items).length;
   document.getElementById('rcv-body').innerHTML=`
     <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-package-import"></i> Receive PO ${esc(p.po)}</h3>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:13px">${esc(p.vendor)||'—'} · ${shortProc(p.proc)} · marks all ${(p.items||[]).length} item${(p.items||[]).length!==1?'s':''} ${kk.b==='in'?'in':'received'} and completes the step${(p.items||[]).length!==1?'s':''}</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:13px">${esc(p.vendor)||'—'} · ${shortProc(p.proc)} · marks ${nIt} item${nIt!==1?'s':''} ${kk.b==='in'?'in':'received'}${waiting?` — ${waiting} other item${waiting!==1?'s':''} on the same step ${waiting!==1?'are':'is'} still out, so the step stays open`:' and completes the step'+(nIt!==1?'s':'')}</div>
     <div class="mkpo-field"><label>Date received</label><input id="rcv-date" type="date" value="${toISO(new Date())}"></div>
     <div class="rcv-drop" onclick="document.getElementById('rcv-file').click()"><i class="ti ti-file-invoice"></i><b>Attach the vendor invoice</b> — PDF or photo. AI reads the invoice #, date, and total; you check them.</div>
     <input type="file" id="rcv-file" accept="application/pdf,image/*" style="display:none" onchange="_rcvFile(this)">
@@ -7781,11 +8012,12 @@ window._rcvComplete=()=>{
     p.invoiceInfo.lines=rcv.lines.map(l=>({desc:l.desc||'', qty:l.qty||'', amount:l.amount||0, po_ref:l.po_ref||'', sel:!!l.sel}));
     if(rcv.aiTotal) p.invoiceInfo.invoiceGrandTotal=rcv.aiTotal;
   }
-  (p.items||[]).forEach(it=>{
-    const s=_extStep(it.orderId,it.step); if(!s) return;
-    s.receivedAt=t; s.done=true; s.doneAt=t;   // received completes the external step
-    const r=orders.find(x=>x.id===it.orderId); if(r) autoAdvanceStatus(r);
-  });
+  // receiving marks THIS PO's lines in; syncStepFromLines only completes the
+  // step once every line on it is back, so a step split across two vendors
+  // stays open until the second PO lands
+  const adv=new Set();
+  _poLines(p, (l,s,r)=>{ l.receivedAt=t; if(!l.sentAt) l.sentAt=p.shipDate||t; if(r) adv.add(r); });
+  adv.forEach(r=>autoAdvanceStatus(r));
   savePOrec(p);
   saveDB(); invalidateSched(); closeModal('rcv-modal');
   renderNeedPO(); updateNavBadges(); render(); renderSchedule();
@@ -7798,15 +8030,17 @@ function renderIssuedPOs(){
   const rows=[];
   orders.forEach(r=>{
     ((r.schedule&&r.schedule.steps)||[]).forEach(s=>{
-      if(s&&s.vendorPO&&String(s.vendorPO).trim()){
+      if(!s) return;
+      // one row per PO'd line, so a step bought from two vendors logs two POs
+      stepLines(s).filter(lineCovered).forEach(l=>{
         rows.push({
-          po:String(s.vendorPO).trim(), vendor:s.vendor||'', proc:s.name,
+          po:String(l.vendorPO).trim(), vendor:l.vendor||s.vendor||'', proc:s.name,
           customer:r.customer||'', custPO:r.po||'', job:r.job||'', part:r.part||r.desc||'',
-          detail:s.detail||'', item:s.itemsPurchased||'', qty:s.qtyNeeded||'',
-          at:s.poAt||'', received:!!(s.receivedAt||s.done), sent:!!s.sentAt,
+          detail:s.detail||'', item:[l.pn,l.desc].filter(Boolean).join(' — '), qty:lineBuyQty(l, r.qty)||'',
+          at:l.poAt||s.poAt||'', received:!!(l.receivedAt||s.done), sent:!!l.sentAt,
           archived:!!r.archived, orderId:r.id
         });
-      }
+      });
     });
   });
   rows.sort((a,b)=>(b.at||'').localeCompare(a.at||'') || (b.po).localeCompare(a.po));
@@ -8143,6 +8377,49 @@ window._stepVendorInfo = (id, name, field, val) => {
   const step = ensureSchedule(r).steps.find(s=>s.name===name); if(!step) return;
   step[field] = (val||'').trim();
   saveDB();
+};
+// ── purchase lines edited on the order card ──────────────────────────────────
+// Each line is its own thing to buy, with its own vendor and PO. Edits re-roll
+// the step's summary fields so the schedule, dispatch board and Issued POs log
+// keep reading the same fields they always have.
+function _slStep(id,name){
+  const r=orders.find(o=>o.id===id); if(!r) return null;
+  const s=ensureSchedule(r).steps.find(x=>x.name===name); if(!s) return null;
+  ensureStepLines(s);
+  return {r,s};
+}
+window._slEdit = (id, name, lineId, field, val) => {
+  const c=_slStep(id,name); if(!c) return;
+  const l=c.s.lines.find(x=>x.id===lineId); if(!l) return;
+  if(field==='qty'||field==='qtyPer') l[field]=(val!==''?Number(val):'');
+  else l[field]=String(val||'').trim();
+  syncStepFromLines(c.s, c.r.qty);
+  saveDB(); render();
+};
+window._slVendor = (sel, id, name, lineId) => {
+  const v=window._resolveVendorSel(sel);
+  if(v==null) return;
+  window._slEdit(id, name, lineId, 'vendor', v);
+};
+window._slAdd = (id, name, e) => {
+  if(e) e.stopPropagation();
+  const c=_slStep(id,name); if(!c) return;
+  c.s.lines.push(newStepLine());
+  syncStepFromLines(c.s, c.r.qty);
+  saveDB(); render();
+};
+window._slDel = (id, name, lineId, e) => {
+  if(e) e.stopPropagation();
+  const c=_slStep(id,name); if(!c) return;
+  const l=c.s.lines.find(x=>x.id===lineId);
+  if(l&&lineCovered(l)){ alert('This item is already on PO '+l.vendorPO+'. Void that PO on the Need PO page first.'); return; }
+  if(c.s.lines.length<=1){   // never leave a step with no line — blank it instead
+    if(l){ Object.assign(l, newStepLine({id:l.id})); }
+  } else {
+    c.s.lines=c.s.lines.filter(x=>x.id!==lineId);
+  }
+  syncStepFromLines(c.s, c.r.qty);
+  saveDB(); render();
 };
 window._stepStart = (id, name, val) => {
   const r = orders.find(o=>o.id===id); if(!r) return;

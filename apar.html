@@ -1314,25 +1314,40 @@ function poInvRef(inv,po){
   const no=inv&&inv.no?String(inv.no).trim():'';
   return no?('Inv '+no):('PO '+po);
 }
+// One step in the order tracker can cover several things to buy, each with its own vendor
+// and PO (hardware especially - PEM nuts from one supplier, standoffs from another). Those
+// live on `step.lines[]`; the step's own vendor/vendorPO are roll-ups, and when the lines
+// disagree the roll-up is deliberately blank or a "5001, 5002" join - neither of which is a
+// bill. So AP reads the LINES. Steps written before purchase lines existed have none, and
+// read back as their single vendor/vendorPO pair. Source of truth: stepLines() in orders.html.
+function apStepPOs(s){
+  if(!s) return [];
+  const raw=s.lines;
+  const L=Array.isArray(raw)?raw.filter(Boolean):(raw&&typeof raw==='object'?Object.values(raw).filter(Boolean):[]);
+  if(L.length) return L.map(l=>({po:String(l.vendorPO||'').trim(), vendor:(l.vendor||s.vendor||'').trim(), sentAt:l.sentAt||s.sentAt||''}))
+                       .filter(x=>x.po);
+  const po=String(s.vendorPO||'').trim();
+  return po?[{po, vendor:(s.vendor||'').trim(), sentAt:s.sentAt||''}]:[];
+}
 function deriveAP(){
   const poIdx=poInvoiceIndex();
-  // Gather every PO step across all orders.
+  // Gather every PO across all orders - one entry per purchased line, not per step.
   const steps=[];
   Object.values(orders).filter(r=>r&&!r.archived).forEach(r=>{
     const ss=(r.schedule&&r.schedule.steps)||[];
     ss.forEach(s=>{
-      if(s&&s.vendorPO&&String(s.vendorPO).trim()){
-        const proc=(s.name||'').replace(/^Outsource- |^Purchasing- /,'');
+      const proc=(s&&s.name||'').replace(/^Outsource- |^Purchasing- /,'');
+      apStepPOs(s).forEach(x=>{
         steps.push({
           orderId:r.id,
-          po:String(s.vendorPO).trim(),
-          vendor:(s.vendor&&s.vendor.trim())||'(vendor)',
+          po:x.po,
+          vendor:x.vendor||'(vendor)',
           proc, detail:s.detail||'',
           part:(r.part||r.desc||''), customer:r.customer||'',
-          sentAt:s.sentAt||'',
+          sentAt:x.sentAt,
           stepName:s.name||''
         });
-      }
+      });
     });
   });
   // Group by vendor + PO number (the safest combine key). A user can opt a group out
