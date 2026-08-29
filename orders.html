@@ -413,6 +413,25 @@ tr:hover .del-btn{opacity:1}
 .iod-row{display:flex;gap:12px;padding:3px 0;font-size:13px}
 .iod-k{width:118px;flex-shrink:0;color:var(--text2)}
 .iod-v{flex:1;min-width:0;color:var(--text);font-weight:600;word-break:break-word}
+/* recipient picker for the confirmation email: chips + the shared address book */
+.cto-box{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:38px;padding:5px 7px;margin-top:5px;
+  border:1px solid var(--border2);border-radius:9px;background:#fff;cursor:text}
+.cto-box input{flex:1 1 130px;min-width:110px;border:0;outline:0;font:inherit;font-size:13px;padding:3px 2px;background:transparent}
+.cto-chip{display:inline-flex;align-items:center;gap:5px;max-width:100%;font-size:12px;font-weight:600;
+  color:#185FA5;background:#e7f0fb;border:1px solid #cfe0f4;border-radius:14px;padding:3px 6px 3px 10px}
+.cto-chip .ti{cursor:pointer;font-size:13px;opacity:.6}
+.cto-chip .ti:hover{opacity:1;color:var(--red)}
+.cto-sugbox{border:1px solid var(--border);border-radius:9px;margin-top:5px;max-height:212px;overflow:auto;background:#fff}
+.cto-sug{display:flex;align-items:center;gap:9px;padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border)}
+.cto-sug:last-child{border-bottom:0}
+.cto-sug.on{background:#eef4fb}
+.cto-av{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#dde6f2;color:#3a5a80;
+  font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.cto-sm{flex:1;min-width:0;font-size:12.5px;line-height:1.35;overflow:hidden}
+.cto-sm small{color:var(--text3);font-size:11px}
+.cto-sm .cto-em{display:block}
+.cto-tag{flex-shrink:0;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;
+  color:#3B6D11;background:#eaf5d8;border-radius:9px;padding:2px 7px;white-space:nowrap}
 .iod-lines{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:4px 0}
 .iod-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 10px;font-size:12px;border-bottom:1px solid var(--border)}
 .iod-line:last-child{border-bottom:0}
@@ -2077,6 +2096,13 @@ body.sb-hidden .topbar{padding-left:24px}
       <button class="btn green" onclick="window.printConfirmation()"><i class="ti ti-printer"></i> Print / Save PDF</button>
       <button class="btn" id="confirm-email-btn" onclick="window.emailConfirmation()" title="Email this confirmation straight to the customer through the shop mailbox — orders still marked Received flip to Confirmed when it sends" style="background:#1e3a5f;color:#fff;border:none"><i class="ti ti-send"></i> Email to customer</button>
     </div>
+  </div>
+</div>
+
+<!-- Who to email the confirmation to: chips + the shared address book -->
+<div class="modal-bg" id="cto-modal" style="display:none;z-index:120">
+  <div class="modal" style="max-width:520px">
+    <div id="cto-body"></div>
   </div>
 </div>
 
@@ -4317,23 +4343,165 @@ function _renderConfirmEmailStatus(msg,err){
   el.style.color=err?'var(--red)':'var(--text2)';
   if(msg!==undefined){ el.textContent=msg; return; }
   const sent=(_confirmItems||[]).map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0];
-  el.textContent=sent?('Emailed to '+sent.to+' · '+new Date(sent.at).toLocaleDateString()):'';
+  if(!sent){ el.textContent=''; el.title=''; return; }
+  const tos=(Array.isArray(sent.tos)&&sent.tos.length)?sent.tos:[sent.to].filter(Boolean);
+  const who=tos.length>1?(tos[0]+' +'+(tos.length-1)+' more'):(tos[0]||sent.to||'');
+  el.textContent='Emailed to '+who+' · '+new Date(sent.at).toLocaleDateString();
+  el.title=tos.join('\n');   // the row is one line and ellipsised — hover for the full list
 }
+// ── who it goes to ───────────────────────────────────────────────────────────
+// The address book is the same shared one the Mail app keeps at mail/contacts,
+// read fresh each time the picker opens (orders.html holds no listener on it).
+const RE_EMAIL=/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
+let _ctoTo=[], _ctoBook=[], _ctoSug=[], _ctoHi=-1, _ctoSend=null;
+// "Jane Machinist <jane@acme.com>", "jane@acme.com; bob@acme.com" — take the
+// addresses out of whatever gets pasted in
+function ctoParse(text){
+  return String(text||'').split(/[,;\n]+/).map(s=>{
+    const m=s.match(/<([^>]+)>/);
+    return (m?m[1]:s).trim();
+  }).filter(Boolean);
+}
+function ctoAdd(raw){
+  let added=0, bad='';
+  ctoParse(raw).forEach(e=>{
+    if(!RE_EMAIL.test(e)){ bad=bad||e; return; }
+    if(_ctoTo.some(x=>x.email.toLowerCase()===e.toLowerCase())) return;   // no duplicates
+    const c=_ctoBook.find(b=>b.email.toLowerCase()===e.toLowerCase());
+    _ctoTo.push({email:e, name:(c&&c.name)||''});
+    added++;
+  });
+  return {added, bad};
+}
+window._ctoRemove=(i)=>{ _ctoTo.splice(i,1); _ctoRender(); document.getElementById('cto-in')?.focus(); };
+window._ctoPick=(i)=>{
+  const s=_ctoSug[i]; if(!s) return;
+  ctoAdd(s.email);
+  const inp=document.getElementById('cto-in'); if(inp) inp.value='';
+  _ctoRender(); document.getElementById('cto-in')?.focus();
+};
+window._ctoKey=(inp,e)=>{
+  const v=inp.value;
+  if(e.key==='Enter'||e.key===','||e.key===';'||e.key==='Tab'){
+    if(_ctoHi>=0&&_ctoSug[_ctoHi]){ e.preventDefault(); window._ctoPick(_ctoHi); return; }
+    if(v.trim()){ e.preventDefault();
+      const r=ctoAdd(v);
+      if(r.added){ inp.value=''; _ctoRender(); }
+      else _ctoNote(r.bad?('“'+r.bad+'” isn’t an email address.'):'Already on the list.');
+    }
+    return;
+  }
+  if(e.key==='Backspace'&&!v&&_ctoTo.length){ e.preventDefault(); _ctoTo.pop(); _ctoRender(); return; }
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){
+    if(!_ctoSug.length) return;
+    e.preventDefault();
+    _ctoHi=(e.key==='ArrowDown') ? Math.min(_ctoSug.length-1,_ctoHi+1) : Math.max(0,_ctoHi-1);
+    _ctoPaintSug();
+    return;
+  }
+  if(e.key==='Escape'&&v){ e.preventDefault(); inp.value=''; _ctoInput(inp); }
+};
+window._ctoBlur=(inp)=>{ if(inp.value.trim()){ if(ctoAdd(inp.value).added){ inp.value=''; _ctoRender(); } } };
+window._ctoInput=(inp)=>{
+  const q=(inp.value||'').trim().toLowerCase();
+  const taken=new Set(_ctoTo.map(x=>x.email.toLowerCase()));
+  _ctoSug=_ctoBook
+    .filter(c=>!taken.has(c.email.toLowerCase()))
+    .filter(c=>!q || [c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase().includes(q))
+    .slice(0,8);
+  _ctoHi=_ctoSug.length?0:-1;
+  _ctoPaintSug();
+};
+function _ctoNote(msg){ const n=document.getElementById('cto-note'); if(n) n.textContent=msg||''; }
+function _ctoPaintSug(){
+  const host=document.getElementById('cto-sug'); if(!host) return;
+  if(!_ctoSug.length){ host.style.display='none'; host.innerHTML=''; return; }
+  host.style.display='block';
+  host.innerHTML=_ctoSug.map((c,i)=>`<div class="cto-sug${i===_ctoHi?' on':''}" onmousedown="event.preventDefault();window._ctoPick(${i})" onmouseenter="window._ctoHover(${i})">
+    <span class="cto-av">${esc2(((c.name||c.email)[0]||'?').toUpperCase())}</span>
+    <span class="cto-sm"><b>${esc2(c.name||c.email)}</b>${c.company?`<small> · ${esc2(c.company)}</small>`:''}
+      <small class="cto-em">${esc2(c.email)}</small></span>
+    ${c.suggested?`<span class="cto-tag">${esc2(c.suggested)}</span>`:''}
+  </div>`).join('');
+}
+window._ctoHover=(i)=>{ _ctoHi=i; _ctoPaintSug(); };
+function _ctoRender(){
+  const host=document.getElementById('cto-body'); if(!host) return;
+  const chips=_ctoTo.map((t,i)=>`<span class="cto-chip" title="${esc2(t.email)}">${esc2(t.name||t.email)}<i class="ti ti-x" onclick="window._ctoRemove(${i})"></i></span>`).join('');
+  host.innerHTML=`
+    <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-send"></i> Email the confirmation</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Everyone below gets the same email. Pick from the shared address book or type an address.</div>
+    <label style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.3px;text-transform:uppercase">To</label>
+    <div class="cto-box" onclick="document.getElementById('cto-in').focus()">
+      ${chips}
+      <input id="cto-in" placeholder="${_ctoTo.length?'Add another…':'Name or email…'}" autocomplete="off"
+        oninput="window._ctoInput(this)" onfocus="window._ctoInput(this)"
+        onkeydown="window._ctoKey(this,event)" onblur="window._ctoBlur(this)">
+    </div>
+    <div id="cto-sug" class="cto-sugbox" style="display:none"></div>
+    <div id="cto-note" style="font-size:11.5px;color:var(--red);min-height:15px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button class="btn" onclick="closeModal('cto-modal')">Cancel</button>
+      <button class="btn blue" id="cto-go" onclick="window._ctoConfirm()"><i class="ti ti-send"></i> Send${_ctoTo.length>1?(' to '+_ctoTo.length):''}</button>
+    </div>`;
+  const inp=document.getElementById('cto-in');
+  if(inp){ inp.focus(); window._ctoInput(inp); }
+}
+window._ctoConfirm=()=>{
+  const inp=document.getElementById('cto-in');
+  if(inp&&inp.value.trim()){ const r=ctoAdd(inp.value); if(!r.added&&r.bad){ _ctoNote('“'+r.bad+'” isn’t an email address.'); return; } inp.value=''; }
+  if(!_ctoTo.length){ _ctoNote('Add at least one recipient.'); _ctoRender(); return; }
+  const list=_ctoTo.map(t=>t.email);
+  closeModal('cto-modal');
+  if(_ctoSend) _ctoSend(list);
+};
 window.emailConfirmation=async ()=>{
   const items=_confirmItems||[]; if(!items.length) return;
-  const btn=document.getElementById('confirm-email-btn');
-  // best guess for the address: the customer index first, then whoever emailed the PO in
-  let guess='';
+  // best guesses: the customer index first, then whoever emailed the PO in —
+  // both are offered at the top of the address book rather than pre-filled, so
+  // nothing goes out to a stale address without being looked at
+  const guesses=[];
   const cust=(_confirmMeta.customer||'').trim();
   const cRec=customers.find(c=>(c.name||'').toLowerCase()===cust.toLowerCase());
-  if(cRec&&cRec.email) guess=cRec.email;
+  if(cRec&&cRec.email) guesses.push({email:cRec.email, name:'', suggested:'customer card'});
   const mailKey=(items.find(i=>i.mailKey)||{}).mailKey||'';
-  if(!guess&&mailKey){
-    try{ const s=await get(ref(db,'mail/threads/'+mailKey)); guess=((s.val()||{}).meta||{}).fromEmail||''; }catch(e){}
+  if(mailKey){
+    try{
+      const meta=((await get(ref(db,'mail/threads/'+mailKey))).val()||{}).meta||{};
+      if(meta.fromEmail) guesses.push({email:meta.fromEmail, name:meta.fromName||'', suggested:'sent the PO'});
+    }catch(e){}
   }
-  const to=(prompt('Email this order confirmation to:',guess)||'').trim();
-  if(!to) return;
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)){ _renderConfirmEmailStatus('That doesn’t look like an email address.',true); return; }
+  // whoever it went to last time, so a re-send is one click
+  (items.map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0]||{tos:[]}).tos
+    ?.forEach(e=>guesses.push({email:e, name:'', suggested:'sent last time'}));
+  let book=[];
+  try{
+    const snap=(await get(ref(db,'mail/contacts'))).val()||{};
+    book=Object.values(snap).filter(c=>c&&c.email&&RE_EMAIL.test(String(c.email).trim()))
+      .map(c=>({email:String(c.email).trim(), name:(c.name||'').trim(), company:(c.company||'').trim()}));
+  }catch(e){ /* no address book reachable — typing still works */ }
+  // guesses first, then the book, one entry per address
+  const seen=new Set(), merged=[];
+  guesses.filter(g=>g.email&&RE_EMAIL.test(g.email)).forEach(g=>{
+    const k=g.email.toLowerCase(); if(seen.has(k)) return; seen.add(k);
+    const b=book.find(x=>x.email.toLowerCase()===k);
+    merged.push({email:g.email, name:g.name||(b&&b.name)||'', company:(b&&b.company)||'', suggested:g.suggested});
+  });
+  book.forEach(b=>{ const k=b.email.toLowerCase(); if(seen.has(k)) return; seen.add(k); merged.push(b); });
+  _ctoBook=merged; _ctoTo=[]; _ctoSug=[]; _ctoHi=-1;
+  _ctoSend=(list)=>_sendConfirmationTo(list);
+  document.getElementById('cto-modal').style.display='flex';
+  _ctoRender();
+};
+async function _sendConfirmationTo(list){
+  const items=_confirmItems||[]; if(!items.length) return;
+  const btn=document.getElementById('confirm-email-btn');
+  const cust=(_confirmMeta.customer||'').trim();
+  // CR/LF would let an address forge extra mail headers — the worker drops `to`
+  // straight into the To: line
+  const tos=list.map(e=>String(e).replace(/[\r\n]/g,'').trim()).filter(e=>RE_EMAIL.test(e));
+  if(!tos.length){ _renderConfirmEmailStatus('No valid email address to send to.',true); return; }
+  const to=tos.join(', ');
   if(btn){ btn.disabled=true; btn.style.opacity=.6; }
   _renderConfirmEmailStatus('Sending…');
   try{
@@ -4384,23 +4552,26 @@ window.emailConfirmation=async ()=>{
     const at=Date.now(), by=(auth.currentUser&&auth.currentUser.email)||'';
     let bumped=0;
     items.forEach(i=>{
-      i.confirmEmailed={to:to, at:at, by:by};
+      // `to` stays the joined string older records already used; `tos` is the
+      // list, and it's what the picker offers back as "sent last time"
+      i.confirmEmailed={to:to, tos:tos, at:at, by:by};
       if(!i.status||i.status==='Received'){ i.status='Confirmed'; bumped++; }
     });
     saveDB(); render();
-    // remember the address on the customer card so next time it's one click
+    // remember the first address on the customer card so next time it's one click
     if(cust){
       autoIndexCustomer(cust,'');
       const cr=customers.find(c=>(c.name||'').toLowerCase()===cust.toLowerCase());
-      if(cr&&!cr.email){ cr.email=to; saveCustomersDB(); }
+      if(cr&&!cr.email){ cr.email=tos[0]; saveCustomersDB(); }
     }
-    _renderConfirmEmailStatus('Sent to '+to+' ✓'+(bumped?(' — '+bumped+' order'+(bumped!==1?'s':'')+' marked Confirmed'):''));
+    _renderConfirmEmailStatus('Sent to '+(tos.length>1?(tos.length+' recipients'):to)+' ✓'
+      +(bumped?(' — '+bumped+' order'+(bumped!==1?'s':'')+' marked Confirmed'):''));
   }catch(e){
     _renderConfirmEmailStatus('Send failed: '+((e&&e.message)||e),true);
   }finally{
     if(btn){ btn.disabled=false; btn.style.opacity=''; }
   }
-};
+}
 
 
 window.handleCustomerSelect = (sel) => {
