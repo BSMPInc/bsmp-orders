@@ -414,6 +414,30 @@ tr:hover .del-btn{opacity:1}
 .iod-k{width:118px;flex-shrink:0;color:var(--text2)}
 .iod-v{flex:1;min-width:0;color:var(--text);font-weight:600;word-break:break-word}
 /* recipient picker for the confirmation email: chips + the shared address book */
+/* message preview — step 2 of the picker */
+.cmp-hdr{border:1px solid var(--border);border-radius:9px;padding:8px 11px;background:var(--bg);margin-bottom:9px}
+.cmp-h{display:flex;gap:9px;font-size:12px;line-height:1.5;padding:1px 0}
+.cmp-h span{flex:0 0 54px;color:var(--text3);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;padding-top:2px}
+.cmp-h b{flex:1;min-width:0;font-weight:600;color:var(--text);word-break:break-word}
+.cmp-body{font-size:12.5px;line-height:1.55;color:var(--text);border:1px solid var(--border);border-radius:9px;
+  padding:11px 13px;background:#fff;max-height:230px;overflow:auto}
+.cmp-tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px;margin-top:8px;background:#fff}
+/* the global `table{min-width:1020px;table-layout:fixed}` is for the orders grid
+   and would blow this one out to 1020px with the money columns pushed off — opt
+   out of both, the same way .att-table does */
+.cmp-tbl{width:100%!important;min-width:0!important;table-layout:auto!important;border-collapse:collapse;font-size:12px}
+.cmp-tbl th{background:var(--bg);font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--text2);padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.cmp-tbl td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+/* the description takes the slack and wraps; qty/rate/amount shrink to their
+   content, so the money columns stay on screen instead of being scrolled off */
+.cmp-tbl th:first-child,.cmp-tbl td:first-child{width:100%}
+.cmp-tbl th:not(:first-child),.cmp-tbl td:not(:first-child){white-space:nowrap}
+.cmp-tbl tbody tr:last-child td{border-bottom:0}
+.cmp-tbl tfoot td{font-weight:800;background:var(--bg);border-top:1px solid var(--border2);border-bottom:0}
+.cmp-tblnote{font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.4}
+.cmp-notes{width:100%;box-sizing:border-box;margin-top:5px;font-family:inherit;font-size:12.5px;
+  padding:8px 10px;border:1px solid var(--border);border-radius:8px;resize:vertical}
 .cto-lbl{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--text2);
   letter-spacing:.3px;text-transform:uppercase;margin-top:9px}
 .cto-lblhint{font-weight:600;letter-spacing:0;text-transform:none;font-size:11px;color:var(--text3)}
@@ -2107,7 +2131,7 @@ body.sb-hidden .topbar{padding-left:24px}
 
 <!-- Who to email the confirmation to: chips + the shared address book -->
 <div class="modal-bg" id="cto-modal" style="display:none;z-index:120">
-  <div class="modal" style="max-width:520px">
+  <div class="modal" style="max-width:580px">
     <div id="cto-body"></div>
   </div>
 </div>
@@ -4365,7 +4389,9 @@ const RE_EMAIL=/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
 // Two recipient lists, To and Cc, each a list of {email,name}. `_ctoField` is
 // whichever box the caret is in — the suggestion list feeds that one.
 let _ctoTo=[], _ctoCc=[], _ctoCcOn=false, _ctoField='to',
-    _ctoBook=[], _ctoSug=[], _ctoHi=-1, _ctoSend=null;
+    _ctoBook=[], _ctoSug=[], _ctoHi=-1, _ctoSend=null,
+    _ctoStep='who',      // 'who' = pick recipients, 'preview' = read the message
+    _ctoCfg=null;        // mailbox + signature, fetched once when the preview opens
 const ctoList=(f)=> f==='cc' ? _ctoCc : _ctoTo;
 // "Jane Machinist <jane@acme.com>", "jane@acme.com; bob@acme.com" — take the
 // addresses out of whatever gets pasted in
@@ -4473,6 +4499,7 @@ function _ctoFieldHtml(f,label,hint){
     <div id="cto-sug-${f}" class="cto-sugbox" style="display:none"></div>`;
 }
 function _ctoRender(){
+  if(_ctoStep==='preview'){ _ctoRenderPreview(); return; }
   const host=document.getElementById('cto-body'); if(!host) return;
   const n=_ctoTo.length+_ctoCc.length;
   const showCc=_ctoCcOn||_ctoCc.length>0;
@@ -4484,12 +4511,79 @@ function _ctoRender(){
     <div id="cto-note" style="font-size:11.5px;color:var(--red);min-height:15px;margin-top:6px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
       <button class="btn" onclick="closeModal('cto-modal')">Cancel</button>
-      <button class="btn blue" id="cto-go" onclick="window._ctoConfirm()"><i class="ti ti-send"></i> Send${n>1?(' to '+n):''}</button>
+      <button class="btn blue" id="cto-go" onclick="window._ctoConfirm()">Review message${n>1?(' · '+n+' recipients'):''} <i class="ti ti-arrow-right"></i></button>
     </div>`;
   _ctoRefocus(_ctoIn(_ctoField)?_ctoField:'to');
 }
-window._ctoConfirm=()=>{
-  // commit whatever is still half-typed in either box before sending
+// ── step 2: read the message before it goes ──────────────────────────────────
+// Rendered from the same _confirmCompose() the send posts, so this is the real
+// wording, the real table and the real signature — not a mock-up of them.
+function _ctoRenderPreview(){
+  const host=document.getElementById('cto-body'); if(!host) return;
+  const e=esc2;
+  const addrLine=(list)=>list.map(t=>e(t.name?(t.name+' <'+t.email+'>'):t.email)).join(', ');
+  if(!_ctoCfg){
+    host.innerHTML=`<h3 style="margin:0 0 12px;display:flex;align-items:center;gap:9px"><i class="ti ti-mail"></i> Message preview</h3>
+      <div style="font-size:12.5px;color:var(--text3);padding:18px 0;text-align:center">Loading the mailbox and signature…</div>`;
+    return;
+  }
+  if(_ctoCfg.error){
+    host.innerHTML=`<h3 style="margin:0 0 12px;display:flex;align-items:center;gap:9px"><i class="ti ti-mail-off"></i> Message preview</h3>
+      <div style="font-size:12.5px;color:var(--red);line-height:1.5">Couldn’t build the preview: ${e(_ctoCfg.error)}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+        <button class="btn" onclick="window._ctoBack()"><i class="ti ti-arrow-left"></i> Back</button>
+        <button class="btn" onclick="closeModal('cto-modal')">Cancel</button>
+      </div>`;
+    return;
+  }
+  const msg=_confirmCompose(_ctoCfg.sigText);
+  // the table the worker renders, drawn here the same way — header row + a TOTAL last
+  const head=msg.rows[0], body=msg.rows.slice(1,-1), tot=msg.rows[msg.rows.length-1];
+  const cellAlign=(j)=>j===0?'left':'right';
+  const tableHtml=`<table class="cmp-tbl">
+    <thead><tr>${head.map((c,j)=>`<th style="text-align:${cellAlign(j)}">${e(c)}</th>`).join('')}</tr></thead>
+    <tbody>${body.map(r=>`<tr>${r.map((c,j)=>`<td style="text-align:${cellAlign(j)}">${e(c)||'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+    <tfoot><tr>${tot.map((c,j)=>`<td style="text-align:${cellAlign(j)}">${e(c)}</td>`).join('')}</tr></tfoot>
+  </table>`;
+  host.innerHTML=`
+    <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-mail"></i> Message preview</h3>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:11px">This is exactly what goes out. Nothing has been sent yet.</div>
+    <div class="cmp-hdr">
+      <div class="cmp-h"><span>From</span><b>${e(_ctoCfg.replyAs)}</b></div>
+      <div class="cmp-h"><span>To</span><b>${addrLine(_ctoTo)}</b></div>
+      ${_ctoCc.length?`<div class="cmp-h"><span>Cc</span><b>${addrLine(_ctoCc)}</b></div>`:''}
+      <div class="cmp-h"><span>Subject</span><b>${e(msg.subject)}</b></div>
+    </div>
+    <div class="cmp-body">${e(msg.body).replace(/\n/g,'<br>')}</div>
+    <div class="cmp-tblwrap">${tableHtml}</div>
+    <div class="cmp-tblnote">The table is sent as a real table — the wording above and the sign-off sit either side of it.${_ctoCfg.sigLogo?' The signature logo is embedded too.':''}</div>
+    <label class="cto-lbl" style="margin-top:12px">Notes on the confirmation<span class="cto-lblhint">edit here and the preview updates</span></label>
+    <textarea id="cmp-notes" rows="2" class="cmp-notes" placeholder="e.g. Pricing valid 30 days. Material certs included."
+      oninput="window._ctoNotes(this.value)">${e(msg.notes)}</textarea>
+    <div id="cto-note" style="font-size:11.5px;color:var(--red);min-height:15px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+      <button class="btn" onclick="window._ctoBack()"><i class="ti ti-arrow-left"></i> Back</button>
+      <button class="btn" onclick="closeModal('cto-modal')">Cancel</button>
+      <button class="btn blue" id="cto-go" onclick="window._ctoSendNow()"><i class="ti ti-send"></i> Send${(_ctoTo.length+_ctoCc.length)>1?(' to '+(_ctoTo.length+_ctoCc.length)):''}</button>
+    </div>`;
+}
+window._ctoBack=()=>{ _ctoStep='who'; _ctoRender(); };   // chips are kept
+// the same field the confirmation ticket edits — the printed copy and the email
+// read from one place, so a fix here shows up on both
+window._ctoNotes=(val)=>{
+  (_confirmItems||[]).forEach(i=>{ i.confirmNotes=val; });
+  saveDB();
+  const t=document.getElementById('confirm-notes-input'); if(t&&t.value!==val) t.value=val;
+  const txt=document.getElementById('confirm-notes-text'), block=document.getElementById('confirm-notes-block');
+  if(txt) txt.textContent=val;
+  if(block) block.style.display=val.trim()?'':'none';
+  // repaint just the body, so the caret stays in the notes box
+  const host=document.getElementById('cto-body');
+  const bodyEl=host&&host.querySelector('.cmp-body');
+  if(bodyEl&&_ctoCfg&&!_ctoCfg.error) bodyEl.innerHTML=esc2(_confirmCompose(_ctoCfg.sigText).body).replace(/\n/g,'<br>');
+};
+window._ctoConfirm=async ()=>{
+  // commit whatever is still half-typed in either box before moving on
   for(const f of ['to','cc']){
     const inp=_ctoIn(f);
     if(inp&&inp.value.trim()){
@@ -4503,6 +4597,14 @@ window._ctoConfirm=()=>{
     if(_ctoCc.length){ _ctoTo=_ctoCc.splice(0,1); _ctoRender(); _ctoNote('Moved '+_ctoTo[0].email+' to To — an email needs at least one main recipient.'); return; }
     _ctoRender(); _ctoNote('Add at least one recipient.'); return;
   }
+  _ctoStep='preview'; _ctoRender();                       // shows the loading line
+  if(!_ctoCfg){
+    try{ _ctoCfg=await _confirmMailCfg(); }
+    catch(err){ _ctoCfg={error:(err&&err.message)||String(err)}; }
+    if(_ctoStep==='preview') _ctoRender();                // unless Cancel/Back beat it
+  }
+};
+window._ctoSendNow=()=>{
   const to=_ctoTo.map(t=>t.email), cc=_ctoCc.map(t=>t.email);
   closeModal('cto-modal');
   if(_ctoSend) _ctoSend(to,cc);
@@ -4542,10 +4644,60 @@ window.emailConfirmation=async ()=>{
   });
   book.forEach(b=>{ const k=b.email.toLowerCase(); if(seen.has(k)) return; seen.add(k); merged.push(b); });
   _ctoBook=merged; _ctoTo=[]; _ctoCc=[]; _ctoCcOn=false; _ctoField='to'; _ctoSug=[]; _ctoHi=-1;
+  _ctoStep='who'; _ctoCfg=null;
   _ctoSend=(toList,ccList)=>_sendConfirmationTo(toList,ccList);
   document.getElementById('cto-modal').style.display='flex';
   _ctoRender();
 };
+// ── the message itself ───────────────────────────────────────────────────────
+// Composed in one place so the preview shows EXACTLY what gets sent — the
+// preview renders this and the send posts this, there is no second copy of the
+// wording that could drift.
+function _confirmCompose(sigText){
+  const items=_confirmItems||[];
+  const cust=(_confirmMeta.customer||'').trim();
+  // dates + totals, computed the same way the printed ticket does
+  const dueDates=items.map(i=>i.due).filter(Boolean).sort();
+  const ordDates=items.map(i=>i.ordered).filter(Boolean).sort();
+  const dueDate=dueDates[dueDates.length-1]||'', orderDate=ordDates[0]||'';
+  const grand=items.reduce((s2,i)=>s2+rowTotal(i),0);
+  const notes=(items.find(i=>i.confirmNotes)||{}).confirmNotes||'';
+  const po=(_confirmMeta.po||'').trim();
+  let body='Hello,\n\nThis confirms receipt of your order'+(po?(' — PO '+po):'')+'. The line items are below.\n'
+    +(orderDate?('\nOrder date: '+fmtDate(orderDate)):'')
+    +(dueDate?('\nCompletion / due date: '+fmtDate(dueDate)):'')
+    +'\n\nThis confirms receipt of your order and is not an invoice.'
+    +(notes?('\n\nNotes:\n'+notes):'')
+    +'\n\nThank you,';
+  body+= sigText ? ('\n\n-- \n'+sigText)
+    : '\nBert\'s Sheet Metal Products Inc.\n9521 Irondale Ave, Chatsworth, CA 91311\n+1 818 775 0104\ninfo@bertsmp.com';
+  const rows=[['Part / Description','Qty','Rate','Amount']];
+  items.forEach(i=>{
+    const lt=rowTotal(i);
+    rows.push([[i.part,i.desc].filter(Boolean).join(' — ')||'—', String(i.qty||''), i.cost?Number(i.cost).toFixed(2):'', lt?fmtMoney(lt):'']);
+  });
+  rows.push(['','','TOTAL',fmtMoney(grand)]);
+  return { subject:'Order Confirmation'+(cust?(' — '+cust):'')+(po?(' — PO '+po):''), body, rows, notes };
+}
+// Mailbox + shared signature. Read once when the preview opens and reused for
+// the send, so what was previewed is what goes out.
+async function _confirmMailCfg(){
+  const cfg=(await get(ref(db,'mail/settings'))).val()||{};
+  const proxy=(cfg.proxyUrl||'').replace(/\/+$/,'');
+  if(!proxy) throw new Error('mail proxy address not set — finish the Mail app setup first');
+  const boxes=(cfg.mailboxes||[]).filter(Boolean);
+  const replyAs=boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||'info@bertsmp.com');
+  // shared signature — same record the Mail app appends on send (key = email with
+  // Firebase-illegal characters swapped for _, matching mail.html's mkey())
+  let sigText='', sigLogo=null;
+  try{
+    const sg=(await get(ref(db,'mail/signatures/'+replyAs.toLowerCase().replace(/[.#$\/\[\]]/g,'_')))).val();
+    const rec=(sg&&typeof sg==='object')?sg:{text:String(sg||'')};
+    sigText=String(rec.text||'').trim();
+    if(rec.logo&&rec.logo.data) sigLogo={data:rec.logo.data, mime:rec.logo.mime||'image/png', width:rec.logo.width||160};
+  }catch(e){ /* no signature — the fallback sign-off in _confirmCompose covers it */ }
+  return {proxy, replyAs, sigText, sigLogo};
+}
 async function _sendConfirmationTo(list, ccList){
   const items=_confirmItems||[]; if(!items.length) return;
   const btn=document.getElementById('confirm-email-btn');
@@ -4561,45 +4713,10 @@ async function _sendConfirmationTo(list, ccList){
   if(btn){ btn.disabled=true; btn.style.opacity=.6; }
   _renderConfirmEmailStatus('Sending…');
   try{
-    const s=await get(ref(db,'mail/settings'));
-    const cfg=s.val()||{};
-    const proxy=(cfg.proxyUrl||'').replace(/\/+$/,'');
-    if(!proxy) throw new Error('mail proxy address not set — finish the Mail app setup first');
-    const boxes=(cfg.mailboxes||[]).filter(Boolean);
-    const replyAs=boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||'info@bertsmp.com');
-    // shared signature — same record the Mail app appends on send (key = email with
-    // Firebase-illegal characters swapped for _, matching mail.html's mkey())
-    let sigText='', sigLogo=null;
-    try{
-      const sg=(await get(ref(db,'mail/signatures/'+replyAs.toLowerCase().replace(/[.#$\/\[\]]/g,'_')))).val();
-      const rec=(sg&&typeof sg==='object')?sg:{text:String(sg||'')};
-      sigText=String(rec.text||'').trim();
-      if(rec.logo&&rec.logo.data) sigLogo={data:rec.logo.data, mime:rec.logo.mime||'image/png', width:rec.logo.width||160};
-    }catch(e){ /* no signature — the fallback sign-off below covers it */ }
-    // dates + totals, computed the same way the printed ticket does
-    const dueDates=items.map(i=>i.due).filter(Boolean).sort();
-    const ordDates=items.map(i=>i.ordered).filter(Boolean).sort();
-    const dueDate=dueDates[dueDates.length-1]||'', orderDate=ordDates[0]||'';
-    const grand=items.reduce((s2,i)=>s2+rowTotal(i),0);
-    const notes=(items.find(i=>i.confirmNotes)||{}).confirmNotes||'';
-    const po=(_confirmMeta.po||'').trim();
-    let body='Hello,\n\nThis confirms receipt of your order'+(po?(' — PO '+po):'')+'. The line items are below.\n'
-      +(orderDate?('\nOrder date: '+fmtDate(orderDate)):'')
-      +(dueDate?('\nCompletion / due date: '+fmtDate(dueDate)):'')
-      +'\n\nThis confirms receipt of your order and is not an invoice.'
-      +(notes?('\n\nNotes:\n'+notes):'')
-      +'\n\nThank you,';
-    body+= sigText ? ('\n\n-- \n'+sigText)
-      : '\nBert\'s Sheet Metal Products Inc.\n9521 Irondale Ave, Chatsworth, CA 91311\n+1 818 775 0104\ninfo@bertsmp.com';
-    const rows=[['Part / Description','Qty','Rate','Amount']];
-    items.forEach(i=>{
-      const lt=rowTotal(i);
-      rows.push([[i.part,i.desc].filter(Boolean).join(' — ')||'—', String(i.qty||''), i.cost?Number(i.cost).toFixed(2):'', lt?fmtMoney(lt):'']);
-    });
-    rows.push(['','','TOTAL',fmtMoney(grand)]);
-    const payload={replyAs, to, cc:ccs,
-      subject:'Order Confirmation'+(cust?(' — '+cust):'')+(po?(' — PO '+po):''),
-      body, tables:[{title:'', header:true, rows}], sigLogo};
+    const {proxy, replyAs, sigText, sigLogo} = _ctoCfg || await _confirmMailCfg();
+    const msg=_confirmCompose(sigText);
+    const payload={replyAs, to, cc:ccs, subject:msg.subject,
+      body:msg.body, tables:[{title:'', header:true, rows:msg.rows}], sigLogo};
     const tok=await auth.currentUser.getIdToken();
     const r=await fetch(proxy+'/send',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify(payload)});
     if(!r.ok) throw new Error('mail proxy error '+r.status+': '+(await r.text()).slice(0,150));
