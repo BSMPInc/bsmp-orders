@@ -1618,12 +1618,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap">
+    <div style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
       <div class="field" style="width:90px"><label>Qty 1</label><input id="qb-1" type="number" value="100" min="1" onchange="calcQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 2</label><input id="qb-2" type="number" value="250" min="1" onchange="calcQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 3</label><input id="qb-3" type="number" value="500" min="1" onchange="calcQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 4</label><input id="qb-4" type="number" value="750" min="1" onchange="calcQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 5</label><input id="qb-5" type="number" value="1000" min="1" onchange="calcQtyBreaks()"></div>
+      <div class="field" style="width:90px"><label>Qty 6</label><input id="qb-6" type="number" value="" min="1" placeholder="optional" onchange="calcQtyBreaks()"></div>
+      <div class="field" style="width:90px"><label>Qty 7</label><input id="qb-7" type="number" value="" min="1" placeholder="optional" onchange="calcQtyBreaks()"></div>
+      <div class="field" style="width:90px"><label>Qty 8</label><input id="qb-8" type="number" value="" min="1" placeholder="optional" onchange="calcQtyBreaks()"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
       <button class="btn btn-accent" onclick="calcQtyBreaks()" style="margin-bottom:1px">Calculate</button>
       <button class="btn" onclick="copyQtyBreaks()" style="margin-bottom:1px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
@@ -1637,6 +1643,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
         AI review
       </button>
+      </div>
     </div>
     <div id="qty-breaks-result"></div>
     <div id="qb-ai-review" style="display:none"></div>
@@ -2122,12 +2129,18 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap">
+    <div style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px">
       <div class="field" style="width:90px"><label>Qty 1</label><input id="asm-qb-1" type="number" value="100" min="1" onchange="calcAsmQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 2</label><input id="asm-qb-2" type="number" value="250" min="1" onchange="calcAsmQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 3</label><input id="asm-qb-3" type="number" value="500" min="1" onchange="calcAsmQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 4</label><input id="asm-qb-4" type="number" value="750" min="1" onchange="calcAsmQtyBreaks()"></div>
       <div class="field" style="width:90px"><label>Qty 5</label><input id="asm-qb-5" type="number" value="1000" min="1" onchange="calcAsmQtyBreaks()"></div>
+      <div class="field" style="width:90px"><label>Qty 6</label><input id="asm-qb-6" type="number" value="" min="1" placeholder="optional" onchange="calcAsmQtyBreaks()"></div>
+      <div class="field" style="width:90px"><label>Qty 7</label><input id="asm-qb-7" type="number" value="" min="1" placeholder="optional" onchange="calcAsmQtyBreaks()"></div>
+      <div class="field" style="width:90px"><label>Qty 8</label><input id="asm-qb-8" type="number" value="" min="1" placeholder="optional" onchange="calcAsmQtyBreaks()"></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
       <button class="btn btn-accent" onclick="calcAsmQtyBreaks()" style="margin-bottom:1px">Calculate</button>
       <button class="btn" onclick="printAsmQtyBreaks()" style="margin-bottom:1px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -2137,6 +2150,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg>
         AI review
       </button>
+      </div>
     </div>
 
     <div id="asm-qb-results"></div>
@@ -6505,7 +6519,9 @@ function qbMixHtml(results){
 
 function calcQtyBreaks(){
   clearQbAiReview('part'); // numbers are changing — a shown review would be stale
-  const qtys=[1,2,3,4,5].map(i=>parseFloat(document.getElementById(`qb-${i}`).value)||0).filter(q=>q>0);
+  const qtys=[...new Set([1,2,3,4,5,6,7,8]
+    .map(i=>parseFloat(document.getElementById(`qb-${i}`).value)||0)
+    .filter(q=>q>0))].sort((a,b)=>a-b);
   if(!qtys.length){
     document.getElementById('qty-breaks-result').innerHTML='<div style="font-size:12px;color:var(--red,#dc2626);padding:8px 0">Enter at least one quantity above, then click Calculate.</div>';
     return;
@@ -8893,7 +8909,9 @@ function calcAsmQtyBreaks(){
   }
   document.getElementById('asm-qb-empty').style.display = 'none';
 
-  const qtys = [1,2,3,4,5].map(i => parseFloat(document.getElementById('asm-qb-'+i).value)||0).filter(q=>q>0);
+  const qtys = [...new Set([1,2,3,4,5,6,7,8]
+    .map(i => parseFloat(document.getElementById('asm-qb-'+i).value)||0)
+    .filter(q=>q>0))].sort((a,b)=>a-b);
   if (!qtys.length) return;
 
   const finance = parseFloat(document.getElementById('asm-finance').value)/100 || 0.07;
