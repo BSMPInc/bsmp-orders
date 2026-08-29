@@ -450,6 +450,19 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 .changelog-list li { font-size: 13px; color: var(--text2); padding: 3px 0 3px 16px; position: relative; line-height: 1.5; }
 .changelog-list li::before { content: '—'; position: absolute; left: 0; color: var(--text3); }
 
+/* OUTSOURCE PRICE BREAKS — the outside shop's own quantity ladder */
+.obr-btn { height:28px; width:30px; padding:0; font-size:11px; font-weight:700; cursor:pointer;
+  border:1px solid var(--border); border-radius:6px; background:var(--surface2); color:var(--text2); }
+.obr-btn:hover { background:var(--surface); }
+.obr-btn.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+.obr-panel { margin:6px 0 4px 0; padding:9px 11px; border:1px dashed var(--border); border-radius:8px; background:var(--surface2); }
+.obr-head { font-size:11px; font-weight:700; color:var(--text2); margin-bottom:7px; }
+.obr-head span { font-weight:400; color:var(--text3); }
+.obr-tiers { display:flex; flex-wrap:wrap; gap:8px 14px; }
+.obr-tier { display:flex; align-items:center; gap:5px; }
+.obr-tier input { width:74px; font-size:12px; padding:4px 7px; }
+.obr-arrow { color:var(--text3); font-size:12px; }
+.obr-active { font-size:11px; font-weight:600; color:#166534; margin-top:7px; min-height:14px; }
 /* QTY BREAKS TABLE */
 .qb-table { width:100%; border-collapse:collapse; font-size:13px; }
 .qb-table th { font-size:10px; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:.07em; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--surface2); text-align:left; }
@@ -1472,6 +1485,17 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Add outsource item
     </button>
+    <div style="display:flex;gap:10px;align-items:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);flex-wrap:wrap">
+      <div class="field" style="width:130px">
+        <label>Margin on outside work</label>
+        <input id="out-markup" type="number" min="0" max="200" step="1" placeholder="same as tier" onchange="calculate()"
+               title="Markup % applied to the outside shop's price only. Leave blank to mark it up at the same rate as everything else.">
+      </div>
+      <div style="flex:1;min-width:200px;font-size:11px;color:var(--text3);line-height:1.45;padding-bottom:4px">
+        Their price is passed through at this margin instead of the quantity tier — a job that's mostly outside work
+        shouldn't carry the same markup as work you do yourself. <strong>Blank = no change</strong>, it's marked up like the rest.
+      </div>
+    </div>
   </div>
 
   <!-- Notes -->
@@ -3433,15 +3457,92 @@ function addHw(desc='',qty='',cost=''){
   if(desc) applyHwPrice(id);   // restored rows get their provenance line back (never touches a saved cost)
 }
 
-function addOut(desc='',qty='',cost=''){
+// How many break tiers an outsource row offers. Outside shops quote a ladder
+// ("1-99 @ $12.40, 100-499 @ $9.80, 500+ @ $8.15") and their price is most of
+// the cost on an outsource-heavy job, so it has to move with quantity the way
+// material already does — otherwise every row of the quantity-break table
+// prices the outside work at the same rate.
+const OUT_BREAK_TIERS = 6;
+function addOut(desc='',qty='',cost='',breaks=null){
   outCount++; const id=outCount;
-  const d=document.createElement('div'); d.id=`out-${id}`;
-  d.style.cssText='display:grid;grid-template-columns:1fr 80px 90px 28px;gap:8px;margin-bottom:6px;align-items:center';
-  d.innerHTML=`<input type="text" id="out-desc-${id}" placeholder="description" value="${desc}" onchange="calculate()">
-    <input type="number" id="out-qty-${id}" placeholder="qty/part" value="${qty}" min="0" step="0.001" onchange="calculate()">
-    <input type="number" id="out-cost-${id}" placeholder="$/piece" value="${cost}" min="0" step="0.01" onchange="calculate()">
-    <button class="del-btn" onclick="removeRow('out-${id}')" title="Remove">×</button>`;
-  document.getElementById('out-container').appendChild(d);
+  const wrap=document.createElement('div'); wrap.id=`out-${id}`;
+  wrap.style.cssText='margin-bottom:6px';
+  const B=normOutBreaks(breaks);
+  const tierRows=[];
+  for(let t=1;t<=OUT_BREAK_TIERS;t++){
+    const b=B[t-1]||{};
+    tierRows.push(`<div class="obr-tier">
+      <input type="number" id="outbr-${id}-min-${t}" placeholder="qty" min="1" step="1" value="${b.min!=null?b.min:''}" onchange="calculate()" title="This price applies from this quantity up">
+      <span class="obr-arrow">→</span>
+      <input type="number" id="outbr-${id}-cost-${t}" placeholder="$/pc" min="0" step="0.01" value="${b.cost!=null?b.cost:''}" onchange="calculate()" title="Their price per piece at that quantity">
+    </div>`);
+  }
+  wrap.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 80px 90px 30px 28px;gap:8px;align-items:center">
+      <input type="text" id="out-desc-${id}" placeholder="description" value="${desc}" onchange="calculate()">
+      <input type="number" id="out-qty-${id}" placeholder="qty/part" value="${qty}" min="0" step="0.001" onchange="calculate()">
+      <input type="number" id="out-cost-${id}" placeholder="$/piece" value="${cost}" min="0" step="0.01" onchange="calculate()">
+      <button type="button" class="obr-btn" id="outbr-btn-${id}" onclick="toggleOutBreaks(${id})" title="Their price breaks — the price per piece at each of their quantity tiers">$$</button>
+      <button class="del-btn" onclick="removeRow('out-${id}')" title="Remove">×</button>
+    </div>
+    <div class="obr-panel" id="outbr-panel-${id}" style="display:none">
+      <div class="obr-head">Their price breaks <span>— qty from → $/piece. Leave blank to use the single price above at every quantity.</span></div>
+      <div class="obr-tiers">${tierRows.join('')}</div>
+      <div class="obr-active" id="outbr-active-${id}"></div>
+    </div>`;
+  document.getElementById('out-container').appendChild(wrap);
+  if(B.length) toggleOutBreaks(id, true);   // a restored row that has tiers shows them
+}
+// tiers come back off a saved quote as an array (or object, from RTDB)
+function normOutBreaks(b){
+  const L = Array.isArray(b) ? b : (b && typeof b==='object' ? Object.values(b) : []);
+  return L.filter(x=>x && (x.min!=null&&x.min!=='' || x.cost!=null&&x.cost!==''))
+          .slice(0,OUT_BREAK_TIERS);
+}
+window.toggleOutBreaks=(id, forceOpen)=>{
+  const p=document.getElementById('outbr-panel-'+id); if(!p) return;
+  const open = forceOpen===true ? true : p.style.display==='none';
+  p.style.display = open?'block':'none';
+  const b=document.getElementById('outbr-btn-'+id);
+  if(b) b.classList.toggle('on', open);
+};
+// Their price at THIS quantity: the highest tier whose minimum the run reaches.
+// Below every tier, the row's own $/piece stands — that box is the 1-off price.
+function getOutBreakCost(id, qty, baseCost){
+  const tiers=[];
+  for(let t=1;t<=OUT_BREAK_TIERS;t++){
+    const min=parseFloat(document.getElementById(`outbr-${id}-min-${t}`)?.value);
+    const cost=parseFloat(document.getElementById(`outbr-${id}-cost-${t}`)?.value);
+    if(!isNaN(min)&&min>0&&!isNaN(cost)&&cost>0) tiers.push({min,cost});
+  }
+  if(!tiers.length) return {cost:baseCost, tier:null};
+  tiers.sort((a,b)=>b.min-a.min);
+  const hit=tiers.find(t=>qty>=t.min);
+  return hit ? {cost:hit.cost, tier:hit} : {cost:baseCost, tier:null};
+}
+// Margin on outside work. Blank = outside work is marked up like everything
+// else, so nothing changes on a quote that doesn't use it.
+function readOutBreaks(id){
+  const out=[];
+  for(let t=1;t<=OUT_BREAK_TIERS;t++){
+    const min=document.getElementById(`outbr-${id}-min-${t}`)?.value;
+    const cost=document.getElementById(`outbr-${id}-cost-${t}`)?.value;
+    if(String(min||'').trim()!=='' || String(cost||'').trim()!=='') out.push({min:String(min||''), cost:String(cost||'')});
+  }
+  return out;
+}
+function getOutMarkup(){
+  const el=document.getElementById('out-markup');
+  if(!el || String(el.value).trim()==='') return null;
+  const v=parseFloat(el.value);
+  return (isFinite(v)&&v>=0) ? v/100 : null;
+}
+// One markup for our own work, a different one for the outside shop's price.
+function splitMarkupCost(totalCostPart, outCostPart, markup){
+  const om=getOutMarkup();
+  if(om===null) return totalCostPart*markup;
+  const own=Math.max(0, totalCostPart-outCostPart);
+  return own*markup + outCostPart*om;
 }
 
 function removeRow(id){ const el=document.getElementById(id); if(el){el.remove();calculate();} }
@@ -4199,17 +4300,22 @@ function calculate(){
     if(desc.value) hwLines.push({desc:desc.value,q,c,total});
   }
 
-  // Outsource
+  // Outsource — their price steps with the run size when they've quoted breaks
   let outCostPart=0, outLines=[];
   for(let i=1;i<=outCount;i++){
     const desc=document.getElementById(`out-desc-${i}`);
     const qEl=document.getElementById(`out-qty-${i}`);
     const cEl=document.getElementById(`out-cost-${i}`);
     if(!desc||!qEl||!cEl) continue;
-    const q=parseFloat(qEl.value)||0, c=parseFloat(cEl.value)||0;
+    const q=parseFloat(qEl.value)||0, base=parseFloat(cEl.value)||0;
+    const br=getOutBreakCost(i, qty, base);
+    const c=br.cost;
+    // say out loud which of their tiers this run lands on
+    const act=document.getElementById('outbr-active-'+i);
+    if(act) act.textContent = br.tier ? (qty+' pcs → their '+br.tier.min+'+ tier at $'+br.tier.cost.toFixed(2)+'/pc') : '';
     if(!q&&!c) continue;
     const total=q*c*(1+finance); outCostPart+=total;
-    if(desc.value) outLines.push({desc:desc.value,q,c,total});
+    if(desc.value) outLines.push({desc:desc.value,q,c,total,breaks:readOutBreaks(i)});
   }
 
   // Add inspection cost if enabled
@@ -4241,7 +4347,7 @@ function calculate(){
   const cnc = computeCnc(qty, finance);
   const cncCostPart = cnc.enabled ? cnc.totalPart : 0;
   const totalCostPart = matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart+cncCostPart;
-  const markupCost = totalCostPart*markup;
+  const markupCost = splitMarkupCost(totalCostPart, outCostPart, markup);
   const finalPrice = roundPrice(totalCostPart+markupCost);
   // Expedite fee — a separate job-level line item, never baked into price/part
   const expType = document.getElementById('exp-type')?.value||'none';
@@ -4323,7 +4429,10 @@ function calculate(){
     cnc.bdLines.forEach(l=> bd+=br(l.label, fmt(l.val), l.sub));
   }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Total cost / part</span><span class="breakdown-val">${fmt(totalCostPart)}</span></div>`;
-  bd+=br(`Markup (${(markup*100).toFixed(0)}% + ${(finance*100).toFixed(1)}% finance)`,fmt(markupCost));
+  const _om=getOutMarkup();
+  bd+=br((_om!==null && outCostPart>0)
+    ? `Markup (${(markup*100).toFixed(0)}% our work · ${(_om*100).toFixed(0)}% outside · + ${(finance*100).toFixed(1)}% finance)`
+    : `Markup (${(markup*100).toFixed(0)}% + ${(finance*100).toFixed(1)}% finance)`, fmt(markupCost));
   {
     const preRound=Math.round((totalCostPart+markupCost)*100)/100;
     if(finalPrice>preRound+1e-9){
@@ -5164,7 +5273,8 @@ function saveQuote(){
   const outLines=[];
   for(let i=1;i<=outCount;i++){
     const desc=gv('out-desc-'+i), q=gv('out-qty-'+i), c=gv('out-cost-'+i);
-    if(desc||q||c) outLines.push({desc,q,c});
+    const breaks=readOutBreaks(i);
+    if(desc||q||c||breaks.length) outLines.push({desc,q,c,breaks});
   }
   // Material price break tiers
   const matBreakRows=[];
@@ -5235,6 +5345,7 @@ function saveQuote(){
     costsheet: gv('costsheet'), sheetsize: gv('sheetsize'),
     customSheetW: gv('custom-sheet-w'), customSheetL: gv('custom-sheet-l'),
     purchasing: gv('purchasing'),
+    outMarkup: gv('out-markup'),
     // Material price breaks
     matBreaksEnabled: gc('matbreaks-enabled'),
     matBreakRows,
@@ -5912,6 +6023,7 @@ function reloadQuote(id){
     sv('costsheet', q.costsheet);
   }
   sv('purchasing', q.purchasing);
+  sv('out-markup', q.outMarkup);
 
   // ---- Material pricing method (sheet vs weight) ----
   matwAreaManual = !!q.matwAreaManual;
@@ -5955,7 +6067,7 @@ function reloadQuote(id){
   else { addOp();addOp();addOp(); }
   if(q.hwLines&&q.hwLines.length) q.hwLines.forEach(l=>addHw(l.desc,l.q,l.c));
   else addHw();
-  if(q.outLines&&q.outLines.length) q.outLines.forEach(l=>addOut(l.desc,l.q,l.c));
+  if(q.outLines&&q.outLines.length) q.outLines.forEach(l=>addOut(l.desc,l.q,l.c,l.breaks));
   else addOut();
 
   // ---- Material price breaks ----
@@ -6422,12 +6534,13 @@ function calcBreakForQty(qty){
     const hcost=parseFloat(document.getElementById('hw-cost-'+i)?.value)||0;
     if(desc&&hqty&&hcost) hwCostPart+=hqty*hcost*(1+finance);
   }
-  // Outsource cost
+  // Outsource cost — at THIS break quantity, so their ladder shows up in ours
   let outCostPart=0;
   for(let i=1;i<=outCount;i++){
     const desc=document.getElementById('out-desc-'+i)?.value||'';
     const oqty=parseFloat(document.getElementById('out-qty-'+i)?.value)||0;
-    const ocost=parseFloat(document.getElementById('out-cost-'+i)?.value)||0;
+    const base=parseFloat(document.getElementById('out-cost-'+i)?.value)||0;
+    const ocost=getOutBreakCost(i, qty, base).cost;
     if(desc&&oqty&&ocost) outCostPart+=oqty*ocost*(1+finance);
   }
   // Inspection cost
@@ -6460,7 +6573,7 @@ function calcBreakForQty(qty){
   const cnc=computeCnc(qty,finance,true);
   const cncCostPart=cnc.enabled?cnc.totalPart:0;
   const totalCostPart=matCostPart+laborCostPart+hwCostPart+outCostPart+purchasing+inspCostPart+progCostPart+weldCostPart+cncCostPart;
-  const markupCost=totalCostPart*markup;
+  const markupCost=splitMarkupCost(totalCostPart, outCostPart, markup);
   const finalPrice=roundPrice(totalCostPart+markupCost);
   const expType=document.getElementById('exp-type')?.value||'none';
   const expAmt=parseFloat(document.getElementById('exp-amount')?.value)||0;
@@ -10222,10 +10335,12 @@ function quotePayload(q){
     pricePerPart: _qNum(q.pricePerPart),
     breakdown: q.breakdown || null,
     jobTotal: _qNum(q.jobTotal),
+    outMarkup: q.outMarkup!=null ? String(q.outMarkup) : '',
     poNumber: q.poNumber || '',
     dueDate: q.dueDate || '',
     laborLines: (q.laborLines||[]).map(l=>({ op:String(l.op||''), mins:String(l.mins!=null?l.mins:'') })),
-    outLines:   (q.outLines||[]).map(o=>({ desc:String(o.desc||''), q:String(o.q!=null?o.q:''), c:String(o.c!=null?o.c:'') })),
+    outLines:   (q.outLines||[]).map(o=>({ desc:String(o.desc||''), q:String(o.q!=null?o.q:''), c:String(o.c!=null?o.c:''),
+                  breaks:(Array.isArray(o.breaks)?o.breaks:[]).map(b=>({min:String(b.min||''), cost:String(b.cost||'')})) })),
     hwLines:    (q.hwLines||[]).map(h=>({ desc:String(h.desc||''), q:String(h.q!=null?h.q:''), c:String(h.c!=null?h.c:'') })),
     notes: q.notes || '',
     drawingUrl: q.drawingUrl || '',
