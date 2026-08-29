@@ -4447,7 +4447,7 @@ function calculate(){
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Job total (×${qty})</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('breakdown').innerHTML=bd;
 
-  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,expType,expAmt,expediteFee,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
+  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,outMarkup:getOutMarkup(),effMarkup:(totalCostPart>0?markupCost/totalCostPart:markup),expType,expAmt,expediteFee,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
   if(typeof renderCostMix==='function') renderCostMix();
 }
 
@@ -6581,7 +6581,12 @@ function calcBreakForQty(qty){
   const expediteFee=(expAmt>0&&expType==='pct')?Math.round(baseJobTotal*expAmt/100*100)/100:(expAmt>0&&expType==='flat')?expAmt:0;
   const jobTotal=baseJobTotal+expediteFee;
   const margin=finalPrice>0?((finalPrice-totalCostPart)/finalPrice*100):0;
-  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,inspCostPart,progCostPart,weldCostPart,cncCostPart,totalCostPart,markup,markupCost,expediteFee,finalPrice,jobTotal,margin};
+  // `markup` is the TIER rate; `effMarkup` is the rate actually applied. With a
+  // separate outside margin the two differ, and showing the tier makes a job
+  // read far healthier than its price really is.
+  const outMarkup=getOutMarkup();
+  const effMarkup=totalCostPart>0?(markupCost/totalCostPart):markup;
+  return{qty,pps,sheetsReq,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,inspCostPart,progCostPart,weldCostPart,cncCostPart,totalCostPart,markup,outMarkup,effMarkup,markupCost,expediteFee,finalPrice,jobTotal,margin};
 }
 
 // ── Cost-mix segments, shared by the main Cost composition panel and the
@@ -6605,7 +6610,7 @@ function mixSegsFor(d){
   var marginV=d.markupCost||0;
   var price=(d.finalPrice!=null&&d.finalPrice>0)?d.finalPrice:cost+marginV;
   var roundUp=price-cost-marginV; if(roundUp<0.005) roundUp=0;
-  if(marginV>0.005) segs.push({k:'Margin ('+Math.round((d.markup||0)*100)+'% markup)',v:marginV,c:'#4a8a1a'});
+  if(marginV>0.005) segs.push({k:'Margin ('+Math.round(((d.effMarkup!=null?d.effMarkup:d.markup)||0)*100)+'% markup)',v:marginV,c:'#4a8a1a'});
   if(roundUp>0) segs.push({k:'Round-up',v:roundUp,c:'#b08d2e'});
   return {segs:segs,cost:cost,price:price,marginV:marginV,roundUp:roundUp};
 }
@@ -6678,7 +6683,7 @@ function calcQtyBreaks(){
       ${hasCnc?`<td class="qb-sub">${fmt(r.cncCostPart)}</td>`:''}
       ${hasWeld?`<td class="qb-sub">${fmt(r.weldCostPart)}</td>`:''}
       <td class="qb-sub">${fmt(r.totalCostPart)}</td>
-      <td class="qb-sub" style="color:var(--sky)">${(r.markup*100).toFixed(0)}%</td>
+      <td class="qb-sub" style="color:var(--sky)"${(r.outMarkup!=null&&r.outCostPart>0)?` title="${(r.markup*100).toFixed(0)}% on our work, ${(r.outMarkup*100).toFixed(0)}% on the outside shop's price — blended over this quantity's cost mix"`:''}>${((r.effMarkup!=null?r.effMarkup:r.markup)*100).toFixed(0)}%${(r.outMarkup!=null&&r.outCostPart>0)?'<span style="color:var(--text3)">*</span>':''}</td>
       <td><span class="qb-price">${fmt(r.finalPrice)}</span></td>
       <td><span class="qb-total">${fmt(r.jobTotal)}</span></td>
       <td class="qb-sub">${r.margin.toFixed(1)}%</td>
@@ -6751,10 +6756,23 @@ async function runQbAiReview(kind){
     const material=document.getElementById('material')?.value||'';
     ctx += `Part: ${partNum||'(unnamed)'}${material?', '+material:''}\nSchedule:\n`;
     rows.forEach(r=>{
-      ctx += `- qty ${r.qty}: cost ${money(r.totalCostPart)}/part, markup ${(r.markup*100).toFixed(0)}%, price ${money(r.finalPrice)}/part, job total ${money(r.jobTotal)}${r.expediteFee?` (incl. ${money(r.expediteFee)} expedite fee)`:''}, margin ${r.margin.toFixed(1)}%\n`;
+      // It gets the rate ACTUALLY applied. Handing it the tier rate next to a
+      // price computed at the blended rate made it (correctly) spot that the
+      // two don't reconcile, and then blame the arithmetic.
+      const applied=(r.effMarkup!=null?r.effMarkup:r.markup);
+      const split=(r.outMarkup!=null&&r.outCostPart>0)
+        ? ` [${(r.markup*100).toFixed(0)}% on our work + ${(r.outMarkup*100).toFixed(0)}% on outside work, which is ${money(r.outCostPart)} of that cost]` : '';
+      ctx += `- qty ${r.qty}: cost ${money(r.totalCostPart)}/part, markup ${(applied*100).toFixed(1)}% applied${split}, price ${money(r.finalPrice)}/part, job total ${money(r.jobTotal)}${r.expediteFee?` (incl. ${money(r.expediteFee)} expedite fee)`:''}, margin ${r.margin.toFixed(1)}%\n`;
     });
   }
   ctx += `\nMarkup tier settings: ${tiers.join('; ')}\n`;
+  // Two things it can't infer from the rows alone, and mis-flagged without:
+  // why a tier can go unused, and why the applied rate sits below the tier rate.
+  ctx += `Note: a tier only shows up in the schedule if one of the chosen break quantities falls inside it — an unused tier is not an error.\n`;
+  const _aiOm = isAsm ? null : getOutMarkup();
+  ctx += (_aiOm!==null)
+    ? `Note: outside (subcontracted) work is deliberately marked up at ${(_aiOm*100).toFixed(0)}% instead of the tier rate, so the applied markup is a blend and sits below the tier on outsource-heavy quantities. That is intended, not an arithmetic error. Pricing is markup-on-cost: price = cost x (1 + applied markup), then rounded UP to a pricing tier.\n`
+    : `Note: pricing is markup-on-cost: price = cost x (1 + markup), then rounded UP to a pricing tier.\n`;
 
   box.style.display='block';
   box.innerHTML='<div style="margin-top:12px;padding:12px 14px;background:var(--sky-light);border:1px solid var(--sky-mid);border-radius:var(--radius);font-size:12px;color:#1d4ed8;display:flex;align-items:center;gap:8px"><div class="spinner"></div>AI is reviewing the break schedule…</div>';
@@ -9079,7 +9097,7 @@ function calcAsmQtyBreaks(){
       <td class="qb-sub">${fmt(r.partsCost)}</td>
       <td class="qb-sub">${fmt(r.opsCost)}</td>
       <td class="qb-sub">${fmt(r.assemblyCost)}</td>
-      <td class="qb-sub" style="color:var(--sky)">${(r.markup*100).toFixed(0)}%</td>
+      <td class="qb-sub" style="color:var(--sky)"${(r.outMarkup!=null&&r.outCostPart>0)?` title="${(r.markup*100).toFixed(0)}% on our work, ${(r.outMarkup*100).toFixed(0)}% on the outside shop's price — blended over this quantity's cost mix"`:''}>${((r.effMarkup!=null?r.effMarkup:r.markup)*100).toFixed(0)}%${(r.outMarkup!=null&&r.outCostPart>0)?'<span style="color:var(--text3)">*</span>':''}</td>
       <td><span class="qb-price">${fmt(r.finalPrice)}</span></td>
       <td><span class="qb-total">${fmt(r.jobTotal)}</span></td>
       <td class="qb-sub">${r.margin.toFixed(1)}%</td>
