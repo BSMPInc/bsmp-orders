@@ -15,9 +15,12 @@
       GET  /threads                     merged, deduped thread list, both boxes
       GET  /thread?box=…&id=…           full messages of one thread
       POST /read   {ids:{box:threadId}} clear UNREAD in every box that has it
-      POST /send   reply: {replyAs, box, id, ids, body, all?, attachments?, tables?}
-                   new:   {replyAs, to, subject, body, attachments?, tables?}
+      POST /send   reply: {replyAs, box, id, ids, body, all?, cc?, attachments?, tables?}
+                   new:   {replyAs, to, subject, body, cc?, attachments?, tables?}
                    all: reply-all — cc everyone on the email except our boxes
+                   to: one address or a comma-joined list; cc: array or comma
+                   list, merged on top of reply-all's, deduped against To:.
+                   Both are re-validated here — a caller cannot smuggle a header
                    attachments: [{name, mime, data(base64)}] — ~18 MB total
                    (Gmail rejects a message over 25 MB after base64 +33%)
                    tables: [{title?, header?, rows:[[cells…]]}] — appended after
@@ -376,6 +379,29 @@ async function sendMail(env, mailboxes, p) {
     if (p.ids && p.ids[from]) threadId = p.ids[from];
   }
   if (!to) throw new Error('no recipient');
+
+  // Client-supplied Cc (the order-confirmation picker sends one). Reply-all
+  // fills `cc` from the thread above instead; anything passed in is merged on
+  // top of that. Both To: and Cc: are written straight into the header block,
+  // so every address is stripped of CR/LF and re-validated here — a caller must
+  // never be able to smuggle in an extra header or a hidden Bcc.
+  const addrOk = (a) => /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(a);
+  const cleanAddr = (raw) => {
+    const s = String(raw == null ? '' : raw).replace(/[\r\n]/g, ' ');
+    const a = (parseAddr(s).email || s).trim().replace(/[<>,;]/g, '');
+    return addrOk(a) ? a : '';
+  };
+  const toList = splitAddrs(String(to)).map(cleanAddr).filter(Boolean);
+  if (!toList.length) throw new Error('no valid recipient');
+  to = toList.join(', ');
+  const seenCc = new Set(toList.map(a => a.toLowerCase()).concat(cc.map(a => a.toLowerCase())));
+  for (const raw of (Array.isArray(p.cc) ? p.cc : String(p.cc || '').split(','))) {
+    const a = cleanAddr(raw);
+    if (!a) continue;
+    const l = a.toLowerCase();
+    if (seenCc.has(l)) continue;   // already on To:, or already cc'd by reply-all
+    seenCc.add(l); cc.push(a);
+  }
 
   const atts = (Array.isArray(p.attachments) ? p.attachments : []).filter(a => a && a.data && a.name);
   // images pasted into the body — embedded inline (cid) where their [image N]

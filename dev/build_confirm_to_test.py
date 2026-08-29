@@ -6,10 +6,20 @@
 # Title says "all pass" or "FAILURES"; delete _confirmtotest.html when done.
 import io
 src = io.open('C:/Users/info/bsmp-orders/orders.html', encoding='utf-8').read()
+wsrc = io.open('C:/Users/info/bsmp-orders/mail-proxy-worker.js', encoding='utf-8').read()
 
-def grab(start, end):
-    a = src.index(start); b = src.index(end, a)
-    return src[a:b]
+def grab(start, end, s=None):
+    s = src if s is None else s
+    a = s.index(start); b = s.index(end, a)
+    return s[a:b]
+
+# The worker's own To:/Cc: sanitiser, sliced verbatim and wrapped so it can be
+# exercised without a request — this is the code that actually writes the header
+# lines, so it is the one worth asserting against.
+worker = (grab('function parseAddr(s) {', '\nfunction decodeEntities', wsrc)
+          + '\nfunction wkRecipients(p, to, cc){\n'
+          + grab("  if (!to) throw new Error('no recipient');", '\n  const atts =', wsrc)
+          + '\n  return {to:to, cc:cc};\n}\n')
 
 a = src.index('<style>'); b = src.index('</style>', a)
 css = src[a+len('<style>'):b]
@@ -50,6 +60,7 @@ function esc2(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/<
 function closeModal(){}
 /*__BLOCK__*/
 /*__MERGE__*/
+/*__WORKER__*/
 
 // ══ 1 · parsing what gets pasted in ══════════════════════════════════════════
 ok('plain address parses', ctoParse('a@x.com').join('|')==='a@x.com');
@@ -105,8 +116,8 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
             {email:'bob@northrop.com',name:'Bob Buyer',company:'Northrop'},
             {email:'zeb@acme.com',name:'Zeb',company:'Acme Aerospace'}];
   _ctoTo=[];
-  document.getElementById('cto-body').innerHTML='<div id="cto-sug"></div>';
-  const fake=(v)=>{ const i={value:v}; _ctoInput(i); return _ctoSug.map(s=>s.email); };
+  document.getElementById('cto-body').innerHTML='<div id="cto-sug-to"></div>';
+  const fake=(v)=>{ const i={value:v}; _ctoInput(i,'to'); return _ctoSug.map(s=>s.email); };
   ok('empty query lists the whole book', fake('').length===3);
   ok('matches on name', fake('jane').join('|')==='jane@acme.com');
   ok('matches on company', fake('northrop').join('|')==='bob@northrop.com');
@@ -140,7 +151,7 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
   const box=document.querySelector('#panel .cto-box').getBoundingClientRect();
   const rows=new Set(chips.map(c=>Math.round(c.getBoundingClientRect().top)));
   ok('a long address wraps to another row instead of overflowing', rows.size>=2, rows.size);
-  const inp=document.getElementById('cto-in').getBoundingClientRect();
+  const inp=document.getElementById('cto-in-to').getBoundingClientRect();
   ok('the type-here box keeps usable width', inp.width>=110, Math.round(inp.width));
   ok('chips and input share one box', inp.top>=box.top-1 && inp.bottom<=box.bottom+1);
   // suggestions
@@ -167,11 +178,99 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
   ok('angle brackets cannot smuggle one', RE.test('a@x.com><evil@bad.com')===false);
 }
 
+// ══ 7 · Cc: a second field, and an address only ever sits in one of them ═════
+{
+  _ctoBook=[{email:'jane@acme.com',name:'Jane Machinist',company:'Acme'}];
+  _ctoTo=[]; _ctoCc=[]; _ctoCcOn=false; _ctoField='to';
+  ctoAdd('jane@acme.com','to');
+  ok('Cc starts empty', _ctoCc.length===0);
+  ok('adding to Cc lands on Cc, not To', (ctoAdd('qa@acme.com','cc').added===1 && _ctoCc.length===1 && _ctoTo.length===1));
+  let x=ctoAdd('jane@acme.com','cc');
+  ok('someone already on To cannot be Cc\\'d as well', x.added===0 && _ctoCc.length===1, x.dupIn);
+  ok('and the note says which field they are on', x.dupIn==='To', x.dupIn);
+  x=ctoAdd('qa@acme.com','to');
+  ok('and the reverse is refused too', x.added===0 && x.dupIn==='Cc', x.dupIn);
+  ok('a Cc address picks up its book name', (ctoAdd('jane2@acme.com','cc'), true));
+  _ctoBook.push({email:'boss@acme.com',name:'The Boss'});
+  ctoAdd('boss@acme.com','cc');
+  ok('Cc chips carry names like To chips does', _ctoCc[_ctoCc.length-1].name==='The Boss', _ctoCc[_ctoCc.length-1].name);
+
+  // the suggestion list must not re-offer anyone on EITHER field
+  document.getElementById('cto-body').innerHTML='<div id="cto-sug-to"></div><div id="cto-sug-cc"></div>';
+  _ctoTo=[{email:'jane@acme.com',name:''}]; _ctoCc=[{email:'boss@acme.com',name:''}];
+  _ctoBook=[{email:'jane@acme.com',name:'Jane'},{email:'boss@acme.com',name:'Boss'},{email:'free@acme.com',name:'Free'}];
+  _ctoInput({value:''},'cc');
+  ok('neither a To nor a Cc address is suggested again', _ctoSug.map(s=>s.email).join('|')==='free@acme.com',
+     _ctoSug.map(s=>s.email).join('|'));
+
+  // render: the Cc row appears once asked for, and the send count spans both
+  _ctoTo=[{email:'jane@acme.com',name:'Jane'},{email:'bob@acme.com',name:''}];
+  _ctoCc=[]; _ctoCcOn=false; _ctoField='to';
+  _ctoRender();
+  ok('Cc row is hidden until asked for', !document.getElementById('cto-in-cc'));
+  ok('a "+ Cc" link is offered', !!document.querySelector('#panel .cto-cclink'));
+  ok('send counts the To recipients', (document.getElementById('cto-go').textContent||'').indexOf('Send to 2')>=0,
+     document.getElementById('cto-go').textContent.trim());
+  _ctoCcOn=true; _ctoCc=[{email:'qa@acme.com',name:'QA'}]; _ctoRender();
+  ok('Cc row renders when opened', !!document.getElementById('cto-in-cc'));
+  ok('the "+ Cc" link goes away once the row is open', !document.querySelector('#panel .cto-cclink'));
+  ok('Cc chips render', document.querySelectorAll('#panel .cto-box')[1].querySelectorAll('.cto-chip').length===1);
+  ok('send counts To + Cc', (document.getElementById('cto-go').textContent||'').indexOf('Send to 3')>=0,
+     document.getElementById('cto-go').textContent.trim());
+  ok('a saved Cc forces the row open on reopen', (_ctoCcOn=false, _ctoRender(), !!document.getElementById('cto-in-cc')));
+  const p=document.getElementById('panel');
+  ok('two-field picker does not scroll sideways', p.scrollWidth<=p.clientWidth+1, p.scrollWidth+' vs '+p.clientWidth);
+  const boxes=[...document.querySelectorAll('#panel .cto-box')].map(b=>b.getBoundingClientRect());
+  ok('the Cc box sits below the To box', boxes.length===2 && boxes[1].top>=boxes[0].bottom-1);
+}
+
+// ══ 8 · the worker's own To:/Cc: sanitiser (what writes the header lines) ════
+{
+  const W=(p,to,cc)=>wkRecipients(p, to, cc||[]);
+  let r=W({cc:['qa@acme.com']}, 'jane@acme.com');
+  ok('worker keeps a plain To', r.to==='jane@acme.com', r.to);
+  ok('worker accepts a client Cc', r.cc.join(', ')==='qa@acme.com', r.cc.join(', '));
+  r=W({}, 'a@x.com, b@y.com');
+  ok('worker keeps a comma-joined To list', r.to==='a@x.com, b@y.com', r.to);
+  r=W({cc:'qa@acme.com, boss@acme.com'}, 'jane@acme.com');
+  ok('worker accepts Cc as a comma string too', r.cc.length===2, r.cc.join('|'));
+  r=W({cc:['jane@acme.com','JANE@acme.com','qa@acme.com']}, 'jane@acme.com');
+  ok('worker drops a Cc that is already on To', r.cc.join('|')==='qa@acme.com', r.cc.join('|'));
+  r=W({cc:['qa@acme.com','QA@ACME.com']}, 'jane@acme.com');
+  ok('worker dedupes Cc against itself', r.cc.length===1, r.cc.join('|'));
+  r=W({cc:['a@x.com']}, 'jane@acme.com', ['a@x.com','b@y.com']);   // reply-all already cc'd these
+  ok('worker keeps reply-all\\'s Cc and does not double it', r.cc.join('|')==='a@x.com|b@y.com', r.cc.join('|'));
+  r=W({cc:['Jane Machinist <jane@acme.com>']}, 'bob@acme.com');
+  ok('worker unwraps a display-name Cc', r.cc.join('|')==='jane@acme.com', r.cc.join('|'));
+  // injection: a CR/LF or a smuggled comma must never reach the header block
+  r=W({cc:['ok@x.com\\r\\nBcc: evil@bad.com']}, 'jane@acme.com');
+  ok('worker refuses a CR/LF Cc payload', r.cc.length===0, JSON.stringify(r.cc));
+  r=W({cc:['a@x.com,evil@bad.com']}, 'jane@acme.com');
+  ok('worker refuses a comma-smuggled Cc', r.cc.length===0, JSON.stringify(r.cc));
+  // a CR/LF To collapses to a space, which makes the whole entry invalid — the
+  // worker refuses the send outright rather than half-cleaning it through
+  let threw=false;
+  try{ W({}, 'jane@acme.com\\r\\nBcc: evil@bad.com'); }catch(e){ threw=true; }
+  ok('worker refuses a CR/LF To payload outright', threw);
+  ok('surrounding whitespace on a good To is fine', W({}, '  jane@acme.com \\r\\n').to==='jane@acme.com',
+     JSON.stringify(W({}, '  jane@acme.com \\r\\n').to));
+  ok('worker refuses junk Cc entries', W({cc:['nope','',null,'a@x.com']}, 'j@a.com').cc.join('|')==='a@x.com');
+  threw=false;
+  try{ W({}, 'not-an-address'); }catch(e){ threw=true; }
+  ok('worker throws rather than sending to an invalid To', threw);
+  threw=false;
+  try{ W({}, ''); }catch(e){ threw=true; }
+  ok('worker still throws on an empty To', threw);
+  // one bad address in a list must not quietly drop the rest, nor pass through
+  ok('worker keeps the good addresses out of a mixed To list', W({}, 'a@x.com, junk, b@y.com').to==='a@x.com, b@y.com',
+     W({}, 'a@x.com, junk, b@y.com').to);
+}
+
 const fails=out.filter(l=>l.indexOf('FAIL')===0).length;
 document.getElementById('out').textContent=out.join('\\n')+'\\n\\n'+(out.length-fails)+'/'+out.length+' assertions passed';
 document.title=fails?(fails+' FAILURES'):'all pass';
 </script>'''
 
-html = html.replace('__CSS__', css).replace('/*__BLOCK__*/', block).replace('/*__MERGE__*/', merge)
+html = html.replace('__CSS__', css).replace('/*__BLOCK__*/', block).replace('/*__MERGE__*/', merge).replace('/*__WORKER__*/', worker)
 io.open('C:/Users/info/bsmp-orders/_confirmtotest.html', 'w', encoding='utf-8').write(html)
 print('wrote _confirmtotest.html')

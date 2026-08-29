@@ -414,6 +414,12 @@ tr:hover .del-btn{opacity:1}
 .iod-k{width:118px;flex-shrink:0;color:var(--text2)}
 .iod-v{flex:1;min-width:0;color:var(--text);font-weight:600;word-break:break-word}
 /* recipient picker for the confirmation email: chips + the shared address book */
+.cto-lbl{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--text2);
+  letter-spacing:.3px;text-transform:uppercase;margin-top:9px}
+.cto-lblhint{font-weight:600;letter-spacing:0;text-transform:none;font-size:11px;color:var(--text3)}
+.cto-cclink{margin-left:auto;font:inherit;font-size:11px;font-weight:700;letter-spacing:.3px;
+  color:#185FA5;background:none;border:0;padding:0;cursor:pointer}
+.cto-cclink:hover{text-decoration:underline}
 .cto-box{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:38px;padding:5px 7px;margin-top:5px;
   border:1px solid var(--border2);border-radius:9px;background:#fff;cursor:text}
 .cto-box input{flex:1 1 130px;min-width:110px;border:0;outline:0;font:inherit;font-size:13px;padding:3px 2px;background:transparent}
@@ -4345,15 +4351,22 @@ function _renderConfirmEmailStatus(msg,err){
   const sent=(_confirmItems||[]).map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0];
   if(!sent){ el.textContent=''; el.title=''; return; }
   const tos=(Array.isArray(sent.tos)&&sent.tos.length)?sent.tos:[sent.to].filter(Boolean);
-  const who=tos.length>1?(tos[0]+' +'+(tos.length-1)+' more'):(tos[0]||sent.to||'');
+  const ccs=Array.isArray(sent.ccs)?sent.ccs:[];
+  const extra=(tos.length-1)+ccs.length;
+  const who=extra>0?(tos[0]+' +'+extra+' more'):(tos[0]||sent.to||'');
   el.textContent='Emailed to '+who+' · '+new Date(sent.at).toLocaleDateString();
-  el.title=tos.join('\n');   // the row is one line and ellipsised — hover for the full list
+  // the row is one line and ellipsised — hover for the full list
+  el.title='To: '+tos.join(', ')+(ccs.length?('\nCc: '+ccs.join(', ')):'');
 }
 // ── who it goes to ───────────────────────────────────────────────────────────
 // The address book is the same shared one the Mail app keeps at mail/contacts,
 // read fresh each time the picker opens (orders.html holds no listener on it).
 const RE_EMAIL=/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
-let _ctoTo=[], _ctoBook=[], _ctoSug=[], _ctoHi=-1, _ctoSend=null;
+// Two recipient lists, To and Cc, each a list of {email,name}. `_ctoField` is
+// whichever box the caret is in — the suggestion list feeds that one.
+let _ctoTo=[], _ctoCc=[], _ctoCcOn=false, _ctoField='to',
+    _ctoBook=[], _ctoSug=[], _ctoHi=-1, _ctoSend=null;
+const ctoList=(f)=> f==='cc' ? _ctoCc : _ctoTo;
 // "Jane Machinist <jane@acme.com>", "jane@acme.com; bob@acme.com" — take the
 // addresses out of whatever gets pasted in
 function ctoParse(text){
@@ -4362,36 +4375,53 @@ function ctoParse(text){
     return (m?m[1]:s).trim();
   }).filter(Boolean);
 }
-function ctoAdd(raw){
-  let added=0, bad='';
+// An address goes in one field or the other, never both — adding to Cc someone
+// already on To is a no-op, and vice versa (the worker dedupes too, but the
+// picker should never show the same person twice).
+function ctoAdd(raw, field){
+  const f=field||_ctoField, list=ctoList(f);
+  let added=0, bad='', dupIn='';
   ctoParse(raw).forEach(e=>{
     if(!RE_EMAIL.test(e)){ bad=bad||e; return; }
-    if(_ctoTo.some(x=>x.email.toLowerCase()===e.toLowerCase())) return;   // no duplicates
-    const c=_ctoBook.find(b=>b.email.toLowerCase()===e.toLowerCase());
-    _ctoTo.push({email:e, name:(c&&c.name)||''});
+    const l=e.toLowerCase();
+    if(list.some(x=>x.email.toLowerCase()===l)) return;
+    const other=ctoList(f==='cc'?'to':'cc');
+    if(other.some(x=>x.email.toLowerCase()===l)){ dupIn=dupIn||(f==='cc'?'To':'Cc'); return; }
+    const c=_ctoBook.find(b=>b.email.toLowerCase()===l);
+    list.push({email:e, name:(c&&c.name)||''});
     added++;
   });
-  return {added, bad};
+  return {added, bad, dupIn};
 }
-window._ctoRemove=(i)=>{ _ctoTo.splice(i,1); _ctoRender(); document.getElementById('cto-in')?.focus(); };
+const _ctoIn=(f)=>document.getElementById('cto-in-'+(f||_ctoField));
+function _ctoRefocus(f){ const el=_ctoIn(f); if(el){ el.focus(); window._ctoInput(el,f); } }
+window._ctoRemove=(f,i)=>{ ctoList(f).splice(i,1); _ctoRender(); _ctoRefocus(f); };
 window._ctoPick=(i)=>{
   const s=_ctoSug[i]; if(!s) return;
-  ctoAdd(s.email);
-  const inp=document.getElementById('cto-in'); if(inp) inp.value='';
-  _ctoRender(); document.getElementById('cto-in')?.focus();
+  const f=_ctoField;
+  ctoAdd(s.email, f);
+  const inp=_ctoIn(f); if(inp) inp.value='';
+  _ctoRender(); _ctoRefocus(f);
 };
-window._ctoKey=(inp,e)=>{
-  const v=inp.value;
+// tell the note WHY nothing was added, rather than a flat "already on the list"
+function _ctoWhy(r){
+  if(r.bad) return '“'+r.bad+'” isn’t an email address.';
+  if(r.dupIn) return 'That address is already on '+r.dupIn+'.';
+  return 'Already on the list.';
+}
+window._ctoKey=(inp,e,f)=>{
+  _ctoField=f;
+  const v=inp.value, list=ctoList(f);
   if(e.key==='Enter'||e.key===','||e.key===';'||e.key==='Tab'){
     if(_ctoHi>=0&&_ctoSug[_ctoHi]){ e.preventDefault(); window._ctoPick(_ctoHi); return; }
     if(v.trim()){ e.preventDefault();
-      const r=ctoAdd(v);
-      if(r.added){ inp.value=''; _ctoRender(); }
-      else _ctoNote(r.bad?('“'+r.bad+'” isn’t an email address.'):'Already on the list.');
+      const r=ctoAdd(v,f);
+      if(r.added){ inp.value=''; _ctoRender(); _ctoRefocus(f); }
+      else _ctoNote(_ctoWhy(r));
     }
     return;
   }
-  if(e.key==='Backspace'&&!v&&_ctoTo.length){ e.preventDefault(); _ctoTo.pop(); _ctoRender(); return; }
+  if(e.key==='Backspace'&&!v&&list.length){ e.preventDefault(); list.pop(); _ctoRender(); _ctoRefocus(f); return; }
   if(e.key==='ArrowDown'||e.key==='ArrowUp'){
     if(!_ctoSug.length) return;
     e.preventDefault();
@@ -4399,12 +4429,14 @@ window._ctoKey=(inp,e)=>{
     _ctoPaintSug();
     return;
   }
-  if(e.key==='Escape'&&v){ e.preventDefault(); inp.value=''; _ctoInput(inp); }
+  if(e.key==='Escape'&&v){ e.preventDefault(); inp.value=''; window._ctoInput(inp,f); }
 };
-window._ctoBlur=(inp)=>{ if(inp.value.trim()){ if(ctoAdd(inp.value).added){ inp.value=''; _ctoRender(); } } };
-window._ctoInput=(inp)=>{
+window._ctoBlur=(inp,f)=>{ if(inp.value.trim()&&ctoAdd(inp.value,f).added){ inp.value=''; _ctoRender(); } };
+window._ctoInput=(inp,f)=>{
+  if(f) _ctoField=f;
   const q=(inp.value||'').trim().toLowerCase();
-  const taken=new Set(_ctoTo.map(x=>x.email.toLowerCase()));
+  // an address already on either field is not offered again
+  const taken=new Set(_ctoTo.concat(_ctoCc).map(x=>x.email.toLowerCase()));
   _ctoSug=_ctoBook
     .filter(c=>!taken.has(c.email.toLowerCase()))
     .filter(c=>!q || [c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase().includes(q))
@@ -4412,9 +4444,12 @@ window._ctoInput=(inp)=>{
   _ctoHi=_ctoSug.length?0:-1;
   _ctoPaintSug();
 };
+window._ctoShowCc=()=>{ _ctoCcOn=true; _ctoRender(); _ctoRefocus('cc'); };
 function _ctoNote(msg){ const n=document.getElementById('cto-note'); if(n) n.textContent=msg||''; }
 function _ctoPaintSug(){
-  const host=document.getElementById('cto-sug'); if(!host) return;
+  // the list lives under whichever box has the caret
+  ['to','cc'].forEach(f=>{ const h=document.getElementById('cto-sug-'+f); if(h&&f!==_ctoField){ h.style.display='none'; h.innerHTML=''; } });
+  const host=document.getElementById('cto-sug-'+_ctoField); if(!host) return;
   if(!_ctoSug.length){ host.style.display='none'; host.innerHTML=''; return; }
   host.style.display='block';
   host.innerHTML=_ctoSug.map((c,i)=>`<div class="cto-sug${i===_ctoHi?' on':''}" onmousedown="event.preventDefault();window._ctoPick(${i})" onmouseenter="window._ctoHover(${i})">
@@ -4425,35 +4460,52 @@ function _ctoPaintSug(){
   </div>`).join('');
 }
 window._ctoHover=(i)=>{ _ctoHi=i; _ctoPaintSug(); };
+function _ctoFieldHtml(f,label,hint){
+  const list=ctoList(f);
+  const chips=list.map((t,i)=>`<span class="cto-chip" title="${esc2(t.email)}">${esc2(t.name||t.email)}<i class="ti ti-x" onclick="window._ctoRemove('${f}',${i})"></i></span>`).join('');
+  return `<label class="cto-lbl">${label}${hint||''}</label>
+    <div class="cto-box" onclick="document.getElementById('cto-in-${f}').focus()">
+      ${chips}
+      <input id="cto-in-${f}" placeholder="${list.length?'Add another…':'Name or email…'}" autocomplete="off"
+        oninput="window._ctoInput(this,'${f}')" onfocus="window._ctoInput(this,'${f}')"
+        onkeydown="window._ctoKey(this,event,'${f}')" onblur="window._ctoBlur(this,'${f}')">
+    </div>
+    <div id="cto-sug-${f}" class="cto-sugbox" style="display:none"></div>`;
+}
 function _ctoRender(){
   const host=document.getElementById('cto-body'); if(!host) return;
-  const chips=_ctoTo.map((t,i)=>`<span class="cto-chip" title="${esc2(t.email)}">${esc2(t.name||t.email)}<i class="ti ti-x" onclick="window._ctoRemove(${i})"></i></span>`).join('');
+  const n=_ctoTo.length+_ctoCc.length;
+  const showCc=_ctoCcOn||_ctoCc.length>0;
   host.innerHTML=`
     <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-send"></i> Email the confirmation</h3>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Everyone below gets the same email. Pick from the shared address book or type an address.</div>
-    <label style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:.3px;text-transform:uppercase">To</label>
-    <div class="cto-box" onclick="document.getElementById('cto-in').focus()">
-      ${chips}
-      <input id="cto-in" placeholder="${_ctoTo.length?'Add another…':'Name or email…'}" autocomplete="off"
-        oninput="window._ctoInput(this)" onfocus="window._ctoInput(this)"
-        onkeydown="window._ctoKey(this,event)" onblur="window._ctoBlur(this)">
-    </div>
-    <div id="cto-sug" class="cto-sugbox" style="display:none"></div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Everyone gets the same email. Pick from the shared address book or type an address.</div>
+    ${_ctoFieldHtml('to','To', showCc?'':`<button type="button" class="cto-cclink" onclick="window._ctoShowCc()">+ Cc</button>`)}
+    ${showCc?_ctoFieldHtml('cc','Cc','<span class="cto-lblhint">copied in — everyone sees them</span>'):''}
     <div id="cto-note" style="font-size:11.5px;color:var(--red);min-height:15px;margin-top:6px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
       <button class="btn" onclick="closeModal('cto-modal')">Cancel</button>
-      <button class="btn blue" id="cto-go" onclick="window._ctoConfirm()"><i class="ti ti-send"></i> Send${_ctoTo.length>1?(' to '+_ctoTo.length):''}</button>
+      <button class="btn blue" id="cto-go" onclick="window._ctoConfirm()"><i class="ti ti-send"></i> Send${n>1?(' to '+n):''}</button>
     </div>`;
-  const inp=document.getElementById('cto-in');
-  if(inp){ inp.focus(); window._ctoInput(inp); }
+  _ctoRefocus(_ctoIn(_ctoField)?_ctoField:'to');
 }
 window._ctoConfirm=()=>{
-  const inp=document.getElementById('cto-in');
-  if(inp&&inp.value.trim()){ const r=ctoAdd(inp.value); if(!r.added&&r.bad){ _ctoNote('“'+r.bad+'” isn’t an email address.'); return; } inp.value=''; }
-  if(!_ctoTo.length){ _ctoNote('Add at least one recipient.'); _ctoRender(); return; }
-  const list=_ctoTo.map(t=>t.email);
+  // commit whatever is still half-typed in either box before sending
+  for(const f of ['to','cc']){
+    const inp=_ctoIn(f);
+    if(inp&&inp.value.trim()){
+      const r=ctoAdd(inp.value,f);
+      if(!r.added&&(r.bad||r.dupIn)){ _ctoField=f; _ctoNote(_ctoWhy(r)); return; }
+      inp.value='';
+    }
+  }
+  if(!_ctoTo.length){
+    // a Cc with nothing on To has no main recipient — promote rather than refuse
+    if(_ctoCc.length){ _ctoTo=_ctoCc.splice(0,1); _ctoRender(); _ctoNote('Moved '+_ctoTo[0].email+' to To — an email needs at least one main recipient.'); return; }
+    _ctoRender(); _ctoNote('Add at least one recipient.'); return;
+  }
+  const to=_ctoTo.map(t=>t.email), cc=_ctoCc.map(t=>t.email);
   closeModal('cto-modal');
-  if(_ctoSend) _ctoSend(list);
+  if(_ctoSend) _ctoSend(to,cc);
 };
 window.emailConfirmation=async ()=>{
   const items=_confirmItems||[]; if(!items.length) return;
@@ -4472,8 +4524,9 @@ window.emailConfirmation=async ()=>{
     }catch(e){}
   }
   // whoever it went to last time, so a re-send is one click
-  (items.map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0]||{tos:[]}).tos
-    ?.forEach(e=>guesses.push({email:e, name:'', suggested:'sent last time'}));
+  const last=items.map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0]||{};
+  (last.tos||[]).forEach(e=>guesses.push({email:e, name:'', suggested:'sent last time'}));
+  (last.ccs||[]).forEach(e=>guesses.push({email:e, name:'', suggested:'cc’d last time'}));
   let book=[];
   try{
     const snap=(await get(ref(db,'mail/contacts'))).val()||{};
@@ -4488,19 +4541,22 @@ window.emailConfirmation=async ()=>{
     merged.push({email:g.email, name:g.name||(b&&b.name)||'', company:(b&&b.company)||'', suggested:g.suggested});
   });
   book.forEach(b=>{ const k=b.email.toLowerCase(); if(seen.has(k)) return; seen.add(k); merged.push(b); });
-  _ctoBook=merged; _ctoTo=[]; _ctoSug=[]; _ctoHi=-1;
-  _ctoSend=(list)=>_sendConfirmationTo(list);
+  _ctoBook=merged; _ctoTo=[]; _ctoCc=[]; _ctoCcOn=false; _ctoField='to'; _ctoSug=[]; _ctoHi=-1;
+  _ctoSend=(toList,ccList)=>_sendConfirmationTo(toList,ccList);
   document.getElementById('cto-modal').style.display='flex';
   _ctoRender();
 };
-async function _sendConfirmationTo(list){
+async function _sendConfirmationTo(list, ccList){
   const items=_confirmItems||[]; if(!items.length) return;
   const btn=document.getElementById('confirm-email-btn');
   const cust=(_confirmMeta.customer||'').trim();
-  // CR/LF would let an address forge extra mail headers — the worker drops `to`
-  // straight into the To: line
-  const tos=list.map(e=>String(e).replace(/[\r\n]/g,'').trim()).filter(e=>RE_EMAIL.test(e));
+  // CR/LF would let an address forge extra mail headers — the worker drops both
+  // To: and Cc: into the header block (it re-validates too; this is the near end)
+  const clean=(l)=>(l||[]).map(e=>String(e).replace(/[\r\n]/g,'').trim()).filter(e=>RE_EMAIL.test(e));
+  const tos=clean(list);
   if(!tos.length){ _renderConfirmEmailStatus('No valid email address to send to.',true); return; }
+  const seenTo=new Set(tos.map(e=>e.toLowerCase()));
+  const ccs=clean(ccList).filter(e=>!seenTo.has(e.toLowerCase()));
   const to=tos.join(', ');
   if(btn){ btn.disabled=true; btn.style.opacity=.6; }
   _renderConfirmEmailStatus('Sending…');
@@ -4541,7 +4597,7 @@ async function _sendConfirmationTo(list){
       rows.push([[i.part,i.desc].filter(Boolean).join(' — ')||'—', String(i.qty||''), i.cost?Number(i.cost).toFixed(2):'', lt?fmtMoney(lt):'']);
     });
     rows.push(['','','TOTAL',fmtMoney(grand)]);
-    const payload={replyAs, to,
+    const payload={replyAs, to, cc:ccs,
       subject:'Order Confirmation'+(cust?(' — '+cust):'')+(po?(' — PO '+po):''),
       body, tables:[{title:'', header:true, rows}], sigLogo};
     const tok=await auth.currentUser.getIdToken();
@@ -4552,9 +4608,9 @@ async function _sendConfirmationTo(list){
     const at=Date.now(), by=(auth.currentUser&&auth.currentUser.email)||'';
     let bumped=0;
     items.forEach(i=>{
-      // `to` stays the joined string older records already used; `tos` is the
-      // list, and it's what the picker offers back as "sent last time"
-      i.confirmEmailed={to:to, tos:tos, at:at, by:by};
+      // `to` stays the joined string older records already used; `tos`/`ccs` are
+      // the lists, and they're what the picker offers back as "sent last time"
+      i.confirmEmailed={to:to, tos:tos, ccs:ccs, at:at, by:by};
       if(!i.status||i.status==='Received'){ i.status='Confirmed'; bumped++; }
     });
     saveDB(); render();
@@ -4564,7 +4620,8 @@ async function _sendConfirmationTo(list){
       const cr=customers.find(c=>(c.name||'').toLowerCase()===cust.toLowerCase());
       if(cr&&!cr.email){ cr.email=tos[0]; saveCustomersDB(); }
     }
-    _renderConfirmEmailStatus('Sent to '+(tos.length>1?(tos.length+' recipients'):to)+' ✓'
+    _renderConfirmEmailStatus('Sent to '+(tos.length>1?(tos.length+' recipients'):to)
+      +(ccs.length?(' · cc '+ccs.length):'')+' ✓'
       +(bumped?(' — '+bumped+' order'+(bumped!==1?'s':'')+' marked Confirmed'):''));
   }catch(e){
     _renderConfirmEmailStatus('Send failed: '+((e&&e.message)||e),true);
