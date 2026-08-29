@@ -217,6 +217,78 @@ const mkOrder=(id,qty,steps)=>({id:id,qty:qty,customer:'Acme',part:'BRK-'+id,job
   ok('object-shaped items walked, holes and dead refs skipped', hit===1, hit);
 }
 
+// ══ 7 · the schedule roll-up chip ════════════════════════════════════════════
+// One chip stands in for the whole line list, and its colour is the honest
+// WORST case — a step that is four-fifths bought must not read as done.
+{
+  const L=(...ls)=>mkStep({lines:ls});
+  const ln=(o)=>Object.assign({id:'l'+Math.round(Math.random()*1e6),pn:'',desc:'nut',qtyPer:'',qty:10,
+    vendor:'',vendorPO:'',poAt:'',sentAt:'',receivedAt:''},o);
+  const TODAY='2026-09-10';
+  const roll=(step,sendBy)=>stepLineRoll(step, 100, sendBy||'', TODAY);
+
+  let x=roll(L(ln({vendor:'Fastenal'}),ln({vendor:'McMaster'})), '2026-09-20');
+  ok('counts the lines', x.n===2, x.n);
+  ok('counts the distinct vendors', x.vendors===2, x.vendors);
+  ok('nothing bought yet reads open', x.state==='open', x.state);
+  ok('and says a PO is needed', x.progress==='needs POs', x.progress);
+  ok('two vendors are summarised, not named', x.vendorTxt==='2 vendors', x.vendorTxt);
+
+  x=roll(L(ln({vendor:'Fastenal'})), '2026-09-20');
+  ok('one vendor is named outright', x.vendorTxt==='Fastenal', x.vendorTxt);
+  ok('a single line says "a PO", not "POs"', x.progress==='needs a PO', x.progress);
+  ok('no vendor anywhere is said out loud', roll(L(ln({})),'2026-09-20').vendorTxt==='no vendor yet');
+  ok('vendor spelling/case is not double counted',
+     roll(L(ln({vendor:'Fastenal'}),ln({vendor:'FASTENAL '})),'2026-09-20').vendors===1);
+
+  // past its order-by with something still unbought = red, whatever else is true
+  x=roll(L(ln({vendor:'F',vendorPO:'1'}),ln({vendor:'M'})), '2026-09-01');
+  ok('unbought past the order-by date reads late', x.state==='late', x.state);
+  ok('late is flagged separately too', x.late===true);
+  ok('late still reports the real progress', x.progress==='1 of 2 on PO', x.progress);
+  // ...but not once everything is on a PO
+  x=roll(L(ln({vendor:'F',vendorPO:'1'}),ln({vendor:'M',vendorPO:'2'})), '2026-09-01');
+  ok('all bought is never late, even past the date', x.state==='covered' && x.late===false, x.state);
+  ok('all bought says so', x.progress==='all on PO', x.progress);
+
+  x=roll(L(ln({vendor:'F',vendorPO:'1'}),ln({vendor:'M'})), '2026-09-20');
+  ok('part bought, not yet late, reads partial', x.state==='partial', x.state);
+  x=roll(L(ln({vendor:'F',vendorPO:'1',receivedAt:'2026-09-05'}),ln({vendor:'M',vendorPO:'2'})), '2026-09-20');
+  ok('some back but not all is still partial', x.state==='partial', x.state);
+  ok('and counts what is in', x.progress==='1 of 2 in', x.progress);
+  x=roll(L(ln({vendor:'F',vendorPO:'1',receivedAt:'2026-09-05'}),ln({vendor:'M',vendorPO:'2',receivedAt:'2026-09-06'})), '2026-09-20');
+  ok('everything back reads received', x.state==='received', x.state);
+  ok('and says all received', x.progress==='all received', x.progress);
+  ok('a received step is never late', roll(L(ln({vendorPO:'1',receivedAt:'2026-09-05'})), '2026-08-01').state==='received');
+  ok('every state has a colour', ['open','late','partial','covered','received'].every(s=>!!LINE_ROLL_COLOR[s]));
+
+  // a step nobody has typed into yet
+  x=roll(L(ln({desc:'',pn:'',qty:''})), '2026-09-20');
+  ok('a blank step reports nothing named', x.named===0, x.named);
+  ok('but still counts as one line needing a PO', x.n===1 && x.state==='open');
+  ok('a part number alone counts as named', roll(L(ln({desc:'',pn:'FH-632-2'})),'').named===1);
+
+  // no order-by date at all (step not scheduled)
+  ok('no send-by date cannot be late', roll(L(ln({})),'').late===false);
+
+  // the hover text lists every line with its real state
+  x=roll(L(ln({pn:'FH-632-2',desc:'PEM nut',qtyPer:4,qty:'',vendor:'Fastenal',vendorPO:'5001'}),
+           ln({desc:'standoff',qty:200,vendor:'McMaster'})), '2026-09-20');
+  ok('tip names the first line with its qty and PO',
+     x.tip.indexOf('FH-632-2 — PEM nut ×400 — Fastenal — PO 5001')>=0, x.tip.split('\\n')[0]);
+  ok('tip admits the unbought line', x.tip.indexOf('standoff ×200 — McMaster — no PO yet')>=0, x.tip.split('\\n')[1]);
+  ok('tip has one entry per line', x.tip.split('\\n').length===2);
+  ok('tip says when a line is blank', roll(L(ln({desc:'',qty:''})),'').tip.indexOf('(nothing entered)')>=0);
+  ok('tip uses the per-piece math for a blank qty',
+     roll(L(ln({desc:'nut',qtyPer:3,qty:''})),'').tip.indexOf('nut ×300')>=0,
+     roll(L(ln({desc:'nut',qtyPer:3,qty:''})),'').tip);
+
+  // legacy step with no lines at all still rolls up as one
+  x=roll(mkStep({itemsPurchased:'16ga CRS', qtyNeeded:8, vendor:'Metal Supply', vendorPO:'1100'}), '2026-09-20');
+  ok('a legacy step rolls up as a single covered line', x.n===1 && x.covered===1 && x.state==='covered', x.state);
+  ok('and names its vendor', x.vendorTxt==='Metal Supply', x.vendorTxt);
+}
+
 const fails=out.filter(l=>l.startsWith('FAIL')).length;
 document.getElementById('out').textContent=out.join('\\n')+'\\n\\n'+(out.length-fails)+'/'+out.length+' assertions passed';
 document.title = fails ? (fails+' FAILURES') : 'all pass';

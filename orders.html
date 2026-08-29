@@ -689,6 +689,16 @@ select.ss-vin{width:170px;flex-shrink:0}
 .ss-lnmath{flex-basis:100%;font-size:10px;color:var(--text3);padding-left:2px}
 .ss-lnrm{cursor:pointer;color:var(--red);font-size:13px;flex-shrink:0;opacity:.55}
 .ss-lnrm:hover{opacity:1}
+/* the roll-up chip that stands in for the whole line list */
+.slc{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font:inherit;font-size:11px;font-weight:600;
+  border:1px solid;border-radius:7px;padding:3px 8px;cursor:pointer;text-align:left;min-width:0;flex-shrink:0;max-width:100%}
+.slc:hover{filter:brightness(.96)}
+.slc b{font-weight:800}
+.slc .ti{font-size:13px;flex-shrink:0;opacity:.8}
+.slc-sep{opacity:.45}
+.slc-prog{font-weight:700}
+.slc-due{font-weight:700;opacity:.85;padding-left:5px;border-left:1px solid currentColor;margin-left:2px}
+.slc-due.late{text-decoration:underline;text-underline-offset:2px}
 .ss-lnadd{font-size:10.5px;font-weight:600;color:var(--blue);background:#e7f0fb;border:1px solid #cfe0f4;border-radius:6px;padding:3px 8px;cursor:pointer;white-space:nowrap;flex-shrink:0;display:flex;align-items:center;gap:3px}
 .ss-lnadd:hover{background:#d8e7f8}
 .ss-lnadd .ti{font-size:12px;color:var(--blue)}
@@ -2504,6 +2514,48 @@ function syncStepFromLines(s, ordQty){
   if(rec.length && rec.length===L.length){ s.receivedAt=rec[rec.length-1]; s.done=true; s.doneAt=s.doneAt||s.receivedAt; }
   else if(rec.length){ s.receivedAt=''; }   // partially in — the step isn't back yet
 }
+
+// ── the one-line roll-up shown on the schedule ───────────────────────────────
+// A step with five fasteners on it must not print five rows in the production
+// schedule — it prints one chip saying how many things, from how many vendors,
+// how many are already on a PO, and when the rest have to be ordered. The colour
+// is the honest worst case across the lines, so a job that LOOKS covered because
+// four of five are bought still reads amber.
+//   red    = something unbought is past its order-by date
+//   amber  = part way — some on POs, or some back but not all
+//   blue   = everything ordered, waiting on delivery
+//   green  = everything received
+//   grey   = nothing ordered yet, and not late
+function stepLineRoll(step, ordQty, sendByISO, todayISO){
+  const L=stepLines(step), n=L.length;
+  const covered=L.filter(lineCovered).length;
+  const received=L.filter(l=>l.receivedAt).length;
+  const vendors=[...new Set(L.filter(l=>(l.vendor||'').trim()).map(l=>l.vendor.trim().toLowerCase()))].length;
+  const named=L.filter(l=>((l.pn||'')+(l.desc||'')).trim()).length;
+  const today=todayISO||toISO(new Date());
+  const late = covered<n && !!sendByISO && sendByISO<today;
+  let state='open';
+  if(n && received===n) state='received';
+  else if(late) state='late';
+  else if(received>0 || (covered>0 && covered<n)) state='partial';
+  else if(n && covered===n) state='covered';
+  const vendorTxt = vendors===0 ? 'no vendor yet' : (vendors===1 ? (L.find(l=>(l.vendor||'').trim())||{}).vendor : vendors+' vendors');
+  const progress = !n ? ''
+    : received===n ? 'all received'
+    : covered===n ? (received?received+' of '+n+' in':'all on PO')
+    : covered>0 ? covered+' of '+n+' on PO'
+    : 'needs '+(vendors>1?'POs':'a PO');
+  return { n, covered, received, vendors, named, late, state, vendorTxt, progress,
+    sendBy:sendByISO||'',
+    // everything typed so far, for the chip's hover text
+    tip: L.map(l=>{
+      const nm=[l.pn,l.desc].filter(Boolean).join(' — ')||'(nothing entered)';
+      const q=lineBuyQty(l, ordQty);
+      return '• '+nm+(q?' ×'+q:'')+(l.vendor?' — '+l.vendor:'')
+        +(l.receivedAt?' — received '+l.receivedAt:(lineCovered(l)?' — PO '+l.vendorPO:' — no PO yet'));
+    }).join('\n') };
+}
+const LINE_ROLL_COLOR={ late:'#A32D2D', partial:'#BA7517', covered:'#3a6ea5', received:'#2f8f6b', open:'#6b7280' };
 // Colors are grouped (not per-process) to keep the calendar, queues and cards calm:
 // one tone for all in-house work, one for purchasing, one for outsourcing.
 const GROUP_COLORS = { internal:'#64748B', purchasing:'#C08A2E', outsource:'#A8443A', delivery:'#2C7A7B' };
@@ -3636,7 +3688,11 @@ function detailInner(r){
     // vendor and PO — so the row below is a list of purchase lines, not a
     // single item box. Each uncovered line becomes its own card on Need PO.
     const isOutStep = extKind(p).group==='outsource';
-    const lineRows = (ext && !done) ? stepLines(step).map(l=>{
+    const slKey=r.id+'|'+p;
+    const open=ext&&!done&&slIsOpen(slKey, step);
+    // only built when the list is actually showing — a vendor select per line
+    // on every order render is real work for something nobody is looking at
+    const lineRows = open ? stepLines(step).map(l=>{
       const li=`'${r.id}','${pJs}','${l.id}'`;
       const math=lineQtyMath(l, qtyNeeded);
       return `<div class="ss-line">
@@ -3651,13 +3707,30 @@ function detailInner(r){
         ${math?`<span class="ss-lnmath" title="How the buy qty was worked out">${esc2(math)}</span>`:''}
       </div>`;
     }).join('') : '';
+    // One chip stands in for the whole line list, so a step buying five
+    // fasteners is one scannable row until you actually want to work on it.
+    const roll=(ext&&!done)?stepLineRoll(step, qtyNeeded, cd?toISO(cd.start):'', toISO(new Date())):null;
+    const chip = roll ? (()=>{
+      const col=LINE_ROLL_COLOR[roll.state]||LINE_ROLL_COLOR.open;
+      const word=isOutStep?'thing':'item';
+      const count=roll.named?`${roll.n} ${word}${roll.n!==1?'s':''}`:'nothing listed yet';
+      const dateBit=(roll.state==='received'||!roll.sendBy)?''
+        : `<span class="slc-due${roll.late?' late':''}">${isOutStep?'send by':'order by'} ${fmtDate(roll.sendBy)}</span>`;
+      return `<button type="button" class="slc${open?' open':''}" style="color:${col};border-color:${col}44;background:${col}12"
+        title="${esc2(roll.tip)}" onclick="window._slToggle('${r.id}','${pJs}',event)">
+        <i class="ti ti-chevron-${open?'down':'right'}"></i>
+        <b>${count}</b>${roll.named?`<span class="slc-sep">·</span><span>${esc2(roll.vendorTxt)}</span>`:''}
+        ${roll.named?`<span class="slc-sep">·</span><span class="slc-prog">${roll.progress}</span>`:''}
+        ${dateBit}
+      </button>`;
+    })() : '';
     const vendorRow = (ext && !done) ? `<div class="ss-vwrap" onclick="event.stopPropagation()">
       <div class="ss-vrow">
-        <i class="ti ti-truck-delivery" title="What this step buys / sends out"></i>
+        ${chip}
         <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black" value="${esc2(step.detail||'')}" onchange="window._stepVendorInfo('${r.id}','${pJs}','detail',this.value)">
-        <button type="button" class="ss-lnadd" onclick="window._slAdd('${r.id}','${pJs}',event)" title="Another thing to buy on this step — it gets its own vendor and PO"><i class="ti ti-plus"></i> Add item</button>
+        ${open?`<button type="button" class="ss-lnadd" onclick="window._slAdd('${r.id}','${pJs}',event)" title="Another thing to buy on this step — it gets its own vendor and PO"><i class="ti ti-plus"></i> Add item</button>`:''}
       </div>
-      <div class="ss-lines">${lineRows}</div>
+      ${open?`<div class="ss-lines">${lineRows}</div>`:''}
     </div>` : '';
     return`<div class="sched-step ss-on${done?' ss-done':''}">
       <i class="ti ti-${done?'circle-check-filled':'circle'} ss-check" style="cursor:pointer;color:${done?'var(--text3)':'var(--border2)'}" title="${done?'Mark not done':'Mark complete'}" onclick="window._toggleStepDone('${r.id}','${p}',event)"></i>
@@ -8733,8 +8806,26 @@ function _slStep(id,name){
   ensureStepLines(s);
   return {r,s};
 }
+// Which step's line list is showing. Only holds steps the user has actually
+// clicked; everything else falls back to the default — open while the step is
+// still blank (that's when you need the boxes), collapsed to the chip once
+// there's something to summarise. Touching a line counts as wanting it open,
+// so the list can't fold up under someone mid-entry.
+const _slOpen=new Map();
+function slIsOpen(key, step){
+  if(_slOpen.has(key)) return _slOpen.get(key);
+  return stepLines(step).every(l=>!((l.pn||'')+(l.desc||'')).trim());
+}
+window._slToggle=(id,name,e)=>{
+  if(e) e.stopPropagation();
+  const c=_slStep(id,name); if(!c) return;
+  const key=id+'|'+name;
+  _slOpen.set(key, !slIsOpen(key, c.s));
+  render();
+};
 window._slEdit = (id, name, lineId, field, val) => {
   const c=_slStep(id,name); if(!c) return;
+  _slOpen.set(id+'|'+name, true);
   const l=c.s.lines.find(x=>x.id===lineId); if(!l) return;
   if(field==='qty'||field==='qtyPer') l[field]=(val!==''?Number(val):'');
   else l[field]=String(val||'').trim();
@@ -8749,6 +8840,7 @@ window._slVendor = (sel, id, name, lineId) => {
 window._slAdd = (id, name, e) => {
   if(e) e.stopPropagation();
   const c=_slStep(id,name); if(!c) return;
+  _slOpen.set(id+'|'+name, true);
   c.s.lines.push(newStepLine());
   syncStepFromLines(c.s, c.r.qty);
   saveDB(); render();
@@ -8756,6 +8848,7 @@ window._slAdd = (id, name, e) => {
 window._slDel = (id, name, lineId, e) => {
   if(e) e.stopPropagation();
   const c=_slStep(id,name); if(!c) return;
+  _slOpen.set(id+'|'+name, true);
   const l=c.s.lines.find(x=>x.id===lineId);
   if(l&&lineCovered(l)){ alert('This item is already on PO '+l.vendorPO+'. Void that PO on the Need PO page first.'); return; }
   if(c.s.lines.length<=1){   // never leave a step with no line — blank it instead
@@ -9028,7 +9121,9 @@ function gatherExternalSteps(){
   orders.filter(r=>!r.archived && !isDoneRow(r)).forEach(r=>{
     computeStepDates(r).forEach(s=>{
       if(s.done) return;
-      out.push({order:r, name:s.name, start:s.start, end:s.end, sentAt:s.sentAt, vendor:s.vendor||'', vendorPO:s.vendorPO||'', kind:extKind(s.name)});
+      const step=(r.schedule&&r.schedule.steps||[]).find(x=>x&&x.name===s.name);
+      out.push({order:r, name:s.name, start:s.start, end:s.end, sentAt:s.sentAt, vendor:s.vendor||'', vendorPO:s.vendorPO||'',
+        kind:extKind(s.name), roll:step?stepLineRoll(step, r.qty, toISO(s.start), toISO(new Date())):null});
     });
   });
   return out;
@@ -9068,10 +9163,23 @@ function renderBoard(){
       const col=PROCESS_COLORS[name]||'#888';
       const rows=list.map(it=>{
         const r=it.order, pr=prioOf(r), isOut=it.kind.group==='outsource';
-        const st=ioStatus(it,today), k=it.kind;
+        let st=ioStatus(it,today); const k=it.kind;
         const label=(r.part||r.desc||'—');
         const sentWord=isOut?'Sent':'Ordered', backWord=cap(k.b);
-        const vend = it.vendor ? ` · <span class="io-vend">${it.vendor}${it.vendorPO?' (PO '+it.vendorPO+')':''}</span>` : '';
+        // A step buying from several vendors has no single vendor/PO to print —
+        // its roll-up says how many things, from how many vendors, how many are
+        // bought. Single-line steps read exactly as they always did.
+        const ro=it.roll;
+        const multi = ro && ro.n>1;
+        // sentAt only fills once EVERY line has gone out, so a part-bought step
+        // would otherwise sit here shouting "Order now" — say what's actually left
+        if(multi && ro.covered>0 && ro.covered<ro.n)
+          st={label:(ro.n-ro.covered)+' to '+(isOut?'send':'order'), c:LINE_ROLL_COLOR.partial};
+        else if(multi && ro.received>0 && ro.received<ro.n)
+          st={label:(ro.n-ro.received)+' still out', c:LINE_ROLL_COLOR.partial};
+        const vend = multi
+          ? ` · <span class="io-vend" style="color:${LINE_ROLL_COLOR[ro.state]||''}" title="${(ro.tip||'').replace(/"/g,'&quot;')}">${ro.n} items · ${ro.vendorTxt} · ${ro.progress}</span>`
+          : (it.vendor ? ` · <span class="io-vend">${it.vendor}${it.vendorPO?' (PO '+it.vendorPO+')':''}</span>` : '');
         const dateLine = it.sentAt
           ? `<span class="io-undo" onclick="undoSent('${r.id}','${name}',event)" title="Click to undo">${sentWord} ${fmtDate(it.sentAt)}</span> · ${backWord} ~${fmtDate(toISO(it.end))}${vend}`
           : `${cap(k.a)} ${fmtDate(toISO(it.start))} → ${backWord} ${fmtDate(toISO(it.end))}${vend}`;

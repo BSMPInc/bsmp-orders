@@ -24,9 +24,37 @@ page = u'''<!doctype html><meta charset="utf-8"><title>purchase line layout</tit
   <div class="sched-steps grp-ext">
     <div class="sched-step ss-on"><span class="ss-seq">1</span><span class="ss-name">Purchasing- Hardware</span></div>
   </div>
+  <!-- collapsed: the roll-up chip stands in for the whole line list -->
+  <div class="ss-vwrap" id="vwrap-closed">
+    <div class="ss-vrow">
+      <button type="button" class="slc" id="chip-late" style="color:#A32D2D;border-color:#A32D2D44;background:#A32D2D12">
+        <i class="ti ti-chevron-right"></i>
+        <b>4 items</b><span class="slc-sep">·</span><span>2 vendors</span>
+        <span class="slc-sep">·</span><span class="slc-prog">1 of 4 on PO</span>
+        <span class="slc-due late">order by 8/12</span>
+      </button>
+      <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black">
+    </div>
+  </div>
+  <div class="ss-vwrap" id="vwrap-green">
+    <div class="ss-vrow">
+      <button type="button" class="slc" id="chip-recv" style="color:#2f8f6b;border-color:#2f8f6b44;background:#2f8f6b12">
+        <i class="ti ti-chevron-right"></i>
+        <b>4 items</b><span class="slc-sep">·</span><span>Fastenal Industrial Supply</span>
+        <span class="slc-sep">·</span><span class="slc-prog">all received</span>
+      </button>
+      <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black">
+    </div>
+  </div>
+  <!-- expanded: chip stays, list and Add item appear under it -->
   <div class="ss-vwrap" id="vwrap">
     <div class="ss-vrow">
-      <i class="ti ti-truck-delivery"></i>
+      <button type="button" class="slc open" id="chip-open" style="color:#BA7517;border-color:#BA751744;background:#BA751712">
+        <i class="ti ti-chevron-down"></i>
+        <b>3 items</b><span class="slc-sep">·</span><span>2 vendors</span>
+        <span class="slc-sep">·</span><span class="slc-prog">1 of 3 on PO</span>
+        <span class="slc-due">order by 9/03</span>
+      </button>
       <input class="ss-vin grow" placeholder="Process / details — e.g. Type II black">
       <button type="button" class="ss-lnadd"><i class="ti ti-plus"></i> Add item</button>
     </div>
@@ -127,6 +155,30 @@ document.querySelectorAll('#panel input, #panel select, #panel button, #panel .s
   if(r.right>pr.right+1||r.left<pr.left-1) esc.push((el.className||el.tagName)+' @'+Math.round(r.left)+'-'+Math.round(r.right));
 });
 ok('no control overflows the panel', esc.length===0, esc.join(' | '));
+
+// ── the roll-up chip ────────────────────────────────────────────────────────
+{
+  const chip=document.getElementById('chip-late').getBoundingClientRect();
+  ok('the collapsed chip fits on one row', chip.height<=34, Math.round(chip.height));
+  ok('the chip leaves room for the details box beside it',
+     document.querySelector('#vwrap-closed .ss-vin.grow').getBoundingClientRect().width>=150,
+     Math.round(document.querySelector('#vwrap-closed .ss-vin.grow').getBoundingClientRect().width));
+  ok('a collapsed step shows no line rows', document.querySelectorAll('#vwrap-closed .ss-line').length===0);
+  ok('a collapsed step offers no Add item', document.querySelectorAll('#vwrap-closed .ss-lnadd').length===0);
+  ok('an expanded step keeps its chip', !!document.getElementById('chip-open'));
+  ok('an expanded step shows Add item', document.querySelectorAll('#vwrap .ss-lnadd').length===1);
+  // the state colour has to actually reach the text, not just the border
+  const cs=getComputedStyle(document.getElementById('chip-late'));
+  ok('a late chip is red', cs.color==='rgb(163, 45, 45)', cs.color);
+  ok('a received chip is green', getComputedStyle(document.getElementById('chip-recv')).color==='rgb(47, 143, 107)',
+     getComputedStyle(document.getElementById('chip-recv')).color);
+  ok('the due date is underlined only when late',
+     getComputedStyle(document.querySelector('#chip-late .slc-due')).textDecorationLine==='underline'
+     && getComputedStyle(document.querySelector('#chip-open .slc-due')).textDecorationLine==='none');
+  // a long vendor name must not push the chip out of the panel
+  const g=document.getElementById('chip-recv').getBoundingClientRect(), pw=panel.getBoundingClientRect();
+  ok('a long vendor name keeps the chip inside the panel', g.right<=pw.right+1, Math.round(g.right)+' vs '+Math.round(pw.right));
+}
 
 // the three-line step editor should stack, not squeeze onto one row
 const lines=[...document.querySelectorAll('#vwrap .ss-line')].map(e=>e.getBoundingClientRect());
