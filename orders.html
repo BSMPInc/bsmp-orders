@@ -2451,8 +2451,15 @@ function normList(v){
   return [];
 }
 function newStepLine(o){
-  return Object.assign({ id:'ln_'+uid(), desc:'', pn:'', qtyPer:'', qty:'', uom:'',
+  // `cost` is what the QUOTE priced this at, per piece of the thing bought — it
+  // rides along so whoever places the PO can see what was bid before they
+  // accept the vendor's number. Nothing computes off it.
+  return Object.assign({ id:'ln_'+uid(), desc:'', pn:'', qtyPer:'', qty:'', uom:'', cost:'',
     vendor:'', vendorPO:'', poId:'', poAt:'', sentAt:'', receivedAt:'' }, o||{});
+}
+function lineCostNote(l){
+  const c=Number(l&&l.cost);
+  return (l&&l.cost!=='' && isFinite(c) && c>0) ? ('quoted '+fmtMoney(c)+' ea') : '';
 }
 // Read-only view: always an array, legacy steps included. Never writes.
 function stepLines(s){
@@ -2551,7 +2558,8 @@ function stepLineRoll(step, ordQty, sendByISO, todayISO){
     tip: L.map(l=>{
       const nm=[l.pn,l.desc].filter(Boolean).join(' — ')||'(nothing entered)';
       const q=lineBuyQty(l, ordQty);
-      return '• '+nm+(q?' ×'+q:'')+(l.vendor?' — '+l.vendor:'')
+      const cn=lineCostNote(l);
+      return '• '+nm+(q?' ×'+q:'')+(cn?' ('+cn+')':'')+(l.vendor?' — '+l.vendor:'')
         +(l.receivedAt?' — received '+l.receivedAt:(lineCovered(l)?' — PO '+l.vendorPO:' — no PO yet'));
     }).join('\n') };
 }
@@ -3704,7 +3712,7 @@ function detailInner(r){
         ${lineCovered(l)
           ? `<span class="ss-vpo" title="Already on a PO">PO ${esc2(l.vendorPO)}</span>`
           : `<i class="ti ti-x ss-lnrm" title="Remove this item" onclick="window._slDel(${li},event)"></i>`}
-        ${math?`<span class="ss-lnmath" title="How the buy qty was worked out">${esc2(math)}</span>`:''}
+        ${(math||lineCostNote(l))?`<span class="ss-lnmath" title="How the buy qty was worked out, and what the quote priced it at">${esc2([math,lineCostNote(l)].filter(Boolean).join(' · '))}</span>`:''}
       </div>`;
     }).join('') : '';
     // One chip stands in for the whole line list, so a step buying five
@@ -5091,6 +5099,35 @@ function _qMapProcesses(q){
   enabled.add('Delivery');
   return { enabled:[...enabled], inspection };
 }
+// Seed the imported order's purchase lines straight off the quote. The two
+// shapes already agree: a quote's hardware row is {desc, q, c} where q is the
+// PER-PIECE count and c the cost each — exactly what a purchase line's qtyPer
+// and cost mean — so the BOM arrives filled in instead of being retyped, and
+// the buy qty falls out of the order qty on its own.
+function _qSeedStepLines(q, steps){
+  const num=(v)=>{ const n=Number(v); return (v!==''&&v!=null&&isFinite(n)&&n>0)?n:''; };
+  const line=(desc,per,cost)=>newStepLine({desc:String(desc||'').trim(), qtyPer:num(per), cost:num(cost)});
+  const put=(procName, rows)=>{
+    if(!rows.length) return;
+    const s=steps.find(x=>x.name===procName); if(!s) return;
+    s.enabled=true;
+    s.lines=normList(s.lines).concat(rows);
+  };
+  put('Purchasing- Hardware',
+      normList(q.hwLines).filter(h=>String(h.desc||'').trim()).map(h=>line(h.desc,h.q,h.c)));
+  // Several quoted outsource rows can map to the SAME process — two plating
+  // lines, say. They become two lines on that one step rather than collapsing
+  // into a single step that no longer says what was quoted.
+  const byProc={};
+  normList(q.outLines).filter(o=>String(o.desc||'').trim()).forEach(o=>{
+    const p=_qOutsourceProcess(o.desc);
+    (byProc[p]=byProc[p]||[]).push(line(o.desc,o.q,o.c));
+  });
+  Object.keys(byProc).forEach(p=>put(p, byProc[p]));
+  // material is one line, and has no sensible per-piece count on a quote
+  const mat=(q.material&&q.material!=='—')?String(q.material).trim():'';
+  if(mat) put('Purchasing- Material',[line(mat,'','')]);
+}
 function _qBuildNotes(q, inspection){
   const lines = [];
   lines.push('Imported from Quote' + (q.quoteNo?(' #'+q.quoteNo):'') + (q.date?(' ('+q.date+')'):'') + '.');
@@ -5142,6 +5179,7 @@ window._doQuoteImport = (id) => {
   const m = _qMapProcesses(q);
   const enabledSet = new Set(m.enabled);
   const steps = PROCESSES.map(p => ({ name:p, enabled:enabledSet.has(p), duration:defDur(p), start:'' }));
+  _qSeedStepLines(q, steps);   // the quote's hardware / outsource / material rows become purchase lines
   const qty = parseFloat(q.qty) || 0;
   const cost = parseFloat(q.pricePerPart != null ? q.pricePerPart : q.costPerPart) || 0;
   const today = new Date().toISOString().slice(0,10);
@@ -8015,7 +8053,7 @@ function npPoolItems(){
         if(lineCovered(l)) return;
         items.push({ orderId:r.id, name:s.name, lineId:l.id, vendor:(l.vendor||s.vendor||'').trim(),
           item:[l.pn,l.desc].filter(Boolean).join(' — '), pn:l.pn||'', desc:l.desc||'',
-          qtyPer:l.qtyPer||'', qty:lineBuyQty(l, r.qty)||'', qtyMath:lineQtyMath(l, r.qty),
+          qtyPer:l.qtyPer||'', qty:lineBuyQty(l, r.qty)||'', qtyMath:lineQtyMath(l, r.qty), costNote:lineCostNote(l),
           ordQty:r.qty||'', detail:s.detail||'',
           customer:r.customer||'', job:r.job||'', part:r.part||r.desc||'', due:r.due||'',
           sendBy:sd?toISO(sd.start):'', backBy:sd?toISO(sd.end):'', lead:s.duration||defDur(s.name),
@@ -8092,7 +8130,7 @@ function renderNeedPO(){
               <input class="npq-in npq-qty" type="number" min="0" placeholder="Buy qty" value="${esc(x.qty)}" onchange="_npEditLine(${ln},'qty',this.value)" title="Quantity to buy — typed here it overrides the per-piece math">
               <input class="npq-in npq-detail" placeholder="Process / spec — e.g. Type II anodize black" value="${esc(x.detail)}" onchange="_npEdit('${x.orderId}','${esc(x.name)}','detail',this.value)">
             </span>
-            ${x.qtyMath?`<span class="npv-math" title="How the buy qty was worked out">${esc(x.qtyMath)}</span>`:''}
+            ${(x.qtyMath||x.costNote)?`<span class="npv-math" title="How the buy qty was worked out, and what the quote priced it at">${esc([x.qtyMath,x.costNote].filter(Boolean).join(' · '))}</span>`:''}
           </span>
           <span class="npv-nums">${x.ordQty?`<span class="npv-num" title="Quantity the order requires"><small>order</small><b>${esc(x.ordQty)}</b></span>`:''}</span>
           <span class="npv-due${over?' over':''}" title="${k.a==='order'?'Order by':'Send by'} → ${k.b==='in'?'in by':'back by'}">${x.sendBy?fmtDate(x.sendBy):'—'}${x.backBy?' → '+fmtDate(x.backBy):''}</span>
@@ -8202,7 +8240,7 @@ window.openMakePO=(gi)=>{
     const l=stepLine(s, x.lineId); if(!l) return;
     x.pn=l.pn||''; x.desc=l.desc||'';
     x.item=[l.pn,l.desc].filter(Boolean).join(' — ');
-    x.qty=lineBuyQty(l, r&&r.qty)||''; x.qtyMath=lineQtyMath(l, r&&r.qty); x.detail=s.detail||'';
+    x.qty=lineBuyQty(l, r&&r.qty)||''; x.qtyMath=lineQtyMath(l, r&&r.qty); x.costNote=lineCostNote(l); x.detail=s.detail||'';
   });
   window._mkpo={rows, proc:g.proc, vendor:g.vendor};
   const k=extKind(g.proc), procCol=PROCESS_COLORS[g.proc]||'#888';
@@ -8213,7 +8251,7 @@ window.openMakePO=(gi)=>{
   document.getElementById('mkpo-body').innerHTML=`
     <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-file-plus"></i> Make PO ${g.vendor?'— '+esc(g.vendor):''}</h3>
     <div style="font-size:12px;color:var(--text3);margin-bottom:13px"><span class="npv-procbadge" style="color:${procCol};border-color:${procCol}55;background:${procCol}14">${procIcon(g.proc,12)} ${shortProc(g.proc)}</span> · ${rows.length} item${rows.length!==1?'s':''} on this PO</div>
-    <div class="mkpo-items">${rows.map(x=>`<div class="mkpo-it"><b>${esc(x.part)||'—'}</b><span class="sub">${esc(x.customer)}${x.job?' · '+esc(x.job):''}</span><span>${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.qty?` <b>×${esc(x.qty)}</b>`:''}${x.qtyMath?`<small style="display:block;color:var(--text3);font-size:10.5px">${esc(x.qtyMath)}</small>`:''}</span></div>`).join('')}</div>
+    <div class="mkpo-items">${rows.map(x=>`<div class="mkpo-it"><b>${esc(x.part)||'—'}</b><span class="sub">${esc(x.customer)}${x.job?' · '+esc(x.job):''}</span><span>${esc(x.item)||'<span style="color:var(--text3)">no item noted</span>'}${x.qty?` <b>×${esc(x.qty)}</b>`:''}${(x.qtyMath||x.costNote)?`<small style="display:block;color:var(--text3);font-size:10.5px">${esc([x.qtyMath,x.costNote].filter(Boolean).join(' · '))}</small>`:''}</span></div>`).join('')}</div>
     ${g.vendor?'':`<div class="mkpo-field"><label>Vendor</label>${vendorSelectHtml('', 'id="mkpo-vendor" onchange="window._resolveVendorSel(this)"')}</div>`}
     <div class="mkpo-grid">
       <div class="mkpo-field"><label>Our PO #</label><input id="mkpo-po" placeholder="PO number"></div>

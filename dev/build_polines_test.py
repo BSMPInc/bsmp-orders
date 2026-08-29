@@ -16,6 +16,9 @@ block  = grab('function normList(v){', '\n// Colors are grouped')
 block += '\n' + grab('function npPoolItems(){', '\n// Open POs =')
 # the PO -> lines walker used by ship-date / void / receive
 block += '\n' + grab('function _poLines(rec, fn){', '\nwindow._polShip')
+# quote -> purchase lines: the seeder and the outsource-process classifier it uses
+block += '\n' + grab('function _qOutsourceProcess(desc){', '\nfunction _qMapProcesses')
+block += '\n' + grab('function _qSeedStepLines(q, steps){', '\nfunction _qBuildNotes')
 
 html = u'''<!doctype html><meta charset="utf-8"><title>purchase lines test</title>
 <pre id="out" style="font:12px ui-monospace,monospace"></pre>
@@ -30,6 +33,7 @@ function toISO(d){ return d.toISOString().slice(0,10); }
 const EXTERNAL_SET=new Set(['Purchasing- Hardware','Purchasing- Material','Outsource- Plating']);
 function isExternal(n){ return EXTERNAL_SET.has(n); }
 function defDur(){ return 5; }
+function fmtMoney(n){ return '$'+(Number(n)||0).toFixed(2); }
 let orders=[];
 function ensureSchedule(r){ return r.schedule; }
 function enabledOrdered(sch){ return (sch.steps||[]).filter(s=>s.enabled); }
@@ -287,6 +291,89 @@ const mkOrder=(id,qty,steps)=>({id:id,qty:qty,customer:'Acme',part:'BRK-'+id,job
   x=roll(mkStep({itemsPurchased:'16ga CRS', qtyNeeded:8, vendor:'Metal Supply', vendorPO:'1100'}), '2026-09-20');
   ok('a legacy step rolls up as a single covered line', x.n===1 && x.covered===1 && x.state==='covered', x.state);
   ok('and names its vendor', x.vendorTxt==='Metal Supply', x.vendorTxt);
+}
+
+// ══ 8 · seeding an imported order's lines from the quote ════════════════════
+// The quote already holds the BOM as {desc, q, c} with q per-piece — the whole
+// point is that it lands as purchase lines instead of being retyped.
+{
+  const mkSteps=()=>['Purchasing- Hardware','Purchasing- Material','Outsource- Plating',
+    'Outsource- Paint','Outsource- Machining','Outsource- Other','Laser']
+    .map(n=>({name:n, enabled:false, duration:5, start:''}));
+  const step=(steps,n)=>steps.find(s=>s.name===n);
+
+  let st=mkSteps();
+  _qSeedStepLines({hwLines:[{desc:'PEM flush nut 6-32',q:'4',c:'0.21'},{desc:'standoff .250 hex',q:'2',c:'1.05'}]}, st);
+  const hw=step(st,'Purchasing- Hardware');
+  ok('hardware rows become one line each', normList(hw.lines).length===2, normList(hw.lines).length);
+  ok('the step is enabled by the seeding', hw.enabled===true);
+  ok('desc carries over', hw.lines[0].desc==='PEM flush nut 6-32', hw.lines[0].desc);
+  ok('the quote qty is read as PER PIECE', hw.lines[0].qtyPer===4, hw.lines[0].qtyPer);
+  ok('the quoted cost each rides along', hw.lines[0].cost===0.21, hw.lines[0].cost);
+  ok('each seeded line gets its own id', hw.lines[0].id!==hw.lines[1].id);
+  ok('nothing is pre-assigned a vendor or PO', hw.lines.every(l=>!l.vendor&&!l.vendorPO));
+  ok('buy qty falls out of the order qty', lineBuyQty(hw.lines[0],200)===800, lineBuyQty(hw.lines[0],200));
+  ok('and shows its work', lineQtyMath(hw.lines[0],200)==='4/pc × 200 pcs = 800', lineQtyMath(hw.lines[0],200));
+  ok('the quoted price reads back for the PO', lineCostNote(hw.lines[0])==='quoted $0.21 ea', lineCostNote(hw.lines[0]));
+
+  // junk in the quote must not become junk lines
+  st=mkSteps();
+  _qSeedStepLines({hwLines:[{desc:'',q:'4',c:'1'},{desc:'  ',q:'',c:''},{desc:'rivnut',q:'',c:''}]}, st);
+  ok('rows with no description are skipped', normList(step(st,'Purchasing- Hardware').lines).length===1,
+     normList(step(st,'Purchasing- Hardware').lines).length);
+  ok('a described row with no numbers still seeds', step(st,'Purchasing- Hardware').lines[0].desc==='rivnut');
+  ok('a missing qty stays blank, not zero', step(st,'Purchasing- Hardware').lines[0].qtyPer==='', JSON.stringify(step(st,'Purchasing- Hardware').lines[0].qtyPer));
+  ok('a missing cost stays blank, not zero', step(st,'Purchasing- Hardware').lines[0].cost==='');
+  ok('a blank cost prints no quoted-price note', lineCostNote(step(st,'Purchasing- Hardware').lines[0])==='');
+  st=mkSteps();
+  _qSeedStepLines({hwLines:[{desc:'nut',q:'abc',c:'-3'}]}, st);
+  ok('a non-numeric qty is dropped, not NaN', step(st,'Purchasing- Hardware').lines[0].qtyPer==='');
+  ok('a negative cost is dropped', step(st,'Purchasing- Hardware').lines[0].cost==='');
+
+  // outsource rows: two that classify the same way must BOTH survive
+  st=mkSteps();
+  _qSeedStepLines({outLines:[{desc:'Black anodize',q:'1',c:'2.50'},{desc:'Zinc plate hardware',q:'1',c:'0.80'},
+                             {desc:'Powder coat white',q:'1',c:'3.00'}]}, st);
+  const plat=step(st,'Outsource- Plating'), paint=step(st,'Outsource- Paint');
+  ok('two rows classifying as plating stay as two lines', normList(plat.lines).length===2, normList(plat.lines).length);
+  ok('and both descriptions survive',
+     plat.lines.map(l=>l.desc).join('|')==='Black anodize|Zinc plate hardware', plat.lines.map(l=>l.desc).join('|'));
+  ok('a paint row lands on the paint step', normList(paint.lines).length===1 && paint.lines[0].desc==='Powder coat white');
+  ok('unrelated steps are left alone', !step(st,'Outsource- Machining').lines && step(st,'Outsource- Machining').enabled===false);
+  ok('an in-house step is never seeded', !step(st,'Laser').lines && step(st,'Laser').enabled===false);
+
+  // material
+  st=mkSteps();
+  _qSeedStepLines({material:'0.0598 thk CRS'}, st);
+  ok('material seeds one line', normList(step(st,'Purchasing- Material').lines).length===1);
+  ok('with the material string as the item', step(st,'Purchasing- Material').lines[0].desc==='0.0598 thk CRS');
+  ok('and no per-piece count', step(st,'Purchasing- Material').lines[0].qtyPer==='');
+  st=mkSteps(); _qSeedStepLines({material:'—'}, st);
+  ok('the quote tool\\'s em-dash placeholder is not a material', !step(st,'Purchasing- Material').lines);
+
+  // an empty quote seeds nothing at all
+  st=mkSteps();
+  _qSeedStepLines({}, st);
+  ok('an empty quote seeds nothing', st.every(s=>!s.lines&&s.enabled===false));
+  st=mkSteps();
+  _qSeedStepLines({hwLines:{a:{desc:'nut',q:'2',c:'1'},b:null}}, st);   // RTDB object-shaped
+  ok('object-shaped quote rows with holes still seed', normList(step(st,'Purchasing- Hardware').lines).length===1);
+
+  // the seeded step behaves like any other: it rolls up and pools
+  st=mkSteps();
+  _qSeedStepLines({hwLines:[{desc:'PEM nut',q:'4',c:'0.21'},{desc:'standoff',q:'2',c:'1.05'}]}, st);
+  const seeded=step(st,'Purchasing- Hardware');
+  syncStepFromLines(seeded, 200);
+  ok('a seeded step reads as needing a PO', seeded.vendorPO==='', seeded.vendorPO);
+  ok('its summary lists both items with buy qtys',
+     seeded.itemsPurchased==='PEM nut ×800; standoff ×400', seeded.itemsPurchased);
+  const rl=stepLineRoll(seeded, 200, '2026-09-20', '2026-09-10');
+  ok('the chip counts the seeded items', rl.n===2 && rl.named===2, rl.n+'/'+rl.named);
+  ok('the chip says no vendor is chosen yet', rl.vendorTxt==='no vendor yet', rl.vendorTxt);
+  ok('the chip shows the quoted price in its tip', rl.tip.indexOf('(quoted $0.21 ea)')>=0, rl.tip.split('\\n')[0]);
+  orders=[Object.assign(mkOrder('oq',200,[]),{schedule:{steps:st.map(x=>Object.assign({},x,{enabled:!!x.lines}))}})];
+  ok('both seeded lines land in the Need PO pool', npPoolItems().length===2, npPoolItems().length);
+  ok('the pool carries the quoted price through', npPoolItems()[0].costNote==='quoted $0.21 ea', npPoolItems()[0].costNote);
 }
 
 const fails=out.filter(l=>l.startsWith('FAIL')).length;
