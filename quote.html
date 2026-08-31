@@ -1601,45 +1601,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div style="margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
         Markup tiers
-        <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">— auto-applied based on quantity. Edit to override.</span>
+        <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">— auto-applied based on quantity. Edit to override; leave a band blank to skip it.</span>
       </div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end" id="markup-tiers-row">
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">1 to</div>
-          <input type="number" id="mt-thresh-1" value="50" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcQtyBreaks()">
-          <input type="number" id="mt-markup-1" value="35" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">to</div>
-          <input type="number" id="mt-thresh-2" value="200" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcQtyBreaks()">
-          <input type="number" id="mt-markup-2" value="30" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">to</div>
-          <input type="number" id="mt-thresh-3" value="500" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcQtyBreaks()">
-          <input type="number" id="mt-markup-3" value="25" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">to</div>
-          <input type="number" id="mt-thresh-4" value="999" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcQtyBreaks()">
-          <input type="number" id="mt-markup-4" value="22" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">above</div>
-          <div style="height:30px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);width:60px">+</div>
-          <input type="number" id="mt-markup-5" value="20" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <button class="btn btn-sm" onclick="resetMarkupTiers()" style="margin-left:8px;margin-bottom:1px;height:30px;align-self:flex-end">Reset defaults</button>
-      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end" id="markup-tiers-row"></div>
     </div>
 
     <div style="margin-bottom:14px">
@@ -2112,45 +2076,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     <div style="margin-bottom:14px">
       <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
         Markup tiers
-        <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">— auto-applied based on order qty. Edit to override.</span>
+        <span style="font-size:10px;font-weight:400;color:var(--text3);text-transform:none;letter-spacing:0;margin-left:6px">— auto-applied based on order qty. Edit to override; leave a band blank to skip it.</span>
       </div>
-      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end">
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">1 to</div>
-          <input type="number" id="asm-mt-thresh-1" value="50" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcAsmQtyBreaks()">
-          <input type="number" id="asm-mt-markup-1" value="35" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcAsmQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">to</div>
-          <input type="number" id="asm-mt-thresh-2" value="200" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcAsmQtyBreaks()">
-          <input type="number" id="asm-mt-markup-2" value="30" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcAsmQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">to</div>
-          <input type="number" id="asm-mt-thresh-3" value="500" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcAsmQtyBreaks()">
-          <input type="number" id="asm-mt-markup-3" value="25" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcAsmQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">to</div>
-          <input type="number" id="asm-mt-thresh-4" value="999" min="1" step="1" style="width:60px;text-align:center;font-size:13px" onchange="calcAsmQtyBreaks()">
-          <input type="number" id="asm-mt-markup-4" value="22" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcAsmQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>
-        <div style="text-align:center">
-          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">above</div>
-          <div style="height:30px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);width:60px">+</div>
-          <input type="number" id="asm-mt-markup-5" value="20" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="calcAsmQtyBreaks()">
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
-        </div>
-        <button class="btn btn-sm" onclick="resetAsmMarkupTiers()" style="margin-left:8px;margin-bottom:1px;height:30px;align-self:flex-end">Reset defaults</button>
-      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end" id="asm-markup-tiers-row"></div>
     </div>
 
     <div style="margin-bottom:14px">
@@ -6732,11 +6660,9 @@ async function runQbAiReview(kind){
 
   // Tier settings as configured on the card
   const pre = isAsm?'asm-mt-':'mt-';
-  const tiers=[];
-  for(let i=1;i<=4;i++){
-    tiers.push(`up to ${document.getElementById(pre+'thresh-'+i)?.value}: ${document.getElementById(pre+'markup-'+i)?.value}% markup`);
-  }
-  tiers.push(`above: ${document.getElementById(pre+'markup-5')?.value}% markup`);
+  // only the bands that are filled in — an unused slot is not a tier
+  const tiers=markupTierBands(pre).map(b=>`up to ${b.max}: ${b.pct}% markup`);
+  tiers.push(`above: ${document.getElementById(pre+'markup-above')?.value}% markup`);
 
   let ctx='';
   if(isAsm){
@@ -6836,8 +6762,8 @@ function qbCliffCheckHtml(results){
     // would warn on nearly every schedule.)
     const minQ=sorted[0].qty, maxQ=sorted[sorted.length-1].qty;
     const seen=new Set();
-    for(const id of ['mt-thresh-1','mt-thresh-2','mt-thresh-3','mt-thresh-4']){
-      const t=Math.round(parseFloat(document.getElementById(id)?.value));
+    for(const band of markupTierBands('mt-')){
+      const t=Math.round(band.max);
       if(!t||t<1||seen.has(t)||t<minQ||t>maxQ) continue; seen.add(t);
       const lo=calcBreakForQty(t), hi=calcBreakForQty(t+1);
       if(hi.jobTotal < lo.jobTotal-0.005){
@@ -8939,79 +8865,93 @@ function loadPriceBreaksFromIndex(){
 
 
 // ===================== SLIDING MARKUP TIERS =====================
-function getMarkupForQty(qty){
-  // Tier thresholds are editable — read current values
-  const t1 = parseFloat(document.getElementById('mt-thresh-1')?.value) || 50;
-  const t2 = parseFloat(document.getElementById('mt-thresh-2')?.value) || 200;
-  const t3 = parseFloat(document.getElementById('mt-thresh-3')?.value) || 500;
-  const t4 = parseFloat(document.getElementById('mt-thresh-4')?.value) || 999;
-  const tiers = [
-    {max:t1,  id:'mt-markup-1'},
-    {max:t2,  id:'mt-markup-2'},
-    {max:t3,  id:'mt-markup-3'},
-    {max:t4,  id:'mt-markup-4'},
-    {max:Infinity, id:'mt-markup-5'}
-  ];
-  for(const tier of tiers){
-    if(qty <= tier.max){
-      const val = parseFloat(document.getElementById(tier.id)?.value);
-      if(!isNaN(val)) return val/100;
-      break;
-    }
+// Eight bands: seven editable "up to N" bands plus a final "above" rate. Only
+// bands 1-4 are filled by default, so the ladder behaves exactly as it did when
+// there were five tiers. A band with a blank threshold OR a blank % is SKIPPED
+// at pricing time — it is an unused slot, never a 0% tier.
+const MT_BANDS = 7;
+const MT_DEF_THRESH = [50, 200, 500, 999, '', '', ''];
+const MT_DEF_MARKUP = [35, 30, 25, 22, '', '', ''];
+const MT_DEF_ABOVE  = 20;
+
+// Eight bands hand-written across two cards is ~240 lines of near-identical
+// markup, so the row is built here instead. Both cards call it at load.
+function buildMarkupTierRow(pre, onchange, resetFn){
+  const box = document.getElementById(pre==='mt-' ? 'markup-tiers-row' : 'asm-markup-tiers-row');
+  if(!box) return;
+  const arrow = '<div style="font-size:16px;color:var(--text3);padding-bottom:22px">→</div>';
+  let h='';
+  for(let i=1;i<=MT_BANDS;i++){
+    if(i>1) h+=arrow;
+    h+=`<div style="text-align:center">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">${i===1?'1 to':'to'}</div>
+          <input type="number" id="${pre}thresh-${i}" value="${MT_DEF_THRESH[i-1]}" min="1" step="1" placeholder="—" style="width:60px;text-align:center;font-size:13px" onchange="${onchange}()">
+          <input type="number" id="${pre}markup-${i}" value="${MT_DEF_MARKUP[i-1]}" min="0" max="200" step="1" placeholder="—" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="${onchange}()">
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
+        </div>`;
   }
-  // Fallback to main markup field
-  return parseFloat(document.getElementById('markup').value)/100||0.30;
+  h+=arrow+`<div style="text-align:center">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:3px">above</div>
+          <div style="height:30px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text3);width:60px">+</div>
+          <input type="number" id="${pre}markup-above" value="${MT_DEF_ABOVE}" min="0" max="200" step="1" style="width:60px;text-align:center;font-size:13px;margin-top:3px" onchange="${onchange}()">
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">%</div>
+        </div>`
+   +`<button class="btn btn-sm" onclick="${resetFn}()" style="margin-left:8px;margin-bottom:1px;height:30px;align-self:flex-end">Reset defaults</button>`;
+  box.innerHTML=h;
 }
 
-function resetMarkupTiers(){
-  document.getElementById('mt-thresh-1').value = 50;
-  document.getElementById('mt-thresh-2').value = 200;
-  document.getElementById('mt-thresh-3').value = 500;
-  document.getElementById('mt-thresh-4').value = 999;
-  document.getElementById('mt-markup-1').value = 35;
-  document.getElementById('mt-markup-2').value = 30;
-  document.getElementById('mt-markup-3').value = 25;
-  document.getElementById('mt-markup-4').value = 22;
-  document.getElementById('mt-markup-5').value = 20;
-  calcQtyBreaks();
+// The filled bands only, lowest threshold first. Sorting means bands typed out
+// of order still ladder correctly — same tolerance the quantity breaks have.
+function markupTierBands(pre){
+  const bands=[];
+  for(let i=1;i<=MT_BANDS;i++){
+    const t=parseFloat(document.getElementById(pre+'thresh-'+i)?.value);
+    const m=parseFloat(document.getElementById(pre+'markup-'+i)?.value);
+    if(isNaN(t)||t<1||isNaN(m)) continue;
+    bands.push({max:t, pct:m});
+  }
+  return bands.sort((a,b)=>a.max-b.max);
 }
+
+// qty <= band.max wins the band; past the last one, the "above" rate; and if
+// even that is blank, the card's own markup field.
+function markupTierFor(pre, qty, fallbackId){
+  const hit=markupTierBands(pre).find(b=>qty<=b.max);
+  if(hit) return hit.pct/100;
+  const above=parseFloat(document.getElementById(pre+'markup-above')?.value);
+  if(!isNaN(above)) return above/100;
+  return parseFloat(document.getElementById(fallbackId)?.value)/100||0.30;
+}
+
+function resetMarkupTierRow(pre, after){
+  for(let i=1;i<=MT_BANDS;i++){
+    const t=document.getElementById(pre+'thresh-'+i); if(t) t.value=MT_DEF_THRESH[i-1];
+    const m=document.getElementById(pre+'markup-'+i); if(m) m.value=MT_DEF_MARKUP[i-1];
+  }
+  const a=document.getElementById(pre+'markup-above'); if(a) a.value=MT_DEF_ABOVE;
+  after();
+}
+
+function getMarkupForQty(qty){ return markupTierFor('mt-', qty, 'markup'); }
+
+function resetMarkupTiers(){ resetMarkupTierRow('mt-', calcQtyBreaks); }
+
+(function(){
+  function buildTierRows(){
+    buildMarkupTierRow('mt-', 'calcQtyBreaks', 'resetMarkupTiers');
+    buildMarkupTierRow('asm-mt-', 'calcAsmQtyBreaks', 'resetAsmMarkupTiers');
+  }
+  // build now if the markup cards are already parsed, so nothing can price a
+  // quantity against a row that does not exist yet
+  if(document.getElementById('markup-tiers-row')) buildTierRows();
+  else document.addEventListener('DOMContentLoaded', buildTierRows);
+})();
 
 
 // ===================== ASSEMBLY QUANTITY BREAKS =====================
-function getAsmMarkupForQty(qty){
-  const t1 = parseFloat(document.getElementById('asm-mt-thresh-1')?.value) || 50;
-  const t2 = parseFloat(document.getElementById('asm-mt-thresh-2')?.value) || 200;
-  const t3 = parseFloat(document.getElementById('asm-mt-thresh-3')?.value) || 500;
-  const t4 = parseFloat(document.getElementById('asm-mt-thresh-4')?.value) || 999;
-  const tiers = [
-    {max:t1,  id:'asm-mt-markup-1'},
-    {max:t2,  id:'asm-mt-markup-2'},
-    {max:t3,  id:'asm-mt-markup-3'},
-    {max:t4,  id:'asm-mt-markup-4'},
-    {max:Infinity, id:'asm-mt-markup-5'}
-  ];
-  for(const tier of tiers){
-    if(qty <= tier.max){
-      const val = parseFloat(document.getElementById(tier.id)?.value);
-      if(!isNaN(val)) return val/100;
-      break;
-    }
-  }
-  return parseFloat(document.getElementById('asm-markup').value)/100||0.30;
-}
+function getAsmMarkupForQty(qty){ return markupTierFor('asm-mt-', qty, 'asm-markup'); }
 
-function resetAsmMarkupTiers(){
-  document.getElementById('asm-mt-thresh-1').value = 50;
-  document.getElementById('asm-mt-thresh-2').value = 200;
-  document.getElementById('asm-mt-thresh-3').value = 500;
-  document.getElementById('asm-mt-thresh-4').value = 999;
-  document.getElementById('asm-mt-markup-1').value = 35;
-  document.getElementById('asm-mt-markup-2').value = 30;
-  document.getElementById('asm-mt-markup-3').value = 25;
-  document.getElementById('asm-mt-markup-4').value = 22;
-  document.getElementById('asm-mt-markup-5').value = 20;
-  calcAsmQtyBreaks();
-}
+function resetAsmMarkupTiers(){ resetMarkupTierRow('asm-mt-', calcAsmQtyBreaks); }
 
 // Find a part's cost-per-part at a given order qty using its saved qtyBreaks.
 // Falls back to the part's base costPerPart if no breaks data or no close match.
