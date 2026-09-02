@@ -8,12 +8,15 @@ def grab(start, end):
     a = src.index(start); b = src.index(end, a)
     return src[a:b]
 
-css = grab('<style>', '</style>').replace('<style>', '')
+import re
+css = '\n'.join(re.findall(r'<style>(.*?)</style>', src, re.S))   # the app has more than one style block
 
 block  = grab("const HOLD_KEY_PO='__po__'", '\n// ══════════════ DAILY DISPATCH')
 block += grab('function dispatchItems(){', "// Drag-to-reorder within a person's list")
 modal = grab('<!-- Put a Today task on hold', '<script type="module">')
-block += grab('function renderDispatch(){', '// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 AI DAILY STAND-UP')
+block += grab('// The whole-shop board:', '// \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 AI DAILY STAND-UP')
+notes = grab('// \u2500\u2500 Team notes:', 'window._pp=')
+chatmodal = grab('<div class="modal-bg" id="chat-modal"', '<!-- Combine multiple orders into one invoice -->')
 block += grab('function enabledOrdered(sch){', '\nfunction addDays(date, n){')
 
 html = u'''<!doctype html><html><head><meta charset="utf-8"><title>Today board \u2014 on hold layout</title>
@@ -24,8 +27,10 @@ body{padding:14px;background:var(--bg);display:block!important}
 #wlbl{font:11px ui-monospace,monospace;color:#374151;background:#fff;border:1px dashed #c9d0da;padding:5px 8px;margin-bottom:10px}
 </style></head><body>
 <div id="wlbl"></div>
+<div id="dispatch-shopnote"></div>
 <div id="dispatch-summary"></div><div id="dispatch-body"></div>
 __MODAL__
+__CHATMODAL__
 <script>
 // stubs for the bits of orders.html the Today board leans on
 const INTERNAL_PROCESSES=['Inventory Check','Purchasing','Program','Laser','Shear/Sawing','Form','Weld','Delivery'];
@@ -58,7 +63,12 @@ const HEALTH_META={behind:{color:'var(--red)',label:'behind'},today:{color:'var(
 function healthBadge(h){ const m=HEALTH_META[h.state]||{color:'var(--text3)',label:h.state}; return '<span style="font-size:10.5px;font-weight:700;color:'+m.color+'">'+m.label+'</span>'; }
 function renderDailyBrief(){} function renderTeamLoad(){}
 function saveDB(){} function refreshActivePage(){ renderDispatch(); check(); }
-const auth={currentUser:{email:'ofc.edgar@bertsmp.com'}};
+const auth={currentUser:{uid:'uid-me',email:'ofc.edgar@bertsmp.com'}};
+const db=null;
+function ref(){ return null; } function onValue(){}
+function set(){ return Promise.resolve(); } function remove(){ return Promise.resolve(); }
+function uid(){ return 'n'+Math.random().toString(36).slice(2,7); }
+__NOTES__
 __BLOCK__
 
 // fixtures
@@ -83,7 +93,14 @@ orders=[
   {id:'5',customer:'Parker Hannifin',job:'U60-1',part:'TUBE-77',due:iso(2),qty:60,status:'Ready for Invoice'}
 ];
 
+const T=Date.now();
+chats[chatKeyStep(orders[0],'Laser')]={n1:{id:'n1',uid:'uid-office',by:'ofc.anahi@bertsmp.com',at:T-60000,text:'Customer wants the long edges deburred before form.'}};
+chats[chatKey(orders[2].customer,orders[2].po)]={n2:{id:'n2',uid:'uid-me',by:'ofc.edgar@bertsmp.com',at:T-30000,text:'PO revised to 250 pcs.'}};
+chats[CHAT_SHOP_KEY]={n3:{id:'n3',uid:'uid-office',by:'ofc.anahi@bertsmp.com',at:T-900000,text:'No overtime Friday - shop closes at 2:30.'}};
+_chatSeen={}; _chatSeenFresh=false;
+
 function check(){
+  if(!innerWidth){ document.title='waiting for a viewport'; return; }
   const rows=[...document.querySelectorAll('.disp-row')];
   const bad=[];
   rows.forEach((r,i)=>{
@@ -99,9 +116,13 @@ function check(){
   document.title = bad.length ? ('PROBLEMS at '+innerWidth+'px') : ('ok at '+innerWidth+'px');
 }
 renderDispatch(); check();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(check);   // icons shift things when they land
+addEventListener('load', check);
+setTimeout(check,600);   // fonts.ready can fire before the glyphs actually reflow
 addEventListener('resize', check);
 </script></body></html>'''
 
-html = html.replace('__CSS__', css).replace('__BLOCK__', block).replace('__MODAL__', modal)
+html = (html.replace('__CSS__', css).replace('__BLOCK__', block).replace('__MODAL__', modal)
+            .replace('__CHATMODAL__', chatmodal).replace('__NOTES__', notes))
 io.open('C:/Users/info/bsmp-orders/_holdlayout.html', 'w', encoding='utf-8', newline='').write(html)
 print('wrote _holdlayout.html (%d chars)' % len(html))

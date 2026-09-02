@@ -8,8 +8,10 @@ def grab(start, end):
     a = src.index(start); b = src.index(end, a)
     return src[a:b]
 
-css = grab('<style>', '</style>').replace('<style>', '')
+import re
+css = '\n'.join(re.findall(r'<style>(.*?)</style>', src, re.S))   # the app has more than one style block
 block = grab("const HOLD_KEY_PO='__po__'", '// Show/hide held tasks on the Today board')
+notes = grab('// ── Team notes:', 'window._pp=')
 # the row builder itself, lifted out of detailInner
 rowsrc = grab('    const pJs=p.replace', '  };\n  const rowsOf =')
 
@@ -49,7 +51,15 @@ function toISO(d){ return new Date(d.getTime()-d.getTimezoneOffset()*60000).toIS
 const LINE_ROLL_COLOR={open:'#888',received:'#2d6010'};
 const cd=null;
 function ensureSchedule(r){ return r.schedule; }
-function enabledOrdered(){ return []; }
+function enabledOrdered(sch){ return (sch&&sch.steps?sch.steps:[]).filter(s=>s.enabled); }
+let orders=[];
+const auth={currentUser:{uid:'uid-me',email:'ofc.edgar@bertsmp.com'}};
+const db=null;
+function ref(){ return null; } function onValue(){}
+function set(){ return Promise.resolve(); } function remove(){ return Promise.resolve(); }
+function uid(){ return 'n'+Math.random().toString(36).slice(2,7); }
+function refreshActivePage(){}
+__NOTES__
 __BLOCK__
 
 function renderRow(r, step, idx, ord){
@@ -64,6 +74,7 @@ const order=(holds)=>({id:'o1',qty:40,holds:holds||{}});
 const st=(name,o)=>Object.assign({name:name,enabled:true,done:false,duration:3},o||{});
 
 const rInt=order({Laser:held('Waiting on customer approval','2026-09-07')});
+chats[chatKeyStep(rInt,'Laser')]={n1:{id:'n1',uid:'uid-office',by:'ofc.anahi@bertsmp.com',at:Date.now(),text:'Deburr before form.'}};
 const rExt=order({'Outsource- Plating':held('Waiting on vendor','')});
 document.getElementById('int').innerHTML =
   renderRow(order({}), st('Laser',{qtyDone:12}), 0, [1,2]) +
@@ -72,6 +83,8 @@ document.getElementById('ext').innerHTML =
   renderRow(order({}), st('Outsource- Plating'), 0, [1,2]) +
   renderRow(rExt, st('Outsource- Plating'), 1, [1,2]);
 
+function check(){
+if(!innerWidth){ document.title='waiting for a viewport'; return; }
 const bad=[];
 [...document.querySelectorAll('.sched-step')].forEach((row,i)=>{
   const tracks=getComputedStyle(row).gridTemplateColumns.split(' ').length;
@@ -85,8 +98,15 @@ const bad=[];
 });
 document.getElementById('wlbl').textContent = bad.length? bad.join(' | ') : 'step rows ok \u2014 hold control visible and inside every row';
 document.title = bad.length? 'PROBLEMS' : 'step rows ok';
+}
+// icons load async and shift things, so measure again once the font lands
+check();
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(check);
+addEventListener('load',check);
+setTimeout(check,600);   // fonts.ready can fire before the glyphs actually reflow
+addEventListener('resize',check);
 </script></body></html>'''
 
-html = html.replace('__CSS__', css).replace('__BLOCK__', block).replace('__ROWSRC__', rowsrc)
+html = html.replace('__CSS__', css).replace('__BLOCK__', block).replace('__ROWSRC__', rowsrc).replace('__NOTES__', notes)
 io.open('C:/Users/info/bsmp-orders/_holdsteprow.html', 'w', encoding='utf-8', newline='').write(html)
 print('wrote _holdsteprow.html (%d chars)' % len(html))

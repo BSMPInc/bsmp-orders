@@ -1585,6 +1585,7 @@ body.sb-hidden .topbar{padding-left:24px}
 
   <!-- Today / Daily Dispatch Page -->
   <div id="dispatch-page" style="display:none">
+    <div id="dispatch-shopnote"></div>
     <div id="dispatch-summary"></div>
     <div id="dispatch-brief"></div>
     <div id="dispatch-load"></div>
@@ -2311,6 +2312,31 @@ body.sb-hidden .topbar{padding-left:24px}
 .chat-del{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:0 2px;font-size:13px}
 .chat-del:hover{color:var(--red)}
 .chat-text{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word}
+/* a note nobody on this device has read yet */
+.note-btn.unread{color:#A32D2D;background:#fbeaea;border-color:#f0c9c9;position:relative}
+.note-btn.unread:hover{filter:brightness(.97)}
+.note-btn.unread::after{content:'';position:absolute;top:-3px;right:-3px;width:7px;height:7px;border-radius:50%;background:var(--red);border:1px solid #fff}
+.disp-job .note-btn,.ss-ctl .note-btn{flex:0 0 auto;margin-left:6px}
+/* thread picker inside the notes popup: the whole job, then one per step */
+.chat-threads{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.chat-tab{font-size:11px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);border-radius:14px;padding:3px 9px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px}
+.chat-tab:hover{border-color:var(--navy3);color:var(--navy3)}
+.chat-tab.on{background:#185FA5;border-color:#185FA5;color:#fff}
+.chat-tab .ct-n{font-size:10px;font-weight:800;opacity:.75}
+.chat-tab.unread{border-color:#e0a3a3;color:#A32D2D;background:#fbeaea}
+.chat-tab.unread.on{background:#A32D2D;border-color:#A32D2D;color:#fff}
+/* Shop notes — one board for the whole shop, pinned at the top of Today */
+.shopnote{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--border);border-radius:13px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:13px;cursor:pointer}
+.shopnote:hover{border-color:var(--navy3)}
+.shopnote.new{border-color:#e0a3a3;background:#fdf6f6}
+.sn-ico{width:32px;height:32px;border-radius:9px;background:#185FA5;color:#fff;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px}
+.shopnote.new .sn-ico{background:#A32D2D}
+.sn-body{flex:1;min-width:0}
+.sn-head{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);display:flex;align-items:center;gap:7px}
+.sn-new{font-size:9.5px;font-weight:800;color:#fff;background:var(--red);border-radius:9px;padding:1px 7px;letter-spacing:.03em}
+.sn-msg{font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+.sn-msg.empty{color:var(--text3);font-style:italic}
+.sn-by{font-size:10.5px;color:var(--text3);margin-top:1px}
 </style>
 <div class="modal-bg" id="chat-modal" style="display:none;align-items:center;justify-content:center;z-index:74">
   <div class="modal" style="max-width:440px;width:92vw;padding:0;display:flex;flex-direction:column;max-height:82vh">
@@ -2323,6 +2349,7 @@ body.sb-hidden .topbar{padding-left:24px}
         </div>
         <button class="btn sm" onclick="window._closeChat()" title="Close"><i class="ti ti-x"></i></button>
       </div>
+      <div id="chat-threads" class="chat-threads" style="display:none"></div>
     </div>
     <div id="chat-thread" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:130px;background:var(--bg)"></div>
     <div style="padding:12px 14px;border-top:1px solid var(--border);display:flex;gap:8px">
@@ -3483,7 +3510,7 @@ function condensedCard(g){
     <div class="pm-top"><span class="pm-cust">${g.customer||'—'}</span>${missBadge}<span class="pm-po">#${g.po}</span></div>
     <div class="pm-mid">${partChip}<span class="pm-count">${g.items.length} item${g.items.length!==1?'s':''}</span></div>
     <div class="pm-bot"><span class="pm-dates">${startVal?`<span class="pm-start" title="Start date">${startVal}</span><span class="pm-arrow">→</span>`:''}<span class="pm-due" style="${g.dueOverdue?'color:var(--red);font-weight:600':''}" title="Due date">${g.overdue?'● ':''}${dueVal}</span></span><span class="pm-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
-    <div class="pm-status" style="align-items:center">${riskChip}${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto">${chatBtnHtml(g.customer,g.po)}</span></div>
+    <div class="pm-status" style="align-items:center">${riskChip}${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto">${chatBtnJob(g)}</span></div>
   </div>`;
 }
 
@@ -3553,7 +3580,7 @@ function poDetailHtml(g){
         <div class="card-stat"><span class="cs-label">PO Value</span><span class="cs-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
         <div class="card-stat"><span class="cs-label">Earliest Due</span><span class="cs-val" style="${dueValStyle}">${dueVal}</span></div>
       </div>
-      <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto">${chatBtnHtml(g.customer,g.po)}</span></div>
+      <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto">${chatBtnJob(g)}</span></div>
       ${outsourceStripHtml(g)}
     </div>
     ${vendorPOsHtml(g)}
@@ -3790,7 +3817,7 @@ function detailInner(r){
       <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,20)}</span>
       <span class="ss-name${done?' done':''}">${p}${anchorIcon}</span>
       <span class="ss-assignee-cell">${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}</span>
-      <span class="ss-ctl">${rightControls}<span class="ss-spacer"></span><span class="ss-date${done?' done':''}">${dateLabel}</span>${holdMiniHtml(r,p,done)}</span>
+      <span class="ss-ctl">${rightControls}<span class="ss-spacer"></span><span class="ss-date${done?' done':''}">${dateLabel}</span>${chatBtnStep(r,p)}${holdMiniHtml(r,p,done)}</span>
       <i class="ti ti-x ss-rm" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
     </div>${vendorRow}`;
   };
@@ -4149,7 +4176,7 @@ const chatRef = ref(db, 'orderChat');
 let chats = {};
 let _chatTarget = null;   // {key, label} while the notes popup is open
 function startChatListener(){
-  onValue(chatRef,(snap)=>{ chats=snap.val()||{}; if(_chatTarget)_renderChatThread(); refreshActivePage(); });
+  onValue(chatRef,(snap)=>{ chats=snap.val()||{}; primeChatSeen(); if(_chatTarget){_renderChatThread();_renderChatSwitch();} refreshActivePage(); });
 }
 // One thread per Customer + PO. RTDB keys can't contain . # $ / [ ] so squash them.
 function chatKey(customer,po){
@@ -4159,11 +4186,67 @@ function chatEntries(key){
   const t=chats[key]; if(!t) return [];
   return Object.values(t).filter(Boolean).sort((a,b)=>(a.at||0)-(b.at||0));
 }
-function chatBtnHtml(customer,po,label){
-  const key=chatKey(customer,po);
+// One thread per TASK as well: the job's thread, plus the order line and the step.
+// Same squash as chatKey so the key stays legal.
+function chatKeyStep(r, stepName){
+  return chatKey(r.customer, r.po) + '~' + r.id + '~' + String(stepName||'').toLowerCase().replace(/[.#$\/\[\]\s]+/g,'_');
+}
+const CHAT_SHOP_KEY='__shop__';                 // the whole-shop message board
+function chatJobLabel(r){ return [r.customer||'—', r.po&&('PO '+r.po), r.job&&('Job '+r.job)].filter(Boolean).join(' · '); }
+// "What have I read?" is kept per person on this device — no rule change, and nobody
+// else's reading marks a note as seen for you.
+let _chatSeen={}, _chatSeenFresh=false;
+function _chatSeenKey(){ const u=auth.currentUser; return 'bsmp_chatseen_'+(u&&u.uid?u.uid:'anon'); }
+function loadChatSeen(){
+  let raw=null; try{ raw=localStorage.getItem(_chatSeenKey()); }catch{}
+  _chatSeenFresh = (raw==null);                 // first run on this device: start from now
+  try{ _chatSeen = raw? (JSON.parse(raw)||{}) : {}; }catch{ _chatSeen={}; }
+}
+function saveChatSeen(){ try{ localStorage.setItem(_chatSeenKey(), JSON.stringify(_chatSeen)); }catch{} }
+// A brand-new device shouldn't open with every old note screaming "unread".
+function primeChatSeen(){
+  if(!_chatSeenFresh) return;
+  _chatSeenFresh=false;
+  Object.keys(chats||{}).forEach(k=>{ const l=chatEntries(k); if(l.length) _chatSeen[k]=Math.max(...l.map(e=>e.at||0)); });
+  saveChatSeen();
+}
+function chatUnread(key){
+  const me=auth.currentUser?auth.currentUser.uid:'';
+  const seen=_chatSeen[key]||0;
+  return chatEntries(key).filter(e=>(e.at||0)>seen && e.uid!==me).length;   // your own notes are never "new"
+}
+function markChatRead(key){
+  const list=chatEntries(key); if(!list.length) return;
+  const newest=Math.max(...list.map(e=>e.at||0));
+  if((_chatSeen[key]||0) < newest){ _chatSeen[key]=newest; saveChatSeen(); }
+}
+// alsoKey: a second thread whose unread notes should still raise the dot here, so a note
+// written on the whole job can't sit unseen behind a task-level button.
+function chatBtnAt(key,label,orderId,also){
   const n=chatEntries(key).length;
-  const lbl=(label||((customer||'')+(po?(' · PO '+po):''))).replace(/\\/g,'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
-  return `<button class="note-btn${n?' has':''}" title="Team notes — everyone can read and add" onclick="event.stopPropagation();window._openChat('${key}','${lbl}')"><i class="ti ti-message-circle-2"></i>${n||''}</button>`;
+  const extra=(also==null?[]:(Array.isArray(also)?also:[also])).filter(k=>k&&k!==key);
+  const u=chatUnread(key)+extra.reduce((t,k)=>t+chatUnread(k),0);
+  const lbl=String(label||'').replace(/\\/g,'').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+  const title=u?`${u} new note${u!==1?'s':''} — tap to read`:'Team notes — everyone can read and add';
+  return `<button class="note-btn${n?' has':''}${u?' unread':''}" title="${title}" onclick="event.stopPropagation();window._openChat('${key}','${lbl}','${orderId||''}')"><i class="ti ti-message-circle-2"></i>${n||''}</button>`;
+}
+function chatBtnHtml(customer,po,label,orderId){
+  return chatBtnAt(chatKey(customer,po), label||((customer||'')+(po?(' · PO '+po):'')), orderId);
+}
+// the note button on a task row — its own step thread, watching the job thread too
+function chatBtnStep(r, stepName, label){
+  return chatBtnAt(chatKeyStep(r,stepName), label||chatJobLabel(r), r.id, chatKey(r.customer,r.po));
+}
+// every task thread under one PO card, so a reply on a step still lights up the card
+function stepThreadKeys(items){
+  const out=[];
+  (items||[]).forEach(r=>enabledOrdered(ensureSchedule(r)).forEach(st=>out.push(chatKeyStep(r,st.name))));
+  return out;
+}
+// the note button on a PO card - the job thread, watching every task thread under it
+function chatBtnJob(g){
+  const one=(g.items&&g.items.length===1)?g.items[0].id:'';   // a single-line PO can offer step tabs
+  return chatBtnAt(chatKey(g.customer,g.po), (g.customer||'')+(g.po?(' · PO '+g.po):''), one, stepThreadKeys(g.items));
 }
 function chatAuthorName(e){
   let local=(e.by||'').split('@')[0];
@@ -4177,18 +4260,54 @@ function fmtChatTime(ms){
   const d=new Date(ms);
   return d.toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'2-digit'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 }
-window._openChat=(key,label)=>{
-  _chatTarget={key,label};
-  document.getElementById('chat-sub').textContent=label;
-  _renderChatThread();
+window._openChat=(key,label,orderId)=>{
+  _chatTarget={key,label,orderId:orderId||''};
+  document.getElementById('chat-sub').textContent=_chatSubText();
+  _renderChatThread();          // marks it read first, so the tab below isn't drawn red
+  _renderChatSwitch();
   document.getElementById('chat-modal').style.display='flex';
   const inp=document.getElementById('chat-input'); inp.value='';
   setTimeout(()=>inp.focus(),30);
 };
-window._closeChat=()=>{ document.getElementById('chat-modal').style.display='none'; _chatTarget=null; };
+window._closeChat=()=>{ document.getElementById('chat-modal').style.display='none'; _chatTarget=null; refreshActivePage(); };
+// which step (if any) the open thread belongs to
+function _chatStepOf(r,key){
+  const hit=enabledOrdered(ensureSchedule(r)).find(st=>chatKeyStep(r,st.name)===key);
+  return hit?hit.name:null;
+}
+function _chatSubText(){
+  const t=_chatTarget; if(!t) return '';
+  if(t.key===CHAT_SHOP_KEY) return 'Everyone in the shop — not tied to a job';
+  const r=t.orderId?orders.find(o=>o.id===t.orderId):null;
+  if(!r) return t.label||'';
+  const st=_chatStepOf(r,t.key);
+  return st ? `${chatJobLabel(r)} · ${shortProc(st)}` : chatJobLabel(r);
+}
+// One tab per thread on this job, so a note written in the wrong place is one tap away.
+function _renderChatSwitch(){
+  const host=document.getElementById('chat-threads'); if(!host) return;
+  const t=_chatTarget;
+  const r=(t&&t.orderId)?orders.find(o=>o.id===t.orderId):null;
+  if(!r){ host.style.display='none'; host.innerHTML=''; return; }
+  const tab=(key,label)=>{
+    const n=chatEntries(key).length, u=chatUnread(key);
+    return `<button type="button" class="chat-tab${key===t.key?' on':''}${u?' unread':''}" onclick="window._chatSwitch('${key}')">${esc2(label)}${n?`<span class="ct-n">${n}</span>`:''}</button>`;
+  };
+  host.style.display='';
+  host.innerHTML = tab(chatKey(r.customer,r.po),'Whole job')
+    + enabledOrdered(ensureSchedule(r)).map(st=>tab(chatKeyStep(r,st.name), shortProc(st.name))).join('');
+}
+window._chatSwitch=(key)=>{
+  if(!_chatTarget) return;
+  _chatTarget.key=key;
+  document.getElementById('chat-sub').textContent=_chatSubText();
+  _renderChatThread(); _renderChatSwitch();
+  document.getElementById('chat-input').focus();
+};
 function _renderChatThread(){
   const box=document.getElementById('chat-thread'); if(!box||!_chatTarget) return;
   const list=chatEntries(_chatTarget.key);
+  markChatRead(_chatTarget.key);          // reading it is what clears the dot
   const me=auth.currentUser?auth.currentUser.uid:'';
   box.innerHTML = list.length ? list.map(e=>`
     <div class="chat-note${e.uid===me?' mine':''}">
@@ -6204,7 +6323,7 @@ function renderOfficeQueue(officeOrders, name){
         <td style="text-align:center;color:var(--text2)">${r.qty||''}</td>
         <td style="${overdue?'color:var(--red);font-weight:700':'color:var(--text2)'}">${r.due?fmtDate(r.due):'—'}</td>
         <td style="font-weight:700">${fmtMoney(rowTotal(r))||''}</td>
-        <td style="text-align:center" onclick="event.stopPropagation()">${chatBtnHtml(r.customer,r.po)}</td>
+        <td style="text-align:center" onclick="event.stopPropagation()">${chatBtnHtml(r.customer,r.po,'',r.id)}</td>
         ${openCell}
       </tr>`;
     }).join('');
@@ -6350,7 +6469,7 @@ function renderQueues(){
       <td>${stepChip}${r.part?`<b>${r.part}</b>`:''}${r.part&&r.desc?' · ':''}${r.desc||''}${holdChipHtml(holdActive(r,sName))}</td>
       ${assignCell}
       <td style="text-align:center">${drawCell}</td>
-      <td style="text-align:center">${chatBtnHtml(r.customer,r.po,(r.customer||'')+(r.po?(' · PO '+r.po):'')+(r.job?(' · Job '+r.job):''))}</td>
+      <td style="text-align:center">${chatBtnStep(r, sName)}</td>
       <td style="${overdue&&!done?'color:var(--red);font-weight:600':''}">${dueTxt}</td>
       <td style="text-align:center">${needByCell}</td>
       <td style="text-align:center">${need||'—'}</td>
@@ -6585,8 +6704,26 @@ function _dispDropSave(list){
   ordered.forEach((it,i)=>{ it.r.daySeq=i+1; it.r.daySeqDate=ds; });
   saveDB(); renderDispatch();
 }
+// The whole-shop board: office → shop messages that aren't about one job.
+// Rides on the same orderChat node under a reserved key, so there's no new rule.
+function renderShopNote(){
+  const host=document.getElementById('dispatch-shopnote'); if(!host) return;
+  const list=chatEntries(CHAT_SHOP_KEY);
+  const last=list[list.length-1];
+  const u=chatUnread(CHAT_SHOP_KEY);
+  host.innerHTML=`<div class="shopnote${u?' new':''}" title="Shop notes — a message board for the whole shop" onclick="window._openChat('${CHAT_SHOP_KEY}','Shop notes','')">
+    <span class="sn-ico"><i class="ti ti-speakerphone"></i></span>
+    <div class="sn-body">
+      <div class="sn-head">Shop notes${u?`<span class="sn-new">${u} new</span>`:''}${list.length?`<span style="font-weight:600;letter-spacing:0;text-transform:none">${list.length} message${list.length!==1?'s':''}</span>`:''}</div>
+      ${last?`<div class="sn-msg">${esc2(last.text||'')}</div><div class="sn-by">${esc2(chatAuthorName(last))} · ${fmtChatTime(last.at)}</div>`
+            :`<div class="sn-msg empty">Nothing posted yet — write a note here for the whole shop.</div>`}
+    </div>
+    <i class="ti ti-chevron-right" style="color:var(--text3);font-size:18px"></i>
+  </div>`;
+}
 function renderDispatch(){
   if(_dd){ _dd.rerenderPending=true; return; }   // never rebuild the board under someone's finger
+  renderShopNote();
   const sumEl=document.getElementById('dispatch-summary');
   const body=document.getElementById('dispatch-body');
   if(!body) return;
@@ -6669,7 +6806,7 @@ function dispatchRow(it, idx, total){
     ${dispSeqBadge(idx)}
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
-    <div class="disp-job"><span class="dj-txt"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</span>${holdChipHtml(hold)}</div>
+    <div class="disp-job"><span class="dj-txt"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</span>${chatBtnStep(r, step.name)}${holdChipHtml(hold)}</div>
     <span class="disp-health">${healthBadge(health)}</span>
     <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span>`:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     <span class="disp-draw">${drawCellHtml(r)}</span>
@@ -6696,7 +6833,7 @@ function officeDispatchRow(it, idx, total){
     ${dispSeqBadge(idx)}
     <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
     <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
-    <div class="disp-job"><span class="dj-txt"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</span>${holdChipHtml(hold)}</div>
+    <div class="disp-job"><span class="dj-txt"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</span>${chatBtnHtml(r.customer,r.po,'',r.id)}${holdChipHtml(hold)}</div>
     <span class="disp-health">${statusChip}</span>
     <span class="disp-dates"><span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     <span class="disp-draw">${drawCellHtml(r)}</span>
@@ -9576,6 +9713,7 @@ setPersistence(auth, browserLocalPersistence).catch(()=>{});
 onAuthStateChanged(auth, (user) => {
   if(user){
     userRole = isOperatorEmail(user.email) ? 'operator' : 'manager';
+    loadChatSeen();
     loginOverlay.style.display = 'none';
     appRoot.style.display = 'flex';
     startDataListeners();
