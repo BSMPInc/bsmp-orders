@@ -796,7 +796,7 @@ select.ss-vin{width:170px;flex-shrink:0}
 .disp-rows{display:flex;flex-direction:column}
 /* Fixed column grid so badges, dates and buttons line up across every row:
    seq | check | process | job | health | dates | drawing | qty | assignee | open | move */
-.disp-row{display:grid;grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 56px 36px 40px;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
+.disp-row{display:grid;grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 56px 36px 36px 40px;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
 body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 40px}
 .disp-seq{font-size:11px;font-weight:800;color:var(--text3);min-width:17px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
 .disp-grip{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;color:var(--text3);cursor:grab;border-radius:7px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
@@ -809,7 +809,26 @@ body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr)
 .disp-row:hover{background:#f9fbfd}
 .disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:0;overflow:hidden}
 .disp-out{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a8553a;background:#a8553a14;border-radius:5px;padding:1px 6px;margin-left:2px}
-.disp-job{flex:1;min-width:0;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* On-hold tasks: parked work, hidden from the Today board until released or the date arrives */
+.disp-stat.hold{background:#eceff4;border-color:#d7dce5;color:#5a6170;cursor:pointer;font-family:inherit}
+.disp-stat.hold b{color:#5a6170}
+.disp-stat.hold:hover{background:#e2e7ef}
+.disp-stat.hold.on{background:#e4eaf5;border-color:#c2cee2;color:#3a4a63}.disp-stat.hold.on b{color:#3a4a63}
+.disp-row.held{background:#fafbfc}
+.disp-row.held .disp-proc,.disp-row.held .dj-txt,.disp-row.held .disp-dates{opacity:.62}
+.disp-row.held:hover .disp-proc,.disp-row.held:hover .dj-txt,.disp-row.held:hover .disp-dates{opacity:1}
+.hold-chip{display:inline-flex;align-items:center;gap:4px;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;font-weight:700;color:#4e5766;background:#e7eaf0;border:1px solid #d5dae3;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;max-width:100%}
+.hold-chip i{font-size:11px}
+.disp-hold-btn{width:36px;height:36px;border:1px solid var(--border2);border-radius:6px;background:var(--card);cursor:pointer;color:var(--text3);font-size:17px;display:inline-flex;align-items:center;justify-content:center}
+.disp-hold-btn:hover{background:var(--bg);border-color:var(--navy3);color:var(--navy3)}
+.disp-hold-btn.on{background:#e4eaf5;border-color:#c2cee2;color:#3a4a63}
+.ss-hold{border:none;background:none;cursor:pointer;color:var(--text3);padding:0 3px;line-height:0;font-size:13px;vertical-align:middle}
+.ss-hold:hover{color:var(--navy3)}
+.ss-hold.on{color:#3a4a63}
+.hold-pick{font-size:12px;padding:5px 10px;border:1px solid var(--border);border-radius:16px;background:var(--card);cursor:pointer;font-family:inherit;color:var(--text2)}
+.hold-pick:hover{background:var(--bg);border-color:var(--navy3);color:var(--navy3)}
+.disp-job{flex:1;min-width:0;font-size:13px;color:var(--text);display:flex;align-items:center;overflow:hidden}
+.dj-txt{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .disp-dates{font-size:11.5px;white-space:nowrap;display:flex;flex-direction:column;line-height:1.45;min-width:0;overflow:hidden}
 .disp-health{display:inline-flex;align-items:center;min-width:0}
 .disp-draw{display:inline-flex;align-items:center;justify-content:center}
@@ -895,7 +914,7 @@ tr.inv-low td{background:#fdf6ee}
 .undo-toast .ut-x{background:none;border:none;color:#9aa5b4;cursor:pointer;padding:4px;display:inline-flex;flex-shrink:0}
 .undo-toast .ut-x:hover{color:#fff}
 @media (pointer: coarse){
-  .disp-row{padding:12px 16px;gap:10px;grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 56px 42px 46px}
+  .disp-row{padding:12px 16px;gap:10px;grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 56px 42px 42px 46px}
   body.role-operator .disp-row{grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 46px}
   .disp-proc{font-size:14px}
   .disp-job{font-size:14px}
@@ -905,7 +924,8 @@ tr.inv-low td{background:#fdf6ee}
   .disp-row,body.role-operator .disp-row{display:flex;flex-wrap:wrap;gap:9px 11px}
   .disp-dates{display:inline-flex;flex-direction:row;flex-wrap:wrap;gap:2px 8px}
   .disp-dates,.disp-job{white-space:normal}
-  .disp-job{flex:1;min-width:200px}
+  .disp-job{flex:1;min-width:200px;flex-wrap:wrap;gap:4px}
+  .dj-txt,.hold-chip{white-space:normal;overflow:visible}
 }
 .pm-mid{display:flex;align-items:center;gap:7px;margin-top:6px}
 .pm-part{font-size:10.5px;font-weight:700;color:#33405a;background:#eef2f8;border:1px solid #d7dde6;border-radius:5px;padding:1px 7px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
@@ -2404,6 +2424,26 @@ body.sb-hidden .topbar{padding-left:24px}
   </div>
 </div>
 
+<!-- Put a Today task on hold - it drops off the Today board until it's released or the hold date arrives -->
+<div class="modal-bg" id="hold-modal" style="display:none;align-items:center;justify-content:center;z-index:74">
+  <div class="modal" style="max-width:460px;padding:22px">
+    <div style="font-size:17px;font-weight:800;margin-bottom:3px"><i class="ti ti-player-pause"></i> Put this task on hold</div>
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:14px" id="hold-sub"></div>
+    <label style="font-size:11px;font-weight:600;color:var(--text2)">Why is it on hold?</label>
+    <input id="hold-reason" type="text" maxlength="80" placeholder="e.g. waiting on customer approval" onkeydown="if(event.key==='Enter')window._saveHold()" style="width:100%;box-sizing:border-box;font-size:14px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin:5px 0 8px">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="hold-picks"></div>
+    <label style="font-size:11px;font-weight:600;color:var(--text2)">Hold until (optional)</label>
+    <input id="hold-until" type="date" style="display:block;width:180px;box-sizing:border-box;font-size:14px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-top:5px;font-family:inherit">
+    <div style="font-size:11px;color:var(--text3);margin-top:10px;line-height:1.5">While it&rsquo;s on hold the task is hidden from the Today board. Leave the date blank to hold it until someone releases it &mdash; with a date it comes back on its own that morning. The job keeps its due date, schedule and Work Queue spot either way.</div>
+    <div id="hold-meta" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px">
+      <button class="btn" onclick="window._closeHold()">Cancel</button>
+      <button class="btn" id="hold-release" style="display:none" onclick="window._releaseHold()"><i class="ti ti-player-play"></i> Release hold</button>
+      <button class="btn green" id="hold-save" onclick="window._saveHold()"><i class="ti ti-player-pause"></i> Put on hold</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, ref, onValue, set, remove, get, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
@@ -2800,7 +2840,7 @@ function updateNavBadges(){
   // Need PO badge = items still waiting on a PO + POs out waiting to be received
   set('badge-needpo', npPoolItems().length + npOpenPOs().length);
   // "Today" badge = jobs whose current step is behind schedule
-  const behind=active.filter(r=>!['Completed','Invoiced'].includes(r.status) && jobHealth(r).state==='behind').length;
+  const behind=active.filter(r=>!['Completed','Invoiced'].includes(r.status) && !currentStepHold(r) && jobHealth(r).state==='behind').length;
   const db=document.getElementById('badge-dispatch');
   if(db){ if(behind>0){ db.textContent=behind; db.style.display=''; db.classList.add('badge-red'); } else db.style.display='none'; }
   const tb=document.getElementById('badge-trash');
@@ -3750,7 +3790,7 @@ function detailInner(r){
       <span class="ss-ico" style="color:${PROCESS_COLORS[p]}" title="${p}">${procIcon(p,20)}</span>
       <span class="ss-name${done?' done':''}">${p}${anchorIcon}</span>
       <span class="ss-assignee-cell">${team.length?`<select class="ss-assignee" title="Assigned to" onchange="window._stepAssignee('${r.id}','${p}',this.value)" onclick="event.stopPropagation()" ${done?'disabled':''}>${assigneeOptions(p, step.assignee||'')}</select>`:''}</span>
-      <span class="ss-ctl">${rightControls}<span class="ss-spacer"></span><span class="ss-date${done?' done':''}">${dateLabel}</span></span>
+      <span class="ss-ctl">${rightControls}<span class="ss-spacer"></span><span class="ss-date${done?' done':''}">${dateLabel}</span>${holdMiniHtml(r,p,done)}</span>
       <i class="ti ti-x ss-rm" style="cursor:pointer;color:var(--red);font-size:14px" title="Remove step" onclick="window._toggleStep('${r.id}','${p}',event)"></i>
     </div>${vendorRow}`;
   };
@@ -6160,7 +6200,7 @@ function renderOfficeQueue(officeOrders, name){
       const openCell = op ? '<td></td>' : `<td style="text-align:center"><button class="q-open-btn" title="Open in Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button></td>`;
       return `<tr class="q-row" data-qjob="${r.id}"${op?'':` onclick="window._openInOrders('${r.id}',event)"`}>
         <td><b>${esc2(r.customer||'—')}</b></td>
-        <td>${esc2(lbl)}</td>
+        <td>${esc2(lbl)}${holdChipHtml(holdActive(r, r.status==='Need Purchase Order'?HOLD_KEY_PO:HOLD_KEY_INV))}</td>
         <td style="text-align:center;color:var(--text2)">${r.qty||''}</td>
         <td style="${overdue?'color:var(--red);font-weight:700':'color:var(--text2)'}">${r.due?fmtDate(r.due):'—'}</td>
         <td style="font-weight:700">${fmtMoney(rowTotal(r))||''}</td>
@@ -6307,7 +6347,7 @@ function renderQueues(){
       <td>${statusBadge(status)}</td>
       <td>${prioCell}</td>
       <td><b>${r.job||'—'}</b></td>
-      <td>${stepChip}${r.part?`<b>${r.part}</b>`:''}${r.part&&r.desc?' · ':''}${r.desc||''}</td>
+      <td>${stepChip}${r.part?`<b>${r.part}</b>`:''}${r.part&&r.desc?' · ':''}${r.desc||''}${holdChipHtml(holdActive(r,sName))}</td>
       ${assignCell}
       <td style="text-align:center">${drawCell}</td>
       <td style="text-align:center">${chatBtnHtml(r.customer,r.po,(r.customer||'')+(r.po?(' · PO '+r.po):'')+(r.job?(' · Job '+r.job):''))}</td>
@@ -6343,6 +6383,106 @@ function renderQueues(){
   </table></div>`;
 }
 
+// ══════════════ TASKS ON HOLD ══════════════
+// A task (a job's current step, or one of the office Get PO / Invoice tasks) can be
+// parked with a reason and an optional "until" date. A held task drops off the Today
+// board — nothing else about the job changes: same due date, same schedule, same spot
+// in Work Queues. Records live on the order as r.holds[<slot>]; the slot is the step
+// name with the characters Firebase won't take in a key swapped out.
+const HOLD_KEY_PO='__po__', HOLD_KEY_INV='__invoice__';
+function holdSlot(name){ return String(name).replace(/[.#$\[\]\/]/g,'_'); }
+function holdKeyForItem(it){ return it.office ? (it.action==='po'?HOLD_KEY_PO:HOLD_KEY_INV) : it.step.name; }
+function holdRec(r, name){
+  const h = r && r.holds;
+  const rec = (h && typeof h==='object' && !Array.isArray(h)) ? h[holdSlot(name)] : null;
+  return (rec && typeof rec==='object') ? rec : null;
+}
+// A hold runs until its "until" date arrives (blank = until someone releases it).
+function holdActive(r, name){
+  const rec=holdRec(r,name);
+  if(!rec) return null;
+  if(rec.until && rec.until <= _todayStr()) return null;   // the date came — back on the board
+  return rec;
+}
+// hold sitting on the job's current actionable step — keeps parked work out of the counts
+function currentStepHold(r){
+  if(!r) return null;
+  const cur=enabledOrdered(ensureSchedule(r)).find(s=>!s.done);
+  return cur ? holdActive(r, cur.name) : null;
+}
+function holdTaskName(name){ return name===HOLD_KEY_PO?'Get PO':(name===HOLD_KEY_INV?'Invoice':shortProc(name)); }
+function holdUntilLabel(rec){ return rec && rec.until ? `until ${fmtDate(rec.until)}` : 'no end date'; }
+function holdTitle(rec){
+  if(!rec) return '';
+  const who=`${rec.by?' — '+chatAuthorName({by:rec.by}):''}${rec.at?' · '+fmtChatTime(rec.at):''}`;
+  return esc2(`On hold: ${rec.reason||'no reason given'} (${holdUntilLabel(rec)})${who}`);
+}
+function holdChipHtml(rec){
+  if(!rec) return '';
+  return `<span class="hold-chip" title="${holdTitle(rec)}"><i class="ti ti-player-pause-filled"></i> ${esc2(rec.reason||'On hold')} · ${holdUntilLabel(rec)}</span>`;
+}
+// Small pause control on a schedule step row (managers only; everyone sees the chip).
+function holdMiniHtml(r, name, done){
+  const rec = holdActive(r, name);
+  const chip = rec ? holdChipHtml(rec) : '';
+  if(done || userRole==='operator') return chip;
+  const nJs = name.replace(/'/g,"\\'");
+  return `${chip}<button type="button" class="ss-hold${rec?' on':''}" title="${rec?'On hold — edit or release':'Put this step on hold (hides it from the Today board)'}" onclick="window._openHold('${r.id}','${nJs}',event)"><i class="ti ti-player-pause${rec?'-filled':''}"></i></button>`;
+}
+function dispHoldBtn(oid, name, rec){
+  const nJs = String(name).replace(/'/g,"\\'");
+  return `<button class="disp-hold-btn${rec?' on':''}" title="${rec?'On hold — edit or release':'Put this task on hold'}" onclick="window._openHold('${oid}','${nJs}',event)"><i class="ti ti-player-pause${rec?'-filled':''}"></i></button>`;
+}
+// Show/hide held tasks on the Today board — remembered per device.
+let _dispShowHeld=false;
+try{ _dispShowHeld = localStorage.getItem('bsmp_disp_showheld')==='1'; }catch{}
+window._dispToggleHeld=()=>{
+  _dispShowHeld=!_dispShowHeld;
+  try{ localStorage.setItem('bsmp_disp_showheld', _dispShowHeld?'1':'0'); }catch{}
+  renderDispatch();
+};
+const HOLD_PICKS=['Waiting on customer','Waiting on material','Waiting on vendor','Waiting on drawing / revision','Waiting on PO','Machine down','Customer pushed it out'];
+let _holdTarget=null;
+window._openHold=(oid, name, e)=>{
+  if(e) e.stopPropagation();
+  const r=orders.find(o=>o.id===oid); if(!r) return;
+  _holdTarget={oid, name};
+  const rec=holdRec(r,name);
+  const label=[r.customer||'—', r.job&&('Job '+r.job), r.part||r.desc].filter(Boolean).join(' · ');
+  document.getElementById('hold-sub').innerHTML=`<b>${esc2(holdTaskName(name))}</b> — ${esc2(label)}`;
+  document.getElementById('hold-reason').value=rec?(rec.reason||''):'';
+  document.getElementById('hold-until').value=rec?(rec.until||''):'';
+  document.getElementById('hold-picks').innerHTML=HOLD_PICKS.map(p=>`<button type="button" class="hold-pick" onclick="window._holdPick('${p.replace(/'/g,"\\'")}')">${p}</button>`).join('');
+  document.getElementById('hold-release').style.display=rec?'':'none';
+  document.getElementById('hold-save').innerHTML=`<i class="ti ti-player-pause"></i> ${rec?'Update hold':'Put on hold'}`;
+  const expired = rec && rec.until && rec.until <= _todayStr();
+  document.getElementById('hold-meta').textContent = rec
+    ? `On hold since ${fmtChatTime(rec.at)}${rec.by?' · '+chatAuthorName({by:rec.by}):''}${expired?' · the hold date has passed, so this task is already back on the board':''}`
+    : '';
+  document.getElementById('hold-modal').style.display='flex';
+  setTimeout(()=>{ const el=document.getElementById('hold-reason'); if(el) el.focus(); },40);
+};
+window._holdPick=(txt)=>{ const el=document.getElementById('hold-reason'); if(el){ el.value=txt; el.focus(); } };
+window._closeHold=()=>{ _holdTarget=null; const m=document.getElementById('hold-modal'); if(m) m.style.display='none'; };
+window._saveHold=()=>{
+  if(!_holdTarget) return;
+  const {oid,name}=_holdTarget;
+  const r=orders.find(o=>o.id===oid); if(!r){ window._closeHold(); return; }
+  const reason=(document.getElementById('hold-reason').value||'').trim();
+  const until=document.getElementById('hold-until').value||'';
+  if(until && until <= _todayStr()){ alert('Pick a date after today — a hold that ends today or earlier is already over.'); return; }
+  if(!r.holds || typeof r.holds!=='object' || Array.isArray(r.holds)) r.holds={};
+  r.holds[holdSlot(name)]={reason, until, by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()};
+  saveDB(); window._closeHold(); refreshActivePage();
+};
+window._releaseHold=()=>{
+  if(!_holdTarget) return;
+  const {oid,name}=_holdTarget;
+  const r=orders.find(o=>o.id===oid);
+  if(r && r.holds) delete r.holds[holdSlot(name)];
+  saveDB(); window._closeHold(); refreshActivePage();
+};
+
 // ══════════════ DAILY DISPATCH — "Today" board ══════════════
 // One row per active job = its current actionable step (first not-done, upstream complete),
 // grouped by the assigned person, sorted by must-start urgency. The morning stand-up screen.
@@ -6353,7 +6493,7 @@ function dispatchItems(){
     const ord=enabledOrdered(ensureSchedule(r));
     const cur=ord.find(s=>!s.done);     // current actionable step (all earlier ones done)
     if(!cur) return;
-    items.push({r, step:cur, health:jobHealth(r), ext:isExternal(cur.name)});
+    items.push({r, step:cur, health:jobHealth(r), ext:isExternal(cur.name), hold:holdActive(r, cur.name)});
   });
   return items;
 }
@@ -6363,11 +6503,14 @@ function dispatchAllItems(){
   const _office=team.find(p=>(p.name||'').trim().toLowerCase()===OFFICE_ASSIGNEE.toLowerCase());
   const officeItems=_office
     ? orders.filter(r=>!r.archived && OFFICE_STATUSES.includes(r.status))
-            .map(r=>({office:true, action:(r.status==='Need Purchase Order'?'po':'invoice'), r, assignee:_office.id, health:{state:'soon',mustStart:null,slackDays:0}}))
+            .map(r=>({office:true, action:(r.status==='Need Purchase Order'?'po':'invoice'), r, assignee:_office.id, health:{state:'soon',mustStart:null,slackDays:0},
+                      hold:holdActive(r, r.status==='Need Purchase Order'?HOLD_KEY_PO:HOLD_KEY_INV)}))
     : [];
   return items.concat(officeItems);
 }
 function dispGroupKey(it){ return it.office ? it.assignee : (it.step.assignee && personById(it.step.assignee) ? it.step.assignee : '__none__'); }
+// What the Today board actually shows — held tasks only while the "on hold" chip is on.
+function dispVisibleItems(){ const all=dispatchAllItems(); return _dispShowHeld ? all : all.filter(it=>!it.hold); }
 const _dispPrio=r=>(r.priority==null?2:r.priority);
 const _dispDue=r=>r.due?new Date(r.due+'T00:00:00').getTime():8.64e15;
 const _dispMs=it=>it.health.mustStart?it.health.mustStart.getTime():8.64e15;
@@ -6377,6 +6520,7 @@ function dispCmp(a,b){ return (HEALTH_RANK[a.health.state]-HEALTH_RANK[b.health.
 function _todayStr(){ return new Date().toISOString().slice(0,10); }
 function daySeqOf(r){ return (r.daySeqDate===_todayStr() && typeof r.daySeq==='number') ? r.daySeq : null; }
 function dispDayCmp(a,b){
+  if(!!a.hold !== !!b.hold) return a.hold?1:-1;      // held tasks sink below live work
   const da=daySeqOf(a.r), db=daySeqOf(b.r);
   if(da!=null && db!=null) return da-db;
   if(da!=null) return -1;
@@ -6385,7 +6529,7 @@ function dispDayCmp(a,b){
 }
 function dispGroupsSorted(){
   const groups=new Map();
-  dispatchAllItems().forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
+  dispVisibleItems().forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
   groups.forEach(arr=>arr.sort(dispDayCmp));
   return groups;
 }
@@ -6447,27 +6591,33 @@ function renderDispatch(){
   const body=document.getElementById('dispatch-body');
   if(!body) return;
   const allItems=dispatchAllItems();
-  const behindN=allItems.filter(i=>i.health.state==='behind').length;
-  const todayN=allItems.filter(i=>i.health.state==='today').length;
+  const liveItems=allItems.filter(i=>!i.hold);
+  const heldItems=allItems.filter(i=>i.hold);
+  const shownItems=_dispShowHeld?allItems:liveItems;
+  const behindN=liveItems.filter(i=>i.health.state==='behind').length;
+  const todayN=liveItems.filter(i=>i.health.state==='today').length;
   const dateStr=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   if(sumEl) sumEl.innerHTML=`<div class="disp-summary">
     <div class="disp-date"><i class="ti ti-sun"></i> ${dateStr}</div>
     <div class="disp-counts">
-      <span class="disp-stat"><b>${allItems.length}</b> task${allItems.length!==1?'s':''} ready</span>
+      <span class="disp-stat"><b>${liveItems.length}</b> task${liveItems.length!==1?'s':''} ready</span>
+      ${heldItems.length?`<button type="button" class="disp-stat hold${_dispShowHeld?' on':''}" title="${_dispShowHeld?'Hide the tasks that are on hold':'Show the tasks that are on hold'}" onclick="window._dispToggleHeld()"><i class="ti ti-player-pause-filled"></i> <b>${heldItems.length}</b> on hold — ${_dispShowHeld?'hide':'show'}</button>`:''}
       ${behindN?`<span class="disp-stat bad"><i class="ti ti-alert-triangle-filled"></i> <b>${behindN}</b> behind</span>`:''}
       ${todayN?`<span class="disp-stat warn"><i class="ti ti-clock-exclamation"></i> <b>${todayN}</b> start today</span>`:''}
     </div></div>`;
 
-  if(!allItems.length){
-    body.innerHTML=`<div class="disp-empty"><i class="ti ti-coffee"></i><div>Nothing ready to dispatch right now</div><span>Every active job is either waiting on an upstream step or already moving. Check back as steps get completed.</span></div>`;
+  if(!shownItems.length){
+    body.innerHTML = heldItems.length
+      ? `<div class="disp-empty"><i class="ti ti-player-pause"></i><div>Everything ready right now is on hold</div><span>${heldItems.length} task${heldItems.length!==1?'s are':' is'} parked. Use the “on hold” chip above to see ${heldItems.length!==1?'them':'it'}.</span></div>`
+      : `<div class="disp-empty"><i class="ti ti-coffee"></i><div>Nothing ready to dispatch right now</div><span>Every active job is either waiting on an upstream step or already moving. Check back as steps get completed.</span></div>`;
     renderDailyBrief(); renderTeamLoad();
     return;
   }
 
   const groups=new Map();
-  allItems.forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
+  shownItems.forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
   groups.forEach(arr=>arr.sort(dispDayCmp));
-  const worst=k=>Math.min(...groups.get(k).map(i=>HEALTH_RANK[i.health.state]));
+  const worst=k=>Math.min(9, ...groups.get(k).filter(i=>!i.hold).map(i=>HEALTH_RANK[i.health.state]));
   let keys=[...groups.keys()].sort((a,b)=>{
     if(a==='__none__') return 1; if(b==='__none__') return -1;
     return (worst(a)-worst(b)) || ((personById(a)?.name||'').localeCompare(personById(b)?.name||''));
@@ -6475,12 +6625,14 @@ function renderDispatch(){
 
   body.innerHTML = keys.map(k=>{
     const arr=groups.get(k); const none=k==='__none__'; const person=none?null:personById(k);
-    const behindCount=arr.filter(i=>i.health.state==='behind').length;
+    const behindCount=arr.filter(i=>!i.hold && i.health.state==='behind').length;
+    const liveN=arr.filter(i=>!i.hold).length, heldN=arr.length-liveN;
+    const heldSub=heldN?` · <span style="color:var(--text3)">${heldN} on hold</span>`:'';
     const collapsed=_dispCollapsed.has(k);
     const chev=`<i class="ti ti-chevron-down disp-chev"></i>`;
     const head = none
-      ? `<div class="disp-phead none" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${arr.length} ready step${arr.length!==1?'s':''} with no owner — assign someone</div></div>${chev}</div>`
-      : `<div class="disp-phead" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:${sigColor(person)}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${arr.length} task${arr.length!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}</div></div>${chev}</div>`;
+      ? `<div class="disp-phead none" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${liveN} ready step${liveN!==1?'s':''} with no owner — assign someone${heldSub}</div></div>${chev}</div>`
+      : `<div class="disp-phead" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:${sigColor(person)}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${liveN} task${liveN!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}${heldSub}</div></div>${chev}</div>`;
     return `<div class="disp-group${none?' none':''}${collapsed?' collapsed':''}" data-gkey="${k}">${head}<div class="disp-rows">${arr.map((it,i)=>dispatchRow(it,i,arr.length)).join('')}</div></div>`;
   }).join('');
   renderDailyBrief(); renderTeamLoad();
@@ -6501,7 +6653,7 @@ function dispMoveCtl(){
 }
 function dispatchRow(it, idx, total){
   if(it.office) return officeDispatchRow(it, idx, total);
-  const {r, step, health, ext}=it;
+  const {r, step, health, ext, hold}=it;
   const col=PROCESS_COLORS[step.name]||'#888';
   const due=r.due?fmtDate(r.due):'—';
   const dueOver=r.due && new Date(r.due+'T00:00:00')<new Date(new Date().toDateString());
@@ -6511,23 +6663,25 @@ function dispatchRow(it, idx, total){
   const qtyCtl = ext ? '<span></span>' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
   const op = userRole==='operator';
   const assignCtl = op ? '' : (team.length ? `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : '<span></span>');
+  const holdBtn = op ? '' : dispHoldBtn(r.id, step.name, hold);
   const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
-  return `<div class="disp-row" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
+  return `<div class="disp-row${hold?' held':''}" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
     <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
-    <div class="disp-job"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</div>
+    <div class="disp-job"><span class="dj-txt"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</span>${holdChipHtml(hold)}</div>
     <span class="disp-health">${healthBadge(health)}</span>
     <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span>`:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     <span class="disp-draw">${drawCellHtml(r)}</span>
     ${qtyCtl}
     ${assignCtl}
+    ${holdBtn}
     ${openBtn}
     ${dispMoveCtl(r, idx, total)}
   </div>`;
 }
 function officeDispatchRow(it, idx, total){
-  const {r, action}=it;
+  const {r, action, hold}=it;
   const isPO = action==='po';
   const col = isPO ? (PROCESS_COLORS['Purchasing']||'#6b7a3a') : '#2d6010';
   const icon = isPO ? procIcon('Purchasing',18) : '<i class="ti ti-file-invoice" style="font-size:18px"></i>';
@@ -6535,18 +6689,20 @@ function officeDispatchRow(it, idx, total){
   const due = r.due?fmtDate(r.due):'—';
   const dueOver = r.due && new Date(r.due+'T00:00:00') < new Date(new Date().toDateString());
   const op = userRole==='operator';
+  const holdBtn = op ? '' : dispHoldBtn(r.id, holdKeyForItem(it), hold);
   const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
   const statusChip = `<span class="status-badge ${STATUS_CLASS[r.status]||''}" style="font-size:10px">${esc2(r.status)}</span>`;
-  return `<div class="disp-row" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
+  return `<div class="disp-row${hold?' held':''}" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
     ${dispSeqBadge(idx)}
     <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
     <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
-    <div class="disp-job"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</div>
+    <div class="disp-job"><span class="dj-txt"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</span>${holdChipHtml(hold)}</div>
     <span class="disp-health">${statusChip}</span>
     <span class="disp-dates"><span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
     <span class="disp-draw">${drawCellHtml(r)}</span>
     <span></span>
     ${op?'':'<span></span>'}
+    ${holdBtn}
     ${openBtn}
     ${dispMoveCtl(r, idx, total)}
   </div>`;
@@ -6560,7 +6716,8 @@ let _ask   = { q:'', answer:'', loading:false, error:'' };
 try{ const c=JSON.parse(localStorage.getItem('bsmp_daily_brief')||'null'); if(c && c.date===new Date().toDateString()){ _brief.text=c.text; _brief.at=c.at; } }catch{}
 
 function buildDispatchSnapshot(){
-  const items=dispatchItems();
+  const held=dispatchItems().filter(it=>it.hold);
+  const items=dispatchItems().filter(it=>!it.hold);
   const nameOf=id=>{ const p=personById(id); return p?p.name:null; };
   const rec=it=>({
     customer:it.r.customer||'', job:it.r.job||'', part:it.r.part||it.r.desc||'',
@@ -6582,7 +6739,8 @@ function buildDispatchSnapshot(){
   const toSendOut=all.filter(x=>x.outside);
   return {
     date:new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}),
-    totals:{activeJobs:items.length, behind:behind.length, startToday:startToday.length, startSoon:soon.length, unassigned:unassigned.length},
+    totals:{activeJobs:items.length, behind:behind.length, startToday:startToday.length, startSoon:soon.length, unassigned:unassigned.length, onHold:held.length},
+    onHold: held.slice(0,10).map(it=>({customer:it.r.customer||'', job:it.r.job||'', step:shortProc(it.step.name), reason:it.hold.reason||'', until:it.hold.until||null})),
     behind:behind.slice(0,15), startToday:startToday.slice(0,15), startSoon:soon.slice(0,10),
     workloadByPerson:byPerson, unassignedReady:unassigned.slice(0,15), outsideWorkToSend:toSendOut.slice(0,15)
   };
@@ -6600,6 +6758,7 @@ Rules:
 - 3 to 6 short lines or sentences. No heading, no preamble, no sign-off.
 - Lead with what is behind schedule and which person needs to act (use the assignee names).
 - Call out any outside work / purchase orders that should be sent out today.
+- Anything under onHold is parked on purpose — mention it only if the shop is what's blocking it.
 - Name the single biggest risk to on-time delivery (the "long pole") if there is one.
 - Flag anything with no owner that needs assigning.
 - If nothing is behind, say so plainly and mention what is coming up.
@@ -6687,6 +6846,7 @@ function teamLoad(){
     const ord=enabledOrdered(ensureSchedule(r));
     const cur=ord.find(s=>!s.done);
     if(!cur) return;
+    if(holdActive(r, cur.name)) return;            // parked work isn't load on anyone today
     const behind = jobHealth(r).state==='behind';
     if(cur.assignee && load.has(cur.assignee)){ const e=load.get(cur.assignee); e.today++; if(behind) e.behind++; }
     else if(!cur.assignee){ unassigned++; if(behind) unassignedBehind++; }
@@ -8786,6 +8946,7 @@ function applyStepDone(id, name, makeDone){
   const sch = ensureSchedule(r);
   const step = sch.steps.find(s=>s.name===name); if(!step) return;
   step.done = makeDone;
+  if(makeDone && r.holds) delete r.holds[holdSlot(name)];   // finishing a step clears its hold
   step.doneAt = makeDone ? new Date().toISOString() : null;
   r.completedProcesses = r.completedProcesses || [];
   if(makeDone){ if(!r.completedProcesses.includes(name)) r.completedProcesses.push(name); if(r.currentProcess===name) r.currentProcess=''; }
