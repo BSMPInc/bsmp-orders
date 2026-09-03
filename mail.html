@@ -302,6 +302,26 @@ body.sb-pinned .dock{left:var(--sb)}
 .reply-row textarea:focus{border-color:var(--accent)}
 .reply-row .btn{flex:none}
 .reply-row .btn.sm{height:38px;width:38px;padding:0;justify-content:center}
+/* quick replies — one tap puts a canned line in the box; the row scrolls sideways
+   so a long list never grows the composer on a 14" laptop */
+.reply .quick-row{display:none}
+.reply.open .quick-row{display:flex;align-items:center;gap:6px;padding:10px 12px 0;overflow-x:auto;overflow-y:hidden}
+.qr-chip{flex:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);padding:5px 10px;cursor:pointer;font-family:inherit;line-height:1.5}
+.qr-chip:hover{border-color:var(--accent);color:var(--accent)}
+.qr-chip.qr-edit{color:var(--text3);border-style:dashed;padding:5px 9px}
+.qr-chip.qr-edit i{font-size:14px;vertical-align:-2px}
+.qr-empty{font-size:12px;color:var(--text3);white-space:nowrap}
+/* the manage-quick-replies editor */
+.qr-row{display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--border)}
+.qr-row:first-child{border-top:none}
+.qr-num{flex:none;width:20px;text-align:center;font-size:11px;font-weight:800;color:var(--text3);padding-top:11px}
+.qr-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.modal .qr-fields input,.modal .qr-fields textarea{width:100%;padding:7px 9px;border:1px solid var(--border2);background:#fff;outline:none;font-family:inherit;font-size:13px}
+.modal .qr-fields textarea{min-height:52px;resize:vertical;line-height:1.45}
+.modal .qr-fields input:focus,.modal .qr-fields textarea:focus{border-color:var(--accent)}
+.qr-acts{flex:none;display:flex;flex-direction:column;gap:4px}
+.qr-acts .icon-btn{width:28px;height:28px;font-size:14px;color:var(--text3)}
+.qr-acts .icon-btn:hover{color:var(--accent);border-color:var(--accent)}
 .hint{font-size:12px;color:var(--text3)}
 .toast{position:fixed;right:18px;bottom:18px;background:#23262b;color:#fff;font-size:13px;font-weight:700;padding:10px 16px;box-shadow:0 8px 30px rgba(0,0,0,.25);opacity:0;transition:opacity .2s;pointer-events:none;z-index:100}
 .toast.show{opacity:1}
@@ -533,6 +553,7 @@ body.sb-pinned .dock{left:var(--sb)}
         <div id="cv-msgs"></div>
         <div class="reply" id="reply-box">
           <div class="reply-collapsed" title="Keyboard: Ctrl+R" onclick="expandReply()"><i class="ti ti-arrow-back-up"></i> Reply</div>
+          <div class="quick-row" id="quick-row"></div>
           <div class="reply-row">
             <select id="reply-as" title="Sends through Gmail from this address — lands in its real Sent folder, threads correctly" onchange="renderSigHints()"></select>
             <button class="btn sm" id="reply-all-btn" title="Reply all — everyone on the email gets the reply, not just the sender" onclick="toggleReplyAll()"><i class="ti ti-users"></i></button>
@@ -570,6 +591,11 @@ body.sb-pinned .dock{left:var(--sb)}
         <h3><i class="ti ti-signature"></i> Signatures</h3>
         <div id="set-sigs"></div>
         <div class="set-help">Added automatically to the bottom of every email sent from that address — replies and new emails both. Leave one blank to send without a signature. Add a logo and it's embedded inside the email under your signature text (never a blocked "load images" placeholder) at the width you set with the slider. Shared by the whole team, and separate from the signature set inside Gmail itself (Gmail's only applies to mail written at gmail.com).</div>
+      </div>
+      <div class="set-card">
+        <h3><i class="ti ti-bolt"></i> Quick replies</h3>
+        <div class="set-help" style="margin-top:0;margin-bottom:10px">The chips above the reply box — the lines this office sends over and over. Tapping one writes it into the reply for you to edit; it never sends on its own. Also editable from the pencil at the end of the chip row.</div>
+        <button class="btn" onclick="openQuick()"><i class="ti ti-pencil"></i> Edit quick replies</button>
       </div>
       <div class="set-card">
         <h3><i class="ti ti-keyboard"></i> Keyboard shortcuts</h3>
@@ -653,6 +679,21 @@ body.sb-pinned .dock{left:var(--sb)}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn" onclick="closeTable()">Cancel</button>
       <button class="btn primary" onclick="saveTable()"><i class="ti ti-check"></i> Add to email</button>
+    </div>
+  </div>
+</div>
+
+<!-- quick replies: the chips above the reply box -->
+<div class="modal-bg" id="quick-modal" onclick="if(event.target===this)closeQuick()">
+  <div class="modal" style="max-width:620px">
+    <h3><i class="ti ti-bolt"></i> Quick replies</h3>
+    <div class="set-help" style="margin-top:2px;margin-bottom:6px">One tap drops the text into the reply box, where you can edit it before sending — nothing sends by itself. The label is what shows on the chip; keep it short. The arrows set the order they appear in. Shared by the office, like contacts and signatures.<br>
+      Write <b>{first}</b> for the first name of whoever you're replying to, and <b>{me}</b> for your own — they fill in as you tap.</div>
+    <div id="qr-rows"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn" onclick="qrAdd()" style="margin-right:auto"><i class="ti ti-plus"></i> Add a chip</button>
+      <button class="btn" onclick="closeQuick()">Cancel</button>
+      <button class="btn primary" onclick="saveQuick()"><i class="ti ti-check"></i> Save</button>
     </div>
   </div>
 </div>
@@ -808,6 +849,7 @@ document.addEventListener('keydown',(ev)=>{
   const composeOpen=$('compose-modal').style.display==='flex';
   const tableOpen=$('table-modal').style.display==='flex';
   const priceOpen=$('price-modal').style.display==='flex';
+  const quickOpen=$('quick-modal').style.display==='flex';
   // Ctrl+Enter sends whichever composer you're typing in
   if((ev.ctrlKey||ev.metaKey)&&ev.key==='Enter'){
     const id=document.activeElement&&document.activeElement.id;
@@ -817,12 +859,13 @@ document.addEventListener('keydown',(ev)=>{
   }
   // Esc backs out of popups
   if(ev.key==='Escape'){
-    if(tableOpen) window.closeTable();
+    if(quickOpen) window.closeQuick();
+    else if(tableOpen) window.closeTable();
     else if(priceOpen) window.closePriceCapture();
     else if(composeOpen) window.closeCompose();
     return;
   }
-  if(!(ev.ctrlKey||ev.metaKey)||ev.altKey||tableOpen||priceOpen) return;
+  if(!(ev.ctrlKey||ev.metaKey)||ev.altKey||tableOpen||priceOpen||quickOpen) return;
   const k=(ev.key||'').toLowerCase();
   if(k==='r'&&!ev.shiftKey){
     // only claim Ctrl+R when there's a conversation to reply to — otherwise
@@ -853,6 +896,7 @@ let FLAGS={};                 // mail/threads/<key> → {flag, assignee, by, at}
 let MUTED={};                 // mail/muted/<emailKey> → {email, name, by, at} — shared hide list
 let CONTACTS={};              // mail/contacts/<emailKey> → {name, email, company, phone, notes, by, at}
 let SIGS={};                  // mail/signatures/<emailKey> → plain-text signature, appended on send
+let QUICK={};                 // mail/quickReplies/<id> → {id, label, text, seq} — the reply chips
 let PRICES={};                // mail/materialPrices/<id> → shared material price book, saved out of vendor emails
 let HWP={};                   // mail/hardwarePrices/<id> → shared hardware price book (same book the Quote Tool uses)
 let NOTES={};                 // mail/notes/<threadKey>/<noteId> → {id, uid, by, at, text} — shared team notes per conversation
@@ -3073,6 +3117,143 @@ window.renderSigHints=function(){
   if(c){ const a=$('cp-from').value; c.textContent=sigOf(a)?('Your '+a+' signature is added when it sends.'):''; }
 };
 const renderSigHints=window.renderSigHints;
+// ── quick replies (shared, mail/quickReplies/<id>) ──────────────────────
+// Chips above the reply box: one tap writes a canned line into the reply, which a
+// person still reads and sends. Until the office saves its own set these starters
+// show, and the editor opens pre-filled with them so the first Save adopts them.
+const QUICK_DEFAULTS=[
+  {label:'Got it',            text:'Got it — thank you.'},
+  {label:'Looking into it',   text:'Thanks {first} — we’re looking into this and I’ll come back to you shortly.'},
+  {label:'Quote today',       text:'Thanks for the RFQ. We’ll have a quote over to you today.'},
+  {label:'Need the drawing',  text:'Hi {first}, could you send the drawing (PDF or DXF, and the revision) so we can quote this accurately?'},
+  {label:'PO received',       text:'Thanks {first} — the PO is in. We’ll confirm the delivery date shortly.'},
+  {label:'On schedule',       text:'Your order is on schedule. I’ll let you know as soon as it ships.'},
+  {label:'Shipped',           text:'This shipped today — tracking to follow.'},
+];
+const qrNewId=()=>'q'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+// saved chips in the order they were arranged; the starters until there are any
+function quickList(){
+  const saved=Object.values(QUICK||{}).filter(q=>q&&(q.label||q.text));
+  if(!saved.length) return QUICK_DEFAULTS.map((d,i)=>({id:'d'+i, label:d.label, text:d.text, seq:i, builtin:true}));
+  return saved.slice().sort((a,b)=>((a.seq==null?999:a.seq)-(b.seq==null?999:b.seq))
+    || String(a.label||'').toLowerCase().localeCompare(String(b.label||'').toLowerCase()));
+}
+// "Smith, Jane" / "Jane Smith" / jane.smith@acme.com -> Jane. Leaves MacLeod alone.
+function qrFirstName(){
+  const msgs=(CURRENT&&CURRENT.messages)||[];
+  let src=null;
+  for(let i=msgs.length-1;i>=0;i--){ if(msgs[i]&&msgs[i].fromEmail&&!ownAddr(msgs[i].fromEmail)){ src=msgs[i]; break; } }
+  let d=String((src&&src.from)||'').replace(/["<>]/g,'').trim();
+  if(d.indexOf('@')>-1) d='';                                  // the display name is just the address
+  if(d.indexOf(',')>-1) d=d.split(',').pop().trim();           // "Smith, Jane"
+  let n=(d.split(/\s+/)[0]||'');
+  if(!n) n=String((src&&src.fromEmail)||replyToRecipient()||'').split('@')[0].split(/[._\-+]+/)[0]||'';
+  n=n.replace(/[^A-Za-z'\-]/g,'');
+  if(!n) return '';
+  return (/[a-z]/.test(n)&&/[A-Z]/.test(n)) ? n : n.charAt(0).toUpperCase()+n.slice(1).toLowerCase();
+}
+function qrMyName(){
+  const local=String((auth.currentUser&&auth.currentUser.email)||'').split('@')[0];
+  const n=(local.replace(/^(operator|ops|ofc)[._-]+/i,'')||local).split(/[._-]+/)[0]||'';
+  return n?n.charAt(0).toUpperCase()+n.slice(1):'';
+}
+function qrExpand(text){
+  const first=qrFirstName(), me=qrMyName();
+  let out=String(text||'').replace(/\{first\}/gi, first).replace(/\{me\}/gi, me);
+  if(!first||!me) out=out.replace(/[ \t]+([,.!?])/g,'$1').replace(/[ \t]{2,}/g,' ');   // "Hi ," when there was no name to fill
+  return out;
+}
+function renderQuickRow(){
+  const host=$('quick-row'); if(!host) return;
+  const list=quickList();
+  host.innerHTML = list.map(q=>{
+    const lbl=String(q.label||q.text||'').slice(0,40);
+    return `<button type="button" class="qr-chip" title="${esc(qrExpand(q.text||''))}" onclick="qrInsert('${esc(q.id)}')">${esc(lbl)}</button>`;
+  }).join('')
+  + (list.length?'':'<span class="qr-empty">No quick replies yet.</span>')
+  + `<button type="button" class="qr-chip qr-edit" title="Add, edit or reorder these quick replies" onclick="openQuick()"><i class="ti ti-pencil"></i> Edit</button>`;
+}
+// drop the line in at the cursor, keeping a blank line between it and whatever is
+// already typed - never replaces what is in the box
+window.qrInsert=(id)=>{
+  const q=quickList().find(x=>x.id===id); if(!q) return;
+  const ta=$('reply-body'); if(!ta) return;
+  const text=qrExpand(q.text||''); if(!text.trim()) return;
+  const val=ta.value;
+  let a=ta.selectionStart, b=ta.selectionEnd;
+  if(document.activeElement!==ta || a==null || b==null){ a=b=val.length; }   // not typing in it -> the end
+  const before=val.slice(0,a), after=val.slice(b);
+  const lead = (before.trim() && !/\n\s*$/.test(before)) ? '\n\n' : '';
+  const tail = (after.trim() && !/^\s*\n/.test(after)) ? '\n\n' : '';
+  ta.value = before + lead + text + tail + after;
+  const pos=(before+lead+text).length;
+  ta.focus(); try{ ta.setSelectionRange(pos,pos); }catch(e){}
+  autoGrowReply(ta); window._draftTick('reply');
+};
+// ── the editor ──
+let _qrEdit=null;
+window.openQuick=()=>{
+  // adopting the starters means giving them real ids - after Save they are ordinary chips
+  _qrEdit=quickList().map(q=>({id:q.builtin?qrNewId():q.id, label:q.label||'', text:q.text||''}));
+  if(!_qrEdit.length) _qrEdit=[{id:qrNewId(),label:'',text:''}];
+  renderQuickEdit();
+  $('quick-modal').style.display='flex';
+  setTimeout(()=>{ const f=document.querySelector('#qr-rows .qr-label'); if(f) f.focus(); },40);
+};
+window.closeQuick=()=>{ $('quick-modal').style.display='none'; _qrEdit=null; };
+// read the boxes back before any re-render, or half-typed edits vanish
+function qrCollect(){
+  if(!_qrEdit) return;
+  Array.prototype.forEach.call(document.querySelectorAll('#qr-rows .qr-row'), el=>{
+    const r=_qrEdit[+el.dataset.i]; if(!r) return;
+    const l=el.querySelector('.qr-label'), t=el.querySelector('.qr-text');
+    if(l) r.label=l.value; if(t) r.text=t.value;
+  });
+}
+function renderQuickEdit(){
+  const host=$('qr-rows'); if(!host||!_qrEdit) return;
+  host.innerHTML=_qrEdit.map((r,i)=>`<div class="qr-row" data-i="${i}">
+    <div class="qr-num">${i+1}</div>
+    <div class="qr-fields">
+      <input class="qr-label" maxlength="40" placeholder="Chip label — e.g. Quote today" value="${esc(r.label||'')}">
+      <textarea class="qr-text" placeholder="The line that gets written into the reply…">${esc(r.text||'')}</textarea>
+    </div>
+    <div class="qr-acts">
+      <span class="icon-btn" title="Move up" onclick="qrMove(${i},-1)"><i class="ti ti-chevron-up"></i></span>
+      <span class="icon-btn" title="Move down" onclick="qrMove(${i},1)"><i class="ti ti-chevron-down"></i></span>
+      <span class="icon-btn" title="Delete this chip" onclick="qrDel(${i})"><i class="ti ti-trash"></i></span>
+    </div></div>`).join('');
+}
+window.qrAdd=()=>{ qrCollect(); _qrEdit.push({id:qrNewId(),label:'',text:''}); renderQuickEdit();
+  const rows=document.querySelectorAll('#qr-rows .qr-label'); const last=rows[rows.length-1]; if(last) last.focus(); };
+window.qrDel=(i)=>{ qrCollect(); _qrEdit.splice(i,1); renderQuickEdit(); };
+window.qrMove=(i,d)=>{
+  qrCollect(); const j=i+d; if(j<0||j>=_qrEdit.length) return;
+  const t=_qrEdit[i]; _qrEdit[i]=_qrEdit[j]; _qrEdit[j]=t; renderQuickEdit();
+};
+window.saveQuick=()=>{
+  qrCollect();
+  const rows=_qrEdit.map(r=>({id:r.id, label:(r.label||'').trim(), text:(r.text||'').trim()}))
+                    .filter(r=>r.label||r.text);
+  const empty=rows.find(r=>!r.text);
+  if(empty){ toast('“'+(empty.label||'One chip')+'” has no text to insert.',true); return; }
+  rows.forEach(r=>{ if(!r.label) r.label=r.text.slice(0,24)+(r.text.length>24?'…':''); });
+  const by=(auth.currentUser&&auth.currentUser.email)||'', now=Date.now();
+  const next={};
+  rows.forEach((r,i)=>{ next[r.id]={id:r.id, label:r.label, text:r.text, seq:i, by, at:now}; });
+  const fail=()=>toast('Could not save the quick replies — check the mail rule is published.',true);
+  // one record at a time, and only what changed - never set() the whole node, or a
+  // chip somebody added on another device disappears when this one saves
+  Object.keys(QUICK||{}).forEach(k=>{ if(!next[k]) remove(ref(db,'mail/quickReplies/'+k)).catch(fail); });
+  Object.keys(next).forEach(k=>{
+    const cur=(QUICK||{})[k], r=next[k];
+    if(cur && cur.label===r.label && cur.text===r.text && cur.seq===r.seq) return;
+    set(ref(db,'mail/quickReplies/'+k), r).catch(fail);
+  });
+  QUICK=next; renderQuickRow(); closeQuick();
+  toast(rows.length+' quick '+(rows.length===1?'reply':'replies')+' saved.');
+};
+
 // ── outgoing attachments (shared by the reply box and the compose modal) ──────
 const MAX_ATT_TOTAL=18*1024*1024;   // Gmail rejects a message over 25 MB *after* base64 (+33%) — 18 MB of real files is the practical ceiling
 window._outAtt={reply:[], compose:[]};
@@ -3241,7 +3422,7 @@ async function bodyPaste(ctx,e){
 { const r=$('reply-body'); if(r) r.addEventListener('paste',e=>bodyPaste('reply',e)); }
 { const c=$('cp-body'); if(c) c.addEventListener('paste',e=>bodyPaste('compose',e)); }
 
-window.expandReply=()=>{ $('reply-box').classList.add('open'); setTimeout(()=>$('reply-body').focus(),30); };
+window.expandReply=()=>{ $('reply-box').classList.add('open'); renderQuickRow(); setTimeout(()=>$('reply-body').focus(),30); };
 window.collapseReply=()=>{ $('reply-box').classList.remove('open'); const ta=$('reply-body'); if(ta) ta.style.height=''; };
 window.autoGrowReply=(ta)=>{ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight+2,220)+'px'; };
 window.sendReply=()=>{
@@ -3770,6 +3951,10 @@ onAuthStateChanged(auth,(user)=>{
         HWP=snap.val()||{};
         if(navPage==='prices') renderPriceTable();
         renderPriceBtn();
+      });
+      onValue(ref(db,'mail/quickReplies'),snap=>{
+        QUICK=snap.val()||{};
+        renderQuickRow();
       });
       onValue(ref(db,'mail/signatures'),snap=>{
         SIGS=snap.val()||{};
