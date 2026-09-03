@@ -17,6 +17,8 @@ html = u'''<!doctype html><meta charset="utf-8"><title>mail quick-reply test</ti
 <div class="reply open" id="reply-box"><div class="quick-row" id="quick-row"></div>
 <textarea id="reply-body"></textarea></div>
 <div id="quick-modal" style="display:none"><div id="qr-rows"></div></div>
+<div id="compose-modal" style="display:none"><input id="cp-to">
+<div class="quick-row" id="quick-row-cp"></div><textarea id="cp-body"></textarea></div>
 <div id="toast"></div>
 <script>
 const out=[];
@@ -36,9 +38,11 @@ function replyToRecipient(){
   return '';
 }
 const auth={currentUser:{uid:'uid-me', email:'ofc.edgar@bertsmp.com'}};
-let GROWN=0, TICKS=0;
+let CONTACTS={};
+const mkey=(e)=>(e||'').toLowerCase().replace(/[.#$\\/\\[\\]]/g,'_');
+let GROWN=0, TICKS=0, LASTCTX='';
 function autoGrowReply(){ GROWN++; }
-window._draftTick=()=>{ TICKS++; };
+window._draftTick=(ctx)=>{ TICKS++; LASTCTX=ctx; };
 // every write the module makes, in order
 let WRITES=[];
 const db=null;
@@ -198,6 +202,49 @@ saveQuick();
 ok('a chip with text but no label gets one', WRITES[0].val.label.length<=25 && WRITES[0].val.label.indexOf('a line')===0, WRITES[0].val.label);
 openQuick(); closeQuick();
 ok('cancelling throws the edits away', _qrEdit===null && $('quick-modal').style.display==='none');
+
+// 8 ─ the same chips in the new-email window
+const cto=$('cp-to'), cbody=$('cp-body');
+CURRENT=thread([msg('Jane Smith','jane@acme.com')]);      // an open conversation must NOT leak in
+CONTACTS={};
+cto.value='ben.walker@acme.com';
+ok('composing, {first} comes off the To box, not the open thread', qrFirstName('compose')==='Ben', qrFirstName('compose'));
+cto.value='Ruth Alvarez <ruth@acme.com>';
+ok('a "Name <email>" recipient is read', qrFirstName('compose')==='Ruth', qrFirstName('compose'));
+cto.value='ruth@acme.com';
+CONTACTS[mkey('ruth@acme.com')]={email:'ruth@acme.com', name:'Ruth Alvarez'};
+ok('the address book names a bare address', qrFirstName('compose')==='Ruth', qrFirstName('compose'));
+cto.value='ruth@acme.com, sam@acme.com';
+ok('with several recipients the first one wins', qrFirstName('compose')==='Ruth', qrFirstName('compose'));
+cto.value='';
+ok('an empty To box gives no name', qrFirstName('compose')==='', qrFirstName('compose'));
+ok('the reply side is unaffected', qrFirstName()==='Jane', qrFirstName());
+cto.value='ben.walker@acme.com';
+ok('placeholders expand against the compose context', qrExpand('Hi {first},','compose')==='Hi Ben,', qrExpand('Hi {first},','compose'));
+ok('the same chip expands differently in a reply', qrExpand('Hi {first},')==='Hi Jane,', qrExpand('Hi {first},'));
+
+QUICK={ q1:{id:'q1',label:'Hi',text:'Hi {first},',seq:0} };
+renderQuickRow();
+const cpHtml=$('quick-row-cp').innerHTML;
+ok('the compose row gets the same chips', (cpHtml.match(/qr-chip/g)||[]).length===2, cpHtml);
+ok('compose chips insert into the compose box', cpHtml.indexOf("qrInsert('q1','compose')")>-1, cpHtml);
+ok('reply chips still say reply', $('quick-row').innerHTML.indexOf("qrInsert('q1','reply')")>-1);
+ok('each row previews its own recipient',
+   cpHtml.indexOf('title="Hi Ben,"')>-1 && $('quick-row').innerHTML.indexOf('title="Hi Jane,"')>-1, cpHtml);
+
+ta.value='reply stays put'; cbody.value=''; TICKS=0; GROWN=0; LASTCTX='';
+qrInsert('q1','compose');
+ok('a compose chip writes into the compose box', cbody.value==='Hi Ben,', JSON.stringify(cbody.value));
+ok('it leaves the reply box alone', ta.value==='reply stays put');
+ok('it saves the compose draft, not the reply one', TICKS===1 && LASTCTX==='compose', TICKS+'/'+LASTCTX);
+ok('the compose box is not auto-grown', GROWN===0, GROWN);
+cbody.value='Dear Ben,'; cbody.focus(); cbody.setSelectionRange(9,9);
+qrInsert('q1','compose');
+ok('the cursor rules apply there too', cbody.value==='Dear Ben,\\n\\nHi Ben,', JSON.stringify(cbody.value));
+ta.value=''; qrInsert('q1');
+ok('no context still means the reply box', ta.value==='Hi Jane,' && LASTCTX==='reply', JSON.stringify(ta.value));
+ta.value=''; qrInsert('q1','nonsense');
+ok('an unknown context falls back to the reply box', ta.value==='Hi Jane,', JSON.stringify(ta.value));
 
 const fails=out.filter(l=>l.slice(0,4)==='FAIL').length;
 document.title = fails? ('FAILURES ('+fails+')') : ('all pass ('+out.length+')');

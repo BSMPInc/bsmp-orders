@@ -304,8 +304,10 @@ body.sb-pinned .dock{left:var(--sb)}
 .reply-row .btn.sm{height:38px;width:38px;padding:0;justify-content:center}
 /* quick replies — one tap puts a canned line in the box; the row scrolls sideways
    so a long list never grows the composer on a 14" laptop */
-.reply .quick-row{display:none}
-.reply.open .quick-row{display:flex;align-items:center;gap:6px;padding:10px 12px 0;overflow-x:auto;overflow-y:hidden}
+.quick-row{display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden}
+.reply .quick-row{display:none}                     /* the reply box shows them once it is open */
+.reply.open .quick-row{display:flex;padding:10px 12px 0}
+.modal .quick-row{padding:0 0 7px}
 .qr-chip{flex:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);padding:5px 10px;cursor:pointer;font-family:inherit;line-height:1.5}
 .qr-chip:hover{border-color:var(--accent);color:var(--accent)}
 .qr-chip.qr-edit{color:var(--text3);border-style:dashed;padding:5px 9px}
@@ -594,7 +596,7 @@ body.sb-pinned .dock{left:var(--sb)}
       </div>
       <div class="set-card">
         <h3><i class="ti ti-bolt"></i> Quick replies</h3>
-        <div class="set-help" style="margin-top:0;margin-bottom:10px">The chips above the reply box — the lines this office sends over and over. Tapping one writes it into the reply for you to edit; it never sends on its own. Also editable from the pencil at the end of the chip row.</div>
+        <div class="set-help" style="margin-top:0;margin-bottom:10px">The chips above the message box, on replies and new emails alike — the lines this office sends over and over. Tapping one writes it in for you to edit; it never sends on its own. Also editable from the pencil at the end of the chip row.</div>
         <button class="btn" onclick="openQuick()"><i class="ti ti-pencil"></i> Edit quick replies</button>
       </div>
       <div class="set-card">
@@ -645,10 +647,11 @@ body.sb-pinned .dock{left:var(--sb)}
     <label>From</label>
     <select id="cp-from" onchange="renderSigHints();window._draftTick('compose')"></select>
     <label>To</label>
-    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — pick from contacts" autocomplete="off" oninput="acInput();window._draftTick('compose')" onkeydown="acKey(event)"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
+    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — pick from contacts" autocomplete="off" oninput="acInput();window._draftTick('compose')" onchange="renderQuickRow()" onkeydown="acKey(event)"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
     <label>Subject</label>
     <input id="cp-subject" type="text" placeholder="Subject" oninput="window._draftTick('compose')">
     <label>Message</label>
+    <div class="quick-row" id="quick-row-cp"></div>
     <textarea id="cp-body" placeholder="Write your message — paste a screenshot (Ctrl+V) and it's embedded right where the cursor is" oninput="window._draftTick('compose')"></textarea>
     <div class="out-atts" id="cp-atts"></div>
     <div class="hint" id="cp-sig-hint" style="margin-top:6px"></div>
@@ -687,8 +690,8 @@ body.sb-pinned .dock{left:var(--sb)}
 <div class="modal-bg" id="quick-modal" onclick="if(event.target===this)closeQuick()">
   <div class="modal" style="max-width:620px">
     <h3><i class="ti ti-bolt"></i> Quick replies</h3>
-    <div class="set-help" style="margin-top:2px;margin-bottom:6px">One tap drops the text into the reply box, where you can edit it before sending — nothing sends by itself. The label is what shows on the chip; keep it short. The arrows set the order they appear in. Shared by the office, like contacts and signatures.<br>
-      Write <b>{first}</b> for the first name of whoever you're replying to, and <b>{me}</b> for your own — they fill in as you tap.</div>
+    <div class="set-help" style="margin-top:2px;margin-bottom:6px">One tap drops the text into whatever you’re writing — a reply or a new email — where you can edit it before sending; nothing sends by itself. The label is what shows on the chip; keep it short. The arrows set the order they appear in. Shared by the office, like contacts and signatures.<br>
+      Write <b>{first}</b> for the first name of the person you're writing to — the sender on a reply, the To box on a new email — and <b>{me}</b> for your own. They fill in as you tap.</div>
     <div id="qr-rows"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn" onclick="qrAdd()" style="margin-right:auto"><i class="ti ti-plus"></i> Add a chip</button>
@@ -1189,7 +1192,7 @@ window.deleteContact=(k,label)=>{
   remove(ref(db,'mail/contacts/'+k)).catch(()=>toast('Could not delete — check the mail rule.',true));
   renderContacts(); renderContactBtn();
 };
-window.composeTo=(email)=>{ openCompose(); $('cp-to').value=email; setTimeout(()=>$('cp-subject').focus(),40); };
+window.composeTo=(email)=>{ openCompose(); $('cp-to').value=email; renderQuickRow(); setTimeout(()=>$('cp-subject').focus(),40); };
 // save-the-sender button shown on an open conversation
 function renderContactBtn(){
   const b=$('contact-btn'); if(!b) return;
@@ -1218,7 +1221,7 @@ window.acInput=()=>{
   box.innerHTML=_acItems.map((c,i)=>`<div class="ac-opt" data-i="${i}" onmousedown="acPick(${i})"><span class="ao-nm">${esc(c.name||c.email)}</span><span class="ao-em">${esc(c.email)}${c.company?' · '+esc(c.company):''}</span></div>`).join('');
   box.style.display='';
 };
-window.acPick=(i)=>{ const c=_acItems[i]; if(!c) return; $('cp-to').value=c.email; $('cp-ac').style.display='none'; _acItems=[]; $('cp-subject').focus(); };
+window.acPick=(i)=>{ const c=_acItems[i]; if(!c) return; $('cp-to').value=c.email; $('cp-ac').style.display='none'; _acItems=[]; renderQuickRow(); $('cp-subject').focus(); };
 window.acKey=(e)=>{
   const box=$('cp-ac'); if(box.style.display==='none'||!_acItems.length) return;
   if(e.key==='ArrowDown'){ e.preventDefault(); _acIdx=Math.min(_acIdx+1,_acItems.length-1); }
@@ -3139,46 +3142,64 @@ function quickList(){
     || String(a.label||'').toLowerCase().localeCompare(String(b.label||'').toLowerCase()));
 }
 // "Smith, Jane" / "Jane Smith" / jane.smith@acme.com -> Jane. Leaves MacLeod alone.
-function qrFirstName(){
-  const msgs=(CURRENT&&CURRENT.messages)||[];
-  let src=null;
-  for(let i=msgs.length-1;i>=0;i--){ if(msgs[i]&&msgs[i].fromEmail&&!ownAddr(msgs[i].fromEmail)){ src=msgs[i]; break; } }
-  let d=String((src&&src.from)||'').replace(/["<>]/g,'').trim();
+function qrNameFrom(display, email){
+  let d=String(display||'').replace(/["<>]/g,'').trim();
   if(d.indexOf('@')>-1) d='';                                  // the display name is just the address
   if(d.indexOf(',')>-1) d=d.split(',').pop().trim();           // "Smith, Jane"
   let n=(d.split(/\s+/)[0]||'');
-  if(!n) n=String((src&&src.fromEmail)||replyToRecipient()||'').split('@')[0].split(/[._\-+]+/)[0]||'';
+  if(!n) n=String(email||'').split('@')[0].split(/[._\-+]+/)[0]||'';
   n=n.replace(/[^A-Za-z'\-]/g,'');
   if(!n) return '';
   return (/[a-z]/.test(n)&&/[A-Z]/.test(n)) ? n : n.charAt(0).toUpperCase()+n.slice(1).toLowerCase();
+}
+// replying: the last person to write in who is not us. composing: whoever is in the
+// To box - the address book knows a lot of them by name.
+function qrFirstName(ctx){
+  if(ctx==='compose'){
+    const raw=String(($('cp-to')&&$('cp-to').value)||'').split(/[,;]/)[0].trim();
+    if(!raw) return '';
+    const m=raw.match(/^(.*)<([^>]+)>\s*$/);                     // "Jane Smith <jane@acme.com>"
+    const email=(m?m[2]:raw).trim(), disp=(m?m[1]:'').trim();
+    const c=(typeof CONTACTS!=='undefined'&&CONTACTS)?CONTACTS[mkey(email)]:null;
+    return qrNameFrom(disp||((c&&c.name)||''), email);
+  }
+  const msgs=(CURRENT&&CURRENT.messages)||[];
+  let src=null;
+  for(let i=msgs.length-1;i>=0;i--){ if(msgs[i]&&msgs[i].fromEmail&&!ownAddr(msgs[i].fromEmail)){ src=msgs[i]; break; } }
+  return qrNameFrom((src&&src.from)||'', (src&&src.fromEmail)||replyToRecipient()||'');
 }
 function qrMyName(){
   const local=String((auth.currentUser&&auth.currentUser.email)||'').split('@')[0];
   const n=(local.replace(/^(operator|ops|ofc)[._-]+/i,'')||local).split(/[._-]+/)[0]||'';
   return n?n.charAt(0).toUpperCase()+n.slice(1):'';
 }
-function qrExpand(text){
-  const first=qrFirstName(), me=qrMyName();
+function qrExpand(text, ctx){
+  const first=qrFirstName(ctx), me=qrMyName();
   let out=String(text||'').replace(/\{first\}/gi, first).replace(/\{me\}/gi, me);
   if(!first||!me) out=out.replace(/[ \t]+([,.!?])/g,'$1').replace(/[ \t]{2,}/g,' ');   // "Hi ," when there was no name to fill
   return out;
 }
+// both boxes get the same chips - the reply box and the new-email window
+const QR_HOSTS={reply:'quick-row', compose:'quick-row-cp'};
 function renderQuickRow(){
-  const host=$('quick-row'); if(!host) return;
   const list=quickList();
-  host.innerHTML = list.map(q=>{
-    const lbl=String(q.label||q.text||'').slice(0,40);
-    return `<button type="button" class="qr-chip" title="${esc(qrExpand(q.text||''))}" onclick="qrInsert('${esc(q.id)}')">${esc(lbl)}</button>`;
-  }).join('')
-  + (list.length?'':'<span class="qr-empty">No quick replies yet.</span>')
-  + `<button type="button" class="qr-chip qr-edit" title="Add, edit or reorder these quick replies" onclick="openQuick()"><i class="ti ti-pencil"></i> Edit</button>`;
+  Object.keys(QR_HOSTS).forEach(ctx=>{
+    const host=$(QR_HOSTS[ctx]); if(!host) return;
+    host.innerHTML = list.map(q=>{
+      const lbl=String(q.label||q.text||'').slice(0,40);
+      return `<button type="button" class="qr-chip" title="${esc(qrExpand(q.text||'',ctx))}" onclick="qrInsert('${esc(q.id)}','${ctx}')">${esc(lbl)}</button>`;
+    }).join('')
+    + (list.length?'':'<span class="qr-empty">No quick replies yet.</span>')
+    + `<button type="button" class="qr-chip qr-edit" title="Add, edit or reorder these quick replies" onclick="openQuick()"><i class="ti ti-pencil"></i> Edit</button>`;
+  });
 }
 // drop the line in at the cursor, keeping a blank line between it and whatever is
 // already typed - never replaces what is in the box
-window.qrInsert=(id)=>{
+window.qrInsert=(id,ctx)=>{
+  ctx = (ctx==='compose') ? 'compose' : 'reply';
   const q=quickList().find(x=>x.id===id); if(!q) return;
-  const ta=$('reply-body'); if(!ta) return;
-  const text=qrExpand(q.text||''); if(!text.trim()) return;
+  const ta=$(ctx==='compose'?'cp-body':'reply-body'); if(!ta) return;
+  const text=qrExpand(q.text||'',ctx); if(!text.trim()) return;
   const val=ta.value;
   let a=ta.selectionStart, b=ta.selectionEnd;
   if(document.activeElement!==ta || a==null || b==null){ a=b=val.length; }   // not typing in it -> the end
@@ -3188,7 +3209,8 @@ window.qrInsert=(id)=>{
   ta.value = before + lead + text + tail + after;
   const pos=(before+lead+text).length;
   ta.focus(); try{ ta.setSelectionRange(pos,pos); }catch(e){}
-  autoGrowReply(ta); window._draftTick('reply');
+  if(ctx==='reply') autoGrowReply(ta);          // the compose box is a fixed, resizable one
+  window._draftTick(ctx);
 };
 // ── the editor ──
 let _qrEdit=null;
@@ -3754,7 +3776,7 @@ window.openCompose=()=>{
     window._outTables.compose=normTables(dc.tables);
     renderOutAtts('compose');
   }
-  renderSigHints();
+  renderSigHints(); renderQuickRow();
   $('compose-modal').style.display='flex';
   setTimeout(()=>$('cp-to').focus(),30);
 };

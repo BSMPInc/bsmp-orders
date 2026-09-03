@@ -12,6 +12,7 @@ def grab(start, end, inclusive_end=True):
 css   = '\n'.join(re.findall(r'<style>(.*?)</style>', src, re.S))
 reply = grab('<div class="reply" id="reply-box">', '<div class="hint" id="reply-sig-hint"></div>') + '</div>'
 modal = grab('<!-- quick replies: the chips above the reply box -->', '<!-- material price capture -->', False)
+compose = grab('<div class="modal-bg" id="compose-modal">', '<!-- quick replies: the chips above the reply box -->', False)
 block = grab(u'// \u2500\u2500 quick replies (shared', u'// \u2500\u2500 outgoing attachments', False)
 
 html = u'''<!doctype html><html><head><meta charset="utf-8"><title>quick reply layout</title>
@@ -20,11 +21,12 @@ html = u'''<!doctype html><html><head><meta charset="utf-8"><title>quick reply l
 body{padding:14px;background:var(--bg)}
 #out{font:12px ui-monospace,monospace;white-space:pre-wrap;background:#fff;border:1px dashed #c9d0da;padding:8px;margin-bottom:12px}
 .host{max-width:900px;background:var(--card);border:1px solid var(--border)}
-/* the editor is a real modal - show it in place so it can be measured */
-#quick-modal{position:static;display:block!important;background:none;padding:0;margin-top:16px}
+/* the modals are real modals - show them in place so they can be measured */
+#quick-modal,#compose-modal{position:static;display:block!important;background:none;padding:0;margin-top:16px}
 </style></head><body>
 <div id="out"></div>
 <div class="host">__REPLY__</div>
+__COMPOSE__
 __MODAL__
 <script>
 function $(id){ return document.getElementById(id); }
@@ -42,6 +44,13 @@ function ref(_d,path){ return {path:path}; }
 function set(){ return Promise.resolve(); }
 function remove(){ return Promise.resolve(); }
 function renderSigHints(){}
+let CONTACTS={};
+const mkey=(e)=>(e||'').toLowerCase().replace(/[.#$\\/\\[\\]]/g,'_');
+function acInput(){}
+function acKey(){}
+function closeCompose(){}
+function sendCompose(){}
+function renderOutAtts(){}
 function toggleReplyAll(){}
 function aiDraftReply(){}
 function pickAtt(){}
@@ -52,6 +61,7 @@ function expandReply(){}
 /*__BLOCK__*/
 
 $('reply-box').classList.add('open');
+$('cp-to').value='ben.walker@acme.com';
 renderQuickRow();
 _qrEdit=quickList().slice(0,3).map(q=>({id:q.id,label:q.label,text:q.text}));
 renderQuickEdit();
@@ -100,6 +110,19 @@ function check(){
   row2.scrollLeft=row2.scrollWidth;
   ok('scrolling reaches the Edit chip at the end', row2.scrollLeft>0);
   row2.scrollLeft=0; host.style.maxWidth=was;
+  // the same row inside the new-email window
+  const crow=$('quick-row-cp'), cchips=[...crow.querySelectorAll('.qr-chip')];
+  const cr=crow.getBoundingClientRect(), cb=$('cp-body').getBoundingClientRect();
+  const cmodal=document.querySelector('#compose-modal .modal').getBoundingClientRect();
+  ok('the compose window shows the chips', getComputedStyle(crow).display==='flex' && cchips.length===8, cchips.length);
+  ok('compose chips sit on one line', new Set(cchips.map(c=>Math.round(c.getBoundingClientRect().top))).size===1);
+  ok('the compose row is one chip tall', cr.height<=44, Math.round(cr.height));
+  ok('the compose chips sit above the message box', cr.bottom<=cb.top+0.5, Math.round(cr.bottom)+' vs '+Math.round(cb.top));
+  ok('the compose row stays inside the window', cr.left>=cmodal.left-0.5 && cr.right<=cmodal.right+0.5);
+  ok('the compose row scrolls rather than clipping',
+     getComputedStyle(crow).overflowX==='auto' && crow.scrollWidth>crow.clientWidth+1,
+     crow.scrollWidth+' > '+crow.clientWidth);
+  ok('a compose chip is aimed at the compose box', crow.innerHTML.indexOf("'compose'")>-1);
   const fails=out.filter(l=>l.slice(0,4)==='FAIL').length;
   document.title = fails? ('FAILURES ('+fails+')') : ('all pass ('+out.length+')');
   $('out').textContent='viewport '+innerWidth+'px\\n'+out.join('\\n');
@@ -109,6 +132,6 @@ addEventListener('resize', check);
 </script></body></html>'''
 
 html = (html.replace('__CSS__', css).replace('__REPLY__', reply).replace('__MODAL__', modal)
-            .replace('/*__BLOCK__*/', block))
+            .replace('__COMPOSE__', compose).replace('/*__BLOCK__*/', block))
 io.open('C:/Users/info/bsmp-orders/_quicklayout.html', 'w', encoding='utf-8', newline='').write(html)
 print('wrote _quicklayout.html (%d chars)' % len(html))
