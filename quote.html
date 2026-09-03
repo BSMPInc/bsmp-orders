@@ -6743,13 +6743,51 @@ async function runQbAiReview(kind){
   }
 }
 
-// Sanity-check the break schedule: a bigger order should never total less than a
-// smaller one. Checks the quantities in the table AND each markup-tier boundary
-// (qty t vs t+1), where a too-steep % step causes the inversion.
+// The largest quantity that still fits inside `sheets` billable sheets, so the
+// check can point at a break that uses the material it is already paying for.
+function maxQtyForSheets(sheets, pps, scrapFactor){
+  if(!(sheets>0)||!(pps>0)||!(scrapFactor>0)) return 0;
+  let n=Math.floor(sheets*pps/scrapFactor);
+  // walk back over any floating-point overshoot at the boundary
+  while(n>0 && billableSheets(n*scrapFactor/pps) > sheets+1e-9) n--;
+  return n;
+}
+
+// Sanity-check the break schedule. Two different faults:
+//   1. cost/part going UP as quantity goes up - almost always the sheet rounding,
+//      where a break lands just past a 1/8 boundary and buys material it cannot use
+//   2. a bigger order totalling LESS than a smaller one - a too-steep markup step,
+//      checked at the table quantities and at each markup-tier boundary (t vs t+1)
 function qbCliffCheckHtml(results){
   const fmt=v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const warns=[];
+  const fmt3=v=>'$'+(v||0).toFixed(2);
+  const warns=[], costWarns=[];
   try{
+    const scrapPct=parseFloat(document.getElementById('scrap-allowance')?.value)||0;
+    const scrapFactor=1+scrapPct/100;
+    const unit=(typeof matMode!=='undefined'&&matMode==='bar')?'bar':'sheet';
+    const byQty=[...results].sort((a,b)=>a.qty-b.qty);
+    for(let i=1;i<byQty.length;i++){
+      const lo=byQty[i-1], hi=byQty[i];
+      if(!(hi.totalCostPart > lo.totalCostPart+0.005)) continue;
+      let line=`<strong>Cost/part rises with quantity: ${hi.qty.toLocaleString()} pcs costs ${fmt3(hi.totalCostPart)}/part but ${lo.qty.toLocaleString()} pcs costs ${fmt3(lo.totalCostPart)}.</strong>`;
+      // is it the rounding? material up AND sheets-per-part up says yes
+      const loPer=lo.qty>0?lo.sheetsReq/lo.qty:0, hiPer=hi.qty>0?hi.sheetsReq/hi.qty:0;
+      const matUp=hi.matCostPart > lo.matCostPart+0.005;
+      if(matUp && hiPer > loPer+1e-12 && hi.pps>0){
+        const used=hi.qty*scrapFactor/hi.pps;
+        line+=`<br>Why: ${unit}s are billed in 1/${SHEET_STEP_DEN}ths, rounded up — ${hi.qty.toLocaleString()} pcs bills ${hi.sheetsReq} ${unit}${hi.sheetsReq===1?'':'s'} (${used.toFixed(3)} actually used) against ${lo.sheetsReq} for ${lo.qty.toLocaleString()}, so material goes ${fmt3(lo.matCostPart)} → ${fmt3(hi.matCostPart)}/part.`;
+        const back=maxQtyForSheets(lo.sheetsReq, hi.pps, scrapFactor);   // same sheets as the lower break
+        const fill=maxQtyForSheets(hi.sheetsReq, hi.pps, scrapFactor);   // fills what this break already buys
+        const opts=[];
+        if(back>lo.qty && back<hi.qty) opts.push(`<strong>${back.toLocaleString()}</strong> (the same ${lo.sheetsReq} ${unit}${lo.sheetsReq===1?'':'s'} the ${lo.qty.toLocaleString()} break already buys — ${fmt3(lo.matCostPart*lo.qty/back)}/part)`);
+        if(fill>hi.qty) opts.push(`<strong>${fill.toLocaleString()}</strong> (fills the ${hi.sheetsReq} ${unit}${hi.sheetsReq===1?'':'s'} you are billing at ${hi.qty.toLocaleString()} — ${fmt3(hi.matCostPart*hi.qty/fill)}/part)`);
+        if(opts.length) line+=`<br>Quote ${opts.join(' or ')} instead, and the curve falls again.`;
+      }else{
+        line+=`<br>Material is not the cause — check the inputs on this break (setup, inspection or programming re-amortized, or a hardware or outside price that steps up).`;
+      }
+      costWarns.push(line);
+    }
     const sorted=[...results].sort((a,b)=>a.qty-b.qty);
     for(let i=1;i<sorted.length;i++){
       if(sorted[i].jobTotal < sorted[i-1].jobTotal-0.005){
@@ -6771,12 +6809,20 @@ function qbCliffCheckHtml(results){
       }
     }
   }catch(e){ console.error('qbCliffCheck failed',e); return ''; }
-  if(!warns.length){
-    return `<div style="font-size:11px;color:#166534;padding:8px 2px 0">✓ Job totals rise with quantity at every break and markup step in this range.</div>`;
+  if(!warns.length && !costWarns.length){
+    return `<div style="font-size:11px;color:#166534;padding:8px 2px 0">✓ Cost/part falls as quantity rises, and job totals rise at every break and markup step in this range.</div>`;
   }
-  return `<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:var(--radius);font-size:12px;color:#92400e;line-height:1.7">`
-    +`<strong>⚠ Price-break check</strong><br>`+warns.join('<br>')
-    +`<br><span style="font-size:11px">Fix: keep the % flat across the quantities you're quoting, or soften the step / move the boundary until this box turns green — the check re-runs every Calculate. (Or accept it knowingly for a big order you want to win.)</span></div>`;
+  let body=`<strong>⚠ Price-break check</strong><br>`;
+  if(costWarns.length){
+    body+=costWarns.join('<br><br>')
+      +`<br><span style="font-size:11px">A break that lands just past a 1/${SHEET_STEP_DEN} boundary pays for material it cannot use — moving the quantity is usually cheaper than absorbing it. (Or hold the price at the smaller break's and eat the difference.)</span>`;
+    if(warns.length) body+=`<hr style="border:none;border-top:1px solid #f0c98a;margin:9px 0">`;
+  }
+  if(warns.length){
+    body+=warns.join('<br>')
+      +`<br><span style="font-size:11px">Fix: keep the % flat across the quantities you're quoting, or soften the step / move the boundary until this box turns green — the check re-runs every Calculate. (Or accept it knowingly for a big order you want to win.)</span>`;
+  }
+  return `<div style="margin-top:10px;padding:10px 14px;background:#fffbeb;border:1px solid #f59e0b;border-radius:var(--radius);font-size:12px;color:#92400e;line-height:1.7">`+body+`</div>`;
 }
 
 function copyQtyBreaks(){
@@ -9205,9 +9251,12 @@ function roundingChanged(){
   try{ if(window._asmCalc&&typeof asmSelectedParts!=='undefined'&&asmSelectedParts.length) calcAssembly(); }catch(e){}
 }
 
+// Sheets are bought and billed in eighths - the price-break check quotes this
+// same number when it explains a cost/part that rises with quantity.
+const SHEET_STEP_DEN = 8;
 function billableSheets(exactSheets){
   // Round up to nearest 1/8 sheet
-  let rounded = Math.ceil(exactSheets * 8) / 8;
+  let rounded = Math.ceil(exactSheets * SHEET_STEP_DEN) / SHEET_STEP_DEN;
   // Apply minimum floor (but only if the part actually uses material)
   if(exactSheets > 0 && MIN_SHEET > 0 && rounded < MIN_SHEET){
     rounded = MIN_SHEET;
