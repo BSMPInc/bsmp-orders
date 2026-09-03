@@ -35,6 +35,8 @@ function refreshActivePage(){}
 function shortProc(n){ return n; }
 function ensureSchedule(r){ return r.schedule||{steps:[]}; }
 function enabledOrdered(sch){ return (sch.steps||[]).filter(s=>s.enabled); }
+let _DISP=[];                                   // what the Today board is showing
+function dispVisibleItems(){ return _DISP.map(x=>x); }   // throws if _DISP is null - on purpose
 /*__BLOCK__*/
 
 // \u2500\u2500 fixtures \u2500\u2500
@@ -87,11 +89,15 @@ chats[kJob]={n1:note('n1','uid-office',T,'PO revised to 60 pcs')};
 const btn=chatBtnStep(o1,'Laser');
 ok('an unread job note still raises the dot on a task row', btn.indexOf('note-btn')>-1 && btn.indexOf('unread')>-1);
 ok('the task button opens the step thread', btn.indexOf("_openChat('"+kStep+"'")>-1);
-ok('count shown is the step thread only', btn.indexOf('</i>0<')===-1 && btn.indexOf('</i></button>')>-1);
+ok('count shown is the step thread only', btn.indexOf('</i>0<')===-1 && btn.indexOf('</i><span class="nb-new">')>-1, btn);
 chats[kStep]={n2:note('n2','uid-office',T,'two')};
-ok('with step notes the count shows', chatBtnStep(o1,'Laser').indexOf('</i>1</button>')>-1, chatBtnStep(o1,'Laser'));
+ok('with step notes the count shows', chatBtnStep(o1,'Laser').indexOf('</i>1<')>-1, chatBtnStep(o1,'Laser'));
+ok('the unread badge carries the number', chatBtnStep(o1,'Laser').indexOf('class="nb-new">2<')>-1, chatBtnStep(o1,'Laser'));
 markChatRead(kStep); markChatRead(kJob);
 ok('once read, no dot', chatBtnStep(o1,'Laser').indexOf('unread')===-1);
+ok('once read, no badge either', chatBtnStep(o1,'Laser').indexOf('nb-new')===-1);
+chats[kStep]={}; for(let i=0;i<12;i++) chats[kStep]['x'+i]=note('x'+i,'uid-office',T+i,'m'+i);
+ok('a big pile of notes caps the badge at 9+', chatBtnStep(o1,'Laser').indexOf('class="nb-new">9+<')>-1, chatBtnStep(o1,'Laser'));
 ok('job button is unchanged for callers passing 2 args', chatBtnHtml('Acme Metals','5001').indexOf("_openChat('"+kJob+"'")>-1);
 
 // 5 - text that came from a person is escaped
@@ -124,6 +130,28 @@ ok('a single-line PO card passes its line id', chatBtnJob({customer:'Acme Metals
 markChatRead(chatKeyStep(o2,'Form'));
 ok('reading the step thread clears the card dot', chatBtnJob(grp).indexOf('unread')===-1);
 ok('stepThreadKeys survives a missing items list', stepThreadKeys(undefined).length===0);
+
+// 8 - the Today tab's own unread badge
+chats={}; _chatSeen={}; _chatSeenFresh=false;
+_DISP=[{r:o1,step:{name:'Laser'}},{r:o2,step:{name:'Form'}},{office:true,r:o3}];
+ok('a quiet board counts nothing', dispatchUnreadCount()===0);
+chats[CHAT_SHOP_KEY]={s1:note('s1','uid-office',T,'Shop closes at 3 today')};
+ok('a shop note raises the tab count', dispatchUnreadCount()===1, dispatchUnreadCount());
+chats[chatKeyStep(o1,'Laser')]={t1:note('t1','uid-office',T,'run 60 not 50')};
+ok('a note on a task on the board counts', dispatchUnreadCount()===2, dispatchUnreadCount());
+chats[chatKey(o3.customer,o3.po)]={j1:note('j1','uid-office',T,'still waiting on the PO')};
+ok('an office row counts its job thread', dispatchUnreadCount()===3, dispatchUnreadCount());
+chats[chatKey(o1.customer,o1.po)]={j2:note('j2','uid-office',T,'PO revised')};
+ok('a job thread shared by two lines is counted once', dispatchUnreadCount()===4, dispatchUnreadCount());
+chats[chatKeyStep(o1,'Laser')].mine=note('mine',ME,T+1,'on it');
+ok('your own note never raises the tab badge', dispatchUnreadCount()===4, dispatchUnreadCount());
+markChatRead(CHAT_SHOP_KEY); markChatRead(chatKeyStep(o1,'Laser'));
+ok('reading threads drops the tab count', dispatchUnreadCount()===2, dispatchUnreadCount());
+chats[chatKeyStep(o3,'Laser')]={z:note('z','uid-office',T,'not on the board')};
+ok('a task the board is not showing does not count', dispatchUnreadCount()===2, dispatchUnreadCount());
+_DISP=null;
+ok('a broken board never breaks the nav', (function(){ try{ return dispatchUnreadCount()===0; }catch(e){ return 'threw: '+e.message; } })()===true);
+_DISP=[];
 
 const fails=out.filter(l=>l.slice(0,4)==='FAIL').length;
 document.title = fails? ('FAILURES ('+fails+')') : ('all pass ('+out.length+')');
