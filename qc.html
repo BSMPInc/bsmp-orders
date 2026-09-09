@@ -642,6 +642,7 @@ const I18N = {
     'The drawing prints on the last page of the blank sheet — the inspector balloons it by hand.':'El plano se imprime en la última página de la hoja en blanco — el inspector lo numera a mano.',
     'Completed handwritten report':'Reporte a mano completado',
     'Print the blank sheet, have the inspector fill it in by hand, then upload a scan or photo of every page here.':'Imprime la hoja en blanco, el inspector la llena a mano y luego sube aquí un escaneo o foto de cada página.',
+    'Rows on the blank sheet':'Filas en la hoja en blanco','One numbered line per characteristic — set it before printing.':'Una línea numerada por característica — ajústalo antes de imprimir.',
     'Upload scan / photo':'Subir escaneo / foto','Take photo':'Tomar foto','No pages uploaded yet.':'Aún no hay páginas subidas.','Open page':'Abrir página',
     'Result on the sheet':'Resultado en la hoja','Inspector notes (from the sheet)':'Notas del inspector (de la hoja)',
     'Remove this page?':'¿Quitar esta página?','Page removed.':'Página quitada.','Awaiting sheet':'Falta la hoja',
@@ -2334,6 +2335,9 @@ window.qcOpenFair=(id)=>{ editId=id; _fairNewMode='simple'; _fairBubbles=[]; _bu
 /* ---- handwritten (manual) first article helpers ----
    The inspector works on paper: print the blank sheet with the drawing, fill it in by hand,
    then the completed pages are scanned/photographed and uploaded onto the same record. */
+const MANUAL_ROWS_DEFAULT=20;
+// how many numbered blank lines the handwritten sheet prints — the live field first, then the saved record, then the default
+function fairManualRows(r){ const el=$('fr-mrows'); const raw=el?el.value:((r&&r.manualRows!=null)?r.manualRows:''); const n=parseInt(raw,10); return (isFinite(n)&&n>0)?Math.min(n,200):MANUAL_ROWS_DEFAULT; }
 function fairSheets(r){ const s=r&&r.manualSheets; return Array.isArray(s)?s.filter(Boolean):Object.values(s||{}).filter(Boolean); }
 // the mode the form is CURRENTLY in — the live selector first, then the saved record, then the new-report default
 function fairIsManual(){ const el=$('fair-modev'); if(el) return el.value==='manual'; const r=editId?INSPECTIONS[editId]:null; return r?(r.mode==='manual'):(_fairNewMode==='manual'); }
@@ -2503,6 +2507,9 @@ function viewFair(){
         </div>
         <div class="field fair-manual-only"><label class="fl">${t('Completed handwritten report')}</label>
           <div class="muted" style="font-size:11.5px;margin-bottom:8px">${t('Print the blank sheet, have the inspector fill it in by hand, then upload a scan or photo of every page here.')}</div>
+          <div class="field" style="max-width:260px"><label class="fl">${t('Rows on the blank sheet')}</label>
+            <input class="in" id="fr-mrows" type="number" min="1" max="200" step="1" value="${esc(v('manualRows',MANUAL_ROWS_DEFAULT))}" ${ro}>
+            <div class="muted" style="font-size:11.5px;margin-top:4px">${t('One numbered line per characteristic — set it before printing.')}</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <label class="btn sm primary"><i class="ti ti-scan"></i> ${t('Upload scan / photo')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="qcPickFiles('frscan',this)"></label>
             <label class="btn sm"><i class="ti ti-camera"></i> ${t('Take photo')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="qcPickFiles('frscan',this)"></label>
@@ -2878,7 +2885,7 @@ window.qcSaveFair=async (action)=>{
   const rec={
     id, type:'fair', mode:gv('fair-modev')||'simple',
     deleted:(prev&&prev.deleted)||null, deletedAt:(prev&&prev.deletedAt)||null, deletedBy:(prev&&prev.deletedBy)||null,
-    manualSheets:sheets, manualResult, manualQty:manual?gv('fr-mqty'):((prev&&prev.manualQty)||''), manualNotes:manual?gv('fr-mnotes'):((prev&&prev.manualNotes)||''),
+    manualSheets:sheets, manualResult, manualRows:manual?fairManualRows(prev):((prev&&prev.manualRows)||null), manualQty:manual?gv('fr-mqty'):((prev&&prev.manualQty)||''), manualNotes:manual?gv('fr-mnotes'):((prev&&prev.manualNotes)||''),
     createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
@@ -3589,7 +3596,7 @@ window.qcFairPrintBlank=async ()=>{
   };
   const blankTools=`<div style="font-size:8px;color:#333;line-height:2">${['Caliper','Mic','Tape','Pin gauge','Other'].map(o=>`<span style="white-space:nowrap;margin-right:6px">☐ ${esc(t(o))}${o==='Other'?' __':''}</span>`).join('')}</div>`;
   const blankRow=`<tr style="height:34px"><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}">${blankTools}</td><td style="${cell};text-align:center;font-size:12px;white-space:nowrap">☐&nbsp;&nbsp;☐</td><td style="${cell}"></td></tr>`;
-  const MANUAL_BLANK_ROWS=20;   // pre-numbered lines for the hand-ballooned drawing
+  const MANUAL_BLANK_ROWS=fairManualRows(r);   // pre-numbered lines for the hand-ballooned drawing (per report, default 20)
   const manualRow=(n)=>`<tr style="height:34px"><td style="${cell};text-align:center">${balloonNo(n)}</td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}">${blankTools}</td><td style="${cell};text-align:center;font-size:12px;white-space:nowrap">☐&nbsp;&nbsp;☐</td><td style="${cell}"></td></tr>`;
   const rows=manual?Array.from({length:MANUAL_BLANK_ROWS},(_,i)=>manualRow(i+1)).join(''):chars.map(c=>{
     const eff=resolveTol(c.requirement||'', c.tol||'');
