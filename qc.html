@@ -295,6 +295,13 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .seg button{height:36px;padding:0 14px;background:#fff;border:none;border-right:1px solid var(--border2);cursor:pointer;font-weight:700;color:var(--text2)}
 .seg button:last-child{border-right:none}
 .seg button.on{background:var(--accent);color:#fff}
+/* handwritten (manual) first article: the form hides the ballooning/characteristics tooling and shows the scan-upload block instead */
+body.fair-manual .fair-dim-only{display:none}
+body:not(.fair-manual) .fair-manual-only{display:none}
+.sheet-tile{position:relative;display:inline-block}
+.sheet-tile .rm{position:absolute;top:-7px;right:-7px;width:20px;height:20px;line-height:18px;text-align:center;background:#fff;border:1px solid var(--border2);cursor:pointer;font-size:12px;color:var(--red)}
+.sheet-doc{display:inline-flex;align-items:center;gap:6px;height:84px;padding:0 12px;border:1px solid var(--border);background:var(--accent-soft);color:var(--text);text-decoration:none;font-size:12px;max-width:220px}
+.sheet-doc span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .res-pick{display:flex;gap:10px}
 .res-pick .opt{flex:1;border:1px solid var(--border2);padding:14px;text-align:center;cursor:pointer;font-weight:800}
 .res-pick .opt.pass.on{background:var(--green-soft);border-color:var(--green);color:var(--green)}
@@ -628,6 +635,32 @@ const I18N = {
     'Cert not found — it may have been deleted.':'Certificado no encontrado — puede haber sido eliminado.',
     // hand-write FAI sheet
     'Print blank FAI sheet':'Imprimir hoja FAI en blanco',
+    // handwritten (manual) first article
+    'Handwritten':'A mano','Handwritten FAR':'FAR a mano','Handwritten first article':'Primer artículo a mano',
+    'Upload the drawing, link the order, print the blank sheet, then upload the inspector’s completed pages.':'Sube el plano, vincula la orden, imprime la hoja en blanco y luego sube las páginas llenadas por el inspector.',
+    'The inspector fills the printed sheet in by hand; the scanned pages are uploaded here.':'El inspector llena la hoja impresa a mano; las páginas escaneadas se suben aquí.',
+    'The drawing prints on the last page of the blank sheet — the inspector balloons it by hand.':'El plano se imprime en la última página de la hoja en blanco — el inspector lo numera a mano.',
+    'Completed handwritten report':'Reporte a mano completado',
+    'Print the blank sheet, have the inspector fill it in by hand, then upload a scan or photo of every page here.':'Imprime la hoja en blanco, el inspector la llena a mano y luego sube aquí un escaneo o foto de cada página.',
+    'Upload scan / photo':'Subir escaneo / foto','Take photo':'Tomar foto','No pages uploaded yet.':'Aún no hay páginas subidas.','Open page':'Abrir página',
+    'Result on the sheet':'Resultado en la hoja','Inspector notes (from the sheet)':'Notas del inspector (de la hoja)',
+    'Remove this page?':'¿Quitar esta página?','Page removed.':'Página quitada.','Awaiting sheet':'Falta la hoja',
+    'page uploaded':'página subida','page removed':'página quitada','sheet result':'resultado de la hoja',
+    'Page upload timed out — check the connection.':'La subida de la página tardó demasiado — revisa la conexión.',
+    'No drawing yet — upload one on the right, then print the blank sheet.':'Aún no hay plano — sube uno a la derecha y luego imprime la hoja en blanco.',
+    'Not to scale — turn the sheet clockwise to read.':'No a escala — gira la hoja en sentido horario para leerlo.','Not to scale.':'No a escala.',
+    'Balloon the drawing by hand — number each dimension to match the report rows.':'Numera el plano a mano — cada dimensión con el número de su fila en el reporte.',
+    'DRAWING':'PLANO',
+    'The handwritten sheet is marked REJECT.':'La hoja a mano está marcada RECHAZAR.',
+    // first-article trash
+    'Trash':'Papelera','In the trash':'En la papelera','Restore':'Restaurar','Delete forever':'Eliminar definitivamente','Deleted by':'Eliminado por',
+    'Back to first articles':'Volver a primeros artículos','The trash is empty.':'La papelera está vacía.',
+    'Deleted first articles stay here until you restore them or delete them for good.':'Los primeros artículos eliminados quedan aquí hasta que los restaures o los elimines definitivamente.',
+    'Move this first article to the trash?':'¿Mover este primer artículo a la papelera?','Moved to the trash.':'Movido a la papelera.','Restored.':'Restaurado.',
+    'Delete this first article for good? This cannot be undone.':'¿Eliminar este primer artículo definitivamente? No se puede deshacer.','Deleted for good.':'Eliminado definitivamente.','NOT deleted:':'NO eliminado:',
+    'Moves the report to the trash — it can be restored from there.':'Mueve el reporte a la papelera — se puede restaurar desde ahí.',
+    'moved to the trash':'movido a la papelera','restored from the trash':'restaurado de la papelera','deleted for good':'eliminado definitivamente',
+    'Handwritten first article marked REJECT:':'Primer artículo a mano marcado RECHAZAR:','see the uploaded sheet':'ver la hoja subida',
     'Print blank FAI sheet: a paper copy with the ballooned drawing — the inspector hand-writes the results.':'Imprimir hoja FAI en blanco: una copia en papel con el plano globeado — el inspector escribe los resultados a mano.',
     'Nothing to print yet — balloon the drawing or list characteristics first.':'Aún no hay nada que imprimir — globea el plano o lista las características primero.',
     'The browser blocked the print window — allow popups for this site.':'El navegador bloqueó la ventana de impresión — permite ventanas emergentes para este sitio.',
@@ -731,6 +764,12 @@ async function dbSet(path,val){
   catch(e){ console.error('save failed:', path, e); qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err'); throw e; }
 }
 async function dbRemove(path){ if(window.qcRemove) return window.qcRemove(path); }
+// partial write: only the listed fields change (null = clear); errors surface the same way as dbSet
+async function dbUpdate(path,val){
+  if(!window.qcUpdate) return;
+  try{ return await window.qcUpdate(path, JSON.parse(JSON.stringify(val))); }
+  catch(e){ console.error('update failed:', path, e); qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err'); throw e; }
+}
 async function upload(file,prefix){ if(window.qcUpload) return window.qcUpload(file,prefix); return ''; }
 
 window._qcPin=(e)=>{ e&&e.stopPropagation(); const p=document.body.classList.toggle('sb-pinned'); const ic=document.getElementById('qc-pin-ico'); if(ic)ic.className='ti '+(p?'ti-pinned':'ti-pin'); };
@@ -2213,25 +2252,115 @@ window.qcDrawPick=async (key,id)=>{
 };
 
 /* =================== FIRST ARTICLES =================== */
+/* ---- first-article trash: a soft delete. The record stays under qc/inspections/<id> with
+   deleted/deletedAt/deletedBy set (no new security rule), drops out of the live list, and
+   can be restored or — manager, confirmed — removed for good. Linked NCRs are never touched. */
+let _fairTrash=false;
+window.qcFairTrashView=(on)=>{ _fairTrash=!!on; render(); };
+window.qcFairTrash=async (id)=>{
+  const r=INSPECTIONS[id]; if(!r||!isMgr()) return;
+  if(!confirm(t('Move this first article to the trash?')+'\n'+(r.partNum||'')+(r.customer?' · '+r.customer:''))) return;
+  try{
+    await dbUpdate('qc/inspections/'+id, { deleted:true, deletedAt:Date.now(), deletedBy:(QC_USER&&QC_USER.email)||'' });
+    try{ await qcLogAudit([{ inspectionId:id, partNum:r.partNum||'', field:'record', action:'trashed' }]); }catch(e){ console.error('audit log failed', e); }
+    qcToast(t('Moved to the trash.'),'ok');
+    if(editId===id){ editId=null; _chars=[]; page='fairs'; }
+    render();
+  }catch(e){}
+};
+window.qcFairRestore=async (id)=>{
+  const r=INSPECTIONS[id]; if(!r||!isMgr()) return;
+  try{
+    await dbUpdate('qc/inspections/'+id, { deleted:null, deletedAt:null, deletedBy:null, restoredAt:Date.now(), restoredBy:(QC_USER&&QC_USER.email)||'' });
+    try{ await qcLogAudit([{ inspectionId:id, partNum:r.partNum||'', field:'record', action:'restored' }]); }catch(e){ console.error('audit log failed', e); }
+    qcToast(t('Restored.'),'ok');
+    render();
+  }catch(e){}
+};
+window.qcFairPurge=async (id)=>{
+  const r=INSPECTIONS[id]; if(!r||!isMgr()||!r.deleted) return;
+  if(!confirm(t('Delete this first article for good? This cannot be undone.')+'\n'+(r.partNum||'')+(r.customer?' · '+r.customer:''))) return;
+  try{
+    // the change history keeps a trace of what was removed (uploaded files stay in Storage)
+    try{ await qcLogAudit([{ inspectionId:id, partNum:r.partNum||'', field:'record', action:'purged', note:[r.partNum,r.customer,r.job?('Job '+r.job):'',r.mode||''].filter(Boolean).join(' · ') }]); }catch(e){ console.error('audit log failed', e); }
+    await dbRemove('qc/inspections/'+id);
+    delete INSPECTIONS[id];
+    qcToast(t('Deleted for good.'),'ok');
+    render();
+  }catch(e){ qcToast(t('NOT deleted:')+' '+((e&&e.message)||e),'err'); }
+};
 function viewFairs(){
-  const list=vals(INSPECTIONS).filter(i=>i.type==='fair').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const all=vals(INSPECTIONS).filter(i=>i.type==='fair');
+  const trashN=all.filter(i=>i.deleted).length;
+  if(_fairTrash && isMgr()){
+    const tl=all.filter(i=>i.deleted).sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0));
+    const trows=tl.map(i=>`<tr>
+      <td class="click" onclick="window.qcOpenFair('${i.id}')"><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')} ${i.rev?('· Rev '+esc(i.rev)):''}</div></td>
+      <td>${i.mode==='as9102'?t('AS9102'):i.mode==='manual'?t('Handwritten'):t('Simple FAR')}</td>
+      <td>${fairStatusBadge(i.fairStatus)}</td>
+      <td>${esc((i.deletedBy||'').split('@')[0])}<div class="muted" style="font-size:12px">${fmtWhen(i.deletedAt)}</div></td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn sm" onclick="window.qcFairRestore('${i.id}')"><i class="ti ti-arrow-back-up"></i> ${t('Restore')}</button>
+        <button class="btn sm" style="color:var(--red)" onclick="window.qcFairPurge('${i.id}')"><i class="ti ti-trash-x"></i> ${t('Delete forever')}</button></td>
+    </tr>`).join('');
+    return `<div class="page-head"><h2>${t('First Articles')} — ${t('Trash')}</h2><p>${t('Deleted first articles stay here until you restore them or delete them for good.')}</p></div>
+      <div class="toolbar"><button class="btn" onclick="window.qcFairTrashView(false)"><i class="ti ti-arrow-left"></i> ${t('Back to first articles')}</button></div>
+      <div class="card" style="padding:0">
+        ${tl.length?`<table class="tbl"><thead><tr><th>${t('Part')}</th><th>${t('Type')}</th><th>${t('Status')}</th><th>${t('Deleted by')}</th><th></th></tr></thead><tbody>${trows}</tbody></table>`
+          :`<div class="empty">${t('The trash is empty.')}</div>`}
+      </div>`;
+  }
+  const list=all.filter(i=>!i.deleted).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const rows=list.map(i=>`<tr class="click" onclick="window.qcOpenFair('${i.id}')">
     <td><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')} ${i.rev?('· Rev '+esc(i.rev)):''}</div></td>
-    <td>${i.mode==='as9102'?t('AS9102'):t('Simple FAR')}</td>
-    <td>${(i.characteristics||[]).length}</td>
+    <td>${i.mode==='as9102'?t('AS9102'):i.mode==='manual'?t('Handwritten'):t('Simple FAR')}</td>
+    <td>${i.mode==='manual'?(fairSheets(i).length?`<i class="ti ti-scan"></i> ${fairSheets(i).length}`:`<span class="muted">${t('Awaiting sheet')}</span>`):(i.characteristics||[]).length}</td>
     <td>${fairStatusBadge(i.fairStatus)}${(i.ncrId&&NCRS[i.ncrId]&&NCRS[i.ncrId].status!=='closed')?` <span class="hist-badge ncr">${t('Open NCR')}</span>`:''}</td>
     <td>${esc((i.createdBy||'').split('@')[0])}<div class="muted" style="font-size:12px">${fmtWhen(i.createdAt)}</div></td>
   </tr>`).join('');
   return `<div class="page-head"><h2>${t('First Articles')}</h2><p>${t('Formal first-article reports. Marvin / managers approve.')}</p></div>
     <div class="toolbar"><button class="btn primary" onclick="showPage('start')"><i class="ti ti-camera-check"></i> ${t('New first article (photo first)')}</button>
-      <button class="btn" onclick="window.qcNewFair()"><i class="ti ti-plus"></i> ${t('Blank first article')}</button></div>
+      <button class="btn" onclick="window.qcNewFair()"><i class="ti ti-plus"></i> ${t('Blank first article')}</button>
+      <button class="btn" onclick="window.qcNewFair('manual')" title="${esc(t('Upload the drawing, link the order, print the blank sheet, then upload the inspector’s completed pages.'))}"><i class="ti ti-writing"></i> ${t('Handwritten first article')}</button>
+      ${isMgr()?`<button class="btn mgr-only" style="margin-left:auto" onclick="window.qcFairTrashView(true)"><i class="ti ti-trash"></i> ${t('Trash')}${trashN?` <span class="badge neutral">${trashN}</span>`:''}</button>`:''}</div>
     <div class="card" style="padding:0">
       ${list.length?`<table class="tbl"><thead><tr><th>${t('Part')}</th><th>${t('Type')}</th><th>${t('Chars')}</th><th>${t('Status')}</th><th>${t('By')}</th></tr></thead><tbody>${rows}</tbody></table>`
         :`<div class="empty">${t('No first articles yet.')}</div>`}
     </div>`;
 }
-window.qcNewFair=()=>{ editId=null; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _frPhotoCheck=null; page='fair'; render(); };
-window.qcOpenFair=(id)=>{ editId=id; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _frPhotoCheck=null; page='fair'; render(); };
+// mode for a NEW report only ('simple' | 'as9102' | 'manual'); a saved record carries its own mode
+let _fairNewMode='simple';
+window.qcNewFair=(m)=>{ editId=null; _fairNewMode=(m==='manual'||m==='as9102')?m:'simple'; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[]; _frPhotoCheck=null; page='fair'; render(); };
+window.qcOpenFair=(id)=>{ editId=id; _fairNewMode='simple'; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[]; _frPhotoCheck=null; page='fair'; render(); };
+/* ---- handwritten (manual) first article helpers ----
+   The inspector works on paper: print the blank sheet with the drawing, fill it in by hand,
+   then the completed pages are scanned/photographed and uploaded onto the same record. */
+function fairSheets(r){ const s=r&&r.manualSheets; return Array.isArray(s)?s.filter(Boolean):Object.values(s||{}).filter(Boolean); }
+// the mode the form is CURRENTLY in — the live selector first, then the saved record, then the new-report default
+function fairIsManual(){ const el=$('fair-modev'); if(el) return el.value==='manual'; const r=editId?INSPECTIONS[editId]:null; return r?(r.mode==='manual'):(_fairNewMode==='manual'); }
+function fairSheetsHtml(sheets){
+  const canRm=isMgr()&&!!editId;
+  if(!sheets.length) return `<div class="muted" style="font-size:12px">${t('No pages uploaded yet.')}</div>`;
+  return sheets.map((s,i)=>{
+    const isImg=/^image\//i.test(s.type||'')||/\.(png|jpe?g|webp|gif)(\?|$)/i.test(s.url||'');
+    const inner=isImg?`<a href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.name||'')}"><img class="thumb" src="${esc(s.url)}" alt=""></a>`
+      :`<a class="sheet-doc" href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.name||'')}"><i class="ti ti-file-text"></i><span>${esc(s.name||t('Open page'))}</span></a>`;
+    return `<span class="sheet-tile">${inner}${canRm?`<span class="rm" title="${esc(t('Remove'))}" onclick="qcFairSheetDel(${i})"><i class="ti ti-x"></i></span>`:''}</span>`;
+  }).join('');
+}
+window.qcFairManualResult=(v)=>{ const h=$('fr-mresv'); if(h) h.value=(h.value===v?'':v); document.querySelectorAll('#fr-mres button').forEach(b=>b.classList.toggle('on', b.dataset.v===(h?h.value:''))); };
+// a page uploaded by mistake — managers can take it off the record (logged; the file itself stays in Storage)
+window.qcFairSheetDel=async (i)=>{
+  const r=editId?INSPECTIONS[editId]:null; if(!r) return;
+  const sheets=fairSheets(r); const gone=sheets[i]; if(!gone) return;
+  if(!confirm(t('Remove this page?')+'\n'+(gone.name||''))) return;
+  sheets.splice(i,1);
+  try{
+    await dbSet('qc/inspections/'+editId+'/manualSheets', sheets);
+    try{ await qcLogAudit([{ inspectionId:editId, partNum:r.partNum||'', field:'sheet', action:'sheet-removed', note:gone.name||'' }]); }catch(e){ console.error('audit log failed', e); }
+    const host=$('fr-sheets'); if(host) host.innerHTML=fairSheetsHtml(sheets);
+    qcToast(t('Page removed.'),'ok');
+  }catch(e){ qcToast(t('NOT saved:')+' '+((e&&e.message)||e),'err'); }
+};
 
 function charRow(i,c){
   c=c||{};
@@ -2312,7 +2441,9 @@ function viewFair(){
   if(r && !_fairBubbles.length) _chars = r.characteristics? r.characteristics.map(c=>({...c})) : [];
   else if(!r && !_fairBubbles.length && !_chars.length) _chars=[{no:1},{no:2},{no:3}];
   const v=(f,d)=>r&&r[f]!=null?r[f]:(d||'');
-  const mode=v('mode','simple');
+  const mode=v('mode',_fairNewMode)||'simple';
+  const manual=mode==='manual';
+  document.body.classList.toggle('fair-manual', manual);   // drives the .fair-dim-only / .fair-manual-only show-hide (toolbar sits outside the card)
   const st=v('fairStatus','Draft');
   const canApprove=isMgr() && (st==='Submitted'||st==='Measuring');
   // Operators can view everything and record measurements on the ballooned drawing,
@@ -2323,14 +2454,15 @@ function viewFair(){
   _fdvBubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
   // heal older reports: every ballooned dimension must have a characteristics row (tap-added bubbles used to miss one)
   (Array.isArray(_fdvBubbles)?_fdvBubbles:Object.values(_fdvBubbles||{})).forEach(b=>{ if(b && b.no!=null && !_chars.find(x=>x.no===b.no)) _chars.push({no:b.no, requirement:b.value||'', tol:b.tol||'', type:catToType(b.category), result:'', dev:'', notes:''}); });
-  return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p>${st!=='Draft'?fairStatusBadge(st):t('Fill the header, list characteristics, then submit for review.')}</p></div>
+  const inTrash=!!(r&&r.deleted);
+  return `<div class="page-head"><h2>${r?t('First article'):t('New first article')}</h2><p id="fair-sub">${inTrash?`<span class="badge flag"><i class="ti ti-trash"></i> ${t('In the trash')}</span> <span class="muted">${esc((r.deletedBy||'').split('@')[0])} · ${fmtWhen(r.deletedAt)}</span> ${isMgr()?`<button class="btn sm" style="margin-left:8px" onclick="window.qcFairRestore('${esc(r.id)}')"><i class="ti ti-arrow-back-up"></i> ${t('Restore')}</button>`:''}`:st!=='Draft'?fairStatusBadge(st):(manual?t('Upload the drawing, link the order, print the blank sheet, then upload the inspector’s completed pages.'):t('Fill the header, list characteristics, then submit for review.'))}</p></div>
   <div class="toolbar" style="margin-bottom:12px">
     <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
     <button class="btn" onclick="window.qcFairPrintBlank()" title="${esc(t('Print blank FAI sheet: a paper copy with the ballooned drawing — the inspector hand-writes the results.'))}"><i class="ti ti-printer"></i> ${t('Print blank FAI sheet')}</button>
-    <button class="btn" onclick="window.qcFairPrintReport()" title="${esc(t('Print the filled report — recorded results, deviations, and pass/fail on BSMP paper.'))}"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
+    <button class="btn fair-dim-only" onclick="window.qcFairPrintReport()" title="${esc(t('Print the filled report — recorded results, deviations, and pass/fail on BSMP paper.'))}"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
     <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
   </div>
-  <div class="card">
+  <div class="card" id="fair-card">
     <div class="fair-top${_fairDrawMin?' draw-min':''}">
       <div class="fair-draw" id="fair-draw-host">${farViewer(r)}</div>
       <div class="fair-info">
@@ -2338,6 +2470,7 @@ function viewFair(){
           <div class="seg" id="fair-mode">
             <button class="${mode==='simple'?'on':''}" onclick="qcFairMode('simple')" ${dis}>${t('Simple FAR')}</button>
             <button class="${mode==='as9102'?'on':''}" onclick="qcFairMode('as9102')" ${dis}>${t('Full AS9102')}</button>
+            <button class="${manual?'on':''}" onclick="qcFairMode('manual')" ${dis} title="${esc(t('The inspector fills the printed sheet in by hand; the scanned pages are uploaded here.'))}">${t('Handwritten')}</button>
           </div>
           <input type="hidden" id="fair-modev" value="${esc(mode)}">
         </div>
@@ -2361,11 +2494,32 @@ function viewFair(){
             <button class="btn sm" id="draw-min-btn" onclick="qcToggleDrawPreview()"><i class="ti ti-${_fairDrawMin?'eye':'eye-off'}"></i> ${_fairDrawMin?t('Show drawing'):t('Hide drawing')}</button>
           </div>
           <div class="thumbs" id="files-frdraw">${qcPendingBadges('frdraw')}</div>
-          ${isMgr()?`<div class="bubble-bar" style="margin-top:8px"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
+          ${isMgr()?`<div class="fair-dim-only"><div class="bubble-bar" style="margin-top:8px"><button class="btn sm primary" id="fair-bubble-btn" onclick="qcFairAutoBubble()"><i class="ti ti-sparkles"></i> ${t('Auto-bubble with AI')}</button>
             <button class="btn sm" id="fair-place-btn" onclick="qcFairPlaceMode()"><i class="ti ti-circle-plus"></i> ${t('Place bubbles myself')}</button></div>
           ${(r&&r.ballooned&&r.ballooned.url)?`<div style="margin-top:6px"><button class="btn sm" id="fair-readb-btn" onclick="qcFairReadBallooned()"><i class="ti ti-sparkles"></i> ${t('Read dimensions from ballooned drawing')}</button></div>`:''}
-          <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')} ${t('Print blank FAI sheet: a paper copy with the ballooned drawing — the inspector hand-writes the results.')}</div>`
-          :`<div class="muted" style="font-size:11.5px;margin-top:8px">${t('Tap a balloon to enter its measurement')}</div>`}
+          <div class="muted" style="font-size:11.5px;margin-top:5px">${t('Auto-bubble: AI finds and places everything. Place bubbles myself: you click each dimension, then AI reads what you marked — more accurate placement.')} ${t('Print blank FAI sheet: a paper copy with the ballooned drawing — the inspector hand-writes the results.')}</div></div>
+          <div class="muted fair-manual-only" style="font-size:11.5px;margin-top:8px">${t('The drawing prints on the last page of the blank sheet — the inspector balloons it by hand.')}</div>`
+          :`<div class="muted fair-dim-only" style="font-size:11.5px;margin-top:8px">${t('Tap a balloon to enter its measurement')}</div>`}
+        </div>
+        <div class="field fair-manual-only"><label class="fl">${t('Completed handwritten report')}</label>
+          <div class="muted" style="font-size:11.5px;margin-bottom:8px">${t('Print the blank sheet, have the inspector fill it in by hand, then upload a scan or photo of every page here.')}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn sm primary"><i class="ti ti-scan"></i> ${t('Upload scan / photo')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="qcPickFiles('frscan',this)"></label>
+            <label class="btn sm"><i class="ti ti-camera"></i> ${t('Take photo')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="qcPickFiles('frscan',this)"></label>
+          </div>
+          <div class="thumbs" id="files-frscan">${qcPendingBadges('frscan')}</div>
+          <div class="thumbs" id="fr-sheets">${fairSheetsHtml(fairSheets(r))}</div>
+          <div class="grid2" style="margin-top:10px">
+            <div class="field"><label class="fl">${t('Result on the sheet')}</label>
+              <div class="seg" id="fr-mres">
+                <button data-v="accept" class="${v('manualResult')==='accept'?'on':''}" onclick="qcFairManualResult('accept')"><i class="ti ti-check"></i> ${t('Accept')}</button>
+                <button data-v="reject" class="${v('manualResult')==='reject'?'on':''}" onclick="qcFairManualResult('reject')"><i class="ti ti-x"></i> ${t('Reject')}</button>
+              </div>
+              <input type="hidden" id="fr-mresv" value="${esc(v('manualResult'))}">
+            </div>
+            <div class="field"><label class="fl">${t('Qty inspected')}</label><input class="in" id="fr-mqty" value="${esc(v('manualQty'))}"></div>
+          </div>
+          <div class="field"><label class="fl">${t('Inspector notes (from the sheet)')}</label><textarea class="in" id="fr-mnotes" rows="2">${esc(v('manualNotes'))}</textarea></div>
         </div>
         <div class="field"><label class="fl">${t('Part photos & AI check')}</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -2379,7 +2533,7 @@ function viewFair(){
       </div>
     </div>
 
-    <div id="fair-bubble-ws">${(isMgr() && _fairImg && !_fairFull)?fairBubbleWorkspace():''}</div>
+    <div id="fair-bubble-ws" class="fair-dim-only">${(isMgr() && _fairImg && !_fairFull)?fairBubbleWorkspace():''}</div>
 
     ${isMgr()?`<div class="card-title" style="margin-top:14px"><i class="ti ti-adjustments-alt"></i> ${t('Default tolerances (title block)')}</div>
     <div class="tol-defs">
@@ -2389,19 +2543,22 @@ function viewFair(){
       <label>${t('Angular')}<div class="pm">±<input id="tol-ang" value="${esc(_fairTolDefaults.ang)}" oninput="qcSetTolDefault('ang',this.value)">°</div></label>
     </div>
     <div class="muted" style="font-size:11.5px;margin-top:4px">${t('Applied when a characteristic has no ± of its own — these are marked with a * in the tolerance column.')}</div>`:''}
+    <div class="fair-dim-only">
     <div class="card-title" style="margin-top:14px"><i class="ti ti-list-numbers"></i> ${t('Characteristics')}</div>
     <div style="overflow-x:auto"><table class="char-tbl"><thead><tr><th style="width:38px">#</th><th style="min-width:120px">${t('Requirement')}</th><th style="min-width:96px">${t('Tolerance Range')}</th><th style="min-width:104px">${t('Type')}</th><th style="min-width:100px">${t('Result')}</th><th style="min-width:88px">${t('Deviation')}</th><th style="min-width:120px">${t('Notes')}</th><th style="width:30px"></th></tr></thead>
       <tbody id="char-body">${_chars.map((c,i)=>charRow(i,c)).join('')}</tbody></table></div>
     ${isMgr()?`<div class="toolbar" style="margin:10px 0 0"><button class="btn sm" onclick="qcCharAdd()"><i class="ti ti-plus"></i> ${t('Add characteristic')}</button></div>`:''}
+    </div>
 
     <div class="toolbar" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
       <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
       <button class="btn fair-save-btn" onclick="window.qcSaveFair('Submitted')">${t('Submit for review')}</button>
       <button class="btn" onclick="window.qcFairPrintBlank()"><i class="ti ti-printer"></i> ${t('Print blank FAI sheet')}</button>
-      <button class="btn" onclick="window.qcFairPrintReport()"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
+      <button class="btn fair-dim-only" onclick="window.qcFairPrintReport()"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
       ${canApprove?`<button class="btn green mgr-only fair-save-btn" onclick="window.qcSaveFair('Approved')"><i class="ti ti-check"></i> ${t('Approve')}</button>
         <button class="btn danger mgr-only fair-save-btn" onclick="window.qcSaveFair('Rejected')">${t('Reject')}</button>`:''}
       <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
+      ${(r&&isMgr()&&!inTrash)?`<button class="btn mgr-only" style="margin-left:auto;color:var(--red)" onclick="window.qcFairTrash('${esc(r.id)}')" title="${esc(t('Moves the report to the trash — it can be restored from there.'))}"><i class="ti ti-trash"></i> ${t('Delete')}</button>`:''}
     </div>
     ${(r&&r.reviewedBy)?`<div class="hint">${t('Last decision:')} ${t(r.fairStatus)} · ${esc((r.reviewedBy||'').split('@')[0])} · ${fmtWhen(r.reviewedAt)}</div>`:''}
   </div>
@@ -2411,7 +2568,7 @@ function fdvIsImg(f){ return f && (/(png|jpe?g|webp|gif)/i.test(f.type||'') || /
 function farViewer(r){
   _curDraw=(r&&r.drawing)||null;
   const url=(_fairImg&&_fairImg.dataUrl) || (fdvIsImg(_curDraw)?_curDraw.url:'') || (r&&r.ballooned&&r.ballooned.url) || (_curDraw&&_curDraw.url) || '';
-  if(!url) return `<div class="fdv-empty"><i class="ti ti-photo"></i><div>${t('No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.')}</div></div>`;
+  if(!url) return `<div class="fdv-empty"><i class="ti ti-photo"></i><div>${fairIsManual()?t('No drawing yet — upload one on the right, then print the blank sheet.'):t('No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.')}</div></div>`;
   return `<div class="fdv"><div class="fdv-canvas" id="fdv-canvas"><img class="fdv-img" id="fdv-img" src="${esc(url)}" draggable="false" alt="drawing" onload="fdvInit()"><div class="fdv-markers" id="fdv-markers"></div></div>
     ${_fdvBubbles.length?`<div class="fdv-hint">${t('Tap a balloon to enter its measurement')}</div>`:''}
     <div class="fdv-ctrls">
@@ -2632,7 +2789,11 @@ window.qcMeasConfirm=(advance)=>{
   }
   qcMeasClose();
 };
-window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); event.target.classList.add('on'); };
+window.qcFairMode=(m)=>{ $('fair-modev').value=m; document.querySelectorAll('#fair-mode button').forEach(b=>b.classList.remove('on')); (event.target.closest('button')||event.target).classList.add('on');
+  // handwritten mode swaps the ballooning/characteristics tooling for the scan-upload block (CSS-driven, so typed header values survive)
+  document.body.classList.toggle('fair-manual', m==='manual');
+  const empty=document.querySelector('#fair-draw-host .fdv-empty div'); if(empty) empty.textContent=(m==='manual')?t('No drawing yet — upload one on the right, then print the blank sheet.'):t('No drawing yet — upload one on the right, then Auto-bubble or Place bubbles.');
+};
 window.qcToggleDrawPreview=()=>{
   _fairDrawMin=!_fairDrawMin;
   const ft=document.querySelector('.fair-top'); if(ft) ft.classList.toggle('draw-min', _fairDrawMin);
@@ -2657,6 +2818,12 @@ async function qcLogAudit(entries){
 function farActionLabel(a){
   if(a.action==='ncr-raised') return t('NCR raised');
   if(a.action==='ncr-corrected') return t('NCR corrected');
+  if(a.action==='sheet-uploaded') return t('page uploaded');
+  if(a.action==='sheet-removed') return t('page removed');
+  if(a.action==='sheet-result') return t('sheet result');
+  if(a.action==='trashed') return t('moved to the trash');
+  if(a.action==='restored') return t('restored from the trash');
+  if(a.action==='purged') return t('deleted for good');
   return a.action==='measure'?t('measured'):t('corrected');
 }
 function farHistoryCard(id){
@@ -2665,6 +2832,8 @@ function farHistoryCard(id){
   const banner=(ncr&&ncr.status!=='closed')?`<div class="hint" style="color:var(--red)"><i class="ti ti-alert-triangle"></i> ${t('Open NCR')} · ${esc((ncr.description||'').slice(0,140))}</div>`:'';
   const rows=list.map(a=>{
     if(a.field==='ncr') return `<div class="hist-row"><span class="hist-badge ncr"><i class="ti ti-clipboard-x"></i> ${farActionLabel(a)}</span><span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
+    if(a.field==='record') return `<div class="hist-row"><span class="hist-badge ${a.action==='restored'?'ok':'oot'}"><i class="ti ti-${a.action==='restored'?'arrow-back-up':'trash'}"></i> ${farActionLabel(a)}</span><span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
+    if(a.field==='sheet') return `<div class="hist-row"><span class="hist-badge ${a.action==='sheet-result'?(a.note==='reject'?'oot':'ok'):'ncr'}" style="${a.action==='sheet-result'?'':'background:var(--accent-soft);color:var(--text)'}"><i class="ti ti-${a.action==='sheet-result'?'clipboard-check':'scan'}"></i> ${farActionLabel(a)}</span> ${a.action==='sheet-result'?`<b>${esc(a.note==='reject'?t('REJECT'):t('ACCEPT'))}</b>`:`<code>${esc(a.note||'')}</code>`}<span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
     const badge=a.nowOot?`<span class="hist-badge oot">${t('Out of tolerance')}</span>`:`<span class="hist-badge ok">${t('In tolerance')}</span>`;
     return `<div class="hist-row"><b>#${esc(a.charNo)}</b> <code>${esc(a.from||'—')}</code> → <code>${esc(a.to||'—')}</code> ${badge}<span class="muted">${farActionLabel(a)} · ${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
   }).join('');
@@ -2694,12 +2863,22 @@ window.qcSaveFair=async (action)=>{
   const phFresh=await withTimeout(uploadPending('frphoto','inspections'), 90000, t('Photo upload timed out — check the connection.'));
   phFresh.forEach(f=>photos.push(f));
   const photoCheck=_frPhotoCheck||(prev&&prev.photoCheck)||null;
+  // handwritten report: the inspector's completed pages ride on the record as manualSheets
+  const manual=(gv('fair-modev')==='manual');
+  const sheets=fairSheets(prev);
+  const shFresh=manual?await withTimeout(uploadPending('frscan','fair-manual'), 120000, t('Page upload timed out — check the connection.')):[];
+  shFresh.forEach(f=>sheets.push({ name:f.name, url:f.url, type:f.type||'', at:Date.now(), by:(QC_USER&&QC_USER.email)||'' }));
+  const manualResult=manual?gv('fr-mresv'):((prev&&prev.manualResult)||'');
   let status=(prev&&prev.fairStatus)||'Draft';
   if(action==='Submitted') status='Submitted';
   else if(action==='Approved'||action==='Rejected') status=action;
   else if(status==='Draft' && _chars.some(c=>c.result)) status='Measuring';
+  // a completed page landing on a draft handwritten report = it is ready for the manager to review
+  if(manual && shFresh.length && (status==='Draft'||status==='Measuring')) status='Submitted';
   const rec={
     id, type:'fair', mode:gv('fair-modev')||'simple',
+    deleted:(prev&&prev.deleted)||null, deletedAt:(prev&&prev.deletedAt)||null, deletedBy:(prev&&prev.deletedBy)||null,
+    manualSheets:sheets, manualResult, manualQty:manual?gv('fr-mqty'):((prev&&prev.manualQty)||''), manualNotes:manual?gv('fr-mnotes'):((prev&&prev.manualNotes)||''),
     createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
@@ -2720,6 +2899,8 @@ window.qcSaveFair=async (action)=>{
       field:'result', from:oldV, to:newV, wasOot:(pc?charIsOot(pc):false), nowOot:charIsOot(c),
       action:oldV===''?'measure':'correct' });
   });
+  shFresh.forEach(f=>audits.push({ inspectionId:id, partNum:part, field:'sheet', action:'sheet-uploaded', note:f.name||'' }));
+  if(manual && manualResult && manualResult!==((prev&&prev.manualResult)||'')) audits.push({ inspectionId:id, partNum:part, field:'sheet', action:'sheet-result', note:manualResult });
 
   // ---- auto-raise / resolve the linked NCR based on out-of-tolerance dimensions ----
   const ootNow=_chars.filter(charIsOot);
@@ -2738,8 +2919,9 @@ window.qcSaveFair=async (action)=>{
       await dbSet('qc/ncr/'+ncrId+'/ootList', ootLabel);
     }
     rec.ncrId=ncrId;
-  } else if(existingNcr && existingNcr.status!=='closed' && !existingNcr.correctedAt){
+  } else if(!manual && existingNcr && existingNcr.status!=='closed' && !existingNcr.correctedAt){
     // every dimension is back in tolerance → mark corrected, leave the final close to a manager
+    // (never on a handwritten report — there are no dimensions in the app to have come back into tolerance)
     await dbSet('qc/ncr/'+ncrId+'/correctedAt', Date.now());
     await dbSet('qc/ncr/'+ncrId+'/correctedBy', (QC_USER&&QC_USER.email)||'');
     audits.push({ inspectionId:id, partNum:part, field:'ncr', action:'ncr-corrected', ncrId });
@@ -2763,11 +2945,24 @@ window.qcSaveFair=async (action)=>{
     }
   }
 
+  // ---- handwritten sheet marked REJECT: offer an NCR (human confirms — same no-orphan-NCR principle) ----
+  if(manual && manualResult==='reject'){
+    const curNcr=rec.ncrId?NCRS[rec.ncrId]:null;
+    if((!curNcr||curNcr.status==='closed') && confirm(t('The handwritten sheet is marked REJECT.')+'\n\n'+t('Raise an NCR for it?'))){
+      const mNcrId=newId('ncr');
+      await dbSet('qc/ncr/'+mNcrId, { id:mNcrId, createdAt:Date.now(), raisedBy:(QC_USER&&QC_USER.email)||'', status:'open',
+        source:'fair-manual', inspectionId:id, farId:id, orderId:rec.orderId, partNum:part, customer:cust, job:rec.job,
+        qtyAffected:rec.manualQty||'', description:t('Handwritten first article marked REJECT:')+' '+(rec.manualNotes||t('see the uploaded sheet')), disposition:'', correctiveAction:'' });
+      audits.push({ inspectionId:id, partNum:part, field:'ncr', action:'ncr-raised', ncrId:mNcrId, note:'handwritten-reject' });
+      rec.ncrId=mNcrId;
+    }
+  }
+
   await dbSet('qc/inspections/'+id, rec);
   // never let an audit-trail write block the main save (e.g. if the qc/audit rule is missing)
   if(audits.length){ try{ await qcLogAudit(audits); }catch(e){ console.error('audit log failed', e); } }
   qcToast(t('First article saved.'),'ok');
-  _frPhotoCheck=null; _pendingFiles['frphoto']=[];
+  _frPhotoCheck=null; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[];
   editId=null; _chars=[]; page='fairs'; render();
   }catch(e){
     console.error('fair save failed', e);
@@ -3358,26 +3553,29 @@ window.qcFairPrintBlank=async ()=>{
   const hasReq=chars.some(c=>String(c.requirement||'').trim()!=='');
   const bubbles=(_fairBubbles&&_fairBubbles.length)?_fairBubbles:((r&&r.bubbles)||[]);
   const anyDrawing=!!(_fairImg || (r&&((r.ballooned&&r.ballooned.url)||(r.drawing&&r.drawing.url))) || (_pendingFiles['frdraw']||[]).length);
-  if(!hasReq && !anyDrawing){ qcToast(t('Nothing to print yet — balloon the drawing or list characteristics first.'),'err'); return; }
+  // handwritten report: numbered blank rows, the inspector writes the requirement + result; the un-ballooned drawing prints last
+  const manual=fairIsManual();
+  if(!manual && !hasReq && !anyDrawing){ qcToast(t('Nothing to print yet — balloon the drawing or list characteristics first.'),'err'); return; }
   // open the window inside the click (popup blockers), fill it once the drawing is ready
   const w=window.open('','_blank','width=780,height=940');
   if(!w){ qcToast(t('The browser blocked the print window — allow popups for this site.'),'err'); return; }
   try{ w.document.write('<body style="font-family:Arial,Helvetica,sans-serif;color:#555;padding:30px">'+esc(t('Preparing sheet…'))+'</body>'); }catch(e){}
-  const _pi=await qcFairPrintImage(r,bubbles);
+  const _pi=await qcFairPrintImage(r,manual?[]:bubbles);
   let imgSrc=_pi.src; const drawRotated=_pi.rotated;
   // header values — live form fields first, the saved record as the fallback
   const hv=(id,f,d)=>{ const el=$(id); const s=el?String(el.value||'').trim():((r&&r[f]!=null)?String(r[f]):''); return s||d||''; };
   const part=hv('fr-part','partNum'), rev=hv('fr-rev','rev'), cust=hv('fr-customer','customer'),
         mat=hv('fr-material','material'), po=hv('fr-po','po'), job=hv('fr-job','job'),
         date=hv('fr-date','date'), by=hv('fr-by','inspectedBy'), mode=hv('fair-modev','mode','simple');
-  const modeLbl=mode==='as9102'?t('Full AS9102'):t('Simple FAR');
+  const modeLbl=mode==='as9102'?t('Full AS9102'):manual?t('Handwritten FAR'):t('Simple FAR');
   const fld=(lbl,val,wide)=>`<div style="flex:${wide?2:1};min-width:${wide?140:92}px"><div style="font-size:8px;letter-spacing:.5px;color:#555;text-transform:uppercase">${esc(lbl)}</div><div style="border-bottom:1px solid #888;min-height:16px;font-size:11px;padding:2px 0 1px">${esc(val||'')}&nbsp;</div></div>`;
   const info=`<div style="display:flex;gap:14px;margin-top:10px">${fld(t('Part #'),part)}${fld(t('Rev'),rev)}${fld(t('Customer'),cust,1)}${fld(t('Material'),mat,1)}</div>
     <div style="display:flex;gap:14px;margin-top:8px">${fld(t('PO #'),po)}${fld(t('Job #'),job)}${fld(t('Qty inspected'),'')}${fld(t('Date'),date)}${fld(t('Inspected by'),by,1)}</div>`;
   const noDrawNote=imgSrc?'':`<div style="margin-top:12px;border:1px dashed #aaa;padding:14px;text-align:center;font-size:10px;color:#777">${esc(t('No drawing attached — balloon numbers refer to the customer drawing.'))}</div>`;
-  const drawNote=drawRotated?t('Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.'):t('Not to scale — balloon numbers match the report rows.');
+  const drawNote=manual?((drawRotated?t('Not to scale — turn the sheet clockwise to read.'):t('Not to scale.'))+' '+t('Balloon the drawing by hand — number each dimension to match the report rows.'))
+    :(drawRotated?t('Not to scale — turn the sheet clockwise to read; balloon numbers match the report rows.'):t('Not to scale — balloon numbers match the report rows.'));
   const drawPage=imgSrc?`<tr style="page-break-before:always"><td>
-      <div style="font-size:10px;font-weight:700;letter-spacing:.4px;margin:4px 0 8px">${esc(t('BALLOONED DRAWING'))}${part?' — '+esc(part):''}${rev?' '+esc(t('Rev'))+' '+esc(rev):''}</div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.4px;margin:4px 0 8px">${esc(manual?t('DRAWING'):t('BALLOONED DRAWING'))}${part?' — '+esc(part):''}${rev?' '+esc(t('Rev'))+' '+esc(rev):''}</div>
       <div style="border:1px solid #999;padding:4px;text-align:center"><img src="${esc(imgSrc)}" style="max-width:100%;max-height:min(80vh,14in);object-fit:contain"></div>
       <div style="font-size:9px;color:#555;margin-top:6px">${esc(drawNote)}</div>
     </td></tr>`:'';
@@ -3391,7 +3589,9 @@ window.qcFairPrintBlank=async ()=>{
   };
   const blankTools=`<div style="font-size:8px;color:#333;line-height:2">${['Caliper','Mic','Tape','Pin gauge','Other'].map(o=>`<span style="white-space:nowrap;margin-right:6px">☐ ${esc(t(o))}${o==='Other'?' __':''}</span>`).join('')}</div>`;
   const blankRow=`<tr style="height:34px"><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}">${blankTools}</td><td style="${cell};text-align:center;font-size:12px;white-space:nowrap">☐&nbsp;&nbsp;☐</td><td style="${cell}"></td></tr>`;
-  const rows=chars.map(c=>{
+  const MANUAL_BLANK_ROWS=20;   // pre-numbered lines for the hand-ballooned drawing
+  const manualRow=(n)=>`<tr style="height:34px"><td style="${cell};text-align:center">${balloonNo(n)}</td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}"></td><td style="${cell}">${blankTools}</td><td style="${cell};text-align:center;font-size:12px;white-space:nowrap">☐&nbsp;&nbsp;☐</td><td style="${cell}"></td></tr>`;
+  const rows=manual?Array.from({length:MANUAL_BLANK_ROWS},(_,i)=>manualRow(i+1)).join(''):chars.map(c=>{
     const eff=resolveTol(c.requirement||'', c.tol||'');
     const tol=eff.src==='none'?'<span style="color:#999">—</span>':(esc(eff.str)+(eff.src==='title'?' <span style="color:#777">*</span>':''));
     const typ=(c.type&&c.type!=='Linear')?`<div style="font-size:8.5px;color:#777;margin-top:1px">${esc(t(c.type))}</div>`:'';
