@@ -953,7 +953,7 @@ async function api(path, opts){
 const MAIL_CACHE_KEY='bsmpMailInbox_v1';
 function saveInboxCache(){
   try{
-    if(_searchQ||_lastQ) return;   // never cache a search view
+    if(_searchQ) return;   // never cache a search view
     const slim=THREADS.slice().sort((a,b)=>b.date-a.date).slice(0,150)
       .map(t=>{ const c=Object.assign({},t); delete c.messages; delete c._msgsAt; return c; });
     localStorage.setItem(MAIL_CACHE_KEY, JSON.stringify({v:1, email:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now(), threads:slim}));
@@ -993,23 +993,51 @@ async function prefetchThreads(){
 let NEXT={};       // per-mailbox Gmail page tokens for "Load older"
 let _loadingOlder=false;
 let _searchQ='';   // non-empty → the list shows a full-history Gmail search
-let _lastQ='';     // what the last completed /threads load searched for
-window.searchAll=()=>{ _searchQ=($('search').value||'').trim(); loadThreads(true, _searchQ); };
+let _inboxBackup=null;  // {threads,next} — the inbox as it stood when a search took over the list
+let _loadSeq=0;         // every loadThreads call takes a number; only the newest may paint the list
+let _loadingQ=null;     // the q of the load in flight ('' = inbox), null when idle — drives the "Searching…" bar
+let _lastLoadAt=0;      // when the inbox last came back OK (drives the refresh when you return to the tab)
+let _typeTimer=null;
+window.searchAll=()=>{
+  const q=($('search').value||'').trim();
+  if(!q){ leaveSearch(); return; }
+  // stash the inbox before a search replaces the list — it comes straight back
+  if(!_searchQ) _inboxBackup={threads:THREADS, next:NEXT};
+  _searchQ=q; loadThreads(true, q);
+};
 window.searchInput=()=>{
   // clearing the box automatically leaves search mode and reloads the inbox
-  if(!($('search').value||'').trim() && _searchQ){ _searchQ=''; loadThreads(false); return; }
-  renderList();
+  if(!($('search').value||'').trim() && _searchQ){ leaveSearch(); return; }
+  // typing filters what's loaded — paint once you pause, not on every keystroke
+  clearTimeout(_typeTimer); _typeTimer=setTimeout(renderList, 90);
 };
+function leaveSearch(){
+  _searchQ='';
+  // the inbox used to be GONE until the reload finished — and stayed gone when
+  // that reload hit a bad moment. Now it's back instantly from the stash and
+  // the reload only merges newer mail on top.
+  if(_inboxBackup){ THREADS=_inboxBackup.threads; NEXT=_inboxBackup.next||{}; _inboxBackup=null; }
+  renderList(); renderNavCounts();
+  loadThreads(false);
+}
+function spinRefresh(on){
+  const btn=$('refresh-btn'); if(!btn) return;
+  btn.disabled=on;
+  btn.innerHTML=on?'<i class="ti ti-loader-2 nt-spin"></i>':'<i class="ti ti-refresh"></i>';
+}
 window.loadThreads=async (manual, q)=>{
   if(q===undefined) q=_searchQ;
-  const btn=$('refresh-btn');
+  const seq=++_loadSeq;
   try{
-    setLive('busy', q?'Searching all mail…':'Checking mail…'); if(btn) btn.disabled=true;
-    const data=await api('/threads'+(q?('?q='+encodeURIComponent(q)):''));
+    setLive('busy', q?'Searching all mail…':'Checking mail…'); spinRefresh(true);
+    _loadingQ=q; if(q) renderList();   // show the "Searching…" bar right away
+    const data=await api('/threads'+(q?('?q='+encodeURIComponent(q)):''), {cache:'no-store'});
+    // a newer load went out while this one was away (a refresh click during the
+    // 2-minute poll, the search box changed, search cleared) — the newer one
+    // paints the list; an older answer landing late must never overwrite it
+    if(seq!==_loadSeq || q!==_searchQ) return;
     const incoming=data.threads||[];
-    // search results replace the list; so does the first load back from a
-    // search (clean inbox again — flagged finds live on via their snapshot)
-    if(q || _lastQ){ THREADS=incoming.slice(); }
+    if(q){ THREADS=incoming.slice(); }   // search results replace the (stashed) inbox
     else{
       // merge, never wipe — a background refresh only brings the newest page,
       // and replacing the list made "Load older" and search finds vanish
@@ -1018,38 +1046,54 @@ window.loadThreads=async (manual, q)=>{
       THREADS=[...byKey.values()];
     }
     THREADS.sort((a,b)=>b.date-a.date);
-    _lastQ=q;
     NEXT=data.next||{};
+    _loadingQ=null;
+    if(!q) _lastLoadAt=Date.now();
     $('connect-banner').style.display='none';
-    setLive('ok','Live');
+    // one mailbox can miss a beat while the other answers — say so instead of
+    // calling the whole refresh a failure (what came through is already merged in)
+    const failed=Array.isArray(data.failed)?data.failed:[];
+    if(failed.length){
+      setLive('err', failed.map(boxTag).join(' + ')+' didn’t answer');
+      if(manual) toast(failed.map(boxTag).join(' + ')+' mailbox didn’t answer this time — showing what was already loaded for it. Try again in a moment.', true);
+    } else setLive('ok','Live');
     // the fetch succeeded — from here on, a render/backfill bug must NEVER be
     // reported as a connection outage
     try{ backfillFlagMeta(); renderList(); renderNavCounts(); maybeOpenDeep(); }
     catch(e){ console.warn('post-load render error', e); }
-    saveInboxCache();
+    if(!q && !failed.length) saveInboxCache();
     setTimeout(prefetchThreads, 400);   // warm the top unread conversations
-    if(manual) toast('Mail refreshed');
+    if(manual && !failed.length) toast(q?'Search finished':'Mail refreshed');
   }catch(e){
+    if(seq!==_loadSeq) return;   // superseded — the newer load reports its own outcome
+    _loadingQ=null;
     if(e.notConnected){ $('connect-banner').style.display='flex'; setLive('err','Not connected'); }
     else { setLive('err','Mail offline'); if(manual) toast(e.message,true); console.warn(e); }
-  }finally{ if(btn) btn.disabled=false; }
+    if(q) renderList();   // drop the "Searching…" bar so the old rows show again
+  }finally{ if(seq===_loadSeq) spinRefresh(false); }
 };
 window.loadOlder=async ()=>{
   if(_loadingOlder || !Object.keys(NEXT).length) return;
   _loadingOlder=true; renderList();
   try{
     const q=_searchQ?('&q='+encodeURIComponent(_searchQ)):'';
-    const data=await api('/threads?tokens='+encodeURIComponent(JSON.stringify(NEXT))+q);
+    const data=await api('/threads?tokens='+encodeURIComponent(JSON.stringify(NEXT))+q, {cache:'no-store'});
     const seen=new Set(THREADS.map(t=>t.key));
     (data.threads||[]).forEach(t=>{ if(!seen.has(t.key)) THREADS.push(t); });
     THREADS.sort((a,b)=>b.date-a.date);
     NEXT=data.next||{};
     backfillFlagMeta();
+    if(Array.isArray(data.failed)&&data.failed.length) toast(data.failed.map(boxTag).join(' + ')+' mailbox didn’t answer — click Load older again for the rest.', true);
   }catch(e){ toast(e.message,true); }
   _loadingOlder=false;
   renderList(); renderNavCounts();
 };
 function startPolling(){ clearInterval(_pollTimer); _pollTimer=setInterval(()=>{ if(SETTINGS.proxyUrl && !_searchQ && document.visibilityState==='visible') loadThreads(false); }, 120000); }
+// coming back to the tab (or back online) after a while → check mail right
+// away instead of waiting for the next 2-minute tick
+function refreshOnReturn(){ if(SETTINGS.proxyUrl && !_searchQ && _loadingQ===null && Date.now()-_lastLoadAt>30000) loadThreads(false); }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refreshOnReturn(); });
+window.addEventListener('online', refreshOnReturn);
 
 // ── rendering ─────────────────────────────────────────────────────────────────
 const NAV_META={
@@ -1077,6 +1121,7 @@ window.trashThread=async ()=>{
   catch(e){ if(btn) btn.disabled=false; toast(e.notConnected?'Mail isn’t connected yet.':('Could not delete: '+e.message),true); return; }
   if(btn) btn.disabled=false;
   THREADS=THREADS.filter(x=>x.key!==t.key);
+  if(_inboxBackup) _inboxBackup.threads=_inboxBackup.threads.filter(x=>x.key!==t.key);   // deleted from a search → gone from the stashed inbox too
   saveInboxCache();   // so it doesn't reappear from the instant-open cache
   if(flagRec){ delete FLAGS[t.key]; remove(ref(db,'mail/threads/'+t.key)).catch(()=>{}); }
   _draftClear('reply',t.key);
@@ -1351,8 +1396,15 @@ window.renderList=()=>{
   const list=visibleThreads();
   const unread=list.filter(t=>t.unread).length;
   const base_txt=list.length?`${list.length} conversation${list.length!==1?'s':''}${unread?` · ${unread} unread`:''}`:'';
-  $('list-count').textContent=_searchQ?`all-history results for “${_searchQ}”${base_txt?' · '+base_txt:''}`:base_txt;
   const rows=$('rows');
+  // a full-history search in flight: say so in the list itself, and don't show
+  // the old rows under a headline that calls them results
+  if(_searchQ && _loadingQ===_searchQ){
+    $('list-count').textContent=`searching all mail history for “${_searchQ}”…`;
+    rows.innerHTML=`<div class="searchmore"><i class="ti ti-loader-2 nt-spin"></i>Searching everything ever received for “${esc(_searchQ)}” — including text inside PDF &amp; Word attachments…</div>`;
+    return;
+  }
+  $('list-count').textContent=_searchQ?`all-history results for “${_searchQ}”${base_txt?' · '+base_txt:''}`:base_txt;
   // typing only filters what's loaded — offer the all-history search right in the list
   const typed=($('search').value||'').trim();
   const searchBar=(typed && !_searchQ)

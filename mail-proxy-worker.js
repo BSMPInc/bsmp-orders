@@ -52,7 +52,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const json = (obj, status = 200) =>
-      new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', ...cors } });
+      new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors } });
 
     try {
       // ---- public: quote request from bertsmp.com -----------------------
@@ -239,8 +239,21 @@ async function gmail(env, mailbox, path, method = 'GET', body = null) {
 
 // ── Gmail batch endpoint: up to 100 thread fetches in ONE HTTP call ─────────
 // (keeps us far under Cloudflare's subrequest cap and makes refreshes fast)
-async function gmailBatch(env, mailbox, paths) {
+async function gmailBatch(env, mailbox, paths, attempt = 0) {
   if (!paths.length) return [];
+  const out = await gmailBatchOnce(env, mailbox, paths);
+  // Gmail answers a few items of a big batch with a 429/5xx now and then.
+  // Those used to vanish silently — a refresh that quietly lost conversations.
+  // Retry just the failed items once, after a short breather.
+  const failed = paths.map((_, i) => i).filter(i => !out[i]);
+  if (failed.length && attempt < 1) {
+    await new Promise(r => setTimeout(r, 800));
+    const again = await gmailBatch(env, mailbox, failed.map(i => paths[i]), attempt + 1);
+    failed.forEach((i, j) => { out[i] = again[j]; });
+  }
+  return out;
+}
+async function gmailBatchOnce(env, mailbox, paths) {
   const tok = await gToken(env, mailbox);
   const boundary = 'batch_bsmp_' + Math.random().toString(36).slice(2);
   const body = paths.map((p, i) =>
@@ -259,7 +272,10 @@ async function gmailBatch(env, mailbox, paths) {
     const idm = /Content-ID:\s*<?response-item(\d+)/i.exec(part);
     const start = part.indexOf('{');
     if (!idm || start < 0) continue;
-    try { out[Number(idm[1])] = JSON.parse(part.slice(start, part.lastIndexOf('}') + 1)); } catch { /* skip bad part */ }
+    try {
+      const obj = JSON.parse(part.slice(start, part.lastIndexOf('}') + 1));
+      out[Number(idm[1])] = (obj && obj.error) ? null : obj;   // a per-item error is a miss, not a thread
+    } catch { /* skip bad part */ }
   }
   return out;
 }
@@ -269,18 +285,33 @@ async function gmailBatch(env, mailbox, paths) {
 // (mail/muted) is what keeps unwanted senders out of view, not Gmail's
 // category guesses (which were hiding real customer mail).
 async function listThreads(env, mailboxes, q, tokens) {
-  const query = (q ? q + ' ' : '') + '-in:spam -in:trash';
+  // The plain inbox load sends NO q at all: Gmail already leaves spam/trash out
+  // by default, and a q= listing goes through Gmail's search index, which runs
+  // a little behind new mail — that lag is why a just-arrived email needed a
+  // second (or third) refresh to show up. A real search still needs q.
+  const query = q ? q + ' -in:spam -in:trash' : '';
   const paging = tokens && Object.keys(tokens).length > 0;
   const next = {};
+  const failed = [];   // boxes that didn't answer this time — the app keeps what it had for them
   const perBox = await Promise.all(mailboxes.map(async (box) => {
     if (paging && !tokens[box]) return { box, threads: [] };   // this box is exhausted
-    const pt = paging ? '&pageToken=' + encodeURIComponent(tokens[box]) : '';
-    const list = await gmail(env, box, 'threads?maxResults=100&q=' + encodeURIComponent(query) + pt);
-    if (list.nextPageToken) next[box] = list.nextPageToken;
-    const metas = await gmailBatch(env, box, (list.threads || []).map(t =>
-      `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`));
-    return { box, threads: metas.filter(Boolean) };
+    try {
+      const pt = paging ? '&pageToken=' + encodeURIComponent(tokens[box]) : '';
+      const list = await gmail(env, box, 'threads?maxResults=' + (q ? 50 : 100) + (query ? '&q=' + encodeURIComponent(query) : '') + pt);
+      if (list.nextPageToken) next[box] = list.nextPageToken;
+      const metas = await gmailBatch(env, box, (list.threads || []).map(t =>
+        `threads/${t.id}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Message-ID&metadataHeaders=Date`));
+      return { box, threads: metas.filter(Boolean) };
+    } catch (e) {
+      // one flaky mailbox used to fail the WHOLE refresh ("Mail offline") —
+      // now the other box still comes through and the app is told which one didn't
+      console.warn('listThreads: ' + box + ' failed: ' + (e && e.message));
+      failed.push(box);
+      if (paging && tokens[box]) next[box] = tokens[box];   // let "Load older" retry the same page
+      return { box, threads: [] };
+    }
   }));
+  if (failed.length === mailboxes.length) throw new Error('Gmail did not answer for any mailbox');
 
   const ours = (a) => mailboxes.some(mb => mb.toLowerCase() === (a || '').toLowerCase());
   const merged = new Map();
@@ -321,7 +352,7 @@ async function listThreads(env, mailboxes, q, tokens) {
     }
   }
   const threads = [...merged.values()].sort((a, b) => b.date - a.date);
-  return { threads, next };
+  return { threads, next, failed };
 }
 
 // ── /thread: full conversation from one mailbox ─────────────────────────────
