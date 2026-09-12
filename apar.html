@@ -706,6 +706,18 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .imp-type.ar{background:#2f8f6b1a;color:var(--ar)}
 .imp-type.ap{background:#A8443A1a;color:var(--ap)}
 .ai-status.err{background:#A32D2D10;border-color:#A32D2D33;color:var(--red)}
+/* AI Extract, statement mode (one bill per statement line) */
+.ai-s-in{width:110px;font-size:12px;padding:3px 6px;border:1px solid var(--border);border-radius:6px;font-family:inherit}
+.ai-s-in.amt{width:92px;text-align:right;font-weight:700}
+.imp-table tr.ai-s-have td,.imp-table tr.ai-s-have .ai-s-in{color:var(--text3)}
+.imp-table tr.ai-s-fill{background:#1e3a5f08}
+.ai-s-pill{font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.ai-s-pill.add{background:#2f8f6b1a;color:var(--ar)}
+.ai-s-pill.fill{background:#1e3a5f14;color:var(--navy)}
+.ai-s-pill.have{background:#8a94a41a;color:var(--text3)}
+.ai-s-note{font-size:10.5px;color:var(--text3);white-space:normal;max-width:230px;margin-top:2px;line-height:1.3}
+.ai-s-note.warn{color:var(--amber);font-weight:600}
+.ai-s-foot{font-size:11.5px;color:var(--text3);margin-top:8px;line-height:1.45}
 .ai-cta{display:flex;align-items:center;gap:14px;background:#2f8f6b0d;border:1px solid #2f8f6b33;border-radius:12px;padding:13px 16px;margin-bottom:16px;cursor:pointer;transition:.15s}
 .ai-cta:hover{background:#2f8f6b18;border-color:#2f8f6b55}
 .ai-cta>i{font-size:26px;color:var(--ar)}
@@ -1052,6 +1064,16 @@ body{ background-image:none; font-feature-settings:"tnum" 1; font-variant-numeri
         <div class="frow"><div class="fld"><label>Terms (net days)</label><input id="ai-terms" type="number"></div><div class="fld"><label>Due date</label><input id="ai-due" type="date"></div></div>
         <div class="fld" id="ai-account-wrap" style="display:none"><label>Account <span id="ai-account-hint" style="font-weight:600;font-size:11px;color:var(--text3)"></span></label><select id="ai-account"></select></div>
         <div class="fld"><label>Description</label><input id="ai-desc"></div>
+      </div>
+      <div id="ai-stmt" style="display:none">
+        <div class="m-sect">Statement &mdash; one bill per line</div>
+        <div class="frow">
+          <div class="fld"><label id="ai-s-l-party">Vendor</label><input id="ai-s-party" onchange="aiStmtVendorChanged()"></div>
+          <div class="fld" id="ai-s-acct-wrap"><label>Account <span style="font-weight:600;font-size:11px;color:var(--text3)">&middot; applies to every line</span></label><select id="ai-s-account"></select></div>
+        </div>
+        <div class="imp-review-head"><div class="imp-summary" id="ai-s-summary"></div><div style="display:flex;gap:6px"><button class="btn sm" onclick="aiStmtCheck(true)">Select all new</button><button class="btn sm" onclick="aiStmtCheck(false)">Clear</button></div></div>
+        <div class="imp-table-wrap"><table class="imp-table" id="ai-s-table"></table></div>
+        <div class="ai-s-foot">Lines marked <b>In app</b> are skipped. <b>Fill PO bill</b> writes the statement&rsquo;s amount, invoice # and date onto the bill the Need PO pipeline already made for that PO. Edit any bill afterwards from Payables.</div>
       </div>
     </div>
     <div class="m-foot"><button class="btn" onclick="closeAI()">Cancel</button><button class="btn green" id="ai-add" onclick="aiAdd()" style="display:none">Add entry</button></div>
@@ -4731,9 +4753,10 @@ let _aiLineItems=[];
 let _aiQueue=[]; let _aiIdx=0; let _aiAddedCount=0;
 window.openAI=()=>{
   setAIType('ar');
-  _aiDiscount=''; _aiLineItems=[]; _aiQueue=[]; _aiIdx=0; _aiAddedCount=0;
-  $('ai-status').style.display='none'; $('ai-preview').style.display='none';
-  const ab=$('ai-add'); ab.style.display='none'; ab.textContent='Add entry';
+  _aiDiscount=''; _aiLineItems=[]; _aiQueue=[]; _aiIdx=0; _aiAddedCount=0; _aiStmt=null;
+  $('ai-status').style.display='none'; $('ai-preview').style.display='none'; $('ai-stmt').style.display='none';
+  const mbox=$('ai-modal').querySelector('.modal'); if(mbox) mbox.style.maxWidth='';
+  const ab=$('ai-add'); ab.style.display='none'; ab.textContent='Add entry'; ab.disabled=false;
   const aw=$('ai-account-wrap'); if(aw)aw.style.display='none';
   $('ai-file').value=''; $('ai-modal').style.display='flex';
 };
@@ -4777,7 +4800,7 @@ window.aiHandle=async(file)=>{
   if(!file)return;
   const st=$('ai-status'); st.style.display='block'; st.className='ai-status';
   st.innerHTML='<i class="ti ti-loader"></i> Reading '+esc(file.name)+'…';
-  $('ai-preview').style.display='none'; $('ai-add').style.display='none';
+  $('ai-preview').style.display='none'; $('ai-add').style.display='none'; $('ai-stmt').style.display='none'; _aiStmt=null;
   const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
   try{
     const b64=await toB64(file); const isImg=(file.type||'').startsWith('image/');
@@ -4785,23 +4808,24 @@ window.aiHandle=async(file)=>{
     const acctClause = (aiType==='ap' && acctList.length)
       ? ` Also return account = the single best-fit bank account for paying this bill, chosen ONLY from this exact list: [${acctList.map(n=>'"'+n+'"').join(', ')}]. Match on what the vendor is for (e.g. power/water/gas/internet → a utilities account, wages/payroll taxes → a payroll account, owner draws → an owner account). If none clearly fits, return account as an empty string. Use the exact account name from the list, nothing else.`
       : '';
-    const multiClause=" A single PDF may contain MORE THAN ONE separate invoice (e.g. a statement with several invoices, or several invoices concatenated). Return a JSON ARRAY with one object per distinct invoice found — if there is only one invoice, return an array with a single object. Each object has these fields:";
+    const multiClause=" A single PDF may contain MORE THAN ONE separate invoice (e.g. a statement with several invoices, or several invoices concatenated). Return a JSON ARRAY with one object per distinct invoice found — if there is only one invoice, return an array with a single object. If the document is a STATEMENT OF ACCOUNT (a list of open invoices with an account balance and aging buckets), return one object per invoice LINE listed: ref = that line's invoice number, po = that line's purchase order / release number, amount = that line's balance due (the open balance, not the original invoice total when the two differ), issue = that line's invoice date, and apply the statement's payment terms to every line. Never return objects for subtotals, aging buckets, previous balance, payments, finance charges, or the statement total. Keep the JSON compact. Each object has these fields:";
     const prompt = (aiType==='ar')
       ? "This document is from Bert's Sheet Metal Products (BSMP / Bert's Welding) and contains one or more INVOICES issued BY BSMP TO customers."+multiClause+" party = the CUSTOMER being billed (the Bill-To / Sold-To company; NEVER Bert's or BSMP), ref = the invoice number, amount = total amount due as a plain number (no $ or commas), issue = invoice date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = payment terms in net days as a number (e.g. 30) if shown else empty string, lineItems = an array of that invoice's line items, each as {part: the part/product/SKU number as a string, qty: the quantity as a number, unit: the unit price as a plain number, total: the line total as a plain number}; include every line item row; if the invoice has no itemized lines return an empty array, description = a short summary such as the customer PO/job reference or items billed. Return ONLY the JSON array, no markdown."
-      : "This document is received BY Bert's Sheet Metal Products (BSMP) and contains one or more BILLS/INVOICES FROM vendors or suppliers."+multiClause+" party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number, or our PO number if that is what's shown, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, discountTerms = the early-payment discount terms exactly as written if any (e.g. '2% 10, Net 30' or '2/10 net 30') else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON array, no markdown.";
+      : "This document is received BY Bert's Sheet Metal Products (BSMP) and contains one or more BILLS/INVOICES FROM vendors or suppliers."+multiClause+" party = the VENDOR/supplier that issued the bill (NEVER Bert's or BSMP), ref = the vendor's invoice/bill number (or our PO number if that is the only reference shown), po = our purchase order / release number when it is shown as its own field, else empty string, amount = total amount due as a plain number, issue = bill date YYYY-MM-DD, due = due date YYYY-MM-DD if shown else empty string, terms = net days as a number if shown else empty string, discountTerms = the early-payment discount terms exactly as written if any (e.g. '2% 10, Net 30' or '2/10 net 30') else empty string, description = a short summary such as the service/process or PO reference."+acctClause+" Return ONLY the JSON array, no markdown.";
     const content = isImg
       ? [{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:prompt}]
       : [{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}];
-    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:4000,messages:[{role:'user',content}]})});
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:12000,messages:[{role:'user',content}]})});
     const data=await resp.json();
     if(data.error){ st.className='ai-status err'; st.textContent='API error: '+(data.error.message||JSON.stringify(data.error)); return; }
     const text=(data.content||[]).map(c=>c.text||'').join('').replace(/```json|```/g,'').trim();
-    let obj; try{ obj=JSON.parse(text); }catch{ st.className='ai-status err'; st.textContent="Couldn't read that document. Try a clearer scan, or enter it manually."; return; }
+    if(data.stop_reason==='max_tokens'){ st.className='ai-status err'; st.textContent="That document has more invoices than can be read in one pass. Split the statement into smaller PDFs and try each part."; return; }
     let arr;
     try{ const parsed=JSON.parse(text); arr=Array.isArray(parsed)?parsed:[parsed]; }
     catch{ st.className='ai-status err'; st.textContent="Couldn't read that document. Try a clearer scan, or enter it manually."; return; }
     arr=arr.filter(o=>o&&(o.party||o.amount!=null||o.ref)); // drop empties
     if(!arr.length){ st.className='ai-status err'; st.textContent="No invoice details found in that document."; return; }
+    if(arr.length>=3){ aiStmtShow(arr); return; }   // a statement: review every line in one table
     _aiQueue=arr; _aiIdx=0; _aiAddedCount=0;
     fillPreview(_aiQueue[0]);
     $('ai-preview').style.display='block'; $('ai-add').style.display='inline-block';
@@ -4887,6 +4911,7 @@ function fillAccountSelect(selId){
   sel.innerHTML='<option value="">Unassigned</option>'+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${id===selId?'selected':''}>${esc(a.name)}</option>`).join('');
 }
 window.aiAdd=()=>{
+  if(_aiStmt){ aiStmtCommit(); return; }
   const party=$('ai-party').value.trim();
   if(!party){ alert('Enter the '+(aiType==='ar'?'customer':'vendor')+' name'); return; }
   const id='m_'+Date.now().toString(36)+Math.floor(Math.random()*1000);
@@ -4920,6 +4945,227 @@ window.aiAdd=()=>{
     const n=_aiAddedCount; st.innerHTML='<i class="ti ti-check"></i> '+(n>1?('Added all '+n+' invoices.'):('Added '+esc(party)+'.'))+' Closing…'; }
   setTimeout(closeAI, 700);
 };
+
+// ── AI Extract, statement mode ───────────────────────────────────────────────
+// A vendor statement of account (McMaster, Grainger, ...) lists every open invoice on
+// one page. Three or more invoices in one file switch the review form to a table: each
+// line becomes its own bill, and every line is first checked against what the app
+// already holds so nothing is entered twice. Per line, the action is one of
+//   add  - nothing in the app matches: a new bill is written
+//   fill - the Need PO pipeline already made a bill for that PO (or invoice #): the
+//          statement's amount, invoice # and date are merged onto it (ovlPatch)
+//   have - already entered (same invoice #, or the same PO bill at the same amount)
+let _aiStmt=null;
+// Reference numbers compare with prefixes and punctuation stripped, so "PO 0829EDUENEZ",
+// "0829-EDUENEZ" and "Inv #71052861" / "71052861" all line up.
+function aiRefKey(s){
+  return String(s||'').trim().toLowerCase()
+    .replace(/^(invoice|inv|bill|p\.o\.|po|no\.?|#)(?=[\s#:.\-]|\d)[\s#:.\-]*/,'')
+    .replace(/[^a-z0-9]/g,'');
+}
+// The statement spells the vendor its own way ("McMaster-Carr Supply Company") while the
+// POs may say "McMaster-Carr" - one key being a prefix of the other counts as the same vendor.
+function aiSameVendor(a,b){
+  if(!a||!b) return false; if(a===b) return true;
+  const short=a.length<b.length?a:b, long=a.length<b.length?b:a;
+  return short.length>=4 && long.startsWith(short);
+}
+function aiFindExisting(type,party,ref,po,amount){
+  const vk=vendorKey(canonicalParty(party));
+  const list=allEntries().filter(e=>e.type===type&&!e.checkEntry&&aiSameVendor(vendorKey(e.party),vk));
+  const rk=aiRefKey(ref), pk=aiRefKey(po);
+  let hit=rk?list.find(e=>aiRefKey(e.ref)===rk):null;
+  if(hit) return {kind:'ref',e:hit};
+  if(pk){
+    hit=list.find(e=>aiRefKey(String(e.poRef||'').replace(/^PO\s*/i,''))===pk || aiRefKey(e.ref)===pk);
+    if(hit) return {kind:'po',e:hit};
+  }
+  if(amount!=null&&isFinite(amount)){
+    hit=list.find(e=>statusOf(e)!=='paid'&&!e.ref&&e.amount!=null&&Math.abs(Number(e.amount)-amount)<=0.01);
+    if(hit) return {kind:'amount',e:hit};
+  }
+  return null;
+}
+function aiStmtShow(arr){
+  const type=aiType;
+  const tally={}; arr.forEach(o=>{ const p=String(o.party||'').trim(); if(p) tally[p]=(tally[p]||0)+1; });
+  const party=Object.keys(tally).sort((a,b)=>tally[b]-tally[a])[0]||'';
+  const numTerms=o=>(o.terms!==''&&o.terms!=null&&!isNaN(Number(o.terms)))?Number(o.terms):null;
+  const termsRow=arr.find(o=>numTerms(o)!=null);
+  const terms=termsRow?numTerms(termsRow):DEFAULT_TERMS;
+  const disc=(arr.find(o=>o.discountTerms)||{}).discountTerms||'';
+  const rows=arr.map((o,i)=>{
+    const raw=(o.amount!=null&&o.amount!=='')?Number(String(o.amount).replace(/[$,\s]/g,'')):NaN;
+    const amt=isFinite(raw)?Math.round(raw*100)/100:null;
+    const lineItems=(type==='ar'&&Array.isArray(o.lineItems))?o.lineItems.map(li=>({
+      part:String(li.part!=null?li.part:'').trim(),
+      qty:(li.qty!=null&&li.qty!=='')?Number(li.qty):null,
+      unit:(li.unit!=null&&li.unit!=='')?Number(li.unit):null,
+      total:(li.total!=null&&li.total!=='')?Number(li.total):null
+    })).filter(li=>li.part||li.qty||li.unit||li.total):[];
+    return {i, ref:String(o.ref||'').trim(), po:String(o.po||'').trim(), amount:amt,
+      issue:ISO_DAY.test(String(o.issue||''))?String(o.issue):'', due:ISO_DAY.test(String(o.due||''))?String(o.due):'',
+      terms:numTerms(o)!=null?numTerms(o):terms, discountTerms:o.discountTerms||disc,
+      desc:String(o.description||o.desc||'').trim(), lineItems,
+      sel:true, action:'add', match:null, note:'', locked:false};
+  });
+  _aiStmt={type,party,terms,discountTerms:disc,rows};
+  $('ai-s-l-party').textContent=(type==='ar')?'Customer':'Vendor';
+  $('ai-s-party').value=party;
+  const aw=$('ai-s-acct-wrap');
+  if(type==='ap'){
+    let chosen='';
+    const memId=vendorAccounts[vendorKey(party)]||'';
+    if(memId&&accounts[memId]) chosen=memId;
+    else{
+      const sug=(arr.find(o=>o.account)||{}).account;
+      if(sug){ const m=Object.entries(accounts).find(([id,a])=>(a.name||'').toLowerCase()===String(sug).toLowerCase()); if(m) chosen=m[0]; }
+    }
+    $('ai-s-account').innerHTML='<option value="">Unassigned</option>'+Object.entries(accounts).map(([id,a])=>`<option value="${id}" ${id===chosen?'selected':''}>${esc(a.name)}</option>`).join('');
+    aw.style.display='';
+  } else aw.style.display='none';
+  aiStmtMatch();
+  const mbox=$('ai-modal').querySelector('.modal'); if(mbox) mbox.style.maxWidth='900px';
+  $('ai-preview').style.display='none'; $('ai-stmt').style.display='block';
+  $('ai-add').style.display='inline-block';
+  renderAiStmt();
+}
+// Decide add / fill / have for every line against the bills already in the app.
+// A vendor often ships one PO as several invoices (McMaster does), so a PO bill may be
+// claimed by ONE statement line only: first the line whose invoice # or amount agrees
+// with it, then any other line on that PO becomes its own new bill.
+function aiStmtMatch(){
+  const S=_aiStmt; if(!S) return;
+  const party=($('ai-s-party').value||'').trim()||S.party;
+  const claimed=new Set(), seenRef=new Set();
+  const sameAmt=(e,r)=>(e.amount!=null&&r.amount!=null&&Math.abs(Number(e.amount)-r.amount)<=0.01);
+  const decide=(r,e)=>{
+    r.match=e;
+    const hasRef=!!r.ref && aiRefKey(e.ref)===aiRefKey(r.ref);
+    if(e.paid>0){ r.action='have'; r.sel=false; r.locked=true; r.note='Already in the app with payments ('+fmtMoney(e.paid)+' paid) — check it by hand'; }
+    else if(e.amount==null){ r.action='fill'; r.note='Fills the PO bill (no amount yet)'; }
+    else if(sameAmt(e,r)&&hasRef){ r.action='have'; r.sel=false; r.locked=true; r.note='Already in the app'; }
+    else if(sameAmt(e,r)){ r.action='fill'; r.note='PO bill, same amount — adds the invoice # and date'; }
+    else { r.action='fill'; r.sel=false; r.note='PO bill shows '+fmtMoney(e.amount)+' — statement says '+fmtMoney(r.amount); }
+  };
+  S.rows.forEach(r=>{ r.match=null; r.note=''; r.locked=false; r.action='add'; r.sel=true; r._m=aiFindExisting(S.type,party,r.ref,r.po,r.amount); });
+  // pass 1: invoice-# matches, and PO matches where the amount agrees (or the bill has none yet)
+  S.rows.forEach(r=>{
+    const m=r._m; if(!m||m.kind==='amount') return;
+    const e=m.e;
+    if(m.kind==='ref'||e.amount==null||sameAmt(e,r)){
+      if(claimed.has(e.id)&&m.kind!=='ref') return;
+      claimed.add(e.id); decide(r,e);
+    }
+  });
+  // pass 2: what is left - a PO bill nobody claimed gets this line (amount differs, so
+  // unchecked); a PO bill already claimed means this is another invoice on the same PO
+  S.rows.forEach(r=>{
+    if(r.match) return;
+    const m=r._m; if(!m) return;
+    if(m.kind==='amount'){ r.match=m.e; r.sel=false; r.note='Possible match: an open bill for the same amount with no invoice #'; return; }
+    if(claimed.has(m.e.id)){ r.note='Another line already covers PO '+r.po+' — added as its own bill'; return; }
+    claimed.add(m.e.id); decide(r,m.e);
+  });
+  S.rows.forEach(r=>{
+    delete r._m;
+    const k=aiRefKey(r.ref);
+    if(k){ if(seenRef.has(k)){ r.action='have'; r.sel=false; r.locked=true; r.note='Repeated line in the statement'; } seenRef.add(k); }
+    if(!(r.amount>0)){ r.sel=false; r.note=r.note||'No amount read — type it in, then tick the line'; }
+  });
+}
+function aiStmtSummary(){
+  const S=_aiStmt; if(!S) return;
+  const isAP=S.type==='ap';
+  const sel=S.rows.filter(r=>r.sel&&r.amount>0);
+  const nAdd=sel.filter(r=>r.action==='add').length, nFill=sel.filter(r=>r.action==='fill').length;
+  const nHave=S.rows.filter(r=>r.action==='have').length;
+  const tot=sel.reduce((s,r)=>s+(r.amount||0),0);
+  $('ai-s-summary').innerHTML=`<b>${S.rows.length}</b> lines read · <b>${nAdd}</b> new${nFill?` · <b>${nFill}</b> onto existing PO bills`:''}${nHave?` · ${nHave} already in the app`:''} · selected <b>${fmtMoney(tot)}</b>`;
+  const ab=$('ai-add'); const n=sel.length;
+  ab.textContent=n?`Add ${n} ${isAP?'bill':'invoice'}${n!==1?'s':''}`:'Nothing selected';
+  ab.disabled=!n;
+}
+function renderAiStmt(){
+  const S=_aiStmt; if(!S) return;
+  const isAP=S.type==='ap';
+  const head=`<thead><tr><th></th><th>Date</th><th>Invoice #</th><th>PO</th><th>Amount</th><th>Due</th><th>Status</th></tr></thead>`;
+  const body=S.rows.map(r=>{
+    const cls=r.action==='have'?'ai-s-have':(r.action==='fill'?'ai-s-fill':'');
+    const pill=r.action==='have'?'<span class="ai-s-pill have">In app</span>':r.action==='fill'?'<span class="ai-s-pill fill">Fill PO bill</span>':'<span class="ai-s-pill add">New</span>';
+    const warn=(r.match&&r.action!=='have'&&!r.sel)?' warn':'';
+    const due=r.due||(r.issue?addDays(r.issue,r.terms):'');
+    return `<tr class="${cls}">
+      <td><input type="checkbox" ${r.sel?'checked':''} ${r.locked?'disabled':''} onchange="aiStmtSel(${r.i},this.checked)"></td>
+      <td>${r.issue?fmtDate(r.issue):'<span class="imp-dim">—</span>'}</td>
+      <td><input class="ai-s-in" value="${esc(r.ref)}" oninput="aiStmtEdit(${r.i},'ref',this.value)"></td>
+      <td>${r.po?esc(r.po):'<span class="imp-dim">—</span>'}</td>
+      <td><input class="ai-s-in amt" type="number" step="0.01" value="${r.amount!=null?r.amount:''}" oninput="aiStmtEdit(${r.i},'amount',this.value)"></td>
+      <td>${due?fmtDate(due):'<span class="imp-dim">—</span>'}</td>
+      <td>${pill}${r.note?`<div class="ai-s-note${warn}">${esc(r.note)}</div>`:''}</td>
+    </tr>`;
+  }).join('');
+  $('ai-s-table').innerHTML=head+'<tbody>'+body+'</tbody>';
+  aiStmtSummary();
+  const st=$('ai-status'); st.style.display='block'; st.className='ai-status';
+  st.innerHTML=`<i class="ti ti-files"></i> This looks like a statement — <b>${S.rows.length}</b> invoices found. Each ticked line becomes its own ${isAP?'bill':'invoice'} · terms net ${S.terms}${S.discountTerms?` · ${esc(S.discountTerms)}`:''}.`;
+}
+window.aiStmtSel=(i,v)=>{ const r=_aiStmt&&_aiStmt.rows[i]; if(!r||r.locked)return; r.sel=!!v; aiStmtSummary(); };
+// Edits stay in the row data (no re-render, so the input keeps focus).
+window.aiStmtEdit=(i,field,val)=>{
+  const r=_aiStmt&&_aiStmt.rows[i]; if(!r)return;
+  if(field==='amount'){ const n=Number(val); r.amount=(val!==''&&isFinite(n))?Math.round(n*100)/100:null; }
+  else r[field]=String(val||'').trim();
+  aiStmtSummary();
+};
+window.aiStmtCheck=(all)=>{
+  const S=_aiStmt; if(!S) return;
+  S.rows.forEach(r=>{ if(r.locked) return; r.sel=all?(r.action!=='have'&&r.amount>0):false; });
+  renderAiStmt();
+};
+window.aiStmtVendorChanged=()=>{ if(!_aiStmt) return; aiStmtMatch(); renderAiStmt(); };
+function aiStmtCommit(){
+  const S=_aiStmt; if(!S) return;
+  const isAP=S.type==='ap';
+  const party=($('ai-s-party').value||'').trim();
+  if(!party){ alert('Enter the '+(isAP?'vendor':'customer')+' name'); return; }
+  const rows=S.rows.filter(r=>r.sel&&r.action!=='have'&&r.amount>0);
+  if(!rows.length){ alert('Nothing selected.'); return; }
+  const adds=rows.filter(r=>r.action==='add'), fills=rows.filter(r=>r.action==='fill');
+  const noun=isAP?'bill':'invoice';
+  if(!confirm(`Add ${adds.length} new ${noun}${adds.length!==1?'s':''}${fills.length?` and fill ${fills.length} existing PO bill${fills.length!==1?'s':''}`:''} for ${party}?`)) return;
+  const acctId=isAP?($('ai-s-account').value||''):'';
+  const stamp=Date.now().toString(36);
+  adds.forEach((r,idx)=>{
+    const id='m_'+stamp+Math.floor(Math.random()*100000).toString(36)+idx;
+    const o={manual:true,type:S.type,party,ref:r.ref,rel:r.desc||(r.po?('PO '+r.po):''),
+      amount:r.amount,issue:r.issue,terms:r.terms,payments:[]};
+    if(r.discountTerms) o.discountTerms=r.discountTerms;
+    if(r.due) o.dueDate=r.due;
+    if(r.lineItems&&r.lineItems.length) o.lineItems=r.lineItems;
+    if(isAP&&acctId){ o.account=acctId; o.payStatus='open'; }
+    writeOverlay(id,o);
+    logAudit('add',{entryId:id,party,detail:`Added ${isAP?'payable':'receivable'} from a statement via AI · ${r.ref||'no #'} · ${fmtMoney(r.amount)}`});
+  });
+  fills.forEach(r=>{
+    const e=r.match; if(!e) return;
+    const patch={};
+    if(e.amount==null||Math.abs(Number(e.amount)-r.amount)>0.01) patch.amount=r.amount;
+    if(r.ref&&aiRefKey(e.ref)!==aiRefKey(r.ref)) patch.ref=r.ref;
+    if(r.issue&&e.issue!==r.issue) patch.issue=r.issue;
+    if(r.discountTerms&&!e.discountTerms) patch.discountTerms=r.discountTerms;
+    if(isAP&&acctId&&!e.account){ patch.account=acctId; patch.payStatus='open'; }
+    if(!Object.keys(patch).length) return;
+    ovlPatch(e.id,e,patch,true);
+    logAudit('add',{entryId:e.id,party,detail:`Filled from a ${party} statement via AI · ${r.ref||'no #'} · ${fmtMoney(r.amount)}`});
+  });
+  if(isAP&&acctId){ const vk=vendorKey(party); if(vendorAccounts[vk]!==acctId){ vendorAccounts[vk]=acctId; dbSet('apar/vendorAccounts/'+vk,acctId); } }
+  render();
+  const st=$('ai-status'); st.style.display='block'; st.className='ai-status';
+  st.innerHTML='<i class="ti ti-check"></i> Added '+adds.length+' '+noun+(adds.length!==1?'s':'')+(fills.length?(' · filled '+fills.length+' PO bill'+(fills.length!==1?'s':'')):'')+' for '+esc(party)+'. Closing…';
+  $('ai-add').disabled=true;
+  setTimeout(closeAI, 900);
+}
 
 // ── Auth + data wiring ───────────────────────────────────────────────────────
 $('lg-btn').onclick=async()=>{
