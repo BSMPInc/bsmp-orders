@@ -409,6 +409,7 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-sec" data-t="Records">Records</div>
       <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
+      <div class="nav-item mgr-only" id="nav-coc" onclick="showPage('coc')"><i class="ti ti-certificate"></i><span class="nav-label" data-t="nav:coc">Certs of Conformance</span></div>
       <div class="nav-sec" data-t="Setup">Setup</div>
       <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span class="nav-label" data-t="Settings">Settings</span></div>
     </div>
@@ -460,7 +461,7 @@ body.role-operator .mgr-only{display:none!important}
 const I18N = {
   en: {
     'dock:start':'Start', 'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs', 'dock:materialcerts':'Certs',
-    'dock:drawcheck':'Drawing Check', 'dock:settings':'Settings',
+    'dock:drawcheck':'Drawing Check', 'dock:settings':'Settings', 'nav:coc':'Certs of Conformance',
     'nav:materialcerts':'Material Certs',
     'msr:hole':'Hole Ø'
   },
@@ -686,7 +687,14 @@ const I18N = {
     'not measured':'sin medir','measured':'medidas','out of tolerance':'fuera de tolerancia',
     'measured — no deviations so far':'medidas — sin desviaciones hasta ahora',
     'All characteristics in tolerance':'Todas las características dentro de tolerancia',
-    'Report status:':'Estado del reporte:'
+    'Report status:':'Estado del reporte:',
+    'nav:coc':'Certificados de conformidad','Certificates of Conformance':'Certificados de conformidad','Certificates':'Certificados',
+    'New certificate':'Nuevo certificado','New certificate of conformance':'Nuevo certificado de conformidad','Save & print':'Guardar e imprimir',
+    'Customer PO':'PO del cliente','Part number':'Número de parte','Drawing revision':'Revisión del dibujo','Quantity shipped':'Cantidad enviada',
+    'Ship date':'Fecha de envío','Certificate date':'Fecha del certificado','Description':'Descripción','Outside processes':'Procesos externos',
+    'Statement of conformance':'Declaración de conformidad','Signed by (printed name)':'Firmado por (nombre)','Title':'Puesto','Signed by':'Firmado por',
+    'Delete certificate':'Eliminar certificado','Certificate saved.':'Certificado guardado.','certificate':'certificado','certificates':'certificados',
+    'No certificates issued yet.':'Aún no se han emitido certificados.','Managers only.':'Solo gerentes.'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -704,7 +712,7 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 
 /* ---------- state ---------- */
 window.QC_USER=null; window.QC_ROLE='manager';
-let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={}, DRAWCHECKS={};
+let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={}, DRAWCHECKS={}, COCS={};
 let DRAW_FILTER='', DRAW_FOLDER=null;   // DRAW_FOLDER: null = folder view, ''=Unfiled, else customer name
 // qc.html?cert=<id> (links from the mail app) → open the cert library on that cert
 let _deepCert=new URLSearchParams(location.search).get('cert')||'';
@@ -747,6 +755,7 @@ window.qcOnData=(name,val)=>{
   else if(name==='audit') AUDIT=val||{};
   else if(name==='drawings') DRAWINGS=val||{};
   else if(name==='drawingChecks') DRAWCHECKS=val||{};
+  else if(name==='cocs') COCS=val||{};
   render();
 };
 window.qcOnAuth=(user,role)=>{
@@ -814,12 +823,13 @@ const META={
   fair:['First Article','First-article report'],
   ncr:['Nonconformances','Flagged parts and corrective action'],
   certs:['Material Certs','Mill & material certifications'],
+  coc:['Certificates of Conformance','Signed statement that shipped parts meet the PO, drawing and specs'],
   drawcheck:['Drawing Check','Compare your model drawing to the customer’s before you cut'],
   drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks'],
   settings:['Settings','AI connection for this device']
 };
 window.showPage=(p)=>{
-  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck')) p='inspections';
+  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck'||p==='coc')) p='inspections';
   if(typeof qcBoxConfirmKill==='function') qcBoxConfirmKill();   // don't leave a confirm card floating over another page
   page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
   if(p==='selfcheck'||p==='start'){
@@ -835,7 +845,7 @@ window.showPage=(p)=>{
   render();
 };
 function setActive(){
-  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings'};
+  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
   const dockMap={start:'dock-start',selfcheck:'dock-start',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',drawcheck:'dock-drawcheck',settings:'dock-settings'};
@@ -858,6 +868,7 @@ function render(){
   else if(page==='fair') c.innerHTML=viewFair();
   else if(page==='ncr') c.innerHTML=viewNcr();
   else if(page==='certs') c.innerHTML=viewCerts();
+  else if(page==='coc') c.innerHTML=viewCoc();
   else if(page==='drawcheck') c.innerHTML=viewDrawCheck();
   else if(page==='drawings') c.innerHTML=viewDrawings();
   else if(page==='settings') c.innerHTML=viewSettings();
@@ -979,6 +990,7 @@ window.qcFillFromOrder=(prefix,oid)=>{
   const o=ORDERS[oid]; if(!o) return;
   const set=(suf,v)=>{const el=$(prefix+suf); if(el&&v!=null) el.value=v;};
   set('-customer',o.customer||''); set('-part',o.part||o.partNum||''); set('-po',o.po||''); set('-job',o.job||'');
+  if(prefix==='coc' && typeof cocFillFromOrder==='function') cocFillFromOrder(o);
 };
 
 /* ---------- file inputs ---------- */
@@ -4531,6 +4543,260 @@ window.qcSaveReviewedCerts=async ()=>{
 
 // initial static translation (login screen + chrome) before sign-in
 applyStatic();
+/* =================== CERTIFICATE OF CONFORMANCE (manager-only) =================== */
+// A CoC is BSMP's signed statement that the parts shipped meet the customer's PO,
+// drawing revision and specs. It is NOT a material cert — those come from the mill and
+// are stored on the Material Certs page; a CoC can list them and print them behind itself.
+// Records live at qc/cocs/<id>. Numbering is COC-0001, COC-0002… (highest existing + 1).
+const COC_STATEMENT_DEFAULT="We hereby certify that the parts listed above were manufactured by Bert's Sheet Metal Products Inc. and conform to all requirements of the referenced purchase order, the drawing at the revision shown, and the specifications called out on them. Material and process certifications are on file and available on request.";
+let COC_FILTER='';
+function cocNextNo(){
+  let max=0;
+  vals(COCS).forEach(c=>{ const m=String(c.no||'').match(/(\d+)\s*$/); if(m) max=Math.max(max,parseInt(m[1],10)); });
+  return 'COC-'+String(max+1).padStart(4,'0');
+}
+function cocOrderCerts(oid){ return oid? vals(CERTS).filter(c=>(c.linkedOrders||[]).indexOf(oid)>=0) : []; }
+// outsourced steps (Outsource- Plating / Paint / Machining / Other) → one line each, with vendor + PO when known
+function cocOrderProcesses(o){
+  const raw=o&&o.schedule&&o.schedule.steps; const steps=Array.isArray(raw)?raw:vals(raw);
+  const out=[];
+  steps.forEach(s=>{
+    if(!s||!/^Outsource/i.test(s.name||'')) return;
+    const proc=(s.name||'').replace(/^Outsource-\s*/i,'').trim();
+    const lines=(Array.isArray(s.lines)?s.lines:vals(s.lines)).filter(Boolean);
+    const one=(desc,vendor,po)=>[desc||proc, vendor?('by '+vendor):'', po?(/^\s*P\.?O\.?\b/i.test(po)?po:'PO '+po):''].filter(Boolean).join(' — ');
+    if(lines.length) lines.forEach(l=>out.push(one(l.desc,l.vendor,l.vendorPO)));
+    else out.push(one(s.itemsPurchased,s.vendor,s.vendorPO));
+  });
+  return out.filter(Boolean);
+}
+function cocGuessRev(o){ const m=String((o&&o.desc)||'').match(/\bRev\.?\s*([A-Za-z0-9.\-]+)/i); return m?m[1]:''; }
+function cocGuessMaterial(o,certs){
+  if(certs&&certs.length){ const ms=[...new Set(certs.map(c=>c.material).filter(Boolean))]; if(ms.length) return ms.join(', '); }
+  const first=String((o&&o.desc)||'').split('·')[0].trim();
+  return /\bRev\b/i.test(first)?'':first;
+}
+function cocSignerDefault(){
+  let saved=null; try{ saved=JSON.parse(localStorage.getItem('bsmp_coc_signer')||'null'); }catch(e){}
+  if(saved&&saved.name) return saved;
+  const em=(QC_USER&&QC_USER.email)||''; const raw=em.split('@')[0].replace(/^(ops|ofc)\./i,'');
+  const name=raw.split(/[._-]+/).filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+  return {name, title:'Quality Manager'};
+}
+// called by the order picker (qcFillFromOrder) once the basic fields are in
+function cocFillFromOrder(o){
+  if(!o) return;
+  const set=(id,val,force)=>{ const el=$(id); if(el && (force||!el.value) && val!=null && val!=='') el.value=val; };
+  const certs=cocOrderCerts(o.id);
+  set('coc-qty', o.qty); set('coc-rev', cocGuessRev(o)); set('coc-desc', o.desc);
+  set('coc-material', cocGuessMaterial(o,certs));
+  set('coc-heat', [...new Set(certs.map(c=>c.heatLot).filter(Boolean))].join(', '));
+  set('coc-ship', o.shipDate||'', !!o.shipDate);
+  set('coc-processes', cocOrderProcesses(o).join('\n'));
+  const box=$('coc-certs'); if(box) box.innerHTML=cocCertPicker(o.id, certs.map(c=>c.id));
+}
+function cocCertPicker(oid, checkedIds){
+  const certs=cocOrderCerts(oid);
+  if(!certs.length) return `<div class="hint">${oid?t('No material certs are linked to this order yet. Link them on the Material Certs page and they will show here.'):t('Pick an order to see its linked material certs.')}</div>`;
+  const on=new Set(checkedIds||[]);
+  return certs.map(c=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;cursor:pointer"><input type="checkbox" class="coc-cert" value="${esc(c.id)}" ${on.has(c.id)?'checked':''}>
+    <span><b>${esc(c.material||'—')}</b>${c.spec?' · '+esc(c.spec):''}${c.heatLot?' · '+t('Heat / Lot')+' '+esc(c.heatLot):''}${c.supplier?' · '+esc(c.supplier):''}${c.certNo?' · '+t('Cert #')+' '+esc(c.certNo):''}</span></label>`).join('');
+}
+function viewCoc(){
+  if(!isMgr()) return `<div class="card"><div class="empty">${t('Managers only.')}</div></div>`;
+  if(editId && (editId==='__new_coc__' || COCS[editId])) return viewCocEdit(editId==='__new_coc__'?null:COCS[editId]);
+  const q=COC_FILTER.toLowerCase().trim();
+  const list=vals(COCS).filter(c=>!q||[c.no,c.customer,c.po,c.part,c.rev,c.job,c.desc,c.material,c.heatLot].filter(Boolean).join(' ').toLowerCase().indexOf(q)>=0)
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const rows=list.map(c=>`<tr>
+    <td style="white-space:nowrap"><b>${esc(c.no||'—')}</b></td>
+    <td style="white-space:nowrap">${fmtDate(c.date)}</td>
+    <td>${esc(c.customer||'—')}</td>
+    <td>${esc(c.po||'—')}</td>
+    <td>${esc(c.part||'—')}${c.rev?` <span class="badge neutral">Rev ${esc(c.rev)}</span>`:''}</td>
+    <td style="text-align:right">${esc(c.qty||'—')}</td>
+    <td class="muted">${esc((c.signerName||c.createdBy||'').split('@')[0])}</td>
+    <td style="white-space:nowrap;text-align:right">
+      <button class="icon-btn" title="${t('Print')}" onclick="window.qcCocPrint('${esc(c.id)}')"><i class="ti ti-printer"></i></button>
+      <span class="icon-btn" title="${t('Edit')}" onclick="window.qcCocEdit('${esc(c.id)}')"><i class="ti ti-pencil"></i></span>
+      <span class="icon-btn" title="${t('Delete')}" onclick="window.qcCocDelete('${esc(c.id)}')"><i class="ti ti-trash"></i></span></td>
+  </tr>`).join('');
+  const total=vals(COCS).length;
+  return `<div class="page-head"><h2>${t('Certificates of Conformance')}</h2><p>${t('Your signed statement that the parts shipped meet the customer’s PO, drawing revision and specs. Material certs stay on their own page and can be printed behind a certificate.')}</p></div>
+    <div class="toolbar">
+      <button class="btn primary" onclick="window.qcCocNew()"><i class="ti ti-plus"></i> ${t('New certificate')}</button>
+      ${total?`<input class="in" style="max-width:340px" placeholder="${t('Search certificates (customer, PO, part, heat)…')}" value="${esc(COC_FILTER)}" oninput="qcCocFilter(this.value)">`:''}
+      <div style="margin-left:auto;font-weight:800;color:var(--text2)">${total} ${total===1?t('certificate'):t('certificates')}</div>
+    </div>
+    <div class="card" style="padding:0">
+      ${list.length?`<table class="tbl"><thead><tr><th>${t('Cert #')}</th><th>${t('Date')}</th><th>${t('Customer')}</th><th>${t('Customer PO')}</th><th>${t('Part #')}</th><th style="text-align:right">${t('Qty')}</th><th>${t('Signed by')}</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+        :`<div class="empty"><i class="ti ti-certificate" style="font-size:30px;opacity:.5;display:block;margin-bottom:8px"></i>${total?t('No certificates match that search.'):t('No certificates issued yet.')}<br><span class="muted">${t('Press')} <b>${t('New certificate')}</b> ${t('— pick the order and everything it knows is filled in for you.')}</span></div>`}
+    </div>`;
+}
+function viewCocEdit(c){
+  const isNew=!c; c=c||{};
+  const v=(k,d)=>c[k]!=null?c[k]:(d==null?'':d);
+  const signer=isNew?cocSignerDefault():{name:c.signerName||'',title:c.signerTitle||''};
+  const certs=cocOrderCerts(c.orderId);
+  const checked=isNew?certs.map(x=>x.id):(c.certIds||[]);
+  const f=(id,label,val,extra)=>`<div class="field"><label class="fl">${label}</label><input class="in" id="${id}" value="${esc(val)}" ${extra||''}></div>`;
+  return `<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Certificates')}</button></div>
+  <div class="page-head"><h2>${isNew?t('New certificate of conformance'):esc(c.no||t('Certificate'))}</h2><p>${isNew?t('Pick the order first — customer, PO, part, quantity, material and outside processes fill in from it. Check everything before you sign.'):t('Edit, then Save & print for a fresh copy.')}</p></div>
+  <div class="card" style="max-width:860px">
+    <div class="field"><label class="fl">${t('Order')}</label>${orderSearchHtml('coc', v('orderId'))}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px">
+      ${f('coc-customer',t('Customer'),v('customer'))}
+      ${f('coc-po',t('Customer PO'),v('po'))}
+      ${f('coc-job',t('Job #'),v('job'))}
+      ${f('coc-part',t('Part number'),v('part'))}
+      ${f('coc-rev',t('Drawing revision'),v('rev'))}
+      ${f('coc-qty',t('Quantity shipped'),v('qty'),'inputmode="numeric"')}
+      ${f('coc-ship',t('Ship date'),v('shipDate',todayISO()),'type="date"')}
+      ${f('coc-date',t('Certificate date'),v('date',todayISO()),'type="date"')}
+    </div>
+    ${f('coc-desc',t('Description'),v('desc'))}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px">
+      ${f('coc-material',t('Material'),v('material'))}
+      ${f('coc-heat',t('Heat / Lot'),v('heatLot'))}
+    </div>
+    <div class="field"><label class="fl">${t('Material certs to list (and print behind)')}</label><div id="coc-certs">${cocCertPicker(v('orderId'), checked)}</div></div>
+    <div class="field"><label class="fl">${t('Outside processes')}</label><textarea class="in" id="coc-processes" rows="3" placeholder="${t('One per line, e.g. Chem film per MIL-DTL-5541 Type II Class 3 — by Vendor — PO 1234')}">${esc(v('processes'))}</textarea></div>
+    <div class="field"><label class="fl">${t('Drawing / specification references')}</label><textarea class="in" id="coc-specs" rows="2" placeholder="${t('e.g. Drawing 12345 Rev B, RoHS compliant, no MIL-STD-130 marking required')}">${esc(v('specs'))}</textarea></div>
+    <div class="field"><label class="fl">${t('Statement of conformance')}</label><textarea class="in" id="coc-statement" rows="4">${esc(v('statement',COC_STATEMENT_DEFAULT))}</textarea></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0 14px">
+      ${f('coc-signer',t('Signed by (printed name)'),signer.name)}
+      ${f('coc-title',t('Title'),signer.title)}
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;margin:4px 0 12px;cursor:pointer"><input type="checkbox" id="coc-attach" ${v('attachCerts',true)?'checked':''}> ${t('Print the checked material certs behind the certificate')}</label>
+    <div class="toolbar" style="margin-top:6px">
+      <button class="btn primary" onclick="window.qcCocSave(true)"><i class="ti ti-printer"></i> ${t('Save & print')}</button>
+      <button class="btn" onclick="window.qcCocSave(false)"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
+      <button class="btn" onclick="editId=null;render()">${t('Cancel')}</button>
+    </div>
+  </div>`;
+}
+window.qcCocNew=()=>{ if(!isMgr()) return; editId='__new_coc__'; render(); };
+window.qcCocEdit=(id)=>{ if(!isMgr()||!COCS[id]) return; editId=id; render(); };
+window.qcCocFilter=(q)=>{ COC_FILTER=q||''; render(); const el=document.querySelector('.toolbar input.in'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } };
+window.qcCocSave=async (thenPrint)=>{
+  if(!isMgr()) return;
+  if(!gv('coc-customer')||!gv('coc-part')||!gv('coc-qty')){ alert(t('Customer, part number and quantity are required.')); return; }
+  const prev=(editId&&editId!=='__new_coc__')?COCS[editId]:null;
+  const id=prev?prev.id:newId('coc');
+  const certIds=[...document.querySelectorAll('.coc-cert:checked')].map(x=>x.value);
+  const signerName=gv('coc-signer'), signerTitle=gv('coc-title');
+  try{ localStorage.setItem('bsmp_coc_signer', JSON.stringify({name:signerName,title:signerTitle})); }catch(e){}
+  const rec={ id, no:(prev&&prev.no)||cocNextNo(), createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'',
+    updatedAt:Date.now(), updatedBy:(QC_USER&&QC_USER.email)||'',
+    orderId:gv('coc-order'), customer:gv('coc-customer'), po:gv('coc-po'), job:gv('coc-job'), part:gv('coc-part'), rev:gv('coc-rev'),
+    qty:gv('coc-qty'), shipDate:gv('coc-ship'), date:gv('coc-date')||todayISO(), desc:gv('coc-desc'),
+    material:gv('coc-material'), heatLot:gv('coc-heat'), certIds, processes:gv('coc-processes'), specs:gv('coc-specs'),
+    statement:gv('coc-statement')||COC_STATEMENT_DEFAULT, signerName, signerTitle, attachCerts:gc('coc-attach'),
+    printedAt:(prev&&prev.printedAt)||null };
+  try{
+    await dbSet('qc/cocs/'+id, rec);
+  }catch(e){
+    console.warn('coc save failed', e);
+    alert(t('Could not save the certificate.')+'\n'+((e&&e.message)||'')+'\n\n'+t('If this says permission denied, the qc/cocs database rule has not been published yet.'));
+    return;
+  }
+  COCS[id]=rec; editId=null; render();
+  qcToast(t('Certificate saved.')+' '+rec.no,'ok');
+  if(thenPrint) window.qcCocPrint(id);
+};
+window.qcCocDelete=async (id)=>{
+  const c=COCS[id]; if(!c||!isMgr()) return;
+  if(!confirm(t('Delete certificate')+' '+(c.no||'')+'?')) return;
+  try{ await dbRemove('qc/cocs/'+id); }catch(e){ alert(t('Could not delete.')+' '+((e&&e.message)||'')); return; }
+  delete COCS[id]; render();
+};
+window.qcCocPrint=(id)=>{
+  const c=COCS[id]; if(!c) return;
+  const certs=(c.certIds||[]).map(x=>CERTS[x]).filter(Boolean);
+  const attach=!!c.attachCerts && certs.length>0;
+  const logo=(typeof BSMP_PRINT_LOGO!=='undefined'&&BSMP_PRINT_LOGO)||'';
+  const w=window.open('','_blank','width=850,height=1100');
+  if(!w){ alert(t('Please allow pop-ups to open the printable certificate.')); return; }
+  const infoCol=(label,val)=>`<div style="flex:1;min-width:110px"><div style="font-size:10px;font-weight:700;color:#222;letter-spacing:.3px">${label}</div><div style="font-size:12px;color:#333;margin-top:2px">${val||'—'}</div></div>`;
+  const th=(txt,extra)=>`<th style="padding:0 8px 8px${extra||''};text-align:left;font-size:10px;font-weight:700;color:#222;letter-spacing:.3px">${txt}</th>`;
+  const td=(html,extra)=>`<td style="padding:9px 8px;border-bottom:1px dashed #ccc;font-size:12px;vertical-align:top${extra||''}">${html}</td>`;
+  const section=(title)=>`<div style="font-size:11px;font-weight:700;color:#222;letter-spacing:.3px;margin:18px 0 6px">${title}</div>`;
+  const longDate=(v)=>{ if(!v) return '—'; const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/); const d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(v); return isNaN(d)?esc(v):d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); };
+  const poLabel=(po)=>po?(/^\s*P\.?O\.?\b/i.test(po)?po:'PO '+po):'';
+  let matRows=certs.map(m=>`<tr>${td(`<b style="color:#000">${esc(m.material||'—')}</b>${m.size?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(m.size)}</div>`:''}`,';padding-left:0')}${td(esc(m.spec||'—'))}${td(esc(m.heatLot||'—'))}${td(`${esc(m.supplier||'—')}${m.mill&&m.mill!==m.supplier?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(m.mill)}</div>`:''}`)}${td(esc(m.certNo||'—'),';padding-right:0')}</tr>`).join('');
+  if(!matRows && (c.material||c.heatLot)) matRows=`<tr>${td(`<b style="color:#000">${esc(c.material||'—')}</b>`,';padding-left:0')}${td('—')}${td(esc(c.heatLot||'—'))}${td('—')}${td('—',';padding-right:0')}</tr>`;
+  const procs=String(c.processes||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const anyItar=certs.some(m=>m.itar);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc((c.no||'COC')+' - '+(c.customer||'')+(c.po?' - '+poLabel(c.po):'')+' - Certificate of Conformance')}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{background:#e5e7eb}
+    .sheet{width:8.5in;min-height:11in;background:#fff;padding:42px 46px;color:#222;font-family:Arial,Helvetica,sans-serif;position:relative}
+    @page{size:letter portrait;margin:0}
+    .certpage{display:block;width:8.5in;height:auto;background:#fff;page-break-before:always}
+    .pagenote{width:8.5in;background:#fff;padding:24px 46px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#b3261e;page-break-before:always}
+    .actions{position:sticky;bottom:12px;text-align:center;padding:8px 0}
+    .actions button{font:700 14px Arial,Helvetica,sans-serif;background:#1e3a5f;color:#fff;border:none;border-radius:6px;padding:10px 26px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+    @media screen{.sheet,.certpage,.pagenote{margin:24px auto;box-shadow:0 2px 16px rgba(0,0,0,0.18)}}
+    @media print{html,body{background:#fff}.sheet,.certpage,.pagenote{margin:0;box-shadow:none}.actions{display:none}}
+  </style></head><body><div class="sheet">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:26px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#000;letter-spacing:.3px">BERT'S SHEET METAL PRODUCTS INC.</div>
+        <div style="font-size:11px;color:#333;margin-top:6px;line-height:1.5">9521 Irondale Ave<br>Chatsworth, CA 91311<br>+1 818 775 0104<br>info@bertsmp.com</div>
+      </div>
+      ${logo?`<img src="${logo}" alt="Bert's Sheet Metal Products Inc." style="width:230px;height:auto;margin-top:2px">`:''}
+    </div>
+
+    <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px">
+      <div style="font-size:30px;font-weight:400;color:#3a3a3a">Certificate of Conformance</div>
+      <div style="text-align:right;font-size:12px;color:#333;line-height:1.5"><div><span style="font-size:10px;font-weight:700;letter-spacing:.3px;color:#222">CERTIFICATE NO.</span> <b style="color:#000">${esc(c.no||'—')}</b></div><div><span style="font-size:10px;font-weight:700;letter-spacing:.3px;color:#222">DATE</span> ${longDate(c.date||todayISO())}</div></div>
+    </div>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap;border-top:2px solid #000;border-bottom:2px solid #000;padding:12px 0;margin-bottom:6px">
+      ${infoCol('CUSTOMER', esc(c.customer))}
+      ${infoCol('CUSTOMER PO', esc(c.po))}
+      ${infoCol('JOB #', esc(c.job))}
+      ${infoCol('PART NUMBER', esc(c.part))}
+      ${infoCol('REVISION', esc(c.rev))}
+      ${infoCol('QUANTITY', esc(c.qty))}
+      ${infoCol('SHIP DATE', longDate(c.shipDate))}
+    </div>
+    ${c.desc?`<div style="font-size:12px;color:#333;margin-bottom:4px"><span style="font-size:10px;font-weight:700;letter-spacing:.3px;color:#222">DESCRIPTION</span> &nbsp;${esc(c.desc)}</div>`:''}
+
+    ${matRows?`${section('MATERIAL')}
+    <table style="width:100%;border-collapse:collapse">
+      <thead><tr style="border-bottom:1px solid #000">${th('MATERIAL',';padding-left:0')}${th('SPECIFICATION')}${th('HEAT / LOT')}${th('SUPPLIER / MILL')}${th('CERT #',';padding-right:0')}</tr></thead>
+      <tbody>${matRows}</tbody>
+    </table>`:''}
+
+    ${procs.length?`${section('OUTSIDE PROCESSES')}<div style="font-size:12px;color:#333;line-height:1.6">${procs.map(p=>'<div>'+esc(p)+'</div>').join('')}</div>`:''}
+    ${c.specs?`${section('DRAWING / SPECIFICATIONS')}<div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">${esc(c.specs)}</div>`:''}
+
+    ${section('STATEMENT OF CONFORMANCE')}
+    <div style="font-size:12px;color:#333;line-height:1.65;white-space:pre-wrap">${esc(c.statement||COC_STATEMENT_DEFAULT)}</div>
+
+    <div style="display:flex;gap:40px;margin-top:64px">
+      <div style="flex:1.4;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Authorized signature<div style="font-size:12px;color:#000;font-weight:700;margin-top:10px">${esc(c.signerName||'')}</div><div style="font-size:11px;color:#444">${esc(c.signerTitle||'')}</div></div>
+      <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Date</div>
+    </div>
+
+    <div style="position:absolute;left:46px;right:46px;bottom:30px;font-size:10px;color:#666;display:flex;justify-content:space-between">
+      <div>${esc(c.no||'')} · ${certs.length?(attach?certs.length+' material certification'+(certs.length!==1?'s':'')+' enclosed':'Material certifications on file'):'Material certifications on file'}${anyItar?' · Contains ITAR-restricted material — do not re-export.':''}</div>
+      <div>This certificate is not an invoice or packing list.</div>
+    </div>
+  </div>${attach?`<div id="cert-pages"><div class="pagenote" style="color:#8a919b">${esc(t('Preparing cert pages…'))}</div></div>`:''}
+  <div class="actions"><button onclick="window.print()">${esc(t('Print'))}</button></div>
+  ${attach?'':'<script>setTimeout(function(){window.focus();window.print();},350)<\/script>'}</body></html>`);
+  w.document.close();
+  if(attach){
+    qcCoverCertPages(certs, w)
+      .catch(e=>console.warn('coc cert render failed', e))
+      .then(()=>{ try{ w.focus(); w.print(); }catch(e){} });
+  }
+  dbUpdate('qc/cocs/'+id, {printedAt:Date.now(), printedBy:(QC_USER&&QC_USER.email)||''}).catch(()=>{});
+};
+
 </script>
 
 <!-- ================= Firebase (auth + db + storage) ================= -->
@@ -4590,6 +4856,7 @@ function startListeners(){
   onValue(ref(db,'qc/audit'),       s=> window.qcOnData('audit', s.val()||{}));
   onValue(ref(db,'qc/drawings'),    s=> window.qcOnData('drawings', s.val()||{}));
   onValue(ref(db,'qc/drawingChecks'), s=> window.qcOnData('drawingChecks', s.val()||{}));
+  onValue(ref(db,'qc/cocs'),        s=> window.qcOnData('cocs', s.val()||{}));
   onValue(ref(db,'orders'),         s=> window.qcOnData('orders', s.val()||{}));
   onValue(ref(db,'quotes'),         s=> window.qcOnData('quotes', s.val()||{}));
   startConnectionWatch();
