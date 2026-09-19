@@ -410,6 +410,7 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
       <div class="nav-item mgr-only" id="nav-coc" onclick="showPage('coc')"><i class="ti ti-certificate"></i><span class="nav-label" data-t="nav:coc">Certs of Conformance</span></div>
+      <div class="nav-item" id="nav-resources" onclick="showPage('resources')"><i class="ti ti-book-2"></i><span class="nav-label" data-t="nav:resources">Resources</span></div>
       <div class="nav-sec" data-t="Setup">Setup</div>
       <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span class="nav-label" data-t="Settings">Settings</span></div>
     </div>
@@ -440,6 +441,7 @@ body.role-operator .mgr-only{display:none!important}
   <button class="dock-tab" id="dock-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span data-t="dock:ncr">NCRs</span></button>
   <button class="dock-tab mgr-only" id="dock-drawcheck" onclick="showPage('drawcheck')"><i class="ti ti-file-diff"></i><span data-t="dock:drawcheck">Drawing Check</span></button>
   <button class="dock-tab mgr-only" id="dock-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span data-t="dock:materialcerts">Certs</span></button>
+  <button class="dock-tab" id="dock-resources" onclick="showPage('resources')"><i class="ti ti-book-2"></i><span data-t="dock:resources">Resources</span></button>
   <button class="dock-tab" id="dock-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span data-t="dock:settings">Settings</span></button>
   <div class="dock-switch">
     <span class="lbl" data-t="Switch app">Switch app</span>
@@ -462,7 +464,7 @@ const I18N = {
   en: {
     'dock:start':'Start', 'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs', 'dock:materialcerts':'Certs',
     'dock:drawcheck':'Drawing Check', 'dock:settings':'Settings', 'nav:coc':'Certs of Conformance',
-    'nav:materialcerts':'Material Certs',
+    'nav:materialcerts':'Material Certs', 'nav:resources':'Resources', 'dock:resources':'Resources',
     'msr:hole':'Hole Ø'
   },
   es: {
@@ -615,6 +617,23 @@ const I18N = {
     'No measurement entered for:':'Falta la medición de:','Save as Pass anyway?':'¿Guardar como Aprobado de todos modos?',
     'No dimension callouts found on the attached drawing — add the customer’s dimensioned drawing (From library) and run the check again to get the two gauge checks.':'El plano adjunto no tiene cotas — agrega el plano acotado del cliente (Desde la biblioteca) y corre la revisión de nuevo para obtener las dos verificaciones con instrumento.',
     // Settings (AI connection)
+    'nav:resources':'Recursos','dock:resources':'Recursos','Resources':'Recursos',
+    'Guides, manuals and maintenance schedules':'Guías, manuales y calendarios de mantenimiento',
+    'Guides, equipment manuals and maintenance schedules. Open a document in a new tab and print from there.':'Guías, manuales de equipos y calendarios de mantenimiento. Abre un documento en una pestaña nueva e imprime desde ahí.',
+    'Search resources — title, ID, tag':'Buscar recursos — título, ID, etiqueta','No resources match your search.':'Ningún recurso coincide con tu búsqueda.',
+    'Equipment manuals & maintenance':'Manuales de equipos y mantenimiento','Quality documents':'Documentos de calidad','Forms':'Formularios',
+    'Document':'Documento','ID / Rev':'ID / Rev','Updated':'Actualizado','Open':'Abrir','Word file':'Archivo Word','Supplier document':'Documento del proveedor',
+    'Maintenance schedule':'Calendario de mantenimiento','Task':'Tarea','How often':'Frecuencia','Who':'Quién','Full procedure':'Procedimiento completo',
+    'Laser air compressor':'Compresor de aire del láser','Laser operator':'Operador del láser','Manager':'Gerente','Anyone':'Cualquiera',
+    '2–3 times a day':'2–3 veces al día','Weekly':'Semanal','First 500 hours':'Primeras 500 horas','Every 3,000 hours or 6 months':'Cada 3,000 horas o 6 meses','When needed':'Cuando haga falta',
+    'Open the manual drain on the air receiver until it blows dry air; glance at PRES and TEMP on the screen.':'Abre la purga manual del tanque hasta que salga aire seco; revisa PRES y TEMP en la pantalla.',
+    'Blow out the intake filter screen (inside out), the motor side vents and the cooler fins. Wipe dust off the VFD with power off. Check the electronic drain cycles. Check the oil level in the sight glass with the unit stopped.':'Sopla la malla de admisión (de adentro hacia afuera), las rejillas del motor y las aletas del enfriador. Limpia el polvo del variador con la energía apagada. Verifica que la purga electrónica funcione. Revisa el nivel de aceite en la mirilla con el equipo parado.',
+    'Change the air filter, the oil filter and the oil. Then set the 500-hour limits to 3000 and zero the counters (password from supplier).':'Cambia el filtro de aire, el filtro de aceite y el aceite. Luego pon los límites de 500 h en 3000 y pon los contadores en cero (contraseña del proveedor).',
+    'Air filter, oil filter, oil, oil-air separator element, every multi-stage filter element, primary filter cartridge. Grease per supplier. Zero all counters.':'Filtro de aire, filtro de aceite, aceite, elemento separador aceite-aire, todos los elementos de los filtros multietapa, cartucho del filtro primario. Grasa según el proveedor. Pon todos los contadores en cero.',
+    'GREASE alarm on the screen: follow page 1 of the guide — log the hours, confirm the grease point with the supplier, then reset the counter.':'Alarma GREASE en la pantalla: sigue la página 1 de la guía — anota las horas, confirma el punto de engrase con el proveedor y luego reinicia el contador.',
+    'TEMP creeping up: cooler fins, intake filter, oil level, room temperature, in that order.':'Si TEMP sube: aletas del enfriador, filtro de admisión, nivel de aceite, temperatura del cuarto, en ese orden.',
+    'Pressure reading looks wrong or the safety valve pops: pressure-sensor condensate procedure (guide, page 5).':'Si la presión se ve mal o salta la válvula de seguridad: procedimiento de condensado del sensor de presión (guía, página 5).',
+    'To add or update a document: ask Claude to drop the new file into the repo\'s docs folder and update the RESOURCES list in qc.html. This list was last updated':'Para agregar o actualizar un documento: pide a Claude que ponga el archivo nuevo en la carpeta docs del repositorio y actualice la lista RESOURCES en qc.html. Esta lista se actualizó por última vez el',
     'Setup':'Configuración','Settings':'Ajustes','dock:settings':'Ajustes','AI connection for this device':'Conexión de IA para este equipo',
     'One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.':'Una sola conexión alimenta todas las funciones de IA — globos en planos, lectura de certificados y revisión de fotos.',
     'AI Connection':'Conexión de IA','Connected via proxy':'Conectado vía proxy','Using direct API key':'Usando clave API directa','Not connected':'Sin conexión',
@@ -826,7 +845,8 @@ const META={
   coc:['Certificates of Conformance','Signed statement that shipped parts meet the PO, drawing and specs'],
   drawcheck:['Drawing Check','Compare your model drawing to the customer’s before you cut'],
   drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks'],
-  settings:['Settings','AI connection for this device']
+  settings:['Settings','AI connection for this device'],
+  resources:['Resources','Guides, manuals and maintenance schedules']
 };
 window.showPage=(p)=>{
   if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck'||p==='coc')) p='inspections';
@@ -845,10 +865,10 @@ window.showPage=(p)=>{
   render();
 };
 function setActive(){
-  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings'};
+  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings',resources:'nav-resources'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
-  const dockMap={start:'dock-start',selfcheck:'dock-start',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',drawcheck:'dock-drawcheck',settings:'dock-settings'};
+  const dockMap={start:'dock-start',selfcheck:'dock-start',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',drawcheck:'dock-drawcheck',settings:'dock-settings',resources:'dock-resources'};
   document.querySelectorAll('.dock-tab').forEach(tb=>tb.classList.remove('active'));
   if(dockMap[page]&&$(dockMap[page])) $(dockMap[page]).classList.add('active');
   const m=META[page]||['Inspections','Quality control'];
@@ -872,6 +892,7 @@ function render(){
   else if(page==='drawcheck') c.innerHTML=viewDrawCheck();
   else if(page==='drawings') c.innerHTML=viewDrawings();
   else if(page==='settings') c.innerHTML=viewSettings();
+  else if(page==='resources') c.innerHTML=viewResources();
   if(_deepCert && page==='certs'){
     const tr=document.getElementById('certrow-'+_deepCert);
     if(tr){
@@ -916,6 +937,103 @@ function viewSettings(){
     <div class="hint" id="qc-key-status" style="min-height:16px;margin-top:6px"></div>
   </div>`;
 }
+/* ---------- resources (guides, manuals, maintenance schedules) ----------
+   Static registry, on purpose: the documents live in the repo's docs/ folder and GitHub Pages
+   serves them next to this file, so a relative link is all a row needs. To add or revise a
+   document: drop the file into docs/<area>/, then edit RESOURCES below (title, id/rev, date, file).
+   Keep RES_UPDATED current — it prints at the bottom of the page. */
+const RES_UPDATED='2026-09-19';
+const RESOURCES=[
+  { key:'equipment', title:'Equipment manuals & maintenance', icon:'ti-tool', items:[
+    { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'A', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts',
+      desc:'Hoverr / Haoweier PM VSD screw compressor: what the GREASE alarm means, controller timers, daily/weekly/500 h/3,000 h schedule, procedures, parts lists per model, service log.',
+      file:'docs/equipment/air-compressor/BSMP Laser Air Compressor - Maintenance Guide.pdf' },
+    { title:'Hoverr PM VSD Air Compressor — Operating Guide (2025)', id:'Supplier', rev:'', date:'2025', tags:'laser compressor air manual supplier taike hoverr haoweier',
+      desc:'The supplier\'s own manual (Taike Machinery Technology, Dongguan). Screens, parameters, consumable lists, flow charts. Source for the BSMP guide.',
+      file:'docs/equipment/air-compressor/Hoverr PM VSD Air Compressor - Operating Guide (2025).pdf', supplier:true },
+  ]},
+  { key:'quality', title:'Quality documents', icon:'ti-shield-check', items:[
+    { title:'Material Compliance Guide — RoHS / REACH / DFARS', id:'BSMP-QG-001', rev:'A', date:'2026-09-18', tags:'rohs reach dfars compliance material cert declaration',
+      desc:'What each rule is, when a customer PO triggers it, which cert language counts, and how BSMP answers. Use before signing any compliance statement.',
+      file:'docs/quality/BSMP Material Compliance Guide - RoHS REACH DFARS.pdf' },
+    { title:'Quality Manual', id:'QM-001', rev:'A', date:'2026-08-13', tags:'quality manual survey as9100 policy',
+      desc:'BSMP quality system as written for supplier surveys: inspection, first articles, NCRs, material traceability, approved vendors, records.',
+      file:'docs/quality/BSMP Quality Manual QM-001 Rev A.pdf', docx:'docs/quality/BSMP Quality Manual QM-001 Rev A.docx' },
+  ]},
+  { key:'forms', title:'Forms', icon:'ti-forms', items:[
+    { title:'Calibration Register', id:'QF-001', rev:'A', date:'2026-08-13', tags:'calibration gauge caliper register form',
+      desc:'Tool IDs BSMP-01…20 pre-seeded, status OK / DUE / OOT / REF. Fill in as tools go out for calibration.',
+      file:'docs/quality/QF-001 Calibration Register.pdf', docx:'docs/quality/QF-001 Calibration Register.docx' },
+    { title:'Employee Training Record', id:'QF-002', rev:'A', date:'2026-08-13', tags:'training record employee form',
+      desc:'One per employee. Topics matched to the apps; (Mgr) rows for manager-only duties.',
+      file:'docs/quality/QF-002 Employee Training Record.pdf', docx:'docs/quality/QF-002 Employee Training Record.docx' },
+    { title:'Internal Audit Checklist', id:'QF-003', rev:'A', date:'2026-08-13', tags:'audit internal checklist form',
+      desc:'Annual internal audit: three-order trace-through plus NCR, supplier, calibration, training and records checks, with a findings log.',
+      file:'docs/quality/QF-003 Internal Audit Checklist.pdf', docx:'docs/quality/QF-003 Internal Audit Checklist.docx' },
+  ]},
+];
+// Maintenance schedules shown on the Resources page. `guide` points at a RESOURCES item by id.
+const MAINTENANCE=[
+  { equipment:'Laser air compressor', guide:'BSMP-MG-001', tasks:[
+    { every:'2–3 times a day', tone:'neutral', who:'Laser operator', task:'Open the manual drain on the air receiver until it blows dry air; glance at PRES and TEMP on the screen.' },
+    { every:'Weekly', tone:'neutral', who:'Laser operator', task:'Blow out the intake filter screen (inside out), the motor side vents and the cooler fins. Wipe dust off the VFD with power off. Check the electronic drain cycles. Check the oil level in the sight glass with the unit stopped.' },
+    { every:'First 500 hours', tone:'warn', who:'Manager', task:'Change the air filter, the oil filter and the oil. Then set the 500-hour limits to 3000 and zero the counters (password from supplier).' },
+    { every:'Every 3,000 hours or 6 months', tone:'warn', who:'Manager', task:'Air filter, oil filter, oil, oil-air separator element, every multi-stage filter element, primary filter cartridge. Grease per supplier. Zero all counters.' },
+    { every:'When needed', tone:'flag', who:'Manager', task:'GREASE alarm on the screen: follow page 1 of the guide — log the hours, confirm the grease point with the supplier, then reset the counter.' },
+    { every:'When needed', tone:'flag', who:'Anyone', task:'TEMP creeping up: cooler fins, intake filter, oil level, room temperature, in that order.' },
+    { every:'When needed', tone:'flag', who:'Manager', task:'Pressure reading looks wrong or the safety valve pops: pressure-sensor condensate procedure (guide, page 5).' },
+  ]},
+];
+let RES_FILTER='';
+function resUrl(f){ return encodeURI(f); }
+function resItemById(id){ for(const sec of RESOURCES){ for(const it of sec.items){ if(it.id===id) return it; } } return null; }
+function resMatches(it,q){
+  q=(q||'').trim().toLowerCase(); if(!q) return true;
+  return [it.title,it.id,it.rev,it.desc,it.tags].join(' ').toLowerCase().indexOf(q)>=0;
+}
+function resRow(it){
+  const idTxt=it.supplier?t('Supplier document'):[it.id,it.rev?('Rev '+it.rev):''].filter(Boolean).join(' · ');
+  return `<tr>
+    <td><div style="font-weight:700">${esc(it.title)}</div><div class="hint" style="margin-top:2px">${esc(it.desc||'')}</div></td>
+    <td style="white-space:nowrap">${esc(idTxt)}</td>
+    <td style="white-space:nowrap">${esc(it.date||'')}</td>
+    <td style="white-space:nowrap;text-align:right">
+      <a class="btn sm primary" href="${resUrl(it.file)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> ${t('Open')}</a>
+      ${it.docx?` <a class="btn sm" href="${resUrl(it.docx)}" download title="${esc(t('Word file'))}"><i class="ti ti-file-type-docx"></i></a>`:''}
+    </td></tr>`;
+}
+function resSectionCard(sec){
+  const items=sec.items.filter(it=>resMatches(it,RES_FILTER));
+  if(!items.length) return '';
+  return `<div class="card" style="padding:0">
+    <div class="card-title" style="padding:14px 18px 0"><i class="ti ${sec.icon}"></i> ${t(sec.title)}</div>
+    <div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th>${t('Document')}</th><th>${t('ID / Rev')}</th><th>${t('Updated')}</th><th></th></tr></thead>
+      <tbody>${items.map(resRow).join('')}</tbody>
+    </table></div></div>`;
+}
+function resScheduleCard(m){
+  const g=resItemById(m.guide);
+  const tasks=m.tasks.filter(x=>!RES_FILTER.trim() || [m.equipment,x.task,x.every,x.who].join(' ').toLowerCase().indexOf(RES_FILTER.trim().toLowerCase())>=0);
+  if(!tasks.length) return '';
+  return `<div class="card" style="padding:0">
+    <div class="card-title" style="padding:14px 18px 0;flex-wrap:wrap"><i class="ti ti-calendar-check"></i> ${t('Maintenance schedule')} — ${t(m.equipment)}
+      ${g?`<a class="btn sm" style="margin-left:auto" href="${resUrl(g.file)}" target="_blank" rel="noopener"><i class="ti ti-book"></i> ${t('Full procedure')}</a>`:''}</div>
+    <div style="overflow-x:auto"><table class="tbl">
+      <thead><tr><th>${t('How often')}</th><th>${t('Task')}</th><th>${t('Who')}</th></tr></thead>
+      <tbody>${tasks.map(x=>`<tr><td style="white-space:nowrap"><span class="badge ${x.tone||'neutral'}">${esc(t(x.every))}</span></td><td>${esc(t(x.task))}</td><td style="white-space:nowrap">${esc(t(x.who))}</td></tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+function viewResources(){
+  const cards=RESOURCES.map(resSectionCard).join('')+MAINTENANCE.map(resScheduleCard).join('');
+  return `<div class="page-head"><h2>${t('Resources')}</h2><p>${t('Guides, equipment manuals and maintenance schedules. Open a document in a new tab and print from there.')}</p></div>
+    <div class="toolbar" style="margin-bottom:12px">
+      <input class="in" id="res-search" style="max-width:360px" placeholder="${esc(t('Search resources — title, ID, tag'))}" value="${esc(RES_FILTER)}" oninput="RES_FILTER=this.value; render(); const el=document.getElementById('res-search'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); }">
+    </div>
+    ${cards||`<div class="card"><div class="empty">${t('No resources match your search.')}</div></div>`}
+    <div class="hint" style="margin-top:6px">${t('To add or update a document: ask Claude to drop the new file into the repo\'s docs folder and update the RESOURCES list in qc.html. This list was last updated')} ${esc(RES_UPDATED)}.</div>`;
+}
+
 function qcSetStatus(id,msg,tone){ const el=$(id); if(!el) return; el.textContent=msg; el.style.color=tone==='ok'?'var(--green)':(tone==='err'?'var(--red)':'var(--text3)'); }
 function qcConnRefresh(){ const b=$('qc-conn-badge'); if(b) b.innerHTML=aiConnBadge(); }
 window.qcSaveProxy=()=>{

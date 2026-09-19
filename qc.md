@@ -34,7 +34,18 @@ Quality control: operator self-checks, First Article Inspection reports (Simple 
 
 ## Pages (`showPage(...)`)
 
-`inspections` (list), `selfcheck` (form), `fairs` (First Article list), `fair` (First Article form), `ncr`, `certs`, `drawings` (drawing library), `settings` (AI connection — per-device, all roles).
+`inspections` (list), `selfcheck` (form), `fairs` (First Article list), `fair` (First Article form), `ncr`, `certs`, `drawings` (drawing library), `resources` (guides, manuals, maintenance schedules — all roles), `settings` (AI connection — per-device, all roles).
+
+### Resources page (`viewResources`, 2026-09-19)
+
+A read-only library of company documents: guides, equipment manuals, quality documents, forms, plus a maintenance schedule table per piece of equipment. **No Firebase and no rule** — the registry is a static constant in the file and the documents are files in the repo's `docs/` folder, which GitHub Pages serves next to `qc.html` (relative links, `encodeURI`'d).
+
+- `RESOURCES` = sections (`equipment`, `quality`, `forms`) → items `{title,id,rev,date,tags,desc,file,docx?,supplier?}`. `file` is the PDF that **Open** launches in a new tab; `docx` adds a small download button for the editable Word original (forms, quality manual). `supplier:true` shows "Supplier document" in place of an ID/Rev.
+- `MAINTENANCE` = schedules `{equipment, guide:<RESOURCES id>, tasks:[{every,tone,who,task}]}`; `guide` becomes the "Full procedure" button. Task text runs through `t()` so add both EN and ES when adding tasks (the compressor schedule is fully translated).
+- `RES_FILTER` search box filters every card by title/id/desc/tags (and schedule rows by task text); the input keeps focus across `render()` the same way the drawing-library search does.
+- `RES_UPDATED` prints in the footer hint — bump it whenever the list changes.
+- **To add or revise a document:** put the file in `docs/<area>/` (commit it — `.gitattributes` marks PDFs binary), add/edit the `RESOURCES` row, bump `RES_UPDATED`. PDF builders live in `dev/` (`build_compressor_guide.py`, `build_compliance_guide.py`) and write straight into `docs/`.
+- ⚠️ The repo is **public**, so everything in `docs/` is public too. Never put passwords, serials, pricing or customer data in a resource document.
 
 ## Core areas (where to work)
 
