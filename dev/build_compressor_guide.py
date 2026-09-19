@@ -22,7 +22,7 @@ MANUAL = os.path.join(DOCDIR, "Hoverr PM VSD Air Compressor - Operating Guide (2
 OUT = os.path.join(DOCDIR, "BSMP Laser Air Compressor - Maintenance Guide.pdf")
 LOGO = r"C:/Users/info/bertsmp-site/assets/img/logo.png"
 
-DOC_ID = "BSMP-MG-001 Rev A"
+DOC_ID = "BSMP-MG-001 Rev B"
 DATE = "2026-09-19"
 
 # ---- palette (BSMP app design language: dark ink, red rule) ----
@@ -162,6 +162,7 @@ story += [head, Spacer(1, 4),
           P(f"Bert's Sheet Metal Products, Inc. \u00b7 9521 Irondale Ave, Chatsworth, CA 91311 \u00b7 818.775.0104 \u00b7 {DOC_ID}", "small"),
           Spacer(1, 8)]
 
+story.append(P("Rev B (2026-09-19) adds page 6: troubleshooting an overload fault or a compressor that cannot keep up, and whether a second compressor helps.", "small"))
 story.append(P("Right now: the GREASE service alarm", "h1"))
 story.append(P("The controller keeps five service-hour counters (air filter, oil filter, oil-air separator, lube oil, grease). "
                "When a counter reaches its preset limit the screen raises a maintenance warning for that item. "
@@ -266,7 +267,7 @@ story.append(P("Supplier", "h1"))
 story.append(P("Taike Machinery Technology (Dongguan) Co., Ltd, brand names Hoverr and Haoweier. Contact printed in the manual: Meng Hui, mobile +86 136 0266 7790 (WeChat works on that number). "
                "Have the model and the hour reading ready. The consumable-parameters password and the grease specification both have to come from them; write the answers on the log page."))
 story.append(P("Our model", "h1"))
-story.append(P("The manual covers the whole range. Circle ours from the nameplate on the front panel so the right parts list on page 6 gets used:"))
+story.append(P("The manual covers the whole range. Circle ours from the nameplate on the front panel so the right parts list on page 7 gets used:"))
 story.append(tbl([
     ["Model", "Motor", "Air delivery", "Laser it is sized for", "Tank", "Parts list"],
     ["HB11PM-16-300", "11 kW", "1.0 m\u00b3/min", "1 to 3 kW", "350 L", "List A"],
@@ -334,7 +335,55 @@ story.append(P("Air element: open the back panel, unclip the housing, swap the p
 
 story.append(PageBreak())
 
-# =============== PAGE 5: parts lists ===============
+# =============== PAGE 6: troubleshooting ===============
+story.append(P("Troubleshooting: overload faults and running out of air", "h1"))
+story.append(P("\u201cThe compressor keeps overloading\u201d covers three different problems with three different fixes. Work out which one you have before spending money. "
+               "The fault log (Menu \u2192 Fault Log) tells you in one tap: a stored fault code means problem 1; no fault, just low pressure at the laser, means 2 or 3."))
+story.append(tbl([
+    ["What you see", "What it is", "What fixes it"],
+    ["Screen shows an overload / overcurrent fault or an E-code and the unit stops",
+     "Motor or VFD drawing too much current. Almost always heat or supply voltage, not a small compressor.",
+     "Clean the cooler, intake screen and motor vents. Check oil. Check the supply voltage (below). A second compressor does nothing here."],
+    ["No fault, but STATE reads LOAD RUN all day and pressure sags during cuts; the laser complains about low gas pressure",
+     "Demand is higher than the unit makes. Leaks and a clogged intake filter look exactly the same as a too-small compressor.",
+     "Soap-test every fitting from the outlet to the cutting head. Change the intake filter. Then, if it still sags, add capacity."],
+    ["Fine on most cuts; drops out only on a pierce or a long high-pressure cut in thick material",
+     "Peak demand, not average demand. The receiver empties faster than the airend refills it.",
+     "More tank volume on the receiver\u2019s auxiliary port. Cheaper than a compressor and does not touch air quality."],
+], [2.2 * inch, 2.3 * inch, 2.5 * inch]))
+story.append(P("Supply voltage: the first thing to check on an overload fault", "h2"))
+story.append(P("This unit is built for 380 V three-phase. US shops run 208, 240 or 480 V. If it was wired to 240 V without a step-up transformer, the motor pulls about 60 percent more current for the same air, "
+               "and it trips on hot days and long cuts. Read <b>VOLT</b> and <b>CURR</b> on the home screen while the laser is cutting and compare with the nameplate on the motor. Rough full-load figures at 380 V:"))
+story.append(tbl([
+    ["Motor", "Full-load current at 380 V", "Same load at 240 V"],
+    ["11 kW", "about 20 A", "about 32 A"],
+    ["15 kW", "about 27 A", "about 43 A"],
+    ["22 kW", "about 40 A", "about 63 A"],
+    ["37 kW", "about 67 A", "about 106 A"],
+], [1.2 * inch, 2.6 * inch, 3.2 * inch]))
+story.append(P("The nameplate wins over this table. If CURR sits above the nameplate figure at normal pressure, the supply is wrong or the airend is dragging (low oil, wrong oil, or a failing bearing).", "small"))
+story.append(P("Order of checks", "h2"))
+story += [
+    N(1, "Photograph the fault log and the home screen under load (PRES, TEMP, FREQ, CURR, VOLT, STATE)."),
+    N(2, "Confirm the wiring voltage at the disconnect and whether a transformer is fitted."),
+    N(3, "Clean the cooler fins, the intake screen and the motor vents. Confirm oil is between the red lines with the unit stopped."),
+    N(4, "Soap-test fittings from the compressor outlet to the cutting head. Listen for leaks with the shop quiet. Check the intake filter element."),
+    N(5, "Pressure still sags on cuts: add receiver volume on the auxiliary port."),
+    N(6, "Only then: a second 16-bar compressor, a bigger unit, or nitrogen instead of air on the thick material that causes the sag."),
+]
+story.append(P("Feeding the tank from a second compressor: three catches", "h2"))
+story.append(note([
+    Paragraph("Read before plumbing anything in", S["kicker"]),
+    Paragraph("<b>1. Pressure.</b> The receiver runs up to 232 psi (1.6 MPa). A normal shop compressor tops out at 125 to 175 psi; its check valve stays shut against the tank and it contributes nothing. "
+              "It helps only if it is also a 16-bar unit, or if the laser is cutting at a pressure the shop compressor can hold.", S["body"]),
+    Paragraph("<b>2. Air quality.</b> The tank feeds the dryer and the multi-stage filters, so any second feed must enter the tank (auxiliary port), never downstream of the filters. "
+              "A piston compressor carries far more oil and water than the screw unit, and the dryer and filters are sized for this unit\u2019s flow alone. Overrun them and the elements die early and the cutting lens fogs, which costs more than the compressor.", S["body"]),
+    Paragraph("<b>3. Control.</b> The two compressors do not talk to each other. Set the helper\u2019s cut-in a little below this unit\u2019s load setpoint so it runs only during a shortfall and shuts off when this unit has caught up.", S["body"]),
+], bg=WARN_BG))
+
+story.append(PageBreak())
+
+# =============== PAGE 7: parts lists ===============
 story.append(P("Parts lists (from the manual, pages 31 to 35)", "h1"))
 story.append(P("Quote the material code when ordering. Every list: first service at 500 h is air filter, oil filter and oil; after that everything below every 3,000 h or 6 months."))
 

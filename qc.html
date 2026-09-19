@@ -633,6 +633,7 @@ const I18N = {
     'GREASE alarm on the screen: follow page 1 of the guide — log the hours, confirm the grease point with the supplier, then reset the counter.':'Alarma GREASE en la pantalla: sigue la página 1 de la guía — anota las horas, confirma el punto de engrase con el proveedor y luego reinicia el contador.',
     'TEMP creeping up: cooler fins, intake filter, oil level, room temperature, in that order.':'Si TEMP sube: aletas del enfriador, filtro de admisión, nivel de aceite, temperatura del cuarto, en ese orden.',
     'Pressure reading looks wrong or the safety valve pops: pressure-sensor condensate procedure (guide, page 5).':'Si la presión se ve mal o salta la válvula de seguridad: procedimiento de condensado del sensor de presión (guía, página 5).',
+    'Overload fault, or pressure sagging during cuts: troubleshooting on page 6 of the guide — fault log, supply voltage, cooler, leaks, then tank volume before a second compressor.':'Falla de sobrecarga, o la presión cae durante los cortes: solución de problemas en la página 6 de la guía — registro de fallas, voltaje de alimentación, enfriador, fugas, y luego volumen de tanque antes de un segundo compresor.',
     'To add or update a document: ask Claude to drop the new file into the repo\'s docs folder and update the RESOURCES list in qc.html. This list was last updated':'Para agregar o actualizar un documento: pide a Claude que ponga el archivo nuevo en la carpeta docs del repositorio y actualice la lista RESOURCES en qc.html. Esta lista se actualizó por última vez el',
     'Setup':'Configuración','Settings':'Ajustes','dock:settings':'Ajustes','AI connection for this device':'Conexión de IA para este equipo',
     'One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.':'Una sola conexión alimenta todas las funciones de IA — globos en planos, lectura de certificados y revisión de fotos.',
@@ -945,8 +946,8 @@ function viewSettings(){
 const RES_UPDATED='2026-09-19';
 const RESOURCES=[
   { key:'equipment', title:'Equipment manuals & maintenance', icon:'ti-tool', items:[
-    { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'A', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts',
-      desc:'Hoverr / Haoweier PM VSD screw compressor: what the GREASE alarm means, controller timers, daily/weekly/500 h/3,000 h schedule, procedures, parts lists per model, service log.',
+    { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'B', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts overload troubleshooting voltage second compressor',
+      desc:'Hoverr / Haoweier PM VSD screw compressor: what the GREASE alarm means, controller timers, daily/weekly/500 h/3,000 h schedule, procedures, troubleshooting (overload fault, running out of air, second compressor), parts lists per model, service log.',
       file:'docs/equipment/air-compressor/BSMP Laser Air Compressor - Maintenance Guide.pdf' },
     { title:'Hoverr PM VSD Air Compressor — Operating Guide (2025)', id:'Supplier', rev:'', date:'2025', tags:'laser compressor air manual supplier taike hoverr haoweier',
       desc:'The supplier\'s own manual (Taike Machinery Technology, Dongguan). Screens, parameters, consumable lists, flow charts. Source for the BSMP guide.',
@@ -982,6 +983,7 @@ const MAINTENANCE=[
     { every:'When needed', tone:'flag', who:'Manager', task:'GREASE alarm on the screen: follow page 1 of the guide — log the hours, confirm the grease point with the supplier, then reset the counter.' },
     { every:'When needed', tone:'flag', who:'Anyone', task:'TEMP creeping up: cooler fins, intake filter, oil level, room temperature, in that order.' },
     { every:'When needed', tone:'flag', who:'Manager', task:'Pressure reading looks wrong or the safety valve pops: pressure-sensor condensate procedure (guide, page 5).' },
+    { every:'When needed', tone:'flag', who:'Manager', task:'Overload fault, or pressure sagging during cuts: troubleshooting on page 6 of the guide — fault log, supply voltage, cooler, leaks, then tank volume before a second compressor.' },
   ]},
 ];
 let RES_FILTER='';
