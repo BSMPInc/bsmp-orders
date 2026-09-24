@@ -5814,6 +5814,8 @@ function deleteQuote(id){
 
 function clearHistory(){
   if(!confirm('Delete all saved quotes? This cannot be undone.')) return;
+  // remember the cleared ids so the cloud merge-down doesn't bring them straight back
+  try{ if(window._qTombstone) window._qTombstone(HISTORY.map(q=>q.id)); }catch(e){}
   HISTORY=[]; localStorage.setItem('bsmp_history','[]'); renderHistory();
 }
 
@@ -10309,7 +10311,119 @@ let _qUser = null;
 let _qSynced = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_quote_synced')||'[]')); }catch(e){ return new Set(); } })();
 function _qSaveSynced(){ try{ localStorage.setItem('bsmp_quote_synced', JSON.stringify([..._qSynced])); }catch(e){} }
 function _qLocalQuotes(){ try{ const a=JSON.parse(localStorage.getItem('bsmp_history')||'[]'); return Array.isArray(a)?a:[]; }catch(e){ return []; } }
-async function _qPush(q){ await set(ref(db,'quotes/'+q.id), quotePayload(q)); _qSynced.add(q.id); _qSaveSynced(); }
+async function _qPush(q){ await set(ref(db,'quotes/'+q.id), quotePayload(q)); _qSynced.add(q.id); _qSaveSynced(); _qPushSnap(q); }
+
+// ── Quote history merge-down (2026-09-24) ──
+// 'quotes' holds the trimmed copy the Order Tracker imports; 'quoteSnaps/<id>' holds the FULL
+// record (everything reloadQuote needs, minus the drawing thumbnail) so a quote saved in one
+// browser shows up, fully editable, in every other browser signed in to the tool.
+// Rules: additive only (a failed or empty read never removes anything here); a cloud copy only
+// replaces a local one when its savedAt is newer AND its content really differs; ids deleted
+// here are remembered (tombstones) so the cloud can't bring them back.
+let _qTomb = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_quote_tombstones')||'[]').map(String)); }catch(e){ return new Set(); } })();
+function _qSaveTomb(){ try{ localStorage.setItem('bsmp_quote_tombstones', JSON.stringify([..._qTomb])); }catch(e){} }
+window._qTombstone = (ids) => { (ids||[]).forEach(id=>{ if(id!=null) _qTomb.add(String(id)); }); _qSaveTomb(); };
+let _qSnapped = (()=>{ try{ return new Set(JSON.parse(localStorage.getItem('bsmp_quote_snapped')||'[]').map(String)); }catch(e){ return new Set(); } })();
+function _qSaveSnapped(){ try{ localStorage.setItem('bsmp_quote_snapped', JSON.stringify([..._qSnapped])); }catch(e){} }
+let _qSnapBlocked = false;
+function _qSnapOf(q){ const s=JSON.parse(JSON.stringify(q)); delete s.img; return s; }
+async function _qPushSnap(q){
+  // never publish a trimmed Order-Tracker copy as if it were the full record
+  if(_qSnapBlocked || !q || q.id==null || q._cloudLite) return false;
+  try{ await set(ref(db,'quoteSnaps/'+q.id), _qSnapOf(q)); _qSnapped.add(String(q.id)); _qSaveSnapped(); return true; }
+  catch(e){
+    _qSnapBlocked = true;
+    console.warn('full-quote copy failed — the database rules may be blocking "quoteSnaps".', e);
+    const st=$q('q-syncall-status'); if(st) st.textContent='Quotes sync to the Order Tracker, but full copies for your other browsers are blocked — the "quoteSnaps" database rule is missing.';
+    return false;
+  }
+}
+// One-time (then incremental): give every local quote its full cloud copy.
+async function _qSnapBackfill(){
+  for(const q of _qLocalQuotes()){
+    if(_qSnapBlocked) return;
+    if(q && q.id!=null && !_qSnapped.has(String(q.id)) && !_qTomb.has(String(q.id))) await _qPushSnap(q);
+  }
+}
+// RTDB drops empty arrays / empty strings, so compare and restore on a normalised shape.
+const _Q_ARRAYS = ['laborLines','hwLines','outLines','qtyBreaks','matBreakRows','weldRows','gangParts'];
+function _qFixArrays(r){ _Q_ARRAYS.forEach(k=>{ if(!Array.isArray(r[k])) r[k] = r[k] ? Object.values(r[k]) : []; }); return r; }
+function _qSig(q){
+  const s={};
+  Object.keys(q||{}).sort().forEach(k=>{
+    if(k==='img' || k==='savedAt' || k==='syncedAt') return;
+    const v=q[k];
+    if(v===undefined || v===null || v==='' || (Array.isArray(v) && !v.length)) return;
+    s[k]=v;
+  });
+  return JSON.stringify(s);
+}
+// A quote that only exists as the trimmed Order-Tracker copy (saved by a browser that
+// predates full copies): enough to list, combine and print; reloads with blanks elsewhere.
+function _qFromLite(r){
+  return _qFixArrays({ ...r, partNum:r.partNum||'—', revision:r.revision||'—', customer:r.customer||'—',
+    material:r.material||'—', status:r.status||'pending', tier:r.tier||'', img:null, _cloudLite:true });
+}
+function _qMergeDown(snaps, lites){
+  if(typeof HISTORY==='undefined' || !Array.isArray(HISTORY)) return;
+  const byId = new Map(HISTORY.map(q=>[String(q.id), q]));
+  let added=0, updated=0;
+  const take = (r, lite) => {
+    if(!r || r.id==null) return;
+    const k=String(r.id);
+    if(_qTomb.has(k)) return;
+    const loc = byId.get(k);
+    if(!loc){ byId.set(k, lite ? _qFromLite(r) : _qFixArrays({...r, img:null})); _qSynced.add(r.id); added++; return; }
+    if(lite) return;
+    if(loc._cloudLite || ((r.savedAt||0) > (loc.savedAt||0) && _qSig(r)!==_qSig(loc))){
+      byId.set(k, _qFixArrays({ ...r, img: loc.img||null })); updated++;
+    } else if(r.savedAt && !loc.savedAt && _qSig(r)===_qSig(loc)) loc.savedAt = r.savedAt;
+  };
+  Object.values(snaps||{}).forEach(r=>{ take(r,false); if(r && r.id!=null) _qSnapped.add(String(r.id)); });   // already in the cloud — no need to send it back
+  Object.values(lites||{}).forEach(r=>{ if(r && r.id!=null && !(snaps && snaps[r.id])) take(r,true); });
+  _qSaveSynced(); _qSaveSnapped();
+  _qAddMissingCustomers([...byId.values()]);   // every pass, so quotes pulled earlier get their customer too
+  if(!added && !updated) return;
+  HISTORY = [...byId.values()].sort((a,b)=>(Number(b.id)||0)-(Number(a.id)||0));
+  try{ if(typeof persistHistory==='function') persistHistory(); else localStorage.setItem('bsmp_history', JSON.stringify(HISTORY)); }catch(e){ console.warn('saving merged history failed', e); }
+  try{ if(typeof renderHistory==='function') renderHistory(); }catch(e){}
+  if(typeof showToast==='function') showToast({title:'Quote history updated', sub:(added?added+' quote'+(added!==1?'s':'')+' added':'')+(added&&updated?' · ':'')+(updated?updated+' updated':'')+' from the cloud', duration:5000});
+}
+// The customer list is per-browser. A pulled quote whose customer this browser has never seen
+// would reload with a blank customer (and lose it on re-save), so add those names here with
+// the default 30% / 7% until someone edits them on the Customers page.
+function _qAddMissingCustomers(list){
+  if(typeof CUSTOMERS==='undefined' || !Array.isArray(CUSTOMERS)) return 0;
+  const have=new Set(CUSTOMERS.map(c=>String(c.name||'').trim().toLowerCase()));
+  let n=0;
+  (list||[]).forEach(q=>{
+    const name=String((q&&q.customer)||'').trim();
+    if(!name || name==='—' || have.has(name.toLowerCase())) return;
+    CUSTOMERS.push({name, markup:30, finance:7}); have.add(name.toLowerCase()); n++;
+  });
+  if(!n) return 0;
+  CUSTOMERS.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  try{ localStorage.setItem('bsmp_customers', JSON.stringify(CUSTOMERS)); }catch(e){}
+  try{ if(typeof populateCustomerSelect==='function') populateCustomerSelect(); }catch(e){}
+  try{ if(typeof renderCustomersTable==='function') renderCustomersTable(); }catch(e){}
+  return n;
+}
+let _qHistListening = false;
+function _qListenHistory(){
+  if(_qHistListening) return; _qHistListening = true;
+  let lites = null, snaps = null, snapsOk = false;
+  // trimmed copies: read once — only used for quotes that have no full copy yet
+  get(ref(db,'quotes')).then(s=>{ lites = s.val()||{}; if(snapsOk) _qMergeDown(snaps, lites); })
+    .catch(e=>console.warn('quote history read failed', e));
+  onValue(ref(db,'quoteSnaps'), s => {
+    snaps = s.val()||{}; snapsOk = true;
+    try{ _qMergeDown(snaps, lites); }catch(e){ console.warn('quote merge failed', e); }
+  }, e => {
+    console.warn('quoteSnaps listener failed — the database rules may be blocking reads of "quoteSnaps".', e);
+    snapsOk = true; snaps = {};
+    if(lites) _qMergeDown({}, lites);
+  });
+}
 async function _qSyncList(list){ let ok=0,fail=0; for(const q of list){ if(q && q.id!=null){ try{ await _qPush(q); ok++; }catch(e){ fail++; } } } return {ok,fail}; }
 async function _qAutoBackfill(){
   const pending=_qLocalQuotes().filter(q=>q && q.id!=null && !_qSynced.has(q.id));
@@ -10357,6 +10471,7 @@ function quotePayload(q){
 }
 window._qCloudSyncQuote = async (q) => {
   if(!_qUser || !q || q.id==null) return;
+  q.savedAt = Date.now();   // the "just changed" path \u2014 the newest edit wins in other browsers
   try{ setSync('busy','Syncing\u2026'); await _qPush(q); setSync('ok','Synced'); }
   catch(e){ setSync('err','Sync failed'); const c=$q('q-sync-chip'); if(c) c.title='Last sync error: '+((e&&e.message)||e); console.warn('quote sync failed', e); }
   // quote came from an RFQ email \u2192 stamp the link back onto the mail thread
@@ -10443,7 +10558,9 @@ async function _qFromMailAtt(){
 }
 window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
+  window._qTombstone([id]);
   try{ await remove(ref(db,'quotes/'+id)); _qSynced.delete(id); _qSaveSynced(); }catch(e){ console.warn('quote remove failed', e); }
+  try{ await remove(ref(db,'quoteSnaps/'+id)); _qSnapped.delete(String(id)); _qSaveSnapped(); }catch(e){ console.warn('full-quote copy remove failed', e); }
 };
 
 // ── Printed Archive cloud sync — mirrors the quote-history sync so the archive
@@ -10545,7 +10662,7 @@ onAuthStateChanged(auth, (user) => {
       return;   // no sync/backfill \u2014 the quote tool never loads for operators
     }
     hideMgrLock();
-    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill(); _qaBackfill().catch(()=>{}); _qaListen(); _qFromMail(); _qFromMailAtt(); _qListenPrices();
+    if(ov) ov.style.display='none'; setSync('busy','Connecting\u2026'); _qAutoBackfill().then(()=>_qSnapBackfill()).catch(()=>{}); _qaBackfill().catch(()=>{}); _qaListen(); _qListenHistory(); _qFromMail(); _qFromMailAtt(); _qListenPrices();
   }
   else {
     hideMgrLock(); if(ov) ov.style.display='flex'; setSync('idle','Signed out');

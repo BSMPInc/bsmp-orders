@@ -66,7 +66,7 @@ Firebase is loaded as ES modules from `gstatic.com` inside a `<script type="modu
 
 Each app owns a top-level namespace, and some apps read across namespaces:
 
-- **quote.html** → owns `quotes/`
+- **quote.html** → owns `quotes/` (trimmed, read by orders/qc), `quoteSnaps/` (full records for cross-browser history) and `quoteArchive/`
 - **orders.html** → owns `orders/`, plus `team`, `customers`, `durations`, `jobCounter`, `trash/`, `backups/`, `backupIndex`; also reads `quotes`
 - **apar.html** → owns `apar/*` (`apar/entries`, `apar/accounts`, `apar/vendorAccounts`, `apar/vendorAliases`, `apar/recurring`, `apar/audit`, `apar/depositLog`, `apar/apSplit`, etc.); also reads `orders`
 - **qc.html** → owns `qc/*` (`qc/inspections`, `qc/ncr`, `qc/certs`, `qc/audit` — append-only change history); also reads `orders` and `quotes`

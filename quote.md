@@ -10,10 +10,11 @@ Estimates and prices sheet-metal jobs, produces a customer-facing printable PDF 
 ## Data & storage
 
 - **Owns RTDB path:** `quotes/`. Quotes sync to the cloud via `_qCloudSyncQuote` / `_qCloudRemoveQuote`; `_qSyncAll` / `_qSyncList` reconcile local and cloud.
+- **Also owns `quoteSnaps/<id>`** (added 2026-09-24, rule published): the FULL quote record (minus the `img` thumbnail). `quotes/<id>` stays the trimmed copy the Order Tracker / QC import. On sign-in `_qListenHistory()` merges cloud quotes DOWN into `HISTORY` (live `onValue` on `quoteSnaps`, one-time `get` of `quotes` for ids with no full copy -> added as `_cloudLite` records). Rules in `_qMergeDown`: additive only; a cloud copy replaces a local one only if its `savedAt` is newer AND `_qSig()` content differs (RTDB drops empty arrays/strings, so compare normalised); ids deleted/cleared locally go in `bsmp_quote_tombstones` and are never pulled back; `_cloudLite` records are never pushed as snaps; unknown customer names are added to the per-browser customer list (30/7). `savedAt` is stamped in `_qCloudSyncQuote` (the "just changed" path) only. Harness: `dev/build_quote_sync_test.py` (38 checks; serve on :8123, it backs up/restores the shared localStorage keys - do not load the app in another tab while it runs).
 - **Storage:** drawings upload under the `quotes/` prefix (`_qUploadDrawing`).
 - **Heavy localStorage use** (this app holds most of the shop's tunable settings):
   - Pricing/config: `bsmp_prices`, `bsmp_rates`, `bsmp_laser_speeds`, `bsmp_tier_markups`, `bsmp_min_sheet`, `bsmp_assumptions`, `bsmp_customers`
-  - Quote numbering/archive: `bsmp_quote_counter`, `bsmp_archive`, `bsmp_history`, `bsmp_quote_synced`
+  - Quote numbering/archive: `bsmp_quote_counter`, `bsmp_archive`, `bsmp_history`, `bsmp_quote_synced`, `bsmp_quote_snapped`, `bsmp_quote_tombstones`
   - Shop identity: `bsmp_shopname`, `bsmp_shoploc`
   - AI connection (shared with qc.html): `bsmp_proxy_url`, `bsmp_apikey`
   - One-off UI flags: `bsmp_*_shown`, `bsmp_restore_msg`, `bsmp_thumbs_v2`, `bsmp_sidebar_pinned`
