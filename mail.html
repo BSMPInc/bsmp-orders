@@ -173,14 +173,21 @@ body.sb-pinned .dock{left:var(--sb)}
 .pr-note{width:100%;min-height:54px;padding:8px 11px;border:1px solid var(--border2);background:#fff;outline:none;resize:vertical;font:inherit;font-size:13px}
 .pr-note:focus{border-color:var(--accent)}
 .pr-sum{font-size:12.5px;color:var(--text2);font-weight:700}
-.pr-hist-row{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
-.pr-hist-row:last-child{border-bottom:0}
+.pr-period{border-bottom:1px solid var(--border)}
+.pr-period:last-child{border-bottom:0}
+.pr-hist-row{display:flex;gap:10px;align-items:center;padding:9px 12px;font-size:13px;cursor:pointer;user-select:none}
+.pr-hist-row:hover{background:var(--bg)}
+.pr-chev{color:var(--text3);font-size:15px;transition:transform .15s}
+.pr-period.open .pr-chev{transform:rotate(90deg);color:var(--accent)}
+.pr-period.open>.pr-hist-row{background:var(--accent-soft)}
+.pr-clip{display:inline-flex;align-items:center;gap:2px;font-size:12px;font-weight:700;color:var(--text3);opacity:.55}
+.pr-clip.has{color:var(--accent);opacity:1}
 .pr-prev{border:1px solid var(--border);background:#fff;padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111}
 .pr-prev table{border-collapse:collapse;margin:8px 0 14px}
 .pr-prev th,.pr-prev td{border:1px solid #b9c0c9;padding:5px 10px;font-size:13px;text-align:left}
 .pr-prev th{background:#eef1f5}
 .pr-meta{font-size:12.5px;color:var(--text2);margin-bottom:10px;line-height:1.7}
-.pr-stubs{padding:10px 12px 12px 24px;border-bottom:1px solid var(--border);background:var(--bg)}
+.pr-stubs{padding:8px 12px 12px 37px;background:var(--bg);border-top:1px solid var(--border)}
 .pr-stub{display:flex;gap:8px;align-items:center;padding:6px 8px;background:#fff;border:1px solid var(--border);margin-bottom:6px;font-size:13px}
 .pr-stub a{color:var(--accent);font-weight:700;cursor:pointer;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 .pr-stub a:hover{text-decoration:underline}
@@ -699,7 +706,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <li><b>Hours</b> in the email are regular hours only; <b>OT Hours</b> are on top of them.</li>
       <li>The gray total under the table (“about $… gross”) is a rough check for you — it is <b>not</b> in the email. Payroll does the real math.</li>
       <li><b>Sent pay periods</b> lists everything sent from here. <b>Open</b> loads one back to fix and resend it — you’ll get a warning that this period was already sent.</li>
-      <li><b>Paystubs:</b> once a period is sent, click <b>Paystubs</b> on it under Sent pay periods to attach the stubs (PDFs or photos, several at once). Click a name to open it; × removes it. Only you can see them.</li>
+      <li><b>Paystubs:</b> once a period is sent, click its row under Sent pay periods to unfold it, then attach the stubs (PDFs or photos, several at once). Click a name to open it; × removes it; click the row again to fold it away. The 📎 number shows how many are attached. Only you can see them.</li>
       <li><b>Send from / Send to</b> are remembered. Change them only if the payroll service’s address changes.</li>
     </ul>
     <div style="display:flex;justify-content:flex-end;margin-top:14px">
@@ -1441,11 +1448,16 @@ function renderPayroll(){
     </tr>`).join('');
   const hist=prPeriodList().slice(0,12).map(p=>{
     const pr=prRows(p.rows), hrs=pr.reduce((s,r)=>s+(r.type==='salary'?0:(prNum(r.hours)||0)),0), ot=pr.reduce((s,r)=>s+(r.type==='salary'?0:(prNum(r.ot)||0)),0);
-    return `<div class="pr-hist-row"><b style="min-width:70px">${esc(p.label||prDateLabel(p.date))}</b>
+    const open=_prStubsOpen.has(p.pid), n=prStubs(p).length;
+    return `<div class="pr-period${open?' open':''}">
+      <div class="pr-hist-row" title="${open?'Fold the paystubs away':'Show the paystubs'}" onclick="_prStubsToggle('${esc(p.pid)}')">
+      <i class="ti ti-chevron-right pr-chev"></i>
+      <b style="min-width:70px">${esc(p.label||prDateLabel(p.date))}</b>
       <span style="color:var(--text2)">${pr.length} people · ${esc(prHours(hrs))} hrs${ot?' + '+esc(prHours(ot))+' OT':''}</span>
+      <span class="pr-clip${n?' has':''}" title="${n?n+' paystub'+(n!==1?'s':'')+' attached':'No paystubs yet'}"><i class="ti ti-paperclip"></i>${n||''}</span>
       <span style="color:var(--text3);font-size:12px;margin-left:auto">sent ${esc(new Date(p.sentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}))} by ${esc(String(p.by||'').split('@')[0].replace(/^(ofc|ops)\./,''))}</span>
-      <button class="btn sm" title="Paystubs for this pay period — attach, open, remove" onclick="_prStubsToggle('${esc(p.pid)}')"><i class="ti ti-paperclip"></i> Paystubs${prStubs(p).length?' ('+prStubs(p).length+')':''}</button>
-      <button class="btn sm" title="Load this period into the form — to fix and resend it" onclick="_prOpen('${esc(p.pid)}')">Open</button></div>${_prStubsOpen===p.pid?prStubsHtml(p):''}`;
+      <button class="btn sm" title="Load this period into the form — to fix and resend it" onclick="event.stopPropagation();_prOpen('${esc(p.pid)}')">Open</button></div>
+      ${open?prStubsHtml(p):''}</div>`;
   }).join('');
   el.innerHTML=`<div class="pr-wrap">
     <div class="page-head"><h2 style="display:flex;align-items:center;gap:10px">Payroll hours <button class="btn sm" title="How to use this page" onclick="openPrHelp()"><i class="ti ti-help-circle"></i> Help</button></h2><p>Pick the pay period, add any overtime, review the email, send. Regular hours fill in at ${PR_DAY_HRS} a day; the employee list and rates are remembered.</p></div>
@@ -1520,7 +1532,9 @@ window._prOpen=(pid)=>{
 // Storage payroll/stubs/<pid>/<ts>_<name> (owner-only Storage rule), listed at
 // payroll/periods/<pid>/stubs/<sid> = {name, path, size, type, at, by}. Opened with
 // getBlob (goes through the Storage rule every time) — no download URL is stored.
-let _prStubsOpen=null;
+// which periods are unfolded — a per-browser convenience, so localStorage (guarded)
+const _prStubsOpen=new Set((()=>{ try{ return JSON.parse(localStorage.getItem('bsmp_pr_open')||'[]'); }catch(e){ return []; } })());
+const prSaveOpen=()=>{ try{ localStorage.setItem('bsmp_pr_open', JSON.stringify([..._prStubsOpen].slice(-20))); }catch(e){} };
 const PR_STUB_MAX=25*1024*1024;
 function prStubs(p){
   const st=p&&p.stubs&&typeof p.stubs==='object'?p.stubs:{};
@@ -1540,7 +1554,7 @@ function prStubsHtml(p){
       <span class="hint" id="pr-stub-status">PDF or photos, up to 25 MB each. Private — only you can open them.</span>
     </div></div>`;
 }
-window._prStubsToggle=(pid)=>{ _prStubsOpen=_prStubsOpen===pid?null:pid; renderPayroll(); };
+window._prStubsToggle=(pid)=>{ if(_prStubsOpen.has(pid)) _prStubsOpen.delete(pid); else _prStubsOpen.add(pid); prSaveOpen(); renderPayroll(); };
 window._prStubAdd=(pid)=>{
   const inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='application/pdf,image/*';
   inp.onchange=async ()=>{
@@ -1565,7 +1579,7 @@ window._prStubAdd=(pid)=>{
     }
     if(done) toast(done+' paystub'+(done!==1?'s':'')+' attached'+(failed?' — '+failed+' failed':'')+'.', !!failed);
     else if(failed) toast('Upload failed — nothing was attached.',true);
-    _prStubsOpen=pid; renderPayroll();
+    _prStubsOpen.add(pid); prSaveOpen(); renderPayroll();
   };
   inp.click();
 };
