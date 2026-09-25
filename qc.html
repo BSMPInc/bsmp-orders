@@ -943,7 +943,7 @@ function viewSettings(){
    serves them next to this file, so a relative link is all a row needs. To add or revise a
    document: drop the file into docs/<area>/, then edit RESOURCES below (title, id/rev, date, file).
    Keep RES_UPDATED current — it prints at the bottom of the page. */
-const RES_UPDATED='2026-09-19';
+const RES_UPDATED='2026-09-25';
 const RESOURCES=[
   { key:'equipment', title:'Equipment manuals & maintenance', icon:'ti-tool', items:[
     { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'B', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts overload troubleshooting voltage second compressor',
@@ -952,6 +952,9 @@ const RESOURCES=[
     { title:'Hoverr PM VSD Air Compressor — Operating Guide (2025)', id:'Supplier', rev:'', date:'2025', tags:'laser compressor air manual supplier taike hoverr haoweier',
       desc:'The supplier\'s own manual (Taike Machinery Technology, Dongguan). Screens, parameters, consumable lists, flow charts. Source for the BSMP guide.',
       file:'docs/equipment/air-compressor/Hoverr PM VSD Air Compressor - Operating Guide (2025).pdf', supplier:true },
+    { title:'Laser Water Chiller — Compressor Troubleshooting Checklist', id:'BSMP-MG-002', rev:'A', date:'2026-09-25', tags:'laser chiller water cooling compressor tongfei tflw refrigerant r134a electrician troubleshooting checklist',
+      desc:'Tongfei TFLW-3000WDR: fan runs but no cooling. One page: shop checks (alarm, setpoint, refrigerant gauges, water, airflow) and electrician checks (transformer, phase protector, overload, contactor, pressure switches, compressor windings), with a readings grid to fill in.',
+      file:'docs/equipment/laser-chiller/BSMP Laser Chiller - Compressor Troubleshooting Checklist.pdf' },
   ]},
   { key:'quality', title:'Quality documents', icon:'ti-shield-check', items:[
     { title:'Material Compliance Guide — RoHS / REACH / DFARS', id:'BSMP-QG-001', rev:'A', date:'2026-09-18', tags:'rohs reach dfars compliance material cert declaration',
