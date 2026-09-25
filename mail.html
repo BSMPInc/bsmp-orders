@@ -519,7 +519,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="nav-item" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span class="nav-label">Certs &amp; invoices</span></div>
       <div class="nav-item" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span class="nav-label">Price book</span></div>
       <div class="nav-item" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span class="nav-label">Contacts</span></div>
-      <div class="nav-item" data-page="payroll" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span class="nav-label">Payroll hours</span></div>
+      <div class="nav-item pr-owner-only" data-page="payroll" style="display:none" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span class="nav-label">Payroll hours</span></div>
       <div class="nav-sec">Setup</div>
       <div class="nav-item" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span class="nav-label">Settings</span></div>
     </div>
@@ -660,7 +660,7 @@ body.sb-pinned .dock{left:var(--sb)}
   <button class="dock-tab" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span>Certs</span></button>
   <button class="dock-tab" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span>Prices</span></button>
   <button class="dock-tab" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span>Contacts</span></button>
-  <button class="dock-tab" data-page="payroll" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span>Payroll</span></button>
+  <button class="dock-tab pr-owner-only" data-page="payroll" style="display:none" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span>Payroll</span></button>
   <button class="dock-tab" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
   <div class="dock-switch">
     <span class="lbl">Switch app</span>
@@ -1302,17 +1302,23 @@ window.deleteContact=(k,label)=>{
 };
 window.composeTo=(email)=>{ openCompose(); $('cp-to').value=email; renderQuickRow(); setTimeout(()=>$('cp-subject').focus(),40); };
 
-// ── payroll hours (shared, mail/payroll) ──────────────────────────────────────
+// ── payroll hours (owner only, top-level payroll/) ────────────────────────────
 // Fill in hours/pay once per pay period and it goes out as the same email the
 // office used to type by hand: "Payroll Hours <period>", "Thank you", then a
 // table (Employee | Hours | OT Hours | Rate | Hourly) — sent through /send's
 // tables, so no worker change. Pay periods are semi-monthly: the 11th–25th and
 // the 26th–10th. Regular hours fill in as weekdays (Mon–Fri, holidays paid) × 8;
-// overtime is typed by hand. mail/payroll/roster/<id> = the employee list
+// overtime is typed by hand. payroll/roster/<id> = the employee list
 // (per-id writes, never the whole list — see the whole-object set() clobber
-// note), mail/payroll/settings = {to, from}, mail/payroll/periods/<id> = every
+// note), payroll/settings = {to, from}, payroll/periods/<id> = every
 // sent period.
-let PAYROLL={roster:{}, settings:{}, periods:{}};
+// OWNER ONLY. Pay rates live at the top-level "payroll" path, NOT under mail/,
+// because mail/ is readable by every signed-in account and an RTDB child rule
+// can't take back a parent's read. The database rule on "payroll" is the real
+// lock (same two emails); hiding the tab is just tidiness. Keep both lists in step.
+const PR_OWNERS=['ofc.edgar@bertsmp.com','info@bertsmp.com'];
+const prIsOwner=()=>PR_OWNERS.includes(String((auth.currentUser&&auth.currentUser.email)||'').toLowerCase());
+let PAYROLL={roster:{}, settings:{}, periods:{}}, _prDenied=false;
 const PR_TO_DEFAULT='payroll@businesssolutions-4u.com';
 const PR_STARTERS=[   // from the last hand-typed email (9/10/26) — used until the list is saved once
   {name:'Hector Orellena', type:'hourly', rate:'27'},
@@ -1409,6 +1415,9 @@ function prProblems(f){
 }
 function renderPayroll(){
   const el=$('v-payroll'); if(!el) return;
+  if(!prIsOwner()){ el.innerHTML='<div class="empty" style="padding:40px"><i class="ti ti-lock" style="font-size:30px;opacity:.5;display:block;margin-bottom:8px"></i>Payroll is private.</div>'; return; }
+  if(_prDenied){ el.innerHTML=`<div class="card" style="padding:18px;max-width:640px"><h3 style="font-size:15px;margin-bottom:8px"><i class="ti ti-lock"></i> Payroll database rule not published yet</h3>
+    <div class="hint">Payroll now lives in its own locked spot in the database so only you can read it. Add the <b>payroll</b> rule in the Firebase console (Realtime Database → Rules), publish, then reload this page.</div></div>`; return; }
   if(!_prForm) _prForm=prNewForm();
   const f=_prForm;
   const boxes=SETTINGS.mailboxes||[];
@@ -1510,17 +1519,17 @@ function prSaveRoster(f){
     const rec={name:r.name.trim(), type:r.type, rate:String(prNum(r.rate)||''), order:i,
       by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()};
     PAYROLL.roster[r.rid]=rec;
-    writes.push(set(ref(db,'mail/payroll/roster/'+r.rid), rec));
+    writes.push(set(ref(db,'payroll/roster/'+r.rid), rec));
   });
-  (f.removed||[]).forEach(rid=>{ delete PAYROLL.roster[rid]; writes.push(remove(ref(db,'mail/payroll/roster/'+rid))); });
+  (f.removed||[]).forEach(rid=>{ delete PAYROLL.roster[rid]; writes.push(remove(ref(db,'payroll/roster/'+rid))); });
   f.removed=[]; f.seeded=false;
-  writes.push(update(ref(db,'mail/payroll/settings'), {to:String(f.to||'').trim(), from:f.from||''}));
+  writes.push(update(ref(db,'payroll/settings'), {to:String(f.to||'').trim(), from:f.from||''}));
   return Promise.all(writes);
 }
 window._prSaveList=()=>{
   if(!prFilled(_prForm).some(r=>String(r.name||'').trim())){ toast('Add at least one employee first.',true); return; }
   prSaveRoster(_prForm).then(()=>{ toast('Employee list saved.'); renderPayroll(); })
-    .catch(()=>toast('Could not save — check the mail rule is published.',true));
+    .catch(()=>toast('Could not save — check the payroll database rule is published.',true));
 };
 window._prReview=()=>{
   const probs=prProblems(_prForm);
@@ -1567,7 +1576,7 @@ window._prSend=()=>{
       const pid='p'+Date.now().toString(36);
       rec.sentAt=Date.now(); rec.by=(auth.currentUser&&auth.currentUser.email)||'';
       PAYROLL.periods[pid]=rec;
-      set(ref(db,'mail/payroll/periods/'+pid), rec).catch(()=>toast('Sent, but the record did not save — check the mail rule.',true));
+      set(ref(db,'payroll/periods/'+pid), rec).catch(()=>toast('Sent, but the record did not save — check the payroll database rule.',true));
       prSaveRoster(f).catch(()=>{});
       _prForm=null; if(navPage==='payroll') renderPayroll();
       loadThreads(false);
@@ -1665,6 +1674,7 @@ window.go=(page)=>{
   $('v-contacts').style.display = page==='contacts'?'':'none';
   $('v-prices').style.display = page==='prices'?'':'none';
   $('v-payroll').style.display = page==='payroll'?'':'none';
+  if(page==='payroll'&&!prIsOwner()){ window.go('inbox'); return; }
   if(page==='payroll'){ $('tb-t').textContent='Payroll hours'; $('tb-s').textContent='Hours and pay for each pay period, emailed to the payroll service'; _prPreview=false; renderPayroll(); return; }
   if(page==='settings'){ $('tb-t').textContent='Settings'; $('tb-s').textContent='Mail connection'; renderSettings(); return; }
   if(page==='contacts'){ $('tb-t').textContent='Contacts'; $('tb-s').textContent='Shared shop address book'; _ctEdit=null; renderContacts(); return; }
@@ -4348,13 +4358,22 @@ onAuthStateChanged(auth,(user)=>{
         if(_noteTarget) renderNoteThread();
         if(CURRENT) renderNotesBtn();
       });
-      onValue(ref(db,'mail/payroll'),snap=>{
+      const prOwner=PR_OWNERS.includes(String(user.email||'').toLowerCase());
+      document.querySelectorAll('.pr-owner-only').forEach(n=>{ n.style.display=prOwner?'':'none'; });
+      if(prOwner) onValue(ref(db,'payroll'),snap=>{
+        _prDenied=false;
         const v=snap.val()||{};
+        // one-time move: anything saved while payroll lived under mail/ (readable by
+        // every account) is copied here, then deleted from mail/
+        if(!snap.exists()) get(ref(db,'mail/payroll')).then(old=>{
+          if(!old.exists()) return;
+          set(ref(db,'payroll'), old.val()).then(()=>remove(ref(db,'mail/payroll'))).catch(e=>console.warn('payroll move failed',e));
+        }).catch(()=>{});
         PAYROLL={roster:(v.roster&&typeof v.roster==='object')?v.roster:{}, settings:v.settings||{},
           periods:(v.periods&&typeof v.periods==='object')?v.periods:{}};
         // only repaint an untouched page — never wipe hours someone is typing
         if(navPage==='payroll' && (!_prForm || (!_prForm.dirty && !_prPreview))){ _prForm=null; renderPayroll(); }
-      });
+      }, err=>{ _prDenied=true; console.warn('payroll read denied',err); if(navPage==='payroll') renderPayroll(); });
       onValue(ref(db,'mail/contacts'),snap=>{
         CONTACTS=snap.val()||{};
         if(navPage==='contacts') renderContacts();
