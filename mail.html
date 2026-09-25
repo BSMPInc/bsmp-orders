@@ -156,6 +156,31 @@ body.sb-pinned .dock{left:var(--sb)}
 .ct-form input{width:100%;height:36px;padding:0 11px;border:1px solid var(--border2);background:#fff;outline:none;font-size:13px}
 .ct-form input:focus{border-color:var(--accent)}
 .savedchip{color:#1f7d57!important}
+/* payroll hours page */
+.pr-wrap{max-width:760px}
+.pr-top{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;margin-bottom:12px}
+.pr-top label{display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px}
+.pr-top input,.pr-top select{height:36px;padding:0 10px;border:1px solid var(--border2);background:#fff;outline:none;font-size:13px}
+.pr-top input:focus,.pr-top select:focus{border-color:var(--accent)}
+.pr-tbl{width:100%;border-collapse:collapse;background:#fff}
+.pr-tbl th{font-size:11px;font-weight:700;color:var(--text2);text-align:left;padding:8px 8px;border-bottom:1px solid var(--border);background:var(--bg)}
+.pr-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle}
+.pr-tbl input,.pr-tbl select{width:100%;height:34px;padding:0 9px;border:1px solid var(--border2);background:#fff;outline:none;font-size:13px}
+.pr-tbl input:focus,.pr-tbl select:focus{border-color:var(--accent)}
+.pr-tbl input:disabled{background:var(--bg);color:var(--text3)}
+.pr-tbl .num{text-align:right}
+.pr-tbl .x{width:34px;text-align:center}
+.pr-note{width:100%;min-height:54px;padding:8px 11px;border:1px solid var(--border2);background:#fff;outline:none;resize:vertical;font:inherit;font-size:13px}
+.pr-note:focus{border-color:var(--accent)}
+.pr-sum{font-size:12.5px;color:var(--text2);font-weight:700}
+.pr-hist-row{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.pr-hist-row:last-child{border-bottom:0}
+.pr-prev{border:1px solid var(--border);background:#fff;padding:16px 18px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#111}
+.pr-prev table{border-collapse:collapse;margin:8px 0 14px}
+.pr-prev th,.pr-prev td{border:1px solid #b9c0c9;padding:5px 10px;font-size:13px;text-align:left}
+.pr-prev th{background:#eef1f5}
+.pr-meta{font-size:12.5px;color:var(--text2);margin-bottom:10px;line-height:1.7}
+@media (max-width:640px){ .pr-tbl th:nth-child(2),.pr-tbl td:nth-child(2){width:92px} }
 /* compose To autocomplete */
 .ac-wrap{position:relative}
 .ac-list{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid var(--border2);border-top:none;max-height:220px;overflow-y:auto;box-shadow:0 8px 20px rgba(16,24,40,.12)}
@@ -489,6 +514,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="nav-item" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span class="nav-label">Certs &amp; invoices</span></div>
       <div class="nav-item" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span class="nav-label">Price book</span></div>
       <div class="nav-item" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span class="nav-label">Contacts</span></div>
+      <div class="nav-item" data-page="payroll" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span class="nav-label">Payroll hours</span></div>
       <div class="nav-sec">Setup</div>
       <div class="nav-item" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span class="nav-label">Settings</span></div>
     </div>
@@ -614,6 +640,9 @@ body.sb-pinned .dock{left:var(--sb)}
 
     <!-- ============ MATERIAL PRICE BOOK ============ -->
     <div class="content" id="v-prices" style="display:none"></div>
+
+    <!-- ============ PAYROLL HOURS ============ -->
+    <div class="content" id="v-payroll" style="display:none"></div>
   </main>
 </div>
 
@@ -626,6 +655,7 @@ body.sb-pinned .dock{left:var(--sb)}
   <button class="dock-tab" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span>Certs</span></button>
   <button class="dock-tab" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span>Prices</span></button>
   <button class="dock-tab" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span>Contacts</span></button>
+  <button class="dock-tab" data-page="payroll" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span>Payroll</span></button>
   <button class="dock-tab" data-page="settings" onclick="go('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
   <div class="dock-switch">
     <span class="lbl">Switch app</span>
@@ -1238,6 +1268,233 @@ window.deleteContact=(k,label)=>{
   renderContacts(); renderContactBtn();
 };
 window.composeTo=(email)=>{ openCompose(); $('cp-to').value=email; renderQuickRow(); setTimeout(()=>$('cp-subject').focus(),40); };
+
+// ── payroll hours (shared, mail/payroll) ──────────────────────────────────────
+// Fill in hours/pay once per pay period and it goes out as the same email the
+// office used to type by hand: "Payroll Hours <date>", "Thank you", then a
+// table (Employee | Hours | Rate | Hourly) — sent through /send's tables, so no
+// worker change. mail/payroll/roster/<id> = the employee list (per-id writes,
+// never the whole list — see the whole-object set() clobber note),
+// mail/payroll/settings = {to, from}, mail/payroll/periods/<id> = every sent
+// period, which pre-fills the next one's hours.
+let PAYROLL={roster:{}, settings:{}, periods:{}};
+const PR_TO_DEFAULT='payroll@businesssolutions-4u.com';
+const PR_STARTERS=[   // from the last hand-typed email (9/10/26) — used until the list is saved once
+  {name:'Hector Orellena', type:'hourly', rate:'27'},
+  {name:'Marvin Orellana', type:'hourly', rate:'24'},
+  {name:'Clemente Galindo', type:'hourly', rate:'24'},
+  {name:'Oziel Duenez', type:'salary', rate:'2400'},
+  {name:'Edgar Duenez', type:'salary', rate:'2400'}];
+let _prForm=null, _prPreview=false;
+const prNum=(v)=>{ const n=parseFloat(String(v==null?'':v).replace(/[$,\s]/g,'')); return isFinite(n)?n:NaN; };
+function prDateLabel(iso){   // 2026-09-10 → 9/10/26
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); if(!m) return '';
+  return (+m[2])+'/'+(+m[3])+'/'+m[1].slice(2);
+}
+function prToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function prMoney(v,type){
+  const n=prNum(v); if(isNaN(n)) return '';
+  const whole=Math.abs(n-Math.round(n))<1e-9;
+  const dec=(type==='salary'&&whole)?0:2;   // $27.00 hourly · $2,400 salary, as the office writes it
+  return '$'+n.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+}
+function prHours(v){ const n=prNum(v); return isNaN(n)?'':String(+n.toFixed(2)); }
+function prRosterList(){   // RTDB lists come back object-shaped with holes — normalize
+  const r=PAYROLL.roster&&typeof PAYROLL.roster==='object'?PAYROLL.roster:{};
+  return Object.keys(r).map(k=>r[k]&&r[k].name?Object.assign({rid:k},r[k]):null).filter(Boolean)
+    .sort((a,b)=>(a.order||0)-(b.order||0));
+}
+function prPeriodList(){
+  const p=PAYROLL.periods&&typeof PAYROLL.periods==='object'?PAYROLL.periods:{};
+  return Object.keys(p).map(k=>p[k]&&p[k].sentAt?Object.assign({pid:k},p[k]):null).filter(Boolean)
+    .sort((a,b)=>b.sentAt-a.sentAt);
+}
+function prRows(rows){ return (Array.isArray(rows)?rows:Object.values(rows||{})).filter(Boolean); }
+function prNewForm(){
+  const roster=prRosterList();
+  const base=roster.length?roster:PR_STARTERS.map((s,i)=>Object.assign({rid:'', order:i},s));
+  const last=prPeriodList()[0];
+  const lastHrs={}; if(last) prRows(last.rows).forEach(r=>{ if(r.name) lastHrs[r.name.toLowerCase()]=r.hours; });
+  const boxes=SETTINGS.mailboxes||[];
+  const s=PAYROLL.settings||{};
+  const from=(s.from&&boxes.includes(s.from))?s.from:(boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||''));
+  return {date:prToday(), from, to:s.to||PR_TO_DEFAULT, note:'', removed:[], seeded:!roster.length,
+    rows:base.map(r=>({rid:r.rid||'', name:r.name||'', type:r.type==='salary'?'salary':'hourly', rate:String(r.rate==null?'':r.rate),
+      hours:r.type==='salary'?'':(lastHrs[String(r.name||'').toLowerCase()]||'')}))};
+}
+// the one place the email's wording lives — preview renders it, send posts it
+function prCompose(f){
+  const label=prDateLabel(f.date), title='Payroll Hours '+label;
+  const rows=[['Employee','Hours','Rate','Hourly']].concat(prFilled(f).map(r=>[
+    r.name.trim(), r.type==='salary'?'--':prHours(r.hours), prMoney(r.rate,r.type), r.type==='salary'?'Salary':'Hourly']));
+  const note=String(f.note||'').trim();
+  return {subject:title, body:title+'\n\n'+(note?note+'\n\n':'')+'Thank you', table:{title, header:true, rows}};
+}
+const prFilled=(f)=>f.rows.filter(r=>String(r.name||'').trim()||String(r.hours||'').trim()||String(r.rate||'').trim());
+function prProblems(f){
+  const out=[];
+  if(!prDateLabel(f.date)) out.push('Pick the pay date.');
+  if(!/^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$/.test(String(f.to||'').trim())) out.push('The "Send to" address doesn’t look right.');
+  if(!f.from) out.push('No mailbox to send from — check Settings.');
+  const rows=prFilled(f);
+  if(!rows.length) out.push('Add at least one employee.');
+  rows.forEach(r=>{
+    const who=String(r.name||'').trim()||'A row';
+    if(!String(r.name||'').trim()) out.push('A row has hours or a rate but no name.');
+    if(r.type==='hourly'&&(isNaN(prNum(r.hours))||prNum(r.hours)<0)) out.push(who+': enter the hours.');
+    if(isNaN(prNum(r.rate))||prNum(r.rate)<=0) out.push(who+': enter the '+(r.type==='salary'?'salary amount':'hourly rate')+'.');
+  });
+  return out;
+}
+function renderPayroll(){
+  const el=$('v-payroll'); if(!el) return;
+  if(!_prForm) _prForm=prNewForm();
+  const f=_prForm;
+  const boxes=SETTINGS.mailboxes||[];
+  if(!boxes.includes(f.from)) f.from=boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||'');   // settings arrived after the form was made
+  if(_prPreview){ el.innerHTML=prPreviewHtml(f); return; }
+  const rows=f.rows.map((r,i)=>`<tr>
+      <td><input value="${esc(r.name)}" placeholder="Name" oninput="_prSet(${i},'name',this.value)"></td>
+      <td style="width:108px"><select onchange="_prSet(${i},'type',this.value,true)">
+        <option value="hourly"${r.type==='hourly'?' selected':''}>Hourly</option>
+        <option value="salary"${r.type==='salary'?' selected':''}>Salary</option></select></td>
+      <td style="width:96px"><input class="num" inputmode="decimal" value="${r.type==='salary'?'--':esc(r.hours)}" ${r.type==='salary'?'disabled title="Salary — no hours"':'placeholder="0"'} oninput="_prSet(${i},'hours',this.value)"></td>
+      <td style="width:120px"><input class="num" inputmode="decimal" value="${esc(r.rate)}" placeholder="${r.type==='salary'?'2400':'24.00'}" oninput="_prSet(${i},'rate',this.value)"></td>
+      <td class="x"><span class="icon-btn" title="Remove this row" style="cursor:pointer;color:var(--text3)" onclick="_prDel(${i})"><i class="ti ti-x"></i></span></td>
+    </tr>`).join('');
+  const hist=prPeriodList().slice(0,12).map(p=>{
+    const pr=prRows(p.rows), hrs=pr.reduce((s,r)=>s+(r.type==='salary'?0:(prNum(r.hours)||0)),0);
+    return `<div class="pr-hist-row"><b style="min-width:70px">${esc(p.label||prDateLabel(p.date))}</b>
+      <span style="color:var(--text2)">${pr.length} people · ${esc(prHours(hrs))} hourly hrs</span>
+      <span style="color:var(--text3);font-size:12px;margin-left:auto">sent ${esc(new Date(p.sentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}))} by ${esc(String(p.by||'').split('@')[0].replace(/^(ofc|ops)\./,''))}</span>
+      <button class="btn sm" title="Load this period into the form — to fix and resend it" onclick="_prOpen('${esc(p.pid)}')">Open</button></div>`;
+  }).join('');
+  el.innerHTML=`<div class="pr-wrap">
+    <div class="page-head"><h2>Payroll hours</h2><p>Fill in this pay period, review the email, send. The employee list and rates are remembered; last period’s hours are filled in to start.</p></div>
+    <div class="card" style="padding:16px">
+      <div class="pr-top">
+        <div><label>Pay date</label><input type="date" value="${esc(f.date)}" onchange="_prTop('date',this.value)"></div>
+        <div><label>Send from</label><select onchange="_prTop('from',this.value)">${boxes.map(a=>`<option value="${esc(a)}"${a===f.from?' selected':''}>${esc(a)}</option>`).join('')}</select></div>
+        <div style="flex:1;min-width:220px"><label>Send to</label><input style="width:100%" value="${esc(f.to)}" oninput="_prTop('to',this.value)"></div>
+      </div>
+      <div style="overflow-x:auto"><table class="pr-tbl">
+        <thead><tr><th>Employee</th><th>Pay type</th><th class="num">Hours</th><th class="num">Rate / amount</th><th></th></tr></thead>
+        <tbody>${rows}</tbody></table></div>
+      <div style="display:flex;gap:8px;align-items:center;margin:10px 0 14px;flex-wrap:wrap">
+        <button class="btn sm" onclick="_prAdd()"><i class="ti ti-user-plus"></i> Add employee</button>
+        <span class="pr-sum" id="pr-sum" style="margin-left:auto"></span>
+      </div>
+      <label style="display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">Note to payroll (optional — goes above “Thank you”)</label>
+      <textarea class="pr-note" placeholder="e.g. Marvin took 1 sick day" oninput="_prTop('note',this.value)">${esc(f.note)}</textarea>
+      <div id="pr-err" class="hint" style="color:var(--red);margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn primary" onclick="_prReview()"><i class="ti ti-eye"></i> Review email</button>
+        <button class="btn" title="Save the names, pay types and rates for next time — without sending" onclick="_prSaveList()"><i class="ti ti-device-floppy"></i> Save employee list</button>
+        <button class="btn" title="Start over from the saved list" onclick="_prReset()">Reset</button>
+      </div>
+      ${f.seeded?'<div class="hint" style="margin-top:10px">Names and rates were copied from your 9/10/26 payroll email — check them, then Save employee list (or just send; sending saves it too).</div>':''}
+    </div>
+    <div class="page-head" style="margin-top:22px"><h2 style="font-size:15px">Sent pay periods</h2></div>
+    <div class="card" style="padding:0">${hist||'<div class="empty" style="padding:22px">Nothing sent from here yet.</div>'}</div>
+  </div>`;
+  prPaintSum();
+}
+function prPaintSum(){
+  const s=$('pr-sum'); if(!s||!_prForm) return;
+  const rows=prFilled(_prForm);
+  const hrs=rows.reduce((t,r)=>t+(r.type==='hourly'?(prNum(r.hours)||0):0),0);
+  const gross=rows.reduce((t,r)=>t+(r.type==='hourly'?(prNum(r.hours)||0)*(prNum(r.rate)||0):(prNum(r.rate)||0)),0);
+  s.textContent=rows.length+' employee'+(rows.length!==1?'s':'')+' · '+prHours(hrs)+' hourly hrs · about '+prMoney(gross,'salary').replace(/\.\d+$/,'')+' gross (not sent)';
+}
+window._prSet=(i,k,v,rerender)=>{ const r=_prForm&&_prForm.rows[i]; if(!r) return; r[k]=v; _prForm.dirty=true; if(k==='type'&&v==='salary') r.hours=''; if(rerender) renderPayroll(); else prPaintSum(); };
+window._prTop=(k,v)=>{ if(_prForm){ _prForm[k]=v; _prForm.dirty=true; } };
+window._prAdd=()=>{ _prForm.dirty=true; _prForm.rows.push({rid:'', name:'', type:'hourly', hours:'', rate:''}); renderPayroll();
+  const ins=document.querySelectorAll('#v-payroll .pr-tbl tbody tr:last-child input'); if(ins[0]) ins[0].focus(); };
+window._prDel=(i)=>{ const r=_prForm.rows[i]; if(!r) return;
+  if(String(r.name||'').trim() && !confirm('Remove '+r.name.trim()+' from the list? (Saved when you save the list or send.)')) return;
+  if(r.rid) _prForm.removed.push(r.rid);
+  _prForm.dirty=true;
+  _prForm.rows.splice(i,1); renderPayroll(); };
+window._prReset=()=>{ if(!confirm('Clear this form and start again from the saved list?')) return; _prForm=prNewForm(); _prPreview=false; renderPayroll(); };
+window._prOpen=(pid)=>{
+  const p=(PAYROLL.periods||{})[pid]; if(!p) return;
+  const f=prNewForm();
+  const byName={}; f.rows.forEach(r=>{ byName[r.name.toLowerCase()]=r; });
+  f.date=p.date||f.date; f.note=p.note||''; if(p.to) f.to=p.to; if(p.from&&(SETTINGS.mailboxes||[]).includes(p.from)) f.from=p.from;
+  f.rows=prRows(p.rows).map(r=>{ const cur=byName[String(r.name||'').toLowerCase()];
+    return {rid:cur?cur.rid:'', name:r.name||'', type:r.type==='salary'?'salary':'hourly', hours:r.type==='salary'?'':String(r.hours==null?'':r.hours), rate:String(r.rate==null?'':r.rate)}; });
+  f.dirty=true; _prForm=f; _prPreview=false; renderPayroll(); window.scrollTo(0,0);
+  toast('Loaded the '+(p.label||prDateLabel(p.date))+' pay period — change what you need and send again.');
+};
+// roster: one write per person (never set() the whole list from this copy)
+function prSaveRoster(f){
+  const rows=prFilled(f).filter(r=>String(r.name||'').trim());
+  const writes=[];
+  rows.forEach((r,i)=>{
+    if(!r.rid) r.rid='e'+Date.now().toString(36)+i;
+    const rec={name:r.name.trim(), type:r.type, rate:String(prNum(r.rate)||''), order:i,
+      by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now()};
+    PAYROLL.roster[r.rid]=rec;
+    writes.push(set(ref(db,'mail/payroll/roster/'+r.rid), rec));
+  });
+  (f.removed||[]).forEach(rid=>{ delete PAYROLL.roster[rid]; writes.push(remove(ref(db,'mail/payroll/roster/'+rid))); });
+  f.removed=[]; f.seeded=false;
+  writes.push(update(ref(db,'mail/payroll/settings'), {to:String(f.to||'').trim(), from:f.from||''}));
+  return Promise.all(writes);
+}
+window._prSaveList=()=>{
+  if(!prFilled(_prForm).some(r=>String(r.name||'').trim())){ toast('Add at least one employee first.',true); return; }
+  prSaveRoster(_prForm).then(()=>{ toast('Employee list saved.'); renderPayroll(); })
+    .catch(()=>toast('Could not save — check the mail rule is published.',true));
+};
+window._prReview=()=>{
+  const probs=prProblems(_prForm);
+  if(probs.length){ const e=$('pr-err'); if(e) e.innerHTML=probs.map(esc).join('<br>'); return; }
+  _prPreview=true; renderPayroll(); window.scrollTo(0,0);
+};
+window._prBack=()=>{ _prPreview=false; renderPayroll(); };
+function prPreviewHtml(f){
+  const c=prCompose(f), sig=sigOf(f.from), logo=sigLogoOf(f.from);
+  const dup=prPeriodList().find(p=>p.date===f.date);
+  const tbl=c.table.rows.map((r,i)=>'<tr>'+r.map(x=>i===0?`<th>${esc(x)}</th>`:`<td>${esc(x)}</td>`).join('')+'</tr>').join('');
+  return `<div class="pr-wrap">
+    <div class="page-head"><h2>Review the payroll email</h2><p>This is exactly what goes out. Nothing is sent until you press Send.</p></div>
+    ${dup?`<div class="card" style="padding:10px 14px;margin-bottom:12px;border-left:3px solid var(--amber);background:var(--amber-soft)"><b>Already sent once:</b> ${esc(c.subject)} went out ${esc(new Date(dup.sentAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))}. Sending again sends a second email — say what changed in the note.</div>`:''}
+    <div class="pr-meta"><b>From:</b> ${esc(f.from)}<br><b>To:</b> ${esc(String(f.to).trim())}<br><b>Subject:</b> ${esc(c.subject)}</div>
+    <div class="pr-prev">${esc(c.body).replace(/\n/g,'<br>')}
+      <div style="font-weight:700;margin:14px 0 6px">${esc(c.table.title)}</div><table>${tbl}</table>
+      ${sig?esc('-- \n'+sig).replace(/\n/g,'<br>'):''}
+      ${logo?`<div style="margin-top:10px"><img src="data:${esc(logo.mime)};base64,${logo.data}" width="${logo.width}" style="display:block;max-width:100%;height:auto" alt=""></div>`:''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" onclick="_prBack()"><i class="ti ti-arrow-left"></i> Back — edit</button>
+      <button class="btn primary" onclick="_prSend()"><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg> Send</button>
+    </div></div>`;
+}
+window._prSend=()=>{
+  const f=_prForm; if(!f) return;
+  const probs=prProblems(f); if(probs.length){ _prPreview=false; renderPayroll(); const e=$('pr-err'); if(e) e.innerHTML=probs.map(esc).join('<br>'); return; }
+  const c=prCompose(f), to=String(f.to).trim();
+  const payload={replyAs:f.from, to, subject:c.subject, body:withSig(c.body,f.from), tables:[c.table], sigLogo:sigLogoOf(f.from)};
+  const rec={date:f.date, label:prDateLabel(f.date), note:String(f.note||'').trim(), to, from:f.from, subject:c.subject,
+    rows:prFilled(f).map(r=>({name:r.name.trim(), type:r.type, hours:r.type==='salary'?'':prHours(r.hours), rate:String(prNum(r.rate))}))};
+  _prPreview=false; renderPayroll();
+  showUndo('Sending payroll',{countdown:true, secs:8,
+    onUndo:()=>{ _prForm=f; _prPreview=true; if(navPage==='payroll') renderPayroll(); toast('Send canceled — the payroll email is back for review.'); },
+    onTimeout:async ()=>{
+      try{ await api('/send',{method:'POST',body:JSON.stringify(payload)}); }
+      catch(e){ _prForm=f; _prPreview=true; if(navPage==='payroll') renderPayroll();
+        toast(e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':('Send failed: '+e.message),true); return; }
+      toast('Payroll sent ✓');
+      const pid='p'+Date.now().toString(36);
+      rec.sentAt=Date.now(); rec.by=(auth.currentUser&&auth.currentUser.email)||'';
+      PAYROLL.periods[pid]=rec;
+      set(ref(db,'mail/payroll/periods/'+pid), rec).catch(()=>toast('Sent, but the record did not save — check the mail rule.',true));
+      prSaveRoster(f).catch(()=>{});
+      _prForm=null; if(navPage==='payroll') renderPayroll();
+      loadThreads(false);
+    }});
+};
 // save-the-sender button shown on an open conversation
 function renderContactBtn(){
   const b=$('contact-btn'); if(!b) return;
@@ -1324,11 +1581,13 @@ window.go=(page)=>{
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   document.querySelectorAll('.dock-tab').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   backToList();
-  const full = page==='settings'||page==='contacts'||page==='prices';
+  const full = page==='settings'||page==='contacts'||page==='prices'||page==='payroll';
   $('v-list').style.display = full?'none':'';
   $('v-settings').style.display = page==='settings'?'':'none';
   $('v-contacts').style.display = page==='contacts'?'':'none';
   $('v-prices').style.display = page==='prices'?'':'none';
+  $('v-payroll').style.display = page==='payroll'?'':'none';
+  if(page==='payroll'){ $('tb-t').textContent='Payroll hours'; $('tb-s').textContent='Hours and pay for each pay period, emailed to the payroll service'; _prPreview=false; renderPayroll(); return; }
   if(page==='settings'){ $('tb-t').textContent='Settings'; $('tb-s').textContent='Mail connection'; renderSettings(); return; }
   if(page==='contacts'){ $('tb-t').textContent='Contacts'; $('tb-s').textContent='Shared shop address book'; _ctEdit=null; renderContacts(); return; }
   if(page==='prices'){ $('tb-t').textContent='Price book'; $('tb-s').textContent='Materials & hardware, saved out of vendor emails — one search, every vendor'; renderPrices(); return; }
@@ -1503,7 +1762,7 @@ function fmtWhen(ms){
 function isWide(){ return window.matchMedia('(min-width:1000px)').matches; }
 function placeConvo(){
   const convo=$('v-convo'), rp=$('read-pane');
-  const fullPage = navPage==='settings'||navPage==='contacts';   // own full-screen views
+  const fullPage = navPage==='settings'||navPage==='contacts'||navPage==='prices'||navPage==='payroll';   // own full-screen views
   if(isWide()){
     if(convo.parentElement!==rp) rp.appendChild(convo);
     convo.classList.add('embedded');
@@ -4010,6 +4269,13 @@ onAuthStateChanged(auth,(user)=>{
         renderList();
         if(_noteTarget) renderNoteThread();
         if(CURRENT) renderNotesBtn();
+      });
+      onValue(ref(db,'mail/payroll'),snap=>{
+        const v=snap.val()||{};
+        PAYROLL={roster:(v.roster&&typeof v.roster==='object')?v.roster:{}, settings:v.settings||{},
+          periods:(v.periods&&typeof v.periods==='object')?v.periods:{}};
+        // only repaint an untouched page — never wipe hours someone is typing
+        if(navPage==='payroll' && (!_prForm || (!_prForm.dirty && !_prPreview))){ _prForm=null; renderPayroll(); }
       });
       onValue(ref(db,'mail/contacts'),snap=>{
         CONTACTS=snap.val()||{};
