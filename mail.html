@@ -180,6 +180,11 @@ body.sb-pinned .dock{left:var(--sb)}
 .pr-prev th,.pr-prev td{border:1px solid #b9c0c9;padding:5px 10px;font-size:13px;text-align:left}
 .pr-prev th{background:#eef1f5}
 .pr-meta{font-size:12.5px;color:var(--text2);margin-bottom:10px;line-height:1.7}
+.pr-help ol{margin:4px 0 12px 20px;padding:0}
+.pr-help li{margin:0 0 9px;line-height:1.5;font-size:13.5px}
+.pr-help h4{font-size:12px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
+.pr-help ul{margin:0 0 4px 18px;padding:0}
+.pr-help ul li{font-size:13px;margin-bottom:6px}
 @media (max-width:640px){ .pr-tbl th:nth-child(2),.pr-tbl td:nth-child(2){width:92px} }
 /* compose To autocomplete */
 .ac-wrap{position:relative}
@@ -671,6 +676,33 @@ body.sb-pinned .dock{left:var(--sb)}
 </div>
 
 <!-- compose modal -->
+<!-- payroll help -->
+<div class="modal-bg" id="pr-help-modal" onclick="if(event.target===this)closePrHelp()">
+  <div class="modal pr-help" style="max-width:600px">
+    <h3><i class="ti ti-help-circle"></i> How to send payroll hours</h3>
+    <ol>
+      <li><b>Pick the pay period.</b> Periods run the <b>11th–25th</b> and the <b>26th–10th</b>. The page opens on the one that just ended.</li>
+      <li><b>Check the regular hours.</b> Every hourly person starts at <b>weekdays × 8</b> for that period (Mon–Fri; holidays count as paid days). The line above the table shows the math, e.g. 11 weekdays × 8 = 88.</li>
+      <li><b>Missed a day?</b> Type over that person’s hours (8 less per day missed). The box turns yellow so you can see it was changed by hand.</li>
+      <li><b>Overtime:</b> type each person’s OT hours in the <b>OT hours</b> column. Leave it blank for none — it goes out as 0.</li>
+      <li><b>Note (optional):</b> anything payroll should know — a missed day, a bonus, a new rate. It goes in the email above “Thank you”.</li>
+      <li><b>Review email</b> shows exactly what will be sent. Check it, then press <b>Send</b>. You have 8 seconds to hit <b>Undo</b> at the bottom of the screen.</li>
+    </ol>
+    <h4>Good to know</h4>
+    <ul>
+      <li><b>Salary</b> people show “--” for hours and overtime; the amount in <b>Rate / amount</b> is what goes out.</li>
+      <li><b>People and rates:</b> add someone with <b>Add employee</b>, remove with the ×, change a rate right in the table. <b>Save employee list</b> keeps the changes for next time (sending saves them too).</li>
+      <li><b>Hours</b> in the email are regular hours only; <b>OT Hours</b> are on top of them.</li>
+      <li>The gray total under the table (“about $… gross”) is a rough check for you — it is <b>not</b> in the email. Payroll does the real math.</li>
+      <li><b>Sent pay periods</b> lists everything sent from here. <b>Open</b> loads one back to fix and resend it — you’ll get a warning that this period was already sent.</li>
+      <li><b>Send from / Send to</b> are remembered. Change them only if the payroll service’s address changes.</li>
+    </ul>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button class="btn primary" onclick="closePrHelp()">Got it</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="compose-modal">
   <div class="modal">
     <h3>New email</h3>
@@ -892,6 +924,7 @@ document.addEventListener('keydown',(ev)=>{
   }
   // Esc backs out of popups
   if(ev.key==='Escape'){
+    if($('pr-help-modal').style.display==='flex'){ window.closePrHelp(); return; }
     if(quickOpen) window.closeQuick();
     else if(tableOpen) window.closeTable();
     else if(priceOpen) window.closePriceCapture();
@@ -1400,7 +1433,7 @@ function renderPayroll(){
       <button class="btn sm" title="Load this period into the form — to fix and resend it" onclick="_prOpen('${esc(p.pid)}')">Open</button></div>`;
   }).join('');
   el.innerHTML=`<div class="pr-wrap">
-    <div class="page-head"><h2>Payroll hours</h2><p>Pick the pay period, add any overtime, review the email, send. Regular hours fill in at ${PR_DAY_HRS} a day; the employee list and rates are remembered.</p></div>
+    <div class="page-head"><h2 style="display:flex;align-items:center;gap:10px">Payroll hours <button class="btn sm" title="How to use this page" onclick="openPrHelp()"><i class="ti ti-help-circle"></i> Help</button></h2><p>Pick the pay period, add any overtime, review the email, send. Regular hours fill in at ${PR_DAY_HRS} a day; the employee list and rates are remembered.</p></div>
     <div class="card" style="padding:16px">
       <div class="pr-top">
         <div><label>Pay period</label><select onchange="_prPeriodPick(this.value)">${prPeriodOptions(per.start).map(o=>`<option value="${esc(o.start)}"${o.start===per.start?' selected':''}>${esc(o.label)}</option>`).join('')}</select></div>
@@ -1495,6 +1528,8 @@ window._prReview=()=>{
   _prPreview=true; renderPayroll(); window.scrollTo(0,0);
 };
 window._prBack=()=>{ _prPreview=false; renderPayroll(); };
+window.openPrHelp=()=>{ $('pr-help-modal').style.display='flex'; };
+window.closePrHelp=()=>{ $('pr-help-modal').style.display='none'; };
 function prPreviewHtml(f){
   const c=prCompose(f), sig=sigOf(f.from), logo=sigLogoOf(f.from);
   const dup=prPeriodList().find(p=>p.start===f.start);
