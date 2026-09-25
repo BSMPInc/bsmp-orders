@@ -736,6 +736,9 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
     </div>
   </div>
 
+  <!-- Claude's decisions for the loaded quote (only shown when the quote carries them) -->
+  <div id="claude-review-bar" style="display:none"></div>
+
   <!-- Job Info -->
   <div class="card">
     <div class="card-title">
@@ -5252,6 +5255,8 @@ function saveQuote(){
     qtyBreaks: window._qtyBreaksResults || [],
     laborLines, hwLines, outLines,
     notes: document.getElementById('notes').value,
+    // Claude's decision record: attached when Claude builds the quote, kept when the quote is re-saved
+    claudeReview: window._pendingClaudeReview || (existing && existing.claudeReview) || null,
     img: currentPartImg||null,
     drawingUrl: currentDrawingUrl||'',
 
@@ -5332,6 +5337,7 @@ function saveQuote(){
   HISTORY.unshift(quote);
   if(HISTORY.length>500) HISTORY.pop();
   currentQuoteId=quote.id;   // further saves keep updating this record
+  window._pendingClaudeReview = null;   // a decision record belongs to exactly one saved quote
   try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(quote); }catch(e){}
   // Upload the full-res drawing to Firebase Storage, then attach its URL to the quote
   // (localStorage keeps only the small thumbnail; the database keeps only the URL).
@@ -5482,6 +5488,7 @@ function renderHistory(){
             <div>
               <div style="font-weight:600;font-size:13px">${q.partNum}${q.quoteNo?` <span style="display:inline-block;font-size:10px;font-weight:700;color:#0369a1;background:#e0f2fe;border-radius:4px;padding:1px 6px;margin-left:4px;vertical-align:middle">Quote #${q.quoteNo}</span>`:''}</div>
               <div style="font-size:11px;color:var(--text3)">${q.tier?(()=>{const t=TIER_DEFS.find(d=>d.key===q.tier);return t?`<span style="display:inline-block;font-size:10px;font-weight:700;color:${t.color};background:${t.bg};border-radius:4px;padding:1px 6px;margin-right:5px">${t.label}</span>`:'';})():''}Rev ${q.revision}${isStale(q)?` <span style="display:inline-block;font-size:10px;font-weight:700;color:#8a6d2f;background:#f6f0e0;border-radius:4px;padding:1px 6px;margin-left:4px" title="Pending ${quoteAgeDays(q)} days — consider a follow-up call">⚑ ${quoteAgeDays(q)}d — follow up</span>`:''}</div>
+              ${claudeChip(q)}
             </div>
           </div>
         </td>
@@ -5513,6 +5520,104 @@ function renderHistory(){
   renderHistoryStats(searchMatched);
 }
 
+// ===================== CLAUDE'S DECISIONS =====================
+// A quote Claude builds carries claudeReview:
+//   { by, at, summary, decisions:[{ area, question, options:[...], choice, because, check, source }],
+//     reviewedAt, reviewedBy }
+// "check" marks an estimate or judgement call the owner should confirm. The record rides along with
+// the quote (and its cloud copy), so it shows in every browser; Mark reviewed stamps who/when.
+function claudeReviewOf(q){
+  const r = q && q.claudeReview;
+  if(!r || !r.decisions) return null;
+  const decisions = (Array.isArray(r.decisions) ? r.decisions : Object.values(r.decisions)).filter(Boolean)
+    .map(d => ({ ...d, options: Array.isArray(d.options) ? d.options : (d.options ? Object.values(d.options) : []) }));
+  return { ...r, decisions };
+}
+function claudeChip(q){
+  const r = claudeReviewOf(q); if(!r) return '';
+  const n = r.decisions.filter(d=>d.check).length;
+  const done = !!r.reviewedAt;
+  const txt = done ? 'Claude · reviewed' : ('Claude' + (n ? ' · ' + n + ' to check' : '’s decisions'));
+  const col = done ? 'color:#2f7a55;background:#e6f1ea;border-color:#bfdcca'
+    : (n ? 'color:#8a5a12;background:#fbf1dc;border-color:#ecd49c' : 'color:#1e3a5f;background:#e8eef6;border-color:#c9d6e6');
+  return `<button type="button" onclick="showClaudeReview(${q.id})" title="See what Claude decided on this quote and why" style="margin-top:4px;font-size:10.5px;font-weight:700;border:1px solid;border-radius:999px;padding:2px 9px;cursor:pointer;font-family:inherit;white-space:nowrap;${col}">${txt}</button>`;
+}
+function renderClaudeReviewBar(){
+  const bar = document.getElementById('claude-review-bar'); if(!bar) return;
+  const q = currentQuoteId!=null ? HISTORY.find(h=>h.id===currentQuoteId) : null;
+  const r = claudeReviewOf(q);
+  if(!r){ bar.style.display='none'; bar.innerHTML=''; return; }
+  const n = r.decisions.filter(d=>d.check).length;
+  bar.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;border-radius:10px;border:1px solid '
+    + (r.reviewedAt ? '#bfdcca;background:#f1f8f4' : '#ecd49c;background:#fdf8ec');
+  bar.innerHTML = `<div style="flex:1;min-width:220px;font-size:13px;color:#1f2937"><strong>Built by Claude</strong> — ${r.decisions.length} decision${r.decisions.length!==1?'s':''}`
+    + (r.reviewedAt ? ` · <span style="color:#2f7a55">reviewed ${qEsc(new Date(r.reviewedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}))}</span>`
+                    : (n ? ` · <span style="color:#8a5a12;font-weight:600">${n} to check before sending</span>` : ''))
+    + `</div><button class="btn btn-sm" onclick="showClaudeReview(${q.id})">Review decisions</button>`;
+}
+function showClaudeReview(id){
+  const q = HISTORY.find(h=>h.id===id); const r = claudeReviewOf(q); if(!r) return;
+  const old = document.getElementById('claude-review-modal'); if(old) old.remove();
+  const checks = r.decisions.map((d,i)=>({d,i})).filter(x=>x.d.check);
+  const when = r.at ? new Date(r.at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+  const node = (d,i) => {
+    const opts = (d.options.length ? d.options : [d.choice]).map(o => {
+      const on = String(o) === String(d.choice);
+      return `<div style="display:flex;align-items:flex-start;gap:8px;margin:3px 0">
+        <span style="flex:none;width:14px;height:14px;margin-top:2px;border-radius:50%;border:2px solid ${on?'#2f7a55':'#c3cad5'};background:${on?'#2f7a55':'transparent'}"></span>
+        <span style="font-size:13px;${on?'font-weight:700;color:#1f2937':'color:#8a93a5'}">${qEsc(o)}${on?' <span style="font-size:10px;font-weight:700;color:#2f7a55;letter-spacing:.04em">CHOSEN</span>':''}</span></div>`;
+    }).join('');
+    return `<div id="crv-${i}" style="border:1px solid ${d.check?'#ecd49c':'#e2e6ec'};border-radius:10px;padding:12px 14px;margin-bottom:10px;background:${d.check?'#fdf8ec':'#fff'}">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a93a5">${qEsc(d.area||'')}</span>
+        ${d.check?'<span style="font-size:10px;font-weight:700;color:#8a5a12;background:#fbf1dc;border:1px solid #ecd49c;border-radius:4px;padding:0 6px">PLEASE CHECK</span>':''}
+      </div>
+      <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:6px">${qEsc(d.question||'')}</div>
+      <div style="border-left:2px solid #e2e6ec;margin-left:6px;padding-left:12px">${opts}</div>
+      ${d.because?`<div style="font-size:12.5px;color:#4b5563;margin-top:8px;line-height:1.5"><strong>Why:</strong> ${qEsc(d.because)}</div>`:''}
+      ${d.source?`<div style="font-size:11px;color:#8a93a5;margin-top:4px">Source: ${qEsc(d.source)}</div>`:''}
+    </div>`;
+  };
+  const who = r.reviewedBy ? ' by ' + qEsc(String(r.reviewedBy).replace(/@.*/,'').replace(/^(ofc|ops)\./,'')) : '';
+  const ov = document.createElement('div'); ov.id = 'claude-review-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:11000;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'DM Sans',system-ui,sans-serif">
+    <div style="padding:18px 20px 12px;border-bottom:1px solid #e2e6ec">
+      <div style="font-size:17px;font-weight:700;color:#0f172a">Claude’s decisions — ${qEsc(q.partNum)}${q.revision&&q.revision!=='—'?' Rev '+qEsc(q.revision):''}</div>
+      <div style="font-size:12px;color:#8a93a5;margin-top:2px">${qEsc(q.customer)} · qty ${qEsc(q.qty)} · $${Number(q.pricePerPart||0).toFixed(2)}/part${when?' · built '+qEsc(when):''}</div>
+    </div>
+    <div style="padding:14px 20px;overflow:auto">
+      ${r.summary?`<div style="font-size:13px;color:#4b5563;line-height:1.6;margin-bottom:14px;white-space:pre-wrap">${qEsc(r.summary)}</div>`:''}
+      ${checks.length?`<div style="border:1px solid #ecd49c;background:#fdf8ec;border-radius:10px;padding:10px 14px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#8a5a12;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Please check before sending (${checks.length})</div>
+        ${checks.map(x=>`<div style="font-size:13px;margin:3px 0"><a href="#" onclick="document.getElementById('crv-${x.i}').scrollIntoView({behavior:'smooth',block:'center'});return false" style="color:#8a5a12">${qEsc(x.d.question)}</a> — <span style="color:#4b5563">${qEsc(x.d.choice)}</span></div>`).join('')}
+      </div>`:''}
+      <div style="font-size:11px;font-weight:700;color:#8a93a5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Decision tree</div>
+      ${r.decisions.map(node).join('')}
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e2e6ec;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;font-size:12px;color:#8a93a5">${r.reviewedAt ? ('Reviewed ' + qEsc(new Date(r.reviewedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})) + who) : 'Not reviewed yet'}</div>
+      ${r.reviewedAt ? '' : `<button class="btn btn-primary btn-sm" onclick="markClaudeReviewed(${q.id})">Mark reviewed</button>`}
+      <button class="btn btn-sm" onclick="document.getElementById('claude-review-modal').remove()">Close</button>
+    </div></div>`;
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
+}
+function markClaudeReviewed(id){
+  const q = HISTORY.find(h=>h.id===id); if(!q || !q.claudeReview) return;
+  q.claudeReview.reviewedAt = Date.now();
+  q.claudeReview.reviewedBy = (window._qUserEmail && window._qUserEmail()) || '';
+  try{ persistHistory(); }catch(e){}
+  try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(q); }catch(e){}
+  renderHistory(); renderClaudeReviewBar(); showClaudeReview(id);
+}
+// keep the banner in step with whichever quote is in the form
+(function(){
+  const wrap = name => { const f = window[name]; if(typeof f !== 'function') return;
+    window[name] = function(){ const out = f.apply(this, arguments); try{ renderClaudeReviewBar(); }catch(e){} return out; }; };
+  ['reloadQuote','resetForm','saveQuote','renderHistory'].forEach(wrap);
+})();
+
 const QUOTE_STATUSES = {
   pending:    { label:'Pending',     color:'#8a6d2f', bg:'#f6f0e0', border:'#e6d8b0' },
   accepted:   { label:'Accepted',    color:'#2f7a55', bg:'#e6f1ea', border:'#bfdcca' },
@@ -5538,6 +5643,9 @@ function setQuoteStatus(id, status){
   }
   if(status !== 'accepted') delete q.acceptedDate;
   localStorage.setItem('bsmp_history', JSON.stringify(HISTORY));
+  // without this a status set here never left this browser, and the history sync could
+  // later bring an older copy back over it
+  try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(q); }catch(e){}
   renderHistory();
 }
 

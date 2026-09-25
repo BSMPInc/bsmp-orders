@@ -34,6 +34,10 @@ Estimates and prices sheet-metal jobs, produces a customer-facing printable PDF 
 - **Archive / history / insights:** `archivePrintedQuote`, `renderArchive`, `renderHistory`, `renderArchiveInsights`, `renderLaserInsights`, `exportArchiveCSV`.
 - **PDF output & numbering:** `consumeQuoteNumber` / `saveNextQuoteNumber`, `reprintArchived`, `tbPrint`.
 
+## Claude's decisions (added 2026-09-24)
+
+Quotes Claude builds carry `claudeReview: { by, at, summary, decisions:[{area, question, options[], choice, because, check, source}], reviewedAt, reviewedBy }`. `check:true` = an estimate / judgement call the owner should confirm. Shown as a chip under the part number in History (`claudeChip`), a banner above Job Info when that quote is loaded (`renderClaudeReviewBar`, kept in step by wrapping reloadQuote/resetForm/saveQuote/renderHistory), and a pop-up decision tree (`showClaudeReview`) with **Mark reviewed** (`markClaudeReviewed`, stamps who/when and syncs). `saveQuote` attaches `window._pendingClaudeReview` to a NEW quote (then clears it) and keeps `existing.claudeReview` on re-save. The record travels in the `quoteSnaps` full copy, so it shows in every browser. Status changes (`setQuoteStatus`) now also sync to the cloud (they used to stay in one browser).
+
 ## Quote record (rough shape)
 
 Fields commonly present: `id`, `customer`, `part`, `qty`, `material`, `tier`, `status`, `total`, and timestamps. Status is managed via `setQuoteStatus` / `statusDropdown` (quote status tracker).
