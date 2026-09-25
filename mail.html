@@ -1271,12 +1271,14 @@ window.composeTo=(email)=>{ openCompose(); $('cp-to').value=email; renderQuickRo
 
 // ── payroll hours (shared, mail/payroll) ──────────────────────────────────────
 // Fill in hours/pay once per pay period and it goes out as the same email the
-// office used to type by hand: "Payroll Hours <date>", "Thank you", then a
-// table (Employee | Hours | Rate | Hourly) — sent through /send's tables, so no
-// worker change. mail/payroll/roster/<id> = the employee list (per-id writes,
-// never the whole list — see the whole-object set() clobber note),
-// mail/payroll/settings = {to, from}, mail/payroll/periods/<id> = every sent
-// period, which pre-fills the next one's hours.
+// office used to type by hand: "Payroll Hours <period>", "Thank you", then a
+// table (Employee | Hours | OT Hours | Rate | Hourly) — sent through /send's
+// tables, so no worker change. Pay periods are semi-monthly: the 11th–25th and
+// the 26th–10th. Regular hours fill in as weekdays (Mon–Fri, holidays paid) × 8;
+// overtime is typed by hand. mail/payroll/roster/<id> = the employee list
+// (per-id writes, never the whole list — see the whole-object set() clobber
+// note), mail/payroll/settings = {to, from}, mail/payroll/periods/<id> = every
+// sent period.
 let PAYROLL={roster:{}, settings:{}, periods:{}};
 const PR_TO_DEFAULT='payroll@businesssolutions-4u.com';
 const PR_STARTERS=[   // from the last hand-typed email (9/10/26) — used until the list is saved once
@@ -1291,7 +1293,32 @@ function prDateLabel(iso){   // 2026-09-10 → 9/10/26
   const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); if(!m) return '';
   return (+m[2])+'/'+(+m[3])+'/'+m[1].slice(2);
 }
-function prToday(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const PR_DAY_HRS=8;   // a regular work day
+const prIso=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function prParse(iso){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||''); return m?new Date(+m[1],+m[2]-1,+m[3]):null; }
+// the pay period a day falls in: 11th–25th, or 26th–10th of the next month
+function prPeriodOf(d){
+  const y=d.getFullYear(), m=d.getMonth(), day=d.getDate();
+  if(day>=11&&day<=25) return {start:new Date(y,m,11), end:new Date(y,m,25)};
+  if(day>=26) return {start:new Date(y,m,26), end:new Date(y,m+1,10)};
+  return {start:new Date(y,m-1,26), end:new Date(y,m,10)};
+}
+function prPeriod(startIso){
+  const d=prParse(startIso); if(!d) return null;
+  const p=prPeriodOf(d); let wd=0;
+  for(const x=new Date(p.start); x<=p.end; x.setDate(x.getDate()+1)){ const w=x.getDay(); if(w>=1&&w<=5) wd++; }
+  const start=prIso(p.start), end=prIso(p.end);
+  return {start, end, weekdays:wd, regHrs:wd*PR_DAY_HRS, label:prDateLabel(start)+' - '+prDateLabel(end)};
+}
+// payroll usually goes out on the period's last day or just after — so default
+// to the period that held the day before yesterday (9/25 → 9/11–9/25, 9/12 → 8/26–9/10)
+function prDefaultStart(){ const d=new Date(); d.setDate(d.getDate()-2); return prIso(prPeriodOf(d).start); }
+function prPeriodOptions(cur){
+  const out=[]; let d=prParse(prDefaultStart()); d.setDate(d.getDate()+20);   // one period ahead
+  for(let i=0;i<9;i++){ const p=prPeriodOf(d); out.push(prIso(p.start)); d=new Date(p.start); d.setDate(d.getDate()-1); }
+  if(cur&&!out.includes(cur)) out.push(cur);
+  return out.map(prPeriod).filter(Boolean).sort((a,b)=>a.start<b.start?1:-1);
+}
 function prMoney(v,type){
   const n=prNum(v); if(isNaN(n)) return '';
   const whole=Math.abs(n-Math.round(n))<1e-9;
@@ -1313,27 +1340,27 @@ function prRows(rows){ return (Array.isArray(rows)?rows:Object.values(rows||{}))
 function prNewForm(){
   const roster=prRosterList();
   const base=roster.length?roster:PR_STARTERS.map((s,i)=>Object.assign({rid:'', order:i},s));
-  const last=prPeriodList()[0];
-  const lastHrs={}; if(last) prRows(last.rows).forEach(r=>{ if(r.name) lastHrs[r.name.toLowerCase()]=r.hours; });
+  const per=prPeriod(prDefaultStart());
   const boxes=SETTINGS.mailboxes||[];
   const s=PAYROLL.settings||{};
   const from=(s.from&&boxes.includes(s.from))?s.from:(boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||''));
-  return {date:prToday(), from, to:s.to||PR_TO_DEFAULT, note:'', removed:[], seeded:!roster.length,
+  return {start:per.start, from, to:s.to||PR_TO_DEFAULT, note:'', removed:[], seeded:!roster.length,
     rows:base.map(r=>({rid:r.rid||'', name:r.name||'', type:r.type==='salary'?'salary':'hourly', rate:String(r.rate==null?'':r.rate),
-      hours:r.type==='salary'?'':(lastHrs[String(r.name||'').toLowerCase()]||'')}))};
+      hours:r.type==='salary'?'':String(per.regHrs), hoursAuto:true, ot:''}))};
 }
 // the one place the email's wording lives — preview renders it, send posts it
 function prCompose(f){
-  const label=prDateLabel(f.date), title='Payroll Hours '+label;
-  const rows=[['Employee','Hours','Rate','Hourly']].concat(prFilled(f).map(r=>[
-    r.name.trim(), r.type==='salary'?'--':prHours(r.hours), prMoney(r.rate,r.type), r.type==='salary'?'Salary':'Hourly']));
+  const per=prPeriod(f.start), title='Payroll Hours '+(per?per.label:'');
+  const rows=[['Employee','Hours','OT Hours','Rate','Hourly']].concat(prFilled(f).map(r=>[
+    r.name.trim(), r.type==='salary'?'--':prHours(r.hours), r.type==='salary'?'--':(prHours(r.ot)||'0'),
+    prMoney(r.rate,r.type), r.type==='salary'?'Salary':'Hourly']));
   const note=String(f.note||'').trim();
   return {subject:title, body:title+'\n\n'+(note?note+'\n\n':'')+'Thank you', table:{title, header:true, rows}};
 }
-const prFilled=(f)=>f.rows.filter(r=>String(r.name||'').trim()||String(r.hours||'').trim()||String(r.rate||'').trim());
+const prFilled=(f)=>f.rows.filter(r=>String(r.name||'').trim()||String(r.ot||'').trim()||String(r.rate||'').trim());
 function prProblems(f){
   const out=[];
-  if(!prDateLabel(f.date)) out.push('Pick the pay date.');
+  if(!prPeriod(f.start)) out.push('Pick the pay period.');
   if(!/^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$/.test(String(f.to||'').trim())) out.push('The "Send to" address doesn’t look right.');
   if(!f.from) out.push('No mailbox to send from — check Settings.');
   const rows=prFilled(f);
@@ -1342,6 +1369,7 @@ function prProblems(f){
     const who=String(r.name||'').trim()||'A row';
     if(!String(r.name||'').trim()) out.push('A row has hours or a rate but no name.');
     if(r.type==='hourly'&&(isNaN(prNum(r.hours))||prNum(r.hours)<0)) out.push(who+': enter the hours.');
+    if(r.type==='hourly'&&String(r.ot||'').trim()&&(isNaN(prNum(r.ot))||prNum(r.ot)<0)) out.push(who+': overtime hours should be a number.');
     if(isNaN(prNum(r.rate))||prNum(r.rate)<=0) out.push(who+': enter the '+(r.type==='salary'?'salary amount':'hourly rate')+'.');
   });
   return out;
@@ -1353,39 +1381,42 @@ function renderPayroll(){
   const boxes=SETTINGS.mailboxes||[];
   if(!boxes.includes(f.from)) f.from=boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||'');   // settings arrived after the form was made
   if(_prPreview){ el.innerHTML=prPreviewHtml(f); return; }
+  const per=prPeriod(f.start)||prPeriod(prDefaultStart());
   const rows=f.rows.map((r,i)=>`<tr>
       <td><input value="${esc(r.name)}" placeholder="Name" oninput="_prSet(${i},'name',this.value)"></td>
       <td style="width:108px"><select onchange="_prSet(${i},'type',this.value,true)">
         <option value="hourly"${r.type==='hourly'?' selected':''}>Hourly</option>
         <option value="salary"${r.type==='salary'?' selected':''}>Salary</option></select></td>
-      <td style="width:96px"><input class="num" inputmode="decimal" value="${r.type==='salary'?'--':esc(r.hours)}" ${r.type==='salary'?'disabled title="Salary — no hours"':'placeholder="0"'} oninput="_prSet(${i},'hours',this.value)"></td>
+      <td style="width:84px"><input class="num" inputmode="decimal" value="${r.type==='salary'?'--':esc(r.hours)}" ${r.type==='salary'?'disabled title="Salary — no hours"':(r.hoursAuto?`title="${per.weekdays} weekdays × ${PR_DAY_HRS} hrs — change it if they missed a day"`:`style="background:var(--amber-soft)" title="Changed by hand — the period’s regular hours are ${per.regHrs}"`)} oninput="_prSet(${i},'hours',this.value);this.style.background='var(--amber-soft)'"></td>
+      <td style="width:84px"><input class="num" inputmode="decimal" value="${r.type==='salary'?'--':esc(r.ot)}" ${r.type==='salary'?'disabled title="Salary — no overtime"':'placeholder="0"'} oninput="_prSet(${i},'ot',this.value)"></td>
       <td style="width:120px"><input class="num" inputmode="decimal" value="${esc(r.rate)}" placeholder="${r.type==='salary'?'2400':'24.00'}" oninput="_prSet(${i},'rate',this.value)"></td>
       <td class="x"><span class="icon-btn" title="Remove this row" style="cursor:pointer;color:var(--text3)" onclick="_prDel(${i})"><i class="ti ti-x"></i></span></td>
     </tr>`).join('');
   const hist=prPeriodList().slice(0,12).map(p=>{
-    const pr=prRows(p.rows), hrs=pr.reduce((s,r)=>s+(r.type==='salary'?0:(prNum(r.hours)||0)),0);
+    const pr=prRows(p.rows), hrs=pr.reduce((s,r)=>s+(r.type==='salary'?0:(prNum(r.hours)||0)),0), ot=pr.reduce((s,r)=>s+(r.type==='salary'?0:(prNum(r.ot)||0)),0);
     return `<div class="pr-hist-row"><b style="min-width:70px">${esc(p.label||prDateLabel(p.date))}</b>
-      <span style="color:var(--text2)">${pr.length} people · ${esc(prHours(hrs))} hourly hrs</span>
+      <span style="color:var(--text2)">${pr.length} people · ${esc(prHours(hrs))} hrs${ot?' + '+esc(prHours(ot))+' OT':''}</span>
       <span style="color:var(--text3);font-size:12px;margin-left:auto">sent ${esc(new Date(p.sentAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}))} by ${esc(String(p.by||'').split('@')[0].replace(/^(ofc|ops)\./,''))}</span>
       <button class="btn sm" title="Load this period into the form — to fix and resend it" onclick="_prOpen('${esc(p.pid)}')">Open</button></div>`;
   }).join('');
   el.innerHTML=`<div class="pr-wrap">
-    <div class="page-head"><h2>Payroll hours</h2><p>Fill in this pay period, review the email, send. The employee list and rates are remembered; last period’s hours are filled in to start.</p></div>
+    <div class="page-head"><h2>Payroll hours</h2><p>Pick the pay period, add any overtime, review the email, send. Regular hours fill in at ${PR_DAY_HRS} a day; the employee list and rates are remembered.</p></div>
     <div class="card" style="padding:16px">
       <div class="pr-top">
-        <div><label>Pay date</label><input type="date" value="${esc(f.date)}" onchange="_prTop('date',this.value)"></div>
+        <div><label>Pay period</label><select onchange="_prPeriodPick(this.value)">${prPeriodOptions(per.start).map(o=>`<option value="${esc(o.start)}"${o.start===per.start?' selected':''}>${esc(o.label)}</option>`).join('')}</select></div>
         <div><label>Send from</label><select onchange="_prTop('from',this.value)">${boxes.map(a=>`<option value="${esc(a)}"${a===f.from?' selected':''}>${esc(a)}</option>`).join('')}</select></div>
         <div style="flex:1;min-width:220px"><label>Send to</label><input style="width:100%" value="${esc(f.to)}" oninput="_prTop('to',this.value)"></div>
       </div>
+      <div class="hint" style="margin:-2px 0 10px">${esc(per.label)}: <b>${per.weekdays} weekdays × ${PR_DAY_HRS} hrs = ${per.regHrs} regular hours</b> for each hourly employee (Mon–Fri, holidays counted as paid). Change someone’s hours if they missed a day.</div>
       <div style="overflow-x:auto"><table class="pr-tbl">
-        <thead><tr><th>Employee</th><th>Pay type</th><th class="num">Hours</th><th class="num">Rate / amount</th><th></th></tr></thead>
+        <thead><tr><th>Employee</th><th>Pay type</th><th class="num">Hours</th><th class="num">OT hours</th><th class="num">Rate / amount</th><th></th></tr></thead>
         <tbody>${rows}</tbody></table></div>
       <div style="display:flex;gap:8px;align-items:center;margin:10px 0 14px;flex-wrap:wrap">
         <button class="btn sm" onclick="_prAdd()"><i class="ti ti-user-plus"></i> Add employee</button>
         <span class="pr-sum" id="pr-sum" style="margin-left:auto"></span>
       </div>
       <label style="display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">Note to payroll (optional — goes above “Thank you”)</label>
-      <textarea class="pr-note" placeholder="e.g. Marvin took 1 sick day" oninput="_prTop('note',this.value)">${esc(f.note)}</textarea>
+      <textarea class="pr-note" placeholder="e.g. Marvin missed Tuesday 9/16" oninput="_prTop('note',this.value)">${esc(f.note)}</textarea>
       <div id="pr-err" class="hint" style="color:var(--red);margin-top:8px"></div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
         <button class="btn primary" onclick="_prReview()"><i class="ti ti-eye"></i> Review email</button>
@@ -1403,12 +1434,23 @@ function prPaintSum(){
   const s=$('pr-sum'); if(!s||!_prForm) return;
   const rows=prFilled(_prForm);
   const hrs=rows.reduce((t,r)=>t+(r.type==='hourly'?(prNum(r.hours)||0):0),0);
-  const gross=rows.reduce((t,r)=>t+(r.type==='hourly'?(prNum(r.hours)||0)*(prNum(r.rate)||0):(prNum(r.rate)||0)),0);
-  s.textContent=rows.length+' employee'+(rows.length!==1?'s':'')+' · '+prHours(hrs)+' hourly hrs · about '+prMoney(gross,'salary').replace(/\.\d+$/,'')+' gross (not sent)';
+  const ot=rows.reduce((t,r)=>t+(r.type==='hourly'?(prNum(r.ot)||0):0),0);
+  const gross=rows.reduce((t,r)=>t+(r.type==='hourly'?((prNum(r.hours)||0)+1.5*(prNum(r.ot)||0))*(prNum(r.rate)||0):(prNum(r.rate)||0)),0);
+  s.title='Rough check only: hours × rate, overtime at 1.5×, plus salaries. The payroll service does the real math.';
+  s.textContent=rows.length+' employee'+(rows.length!==1?'s':'')+' · '+prHours(hrs)+' hrs'+(ot?' + '+prHours(ot)+' OT':'')+' · about '+prMoney(gross,'salary').replace(/\.\d+$/,'')+' gross (not sent)';
 }
-window._prSet=(i,k,v,rerender)=>{ const r=_prForm&&_prForm.rows[i]; if(!r) return; r[k]=v; _prForm.dirty=true; if(k==='type'&&v==='salary') r.hours=''; if(rerender) renderPayroll(); else prPaintSum(); };
+window._prSet=(i,k,v,rerender)=>{ const r=_prForm&&_prForm.rows[i]; if(!r) return; r[k]=v; _prForm.dirty=true;
+  if(k==='hours') r.hoursAuto=false;
+  if(k==='type'&&v==='salary'){ r.hours=''; r.ot=''; }
+  if(k==='type'&&v==='hourly'&&!String(r.hours||'').trim()){ const per=prPeriod(_prForm.start); r.hours=per?String(per.regHrs):''; r.hoursAuto=true; } if(rerender) renderPayroll(); else prPaintSum(); };
 window._prTop=(k,v)=>{ if(_prForm){ _prForm[k]=v; _prForm.dirty=true; } };
-window._prAdd=()=>{ _prForm.dirty=true; _prForm.rows.push({rid:'', name:'', type:'hourly', hours:'', rate:''}); renderPayroll();
+// new period: untouched hours follow the new weekday count; hand-changed ones stay
+window._prPeriodPick=(start)=>{ const f=_prForm, per=prPeriod(start); if(!f||!per) return;
+  f.start=per.start; f.dirty=true;
+  f.rows.forEach(r=>{ if(r.type==='hourly'&&r.hoursAuto) r.hours=String(per.regHrs); });
+  renderPayroll(); };
+window._prAdd=()=>{ _prForm.dirty=true; const per=prPeriod(_prForm.start);
+  _prForm.rows.push({rid:'', name:'', type:'hourly', hours:per?String(per.regHrs):'', hoursAuto:true, ot:'', rate:''}); renderPayroll();
   const ins=document.querySelectorAll('#v-payroll .pr-tbl tbody tr:last-child input'); if(ins[0]) ins[0].focus(); };
 window._prDel=(i)=>{ const r=_prForm.rows[i]; if(!r) return;
   if(String(r.name||'').trim() && !confirm('Remove '+r.name.trim()+' from the list? (Saved when you save the list or send.)')) return;
@@ -1420,9 +1462,9 @@ window._prOpen=(pid)=>{
   const p=(PAYROLL.periods||{})[pid]; if(!p) return;
   const f=prNewForm();
   const byName={}; f.rows.forEach(r=>{ byName[r.name.toLowerCase()]=r; });
-  f.date=p.date||f.date; f.note=p.note||''; if(p.to) f.to=p.to; if(p.from&&(SETTINGS.mailboxes||[]).includes(p.from)) f.from=p.from;
+  f.start=p.start||(prParse(p.date)?prIso(prPeriodOf(prParse(p.date)).start):f.start); f.note=p.note||''; if(p.to) f.to=p.to; if(p.from&&(SETTINGS.mailboxes||[]).includes(p.from)) f.from=p.from;
   f.rows=prRows(p.rows).map(r=>{ const cur=byName[String(r.name||'').toLowerCase()];
-    return {rid:cur?cur.rid:'', name:r.name||'', type:r.type==='salary'?'salary':'hourly', hours:r.type==='salary'?'':String(r.hours==null?'':r.hours), rate:String(r.rate==null?'':r.rate)}; });
+    return {rid:cur?cur.rid:'', name:r.name||'', type:r.type==='salary'?'salary':'hourly', hours:r.type==='salary'?'':String(r.hours==null?'':r.hours), hoursAuto:false, ot:String(r.ot==null?'':r.ot), rate:String(r.rate==null?'':r.rate)}; });
   f.dirty=true; _prForm=f; _prPreview=false; renderPayroll(); window.scrollTo(0,0);
   toast('Loaded the '+(p.label||prDateLabel(p.date))+' pay period — change what you need and send again.');
 };
@@ -1455,7 +1497,7 @@ window._prReview=()=>{
 window._prBack=()=>{ _prPreview=false; renderPayroll(); };
 function prPreviewHtml(f){
   const c=prCompose(f), sig=sigOf(f.from), logo=sigLogoOf(f.from);
-  const dup=prPeriodList().find(p=>p.date===f.date);
+  const dup=prPeriodList().find(p=>p.start===f.start);
   const tbl=c.table.rows.map((r,i)=>'<tr>'+r.map(x=>i===0?`<th>${esc(x)}</th>`:`<td>${esc(x)}</td>`).join('')+'</tr>').join('');
   return `<div class="pr-wrap">
     <div class="page-head"><h2>Review the payroll email</h2><p>This is exactly what goes out. Nothing is sent until you press Send.</p></div>
@@ -1476,8 +1518,9 @@ window._prSend=()=>{
   const probs=prProblems(f); if(probs.length){ _prPreview=false; renderPayroll(); const e=$('pr-err'); if(e) e.innerHTML=probs.map(esc).join('<br>'); return; }
   const c=prCompose(f), to=String(f.to).trim();
   const payload={replyAs:f.from, to, subject:c.subject, body:withSig(c.body,f.from), tables:[c.table], sigLogo:sigLogoOf(f.from)};
-  const rec={date:f.date, label:prDateLabel(f.date), note:String(f.note||'').trim(), to, from:f.from, subject:c.subject,
-    rows:prFilled(f).map(r=>({name:r.name.trim(), type:r.type, hours:r.type==='salary'?'':prHours(r.hours), rate:String(prNum(r.rate))}))};
+  const per=prPeriod(f.start);
+  const rec={start:per.start, end:per.end, label:per.label, note:String(f.note||'').trim(), to, from:f.from, subject:c.subject,
+    rows:prFilled(f).map(r=>({name:r.name.trim(), type:r.type, hours:r.type==='salary'?'':prHours(r.hours), ot:r.type==='salary'?'':(prHours(r.ot)||'0'), rate:String(prNum(r.rate))}))};
   _prPreview=false; renderPayroll();
   showUndo('Sending payroll',{countdown:true, secs:8,
     onUndo:()=>{ _prForm=f; _prPreview=true; if(navPage==='payroll') renderPayroll(); toast('Send canceled — the payroll email is back for review.'); },
