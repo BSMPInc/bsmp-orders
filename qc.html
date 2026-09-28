@@ -711,7 +711,8 @@ const I18N = {
     'nav:coc':'Certificados de conformidad','Certificates of Conformance':'Certificados de conformidad','Certificates':'Certificados',
     'New certificate':'Nuevo certificado','New certificate of conformance':'Nuevo certificado de conformidad','Save & print':'Guardar e imprimir',
     'Customer PO':'PO del cliente','Part number':'Número de parte','Drawing revision':'Revisión del dibujo','Quantity shipped':'Cantidad enviada',
-    'Ship date':'Fecha de envío','Certificate date':'Fecha del certificado','Description':'Descripción','Outside processes':'Procesos externos',
+    'Ship date':'Fecha de envío','Certificate date':'Fecha del certificado','Description':'Descripción','Outside processes':'Procesos externos','Work performed':'Trabajo realizado',
+    'Work done in our shop, e.g. Laser cut, formed, deburred, PEM hardware installed, inspected per drawing':'Trabajo hecho en nuestro taller, p. ej. Corte láser, doblado, desbarbado, instalación de herrajes PEM, inspeccionado según plano',
     'Statement of conformance':'Declaración de conformidad','Signed by (printed name)':'Firmado por (nombre)','Title':'Puesto','Signed by':'Firmado por',
     'Delete certificate':'Eliminar certificado','Certificate saved.':'Certificado guardado.','certificate':'certificado','certificates':'certificados',
     'No certificates issued yet.':'Aún no se han emitido certificados.','Managers only.':'Solo gerentes.'
@@ -4729,7 +4730,7 @@ function viewCoc(){
   if(!isMgr()) return `<div class="card"><div class="empty">${t('Managers only.')}</div></div>`;
   if(editId && (editId==='__new_coc__' || COCS[editId])) return viewCocEdit(editId==='__new_coc__'?null:COCS[editId]);
   const q=COC_FILTER.toLowerCase().trim();
-  const list=vals(COCS).filter(c=>!q||[c.no,c.customer,c.po,c.part,c.rev,c.job,c.desc,c.material,c.heatLot].filter(Boolean).join(' ').toLowerCase().indexOf(q)>=0)
+  const list=vals(COCS).filter(c=>!q||[c.no,c.customer,c.po,c.part,c.rev,c.job,c.desc,c.work,c.material,c.heatLot].filter(Boolean).join(' ').toLowerCase().indexOf(q)>=0)
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const rows=list.map(c=>`<tr>
     <td style="white-space:nowrap"><b>${esc(c.no||'—')}</b></td>
@@ -4783,6 +4784,7 @@ function viewCocEdit(c){
       ${f('coc-heat',t('Heat / Lot'),v('heatLot'))}
     </div>
     <div class="field"><label class="fl">${t('Material certs to list (and print behind)')}</label><div id="coc-certs">${cocCertPicker(v('orderId'), checked)}</div></div>
+    <div class="field"><label class="fl">${t('Work performed')}</label><textarea class="in" id="coc-work" rows="3" placeholder="${t('Work done in our shop, e.g. Laser cut, formed, deburred, PEM hardware installed, inspected per drawing')}">${esc(v('work'))}</textarea></div>
     <div class="field"><label class="fl">${t('Outside processes')}</label><textarea class="in" id="coc-processes" rows="3" placeholder="${t('One per line, e.g. Chem film per MIL-DTL-5541 Type II Class 3 — by Vendor — PO 1234')}">${esc(v('processes'))}</textarea></div>
     <div class="field"><label class="fl">${t('Drawing / specification references')}</label><textarea class="in" id="coc-specs" rows="2" placeholder="${t('e.g. Drawing 12345 Rev B, RoHS compliant, no MIL-STD-130 marking required')}">${esc(v('specs'))}</textarea></div>
     <div class="field"><label class="fl">${t('Statement of conformance')}</label><textarea class="in" id="coc-statement" rows="4">${esc(v('statement',COC_STATEMENT_DEFAULT))}</textarea></div>
@@ -4813,7 +4815,7 @@ window.qcCocSave=async (thenPrint)=>{
     updatedAt:Date.now(), updatedBy:(QC_USER&&QC_USER.email)||'',
     orderId:gv('coc-order'), customer:gv('coc-customer'), po:gv('coc-po'), job:gv('coc-job'), part:gv('coc-part'), rev:gv('coc-rev'),
     qty:gv('coc-qty'), shipDate:gv('coc-ship'), date:gv('coc-date')||todayISO(), desc:gv('coc-desc'),
-    material:gv('coc-material'), heatLot:gv('coc-heat'), certIds, processes:gv('coc-processes'), specs:gv('coc-specs'),
+    material:gv('coc-material'), heatLot:gv('coc-heat'), certIds, work:gv('coc-work'), processes:gv('coc-processes'), specs:gv('coc-specs'),
     statement:gv('coc-statement')||COC_STATEMENT_DEFAULT, signerName, signerTitle, attachCerts:gc('coc-attach'),
     printedAt:(prev&&prev.printedAt)||null };
   try{
@@ -4893,6 +4895,7 @@ window.qcCocPrint=(id)=>{
       <tbody>${matRows}</tbody>
     </table>`:''}
 
+    ${c.work?`${section('WORK PERFORMED')}<div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">${esc(c.work)}</div>`:''}
     ${procs.length?`${section('OUTSIDE PROCESSES')}<div style="font-size:12px;color:#333;line-height:1.6">${procs.map(p=>'<div>'+esc(p)+'</div>').join('')}</div>`:''}
     ${c.specs?`${section('DRAWING / SPECIFICATIONS')}<div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">${esc(c.specs)}</div>`:''}
 

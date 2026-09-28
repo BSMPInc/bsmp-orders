@@ -5526,6 +5526,11 @@ function renderHistory(){
 //     reviewedAt, reviewedBy }
 // "check" marks an estimate or judgement call the owner should confirm. The record rides along with
 // the quote (and its cloud copy), so it shows in every browser; Mark reviewed stamps who/when.
+// A decision may also carry apply:{ '<option text>': patch } so the owner can switch to another option
+// from the review and the quote re-prices itself. patch = { tier:'rush', fields:{ costsheet:'200' },
+// ops:{ set:{ '<op code>': mins }, remove:['<op code>'], replace:{ '<old code>':'<new code>' } }, note:'...' }.
+// Picking stamps pickedAt/pickedBy and keeps Claude's original in claudeChoice. An option with no patch
+// is recorded only (the owner changes the form by hand).
 function claudeReviewOf(q){
   const r = q && q.claudeReview;
   if(!r || !r.decisions) return null;
@@ -5535,7 +5540,7 @@ function claudeReviewOf(q){
 }
 function claudeChip(q){
   const r = claudeReviewOf(q); if(!r) return '';
-  const n = r.decisions.filter(d=>d.check).length;
+  const n = r.decisions.filter(d=>d.check && !d.pickedAt).length;
   const done = !!r.reviewedAt;
   const txt = done ? 'Claude · reviewed' : ('Claude' + (n ? ' · ' + n + ' to check' : '’s decisions'));
   const col = done ? 'color:#2f7a55;background:#e6f1ea;border-color:#bfdcca'
@@ -5547,7 +5552,7 @@ function renderClaudeReviewBar(){
   const q = currentQuoteId!=null ? HISTORY.find(h=>h.id===currentQuoteId) : null;
   const r = claudeReviewOf(q);
   if(!r){ bar.style.display='none'; bar.innerHTML=''; return; }
-  const n = r.decisions.filter(d=>d.check).length;
+  const n = r.decisions.filter(d=>d.check && !d.pickedAt).length;
   bar.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;border-radius:10px;border:1px solid '
     + (r.reviewedAt ? '#bfdcca;background:#f1f8f4' : '#ecd49c;background:#fdf8ec');
   bar.innerHTML = `<div style="flex:1;min-width:220px;font-size:13px;color:#1f2937"><strong>Built by Claude</strong> — ${r.decisions.length} decision${r.decisions.length!==1?'s':''}`
@@ -5558,24 +5563,34 @@ function renderClaudeReviewBar(){
 function showClaudeReview(id){
   const q = HISTORY.find(h=>h.id===id); const r = claudeReviewOf(q); if(!r) return;
   const old = document.getElementById('claude-review-modal'); if(old) old.remove();
-  const checks = r.decisions.map((d,i)=>({d,i})).filter(x=>x.d.check);
+  const checks = r.decisions.map((d,i)=>({d,i})).filter(x=>x.d.check && !x.d.pickedAt);
+  const confirmed = r.decisions.filter(d=>d.check && d.pickedAt).length;
   const when = r.at ? new Date(r.at).toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
   const node = (d,i) => {
-    const opts = (d.options.length ? d.options : [d.choice]).map(o => {
+    const claudes = d.claudeChoice != null ? d.claudeChoice : d.choice;
+    const opts = (d.options.length ? d.options : [d.choice]).map((o,k) => {
       const on = String(o) === String(d.choice);
-      return `<div style="display:flex;align-items:flex-start;gap:8px;margin:3px 0">
+      const auto = !!(d.apply && d.apply[o]);
+      const tag = on ? (d.pickedAt ? (String(o)===String(claudes) ? 'CONFIRMED' : 'YOUR PICK') : 'CHOSEN') : '';
+      const hint = on ? (d.check && !d.pickedAt ? 'Click to confirm Claude’s choice' : '')
+        : (auto ? 'Switch to this option — the quote re-prices and saves' : 'Switch to this option — recorded only; change the form to match');
+      return `<button type="button" onclick="pickClaudeOption(${q.id},${i},${k})" title="${qEsc(hint)}" ${on && !(d.check && !d.pickedAt)?'disabled':''}
+        style="display:flex;align-items:flex-start;gap:8px;margin:2px 0;padding:4px 6px;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:6px;font-family:inherit;cursor:${on && !(d.check && !d.pickedAt)?'default':'pointer'}"
+        onmouseover="if(!this.disabled)this.style.borderColor='#c9d6e6'" onmouseout="this.style.borderColor='transparent'">
         <span style="flex:none;width:14px;height:14px;margin-top:2px;border-radius:50%;border:2px solid ${on?'#2f7a55':'#c3cad5'};background:${on?'#2f7a55':'transparent'}"></span>
-        <span style="font-size:13px;${on?'font-weight:700;color:#1f2937':'color:#8a93a5'}">${qEsc(o)}${on?' <span style="font-size:10px;font-weight:700;color:#2f7a55;letter-spacing:.04em">CHOSEN</span>':''}</span></div>`;
+        <span style="font-size:13px;${on?'font-weight:700;color:#1f2937':'color:#4b5563'}">${qEsc(o)}${tag?` <span style="font-size:10px;font-weight:700;color:#2f7a55;letter-spacing:.04em">${tag}</span>`:''}${!on && String(o)===String(claudes)?' <span style="font-size:10px;font-weight:700;color:#8a93a5;letter-spacing:.04em">CLAUDE’S PICK</span>':''}${!on && !auto?' <span style="font-size:10px;color:#8a93a5">(manual)</span>':''}</span></button>`;
     }).join('');
-    return `<div id="crv-${i}" style="border:1px solid ${d.check?'#ecd49c':'#e2e6ec'};border-radius:10px;padding:12px 14px;margin-bottom:10px;background:${d.check?'#fdf8ec':'#fff'}">
+    const open = d.check && !d.pickedAt;
+    return `<div id="crv-${i}" style="border:1px solid ${open?'#ecd49c':'#e2e6ec'};border-radius:10px;padding:12px 14px;margin-bottom:10px;background:${open?'#fdf8ec':'#fff'}">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
         <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a93a5">${qEsc(d.area||'')}</span>
-        ${d.check?'<span style="font-size:10px;font-weight:700;color:#8a5a12;background:#fbf1dc;border:1px solid #ecd49c;border-radius:4px;padding:0 6px">PLEASE CHECK</span>':''}
+        ${open?'<span style="font-size:10px;font-weight:700;color:#8a5a12;background:#fbf1dc;border:1px solid #ecd49c;border-radius:4px;padding:0 6px">PLEASE CHECK</span>':''}
       </div>
       <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:6px">${qEsc(d.question||'')}</div>
       <div style="border-left:2px solid #e2e6ec;margin-left:6px;padding-left:12px">${opts}</div>
       ${d.because?`<div style="font-size:12.5px;color:#4b5563;margin-top:8px;line-height:1.5"><strong>Why:</strong> ${qEsc(d.because)}</div>`:''}
       ${d.source?`<div style="font-size:11px;color:#8a93a5;margin-top:4px">Source: ${qEsc(d.source)}</div>`:''}
+      ${d.pickedAt?`<div style="font-size:11px;color:#2f7a55;margin-top:4px">${String(d.choice)===String(claudes)?'Confirmed':'Changed from Claude’s pick'} by ${qEsc(String(d.pickedBy||'').replace(/@.*/,'').replace(/^(ofc|ops)\./,'')||'you')} · ${qEsc(new Date(d.pickedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}))}${d.pickNote?' · '+qEsc(d.pickNote):''}</div>`:''}
     </div>`;
   };
   const who = r.reviewedBy ? ' by ' + qEsc(String(r.reviewedBy).replace(/@.*/,'').replace(/^(ofc|ops)\./,'')) : '';
@@ -5589,7 +5604,8 @@ function showClaudeReview(id){
     <div style="padding:14px 20px;overflow:auto">
       ${r.summary?`<div style="font-size:13px;color:#4b5563;line-height:1.6;margin-bottom:14px;white-space:pre-wrap">${qEsc(r.summary)}</div>`:''}
       ${checks.length?`<div style="border:1px solid #ecd49c;background:#fdf8ec;border-radius:10px;padding:10px 14px;margin-bottom:14px">
-        <div style="font-size:11px;font-weight:700;color:#8a5a12;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Please check before sending (${checks.length})</div>
+        <div style="font-size:11px;font-weight:700;color:#8a5a12;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Please check before sending (${checks.length})${confirmed?` <span style="color:#2f7a55;text-transform:none;letter-spacing:0">· ${confirmed} done</span>`:''}</div>
+        <div style="font-size:11.5px;color:#8a5a12;margin-bottom:6px">Click an option below to switch to it, or click the chosen one to confirm it.</div>
         ${checks.map(x=>`<div style="font-size:13px;margin:3px 0"><a href="#" onclick="document.getElementById('crv-${x.i}').scrollIntoView({behavior:'smooth',block:'center'});return false" style="color:#8a5a12">${qEsc(x.d.question)}</a> — <span style="color:#4b5563">${qEsc(x.d.choice)}</span></div>`).join('')}
       </div>`:''}
       <div style="font-size:11px;font-weight:700;color:#8a93a5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Decision tree</div>
@@ -5610,6 +5626,71 @@ function markClaudeReviewed(id){
   try{ persistHistory(); }catch(e){}
   try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(q); }catch(e){}
   renderHistory(); renderClaudeReviewBar(); showClaudeReview(id);
+}
+// Apply one decision-option patch (see the header comment) to the quote loaded in the form.
+function applyClaudePatch(p){
+  if(!p) return;
+  if(p.tier) selectTier(p.tier);
+  Object.entries(p.fields||{}).forEach(([fid,val])=>{
+    const el=document.getElementById(fid); if(!el) return;
+    el.value=String(val); el.dispatchEvent(new Event('change'));
+  });
+  const o=p.ops||{};
+  const rows=()=>{ const out=[]; for(let i=1;i<=opCount;i++){ const s=document.getElementById('op-sel-'+i); if(s) out.push({i,s}); } return out; };
+  Object.entries(o.replace||{}).forEach(([from,to])=>{
+    const r=rows().find(x=>x.s.value===from); if(!r) return;
+    r.s.value=to; if(typeof onOpCodeChange==='function') onOpCodeChange(r.i);
+  });
+  (o.remove||[]).forEach(code=>{ const r=rows().find(x=>x.s.value===code); if(r) removeRow('op-'+r.i); });
+  Object.entries(o.set||{}).forEach(([code,mins])=>{
+    const r=rows().find(x=>x.s.value===code);
+    const v=(mins==null||mins==='')?'':parseFloat(mins).toFixed(3);
+    if(r){ const h=document.getElementById('op-hrs-'+r.i); if(h) h.value=v; }
+    else addOp(code, v);
+  });
+  if(p.note){ const n=document.getElementById('notes'); if(n && n.value.indexOf(p.note)<0) n.value=(n.value?n.value+'\n':'')+p.note; }
+  calcProgramming(); calcInspection(); calculate(); calcQtyBreaks();
+}
+// Owner switches a decision to another option (or confirms Claude's) from the review window.
+async function pickClaudeOption(id, di, oi){
+  const q=HISTORY.find(h=>h.id===id); const r=claudeReviewOf(q); if(!r) return;
+  const d=r.decisions[di]; if(!d) return;
+  const opt=(d.options.length?d.options:[d.choice])[oi]; if(opt==null) return;
+  const same=String(opt)===String(d.choice);
+  const patch=d.apply && d.apply[opt];
+  const who=(window._qUserEmail && window._qUserEmail())||'';
+  if(d.claudeChoice==null) d.claudeChoice=d.choice;
+  let msg='', note='';
+  if(!same && patch){
+    // re-price from the saved record first; if the form can't reproduce the saved price
+    // (e.g. different laser speeds in this browser) don't touch it
+    const before=Number(q.pricePerPart||0);
+    reloadQuote(id); await new Promise(res=>setTimeout(res,400)); calculate();
+    const now=Number((window._calc&&(window._calc.finalPrice||window._calc.finalPricePart))||0);
+    if(Math.abs(now-before)>0.001){
+      alert('This quote re-prices to $'+now.toFixed(2)+' in this browser, not the saved $'+before.toFixed(2)+' (different laser speeds or rates?).\n\nNothing was changed. Open the quote and change it by hand.');
+      return;
+    }
+    applyClaudePatch(patch);
+    d.choice=opt; d.pickedAt=Date.now(); d.pickedBy=who; d.pickNote='';
+    const full=(Array.isArray(q.claudeReview.decisions)?q.claudeReview.decisions:Object.values(q.claudeReview.decisions).filter(Boolean));
+    full[di]=d;   // claudeReviewOf copied the decision; write it back
+    window._pendingClaudeReview={...q.claudeReview, decisions:full};
+    saveQuote();
+    const after=HISTORY.find(h=>h.id===id);
+    msg='Quote updated: $'+before.toFixed(2)+' → $'+Number(after.pricePerPart||0).toFixed(2)+' per part.';
+  } else {
+    if(!same) note=d.apply && d.apply[d.choice] ? 'form NOT changed — edit the quote to match' : 'change the quote by hand to match';
+    d.choice=opt; d.pickedAt=Date.now(); d.pickedBy=who; d.pickNote=note;
+    const full=(Array.isArray(q.claudeReview.decisions)?q.claudeReview.decisions:Object.values(q.claudeReview.decisions).filter(Boolean));
+    full[di]=d; q.claudeReview.decisions=full;
+    try{ persistHistory(); }catch(e){}
+    try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(q); }catch(e){}
+    msg=same?'Confirmed.':'Recorded — this option isn’t applied automatically; change the quote to match.';
+  }
+  renderHistory(); renderClaudeReviewBar(); showClaudeReview(id);
+  const m=document.querySelector('#claude-review-modal > div > div');   // the header, so it shows above the fold
+  if(m){ const b=document.createElement('div'); b.style.cssText='font-size:12.5px;font-weight:700;color:#2f7a55;margin-top:6px'; b.textContent=msg; m.appendChild(b); }
 }
 // keep the banner in step with whichever quote is in the form
 (function(){
