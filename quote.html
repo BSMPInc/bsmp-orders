@@ -5438,6 +5438,7 @@ function resetForm(){
     const wCard=document.getElementById('weld-card'); if(wCard) wCard.style.display='none';
     const cCard=document.getElementById('cnc-card'); if(cCard) cCard.style.display='none';
     if(typeof syncOptCards==='function') syncOptCards(); }
+  _qbClearResults();   // a fresh quote must not inherit the last quote's break table
   calculate();
 }
 
@@ -6304,6 +6305,10 @@ function reloadQuote(id){
   // Open/close the optional cards to match what the quote actually uses
   if(typeof syncOptCards==='function') syncOptCards();
 
+  // ---- Quantity breaks: this quote's own quantities, never the last quote's ----
+  const savedQbs=_qbQtysOf(q);
+  for(let i=1;i<=8;i++){ const el=document.getElementById('qb-'+i); if(el) el.value = savedQbs[i-1]!==undefined ? savedQbs[i-1] : ''; }
+
   // ---- Recalculate everything ----
   calculate();
   calcProgramming();
@@ -6312,6 +6317,20 @@ function reloadQuote(id){
   if(q.batchDeburrEnabled) calcBatchDeburr();
   if(q.batchTapEnabled) calcBatchTap();
   calculate();
+  if(savedQbs.length) calcQtyBreaks(); else _qbClearResults();
+}
+// Saved break quantities of a quote (RTDB may hand back an object with null holes).
+function _qbQtysOf(q){
+  const raw=q && q.qtyBreaks;
+  const list=Array.isArray(raw) ? raw : (raw && typeof raw==='object' ? Object.values(raw) : []);
+  return list.filter(b=>b && b.qty>0).map(b=>b.qty).slice(0,8);
+}
+// Drop the last calculated break table so saveQuote can't store it on another quote (2026-09-29:
+// reopened / new quotes were saving the previous quote's breaks).
+function _qbClearResults(){
+  window._qtyBreaksResults=[]; window._qtyBreaks=[];
+  const el=document.getElementById('qty-breaks-result'); if(el) el.innerHTML='';
+  try{ clearQbAiReview('part'); }catch(e){}
 }
 
 // ===================== RATES =====================
@@ -6760,6 +6779,7 @@ function calcQtyBreaks(){
     .map(i=>parseFloat(document.getElementById(`qb-${i}`).value)||0)
     .filter(q=>q>0))].sort((a,b)=>a-b);
   if(!qtys.length){
+    window._qtyBreaksResults=[]; window._qtyBreaks=[];   // cleared quantities = no break table on save
     document.getElementById('qty-breaks-result').innerHTML='<div style="font-size:12px;color:var(--red,#dc2626);padding:8px 0">Enter at least one quantity above, then click Calculate.</div>';
     return;
   }
