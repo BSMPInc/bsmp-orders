@@ -10507,6 +10507,274 @@ window.syncOptCards=function(){
   if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
 })();
 </script>
+<!-- ===================== QUOTE SIDEBAR LAYOUT (2026-09-29) =====================
+     Owner asked for the quote's sections on a left rail that slides out a drawer, instead of one
+     long scroll. The existing cards are MOVED (not copied) into the drawer, each in its own slot,
+     so every id / onclick / getElementById keeps working. Inactive slots are hidden on the SLOT,
+     never on the card: syncOptCards/toggleOptCard read a card's own display to know whether an
+     optional calculator is on. "Classic" puts every card back where it was (comment placeholders). -->
+<style>
+#panel-quote.qd-on { max-width: none; }
+.qd-wrap { display: flex; align-items: flex-start; position: relative; }
+.qd-rail { position: sticky; top: 0; flex: 0 0 72px; width: 72px; display: flex; flex-direction: column; gap: 2px;
+  padding: 6px 4px; margin-right: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  max-height: calc(100vh - 150px); overflow-y: auto; overflow-x: hidden; z-index: 6; }
+.qd-rail::-webkit-scrollbar { width: 0; }
+.qd-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px 6px;
+  border: 0; background: none; border-radius: 8px; cursor: pointer; color: var(--text2); font: inherit; font-size: 10px;
+  line-height: 1.15; text-align: center; }
+.qd-item .ti { font-size: 19px; color: var(--text3); }
+.qd-item:hover { background: var(--cool-bg, #f1f3f6); color: var(--text); }
+.qd-item.active { background: var(--accent); color: #fff; }
+.qd-item.active .ti { color: #fff; }
+.qd-item .qd-badge { position: absolute; top: 3px; right: 6px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px;
+  background: var(--navy, #1f2a44); color: #fff; font-size: 9px; font-weight: 700; line-height: 15px; }
+.qd-item.active .qd-badge { background: #fff; color: var(--accent); }
+.qd-sep { height: 1px; background: var(--border); margin: 5px 6px; flex: 0 0 auto; }
+.qd-add .ti { color: var(--accent); }
+.qd-classic { margin-top: auto; opacity: .75; }
+.qd-drawer { position: sticky; top: 0; flex: 0 0 auto; width: 0; overflow: hidden; transition: width .22s ease, margin .22s ease; z-index: 5; }
+.qd-wrap.qd-open .qd-drawer { width: 460px; margin-right: 16px; }
+.qd-drawer-in { width: 460px; max-height: calc(100vh - 150px); display: flex; flex-direction: column;
+  background: var(--bg, #f6f7f9); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(20,30,50,.10); }
+.qd-head { display: flex; align-items: center; gap: 6px; padding: 9px 10px; border-bottom: 1px solid var(--border);
+  background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; }
+.qd-title { font-weight: 700; font-size: 13px; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qd-price { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--navy, #1f2a44); background: var(--sky-light, #eef4ff);
+  border: 1px solid var(--sky-mid, #c9dbff); border-radius: 20px; padding: 2px 9px; white-space: nowrap; }
+.qd-ic { border: 0; background: none; cursor: pointer; color: var(--text3); font-size: 17px; padding: 3px; border-radius: 6px; line-height: 1; }
+.qd-ic:hover { background: var(--cool-bg, #f1f3f6); color: var(--text); }
+.qd-body { flex: 1; overflow-y: auto; padding: 12px; min-height: 0; }
+.qd-body .qd-slot { display: none; }
+.qd-body .qd-slot.active { display: block; }
+.qd-body .qd-slot > .card { margin-bottom: 0; }
+.qd-main { flex: 1 1 auto; min-width: 0; container-type: inline-size; container-name: qdmain; }
+.qd-main .quote-grid { max-width: none; margin: 0; }
+@container qdmain (min-width: 760px) {
+  .quote-grid { grid-template-columns: minmax(0,1fr) 340px !important; }
+  .quote-side { position: sticky !important; }
+}
+@container qdmain (max-width: 759px) {
+  .quote-grid { grid-template-columns: 1fr !important; }
+  .quote-side { position: static !important; max-height: none; }
+}
+/* Narrow screens (owner's 14" laptop panel): the drawer slides OVER the page instead of pushing it */
+.qd-wrap.qd-overlay .qd-drawer { position: absolute; left: 84px; top: 0; }
+.qd-wrap.qd-overlay.qd-open .qd-drawer { width: min(460px, calc(100% - 84px)); margin-right: 0; }
+.qd-wrap.qd-overlay .qd-drawer-in { width: min(460px, calc(100vw - 150px)); }
+.qd-wrap.qd-overlay .qd-rail { margin-right: 10px; }
+.qd-classic-bar { display: none; margin-bottom: 12px; }
+#panel-quote:not(.qd-on) .qd-classic-bar { display: flex; justify-content: flex-end; }
+@media print { .qd-rail, .qd-drawer, .qd-classic-bar { display: none !important; } }
+</style>
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  // Rail sections: key, label, icon, how to find the card. core = always on the rail;
+  // the others appear only while that optional calculator is switched on.
+  var SECTIONS=[
+    {k:'upload',  label:'Upload',     name:'Drawing upload & AI extract', ic:'ti-cloud-upload',  find:function(){return $('upload-card');}, core:true},
+    {k:'job',     label:'Job',        name:'Job info', ic:'ti-file-invoice',  title:'Job Info', core:true},
+    {k:'material',label:'Material',   name:'Material & blank', ic:'ti-stack-2',       title:'Material', core:true},
+    {k:'ops',     label:'Operations', ic:'ti-list-details',  title:'Operations', core:true},
+    {k:'prog',    label:'Program',    ic:'ti-code',          find:function(){return $('programming-card');}},
+    {k:'insp',    label:'Inspect',    ic:'ti-zoom-check',    find:function(){return $('inspection-card');}},
+    {k:'hw',      label:'Hardware',   ic:'ti-bolt',          find:function(){return $('hardware-card');}},
+    {k:'out',     label:'Outsource',  ic:'ti-truck',         find:function(){return $('outsource-card');}},
+    {k:'qb',      label:'Qty breaks', ic:'ti-chart-bar',     find:function(){return $('qtybreaks-card');}},
+    {k:'form',    label:'Forming',    ic:'ti-ruler-measure', find:function(){return $('form-complexity-card');}},
+    {k:'deburr',  label:'Deburr',     ic:'ti-sparkles',      find:function(){return $('batch-deburr-card');}},
+    {k:'orbital', label:'Orbital',    ic:'ti-circle-dotted', find:function(){return $('orbital-sand-card');}},
+    {k:'tap',     label:'Tap/drill',  ic:'ti-tool',          find:function(){return $('batch-tap-card');}},
+    {k:'sheet',   label:'Sheet load', ic:'ti-layout-columns',find:function(){return $('sheet-load-card');}},
+    {k:'weld',    label:'Welding',    ic:'ti-flame',         find:function(){return $('weld-card');}},
+    {k:'cnc',     label:'CNC mill',   ic:'ti-settings',      find:function(){return $('cnc-card');}},
+    {k:'gang',    label:'Gang nest',  ic:'ti-layout-grid',   find:function(){return $('gang-nest-card');}},
+    {k:'notes',   label:'Notes',      ic:'ti-notes',         title:'Notes', core:true},
+    {k:'add',     label:'Add detail', name:'Add detail — optional calculators', ic:'ti-plus',          find:function(){return document.querySelector('#panel-quote .card.opt-bar');}, core:true, add:true}
+  ];
+  var LS='bsmp_quote_layout';
+  var built=false, on=false, active=null, wrap, rail, drawer, body, main, grid;
+
+  function cardByTitle(t){
+    var cards=document.querySelectorAll('#panel-quote .quote-main > .card');
+    for(var i=0;i<cards.length;i++){
+      var ct=cards[i].querySelector('.card-title');
+      if(ct && ct.textContent.replace(/\s+/g,' ').trim().indexOf(t)===0) return cards[i];
+    }
+    return null;
+  }
+  function cardOf(s){ if(!s._card) s._card = s.find ? s.find() : cardByTitle(s.title); return s._card; }
+  // an optional calculator is "on" when its card is not display:none (the card's OWN display)
+  // Optional cards stay collapsed in the tool even when the quote uses them (their values still
+  // price), so a section with data in it also belongs on the rail.
+  function hasData(s){
+    try{
+      var filled=function(sel){ var n=0; document.querySelectorAll(sel).forEach(function(x){ if(String(x.value||'').trim()) n++; }); return n; };
+      switch(s.k){
+        case 'prog': return $('prog-apply').value==='yes';
+        case 'insp': return $('insp-apply').value==='yes';
+        case 'hw':   return filled('#hw-container input[id^="hw-desc-"]')>0;
+        case 'out':  return filled('#out-container input[id^="out-desc-"]')>0;
+        case 'qb':   return (window._qtyBreaksResults||[]).length>0;
+        case 'deburr': return !!($('batch-deburr-enabled')||{}).checked;
+        case 'tap':  return !!($('batch-tap-enabled')||{}).checked;
+      }
+    }catch(e){}
+    return false;
+  }
+  function isOn(s){ var c=cardOf(s); return !!c && !!s.slot && (s.core || getComputedStyle(c).display!=='none' || hasData(s)); }
+  function sec(k){ for(var i=0;i<SECTIONS.length;i++) if(SECTIONS[i].k===k) return SECTIONS[i]; return null; }
+
+  function build(){
+    if(built) return true;
+    grid=document.querySelector('#panel-quote .quote-grid'); if(!grid) return false;
+    wrap=document.createElement('div'); wrap.className='qd-wrap';
+    rail=document.createElement('nav'); rail.className='qd-rail'; rail.setAttribute('aria-label','Quote sections');
+    drawer=document.createElement('div'); drawer.className='qd-drawer';
+    drawer.innerHTML='<div class="qd-drawer-in"><div class="qd-head">'
+      +'<button class="qd-ic" title="Previous section" onclick="qdStep(-1)"><i class="ti ti-chevron-up"></i></button>'
+      +'<button class="qd-ic" title="Next section" onclick="qdStep(1)"><i class="ti ti-chevron-down"></i></button>'
+      +'<div class="qd-title" id="qd-title"></div><span class="qd-price" id="qd-price"></span>'
+      +'<button class="qd-ic" title="Close (Esc)" onclick="qdOpen(null)"><i class="ti ti-x"></i></button></div>'
+      +'<div class="qd-body" id="qd-body"></div></div>';
+    body=drawer.querySelector('.qd-body');
+    main=document.createElement('div'); main.className='qd-main';
+    grid.parentNode.insertBefore(wrap, grid);
+    wrap.appendChild(rail); wrap.appendChild(drawer); wrap.appendChild(main);
+    var cb=document.createElement('div'); cb.className='qd-classic-bar';
+    cb.innerHTML='<button class="btn btn-sm" onclick="qdSetLayout(true)"><i class="ti ti-layout-columns"></i> Sidebar layout</button>';
+    main.appendChild(cb); main.appendChild(grid);
+    SECTIONS.forEach(function(s){
+      var c=cardOf(s); if(!c) return;
+      s.home=document.createComment('qd-home:'+s.k); c.parentNode.insertBefore(s.home, c);   // where Classic puts it back
+      s.slot=document.createElement('div'); s.slot.className='qd-slot'; s.slot.setAttribute('data-k', s.k);
+    });
+    body.addEventListener('input', refreshSoon); body.addEventListener('change', refreshSoon);
+    document.addEventListener('keydown', function(e){
+      if(e.key!=='Escape' || !on || !active) return;
+      var m=document.querySelector('.modal-overlay.open, .modal.open, #claude-review-modal'); if(m && m.offsetParent!==null) return;
+      open(null);
+    });
+    if(window.ResizeObserver) new ResizeObserver(fitMode).observe(wrap); else window.addEventListener('resize', fitMode);
+    built=true; return true;
+  }
+  function fitMode(){ if(wrap) wrap.classList.toggle('qd-overlay', wrap.clientWidth < 1000); }
+
+  function setLayout(sidebar){
+    if(!build()) return;
+    on=!!sidebar;
+    try{ localStorage.setItem(LS, on?'sidebar':'classic'); }catch(e){}
+    $('panel-quote').classList.toggle('qd-on', on);
+    SECTIONS.forEach(function(s){
+      var c=cardOf(s); if(!c || !s.slot) return;
+      if(on){ s.slot.appendChild(c); body.appendChild(s.slot); }
+      else { s.home.parentNode.insertBefore(c, s.home.nextSibling); if(s.slot.parentNode) s.slot.parentNode.removeChild(s.slot); }
+    });
+    rail.style.display=on?'':'none'; drawer.style.display=on?'':'none';
+    active=null; wrap.classList.remove('qd-open');
+    fitMode(); renderRail();
+    if(on && !wrap.classList.contains('qd-overlay')) open('job');
+  }
+  function open(k){
+    if(!on) return;
+    var s=k ? sec(k) : null;
+    if(!s || !isOn(s)){ active=null; wrap.classList.remove('qd-open'); renderRail(); return; }
+    active=k;
+    // a collapsed optional card that has data: show it (same as clicking its "Add detail" chip)
+    var c=cardOf(s); if(!s.core && getComputedStyle(c).display==='none'){ c.style.display=''; try{ window.syncOptCards(); }catch(e){} }
+    SECTIONS.forEach(function(x){ if(x.slot) x.slot.classList.toggle('active', x===s); });
+    var t=(cardOf(s).querySelector('.card-title')||{}).textContent||s.label;
+    $('qd-title').textContent = s.name || t.replace(/\s+/g,' ').trim().split(' — ')[0];
+    wrap.classList.add('qd-open'); body.scrollTop=0; renderRail(); updPrice();
+  }
+  function step(d){
+    var list=SECTIONS.filter(isOn); var i=-1;
+    for(var j=0;j<list.length;j++) if(list[j].k===active) i=j;
+    var n=list[(i+d+list.length)%list.length]; if(n) open(n.k);
+  }
+  function badge(s){
+    try{
+      if(s.k==='ops'){ var n=0; document.querySelectorAll('#ops-container select').forEach(function(x){ if(x.value) n++; }); return n||''; }
+      if(s.k==='hw'){ var h=0; document.querySelectorAll('#hw-container input[id^="hw-desc-"]').forEach(function(x){ if(x.value.trim()) h++; }); return h||''; }
+      if(s.k==='qb'){ return (window._qtyBreaksResults||[]).length||''; }
+    }catch(e){}
+    return '';
+  }
+  function renderRail(){
+    if(!rail || !on) return;
+    var html='';
+    SECTIONS.forEach(function(s){
+      if(!isOn(s)) return;
+      if(s.k==='notes') html+='<div class="qd-sep"></div>';
+      var b=badge(s);
+      html+='<button class="qd-item'+(s.add?' qd-add':'')+(active===s.k?' active':'')+'" title="'+s.label+'" onclick="qdToggle(\''+s.k+'\')">'
+        +'<i class="ti '+s.ic+'"></i><span>'+s.label+'</span>'+(b!==''?'<span class="qd-badge">'+b+'</span>':'')+'</button>';
+    });
+    html+='<button class="qd-item qd-classic" title="Back to the long single-page layout" onclick="qdSetLayout(false)"><i class="ti ti-layout-list"></i><span>Classic</span></button>';
+    rail.innerHTML=html;
+  }
+  var tmr=null; function refreshSoon(){ clearTimeout(tmr); tmr=setTimeout(function(){ renderRail(); updPrice(); }, 120); }
+  function updPrice(){
+    var el=$('qd-price'); if(!el) return; var d=window._calc;
+    var p=d && (d.finalPrice||d.finalPricePart);
+    if(!p){ el.style.display='none'; return; }
+    var f=function(v){return '$'+(v||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
+    el.style.display=''; el.textContent=f(p)+' ea · '+f(d.jobTotal)+' job';
+  }
+
+  window.qdSetLayout=setLayout;
+  window.qdOpen=open;
+  window.qdStep=step;
+  window.qdToggle=function(k){ open(active===k ? null : k); };
+  window.qdRefresh=function(){
+    if(!on) return;
+    if(active){ var s=sec(active); if(s && !isOn(s)) open(null); }
+    renderRail(); updPrice();
+  };
+
+  // Hooks: re-price → price chip + badges; optional calculators switched on/off → rail.
+  function wrapFn(name, after){
+    var f=window[name]; if(typeof f!=='function' || f._qd) return;
+    var w=function(){ var r=f.apply(this, arguments); try{ after(); }catch(e){} return r; };
+    w._qd=true; window[name]=w;
+  }
+  function hook(){
+    wrapFn('calculate', refreshSoon);
+    wrapFn('syncOptCards', function(){ window.qdRefresh(); });
+    wrapFn('updateFormComplexityVisibility', function(){ window.qdRefresh(); });
+    wrapFn('reloadQuote', function(){ window.qdRefresh(); });
+    // a new quote: fold away optional calculators the last quote had open but this one doesn't use
+    wrapFn('resetForm', function(){
+      if(on) SECTIONS.forEach(function(x){ var c=cardOf(x); if(c && !x.core && x.k!=='form' && !hasData(x)) c.style.display='none'; });
+      try{ window.syncOptCards(); }catch(e){}
+      window.qdRefresh();
+    });
+    // switching an optional calculator ON from "Add detail" opens it in the drawer (instead of scrolling to it)
+    var tog=window.toggleOptCard;
+    if(typeof tog==='function' && !tog._qd){
+      var w=function(btn,id){
+        if(!on) return tog.apply(this, arguments);
+        var el=$(id); if(!el) return;
+        var turnOn=getComputedStyle(el).display==='none';
+        el.style.display=turnOn?'':'none';
+        if(btn) btn.classList.toggle('active', turnOn);
+        var s=null; SECTIONS.forEach(function(x){ if(cardOf(x)===el) s=x; });
+        if(turnOn && s) open(s.k);
+        else { if(s && active===s.k) open('add'); renderRail(); }
+      };
+      w._qd=true; window.toggleOptCard=w;
+    }
+  }
+  function init(){
+    hook();
+    if(!build()) return;
+    var pref='sidebar'; try{ pref=localStorage.getItem(LS)||'sidebar'; }catch(e){}
+    setLayout(pref!=='classic');
+  }
+  if(document.readyState!=='loading') setTimeout(init, 0); else document.addEventListener('DOMContentLoaded', function(){ setTimeout(init, 0); });
+})();
+</script>
 <div id="toast-host" aria-live="polite"></div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
