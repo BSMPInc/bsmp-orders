@@ -826,6 +826,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <option value="">— Select —</option>
           <optgroup label="Steel">
             <option value="CRS">Cold Rolled Steel (CRS)</option>
+            <option value="Galv">Galvanized (G90)</option>
           </optgroup>
           <optgroup label="Stainless Steel">
             <option value="SS-304">304 Stainless Steel</option>
@@ -3856,6 +3857,7 @@ function loadResmedExample(auto){
 // Material densities in lb/in^3 — used for weight-based material pricing.
 const MATERIAL_DENSITY = {
   'CRS': 0.284,        // cold rolled steel
+  'Galv': 0.284,       // galvanized steel (zinc coat is negligible)
   'SS-304': 0.289,     // 304 stainless
   'SS-316': 0.289,     // 316 stainless
   'Alu-5052': 0.097,   // 5052 aluminum
@@ -3884,6 +3886,17 @@ const MATERIAL_THICKNESSES = {
     {val:'0.375 thk CRS', label:'0.375"  (3/8)'},
     {val:'0.500 thk CRS', label:'0.500"  (1/2)'},
     {val:'0.750 thk CRS', label:'0.750"  (3/4)'},
+  ],
+  // Galvanized: laser speed follows shop-air 304 SS of the nearest thickness (see laserSpeedFor)
+  'Galv': [
+    {val:'0.028 thk Galv G90', label:'0.028"  (24 ga)'},
+    {val:'0.034 thk Galv G90', label:'0.034"  (22 ga)'},
+    {val:'0.040 thk Galv G90', label:'0.040"  (20 ga)'},
+    {val:'0.052 thk Galv G90', label:'0.052"  (18 ga)'},
+    {val:'0.064 thk Galv G90', label:'0.064"  (16 ga)'},
+    {val:'0.079 thk Galv G90', label:'0.079"  (14 ga)'},
+    {val:'0.108 thk Galv G90', label:'0.108"  (12 ga)'},
+    {val:'0.138 thk Galv G90', label:'0.138"  (10 ga)'},
   ],
   'SS-304': [
     {val:'0.035 thk 304 SS', label:'0.035"  (20 ga)'},
@@ -4001,7 +4014,8 @@ function syncMaterialSelects(matVal) {
   const typeSel = document.getElementById('material-type');
   const thkSel = document.getElementById('material-thickness');
   let type = '';
-  if (matVal.includes('CRS')) type = 'CRS';
+  if (matVal.includes('Galv')) type = 'Galv';
+  else if (matVal.includes('CRS')) type = 'CRS';
   else if (matVal.includes('316 SS')) type = 'SS-316';
   else if (matVal.includes('304 SS') || matVal.includes('thk SS')) type = 'SS-304';
   else if (matVal.includes('5052')) type = 'Alu-5052';
@@ -4022,9 +4036,10 @@ function onMaterialChange(){
   const mat = document.getElementById('material').value;
   applyIndexPrice(mat);
   const info = document.getElementById('cut-info');
-  if(LASER_SPEEDS[mat]){
+  const ls = laserSpeedFor(mat);
+  if(ls){
     info.style.display='block';
-    info.textContent = `${mat} loaded — pierce time: ${LASER_SPEEDS[mat].pierce}s each. Enter perimeter to calculate cut time.`;
+    info.textContent = `${mat} loaded — ${ls.via?('speed of '+ls.via+' ('+ls.ips.toFixed(2)+' ips), '):''}pierce time: ${ls.pierce}s each. Enter perimeter to calculate cut time.`;
   } else {
     info.style.display='none';
   }
@@ -4157,7 +4172,7 @@ function calculate(){
   if(!gangEnabled){ const r=document.getElementById('gang-result'); if(r) r.style.display='none'; }
 
   // Laser cut time from perimeter
-  const spd = LASER_SPEEDS[mat];
+  const spd = laserSpeedFor(mat);
   if(spd && perim>0){
     const lt = laserRunTime(spd, perim, pierces);
     const totalMin = lt.totalMin;
@@ -6330,6 +6345,25 @@ function reloadQuote(id){
   calculate();
   if(savedQbs.length) calcQtyBreaks(); else _qbClearResults();
 }
+// Laser speed for a material. Galvanized has no entry of its own: owner rule (2026-09-29) is to cut
+// it at the shop-air 304 SS speed of the nearest thickness, so it also follows his custom SS speeds.
+// Returns {ips, pierce, via} where via names the borrowed entry (null for a direct hit).
+function laserSpeedFor(mat){
+  if(!mat) return null;
+  if(LASER_SPEEDS[mat]) return { ips:LASER_SPEEDS[mat].ips, pierce:LASER_SPEEDS[mat].pierce, via:null };
+  if(/galv/i.test(mat)){
+    const t=parseFloat(mat);
+    if(!(t>0)) return null;
+    let best=null;
+    Object.keys(LASER_SPEEDS).forEach(k=>{
+      if(!/ thk 304 SS$/.test(k)) return;
+      const d=Math.abs(parseFloat(k)-t);
+      if(!best || d<best.d-1e-9) best={k,d};
+    });
+    if(best) return { ips:LASER_SPEEDS[best.k].ips, pierce:LASER_SPEEDS[best.k].pierce, via:best.k };
+  }
+  return null;
+}
 // Laser run time for one part. Re-cool (2026-09-29, owner): the machine blows back over the same
 // cut path after cutting to keep heat down — one more trip around the perimeter at cut speed,
 // no extra pierces. Every laser-time calculation goes through here so the main price, the op row
@@ -6641,7 +6675,7 @@ function calcBreakForQty(qty){
   }
 
   // Laser cut time
-  const spd = LASER_SPEEDS[mat];
+  const spd = laserSpeedFor(mat);
   let laserRunMins = 0;
   if(spd && perim>0) laserRunMins = laserRunTime(spd, perim, pierces).totalMin;
 
