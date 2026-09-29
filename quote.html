@@ -10592,6 +10592,18 @@ window.syncOptCards=function(){
     {k:'add',     label:'Add detail', name:'Add detail — optional calculators', ic:'ti-plus',          find:function(){return document.querySelector('#panel-quote .card.opt-bar');}, core:true, add:true}
   ];
   var LS='bsmp_quote_layout';
+  // Drawing height: compact while a section is open, the owner's normal height when all are closed.
+  // Each is remembered (dragging the viewer's handle in either state updates that state's height).
+  var DVH='bsmp_dv_heights', dvMode=null;
+  function dvHeights(){ var h={tall:360, compact:200}; try{ var o=JSON.parse(localStorage.getItem(DVH)||'{}'); if(o.tall>=150) h.tall=o.tall; if(o.compact>=120) h.compact=o.compact; }catch(e){} return h; }
+  function setDvMode(mode){
+    var vp=$('dv-viewport'); if(!vp || mode===dvMode) return;
+    var h=dvHeights();
+    if(dvMode && vp.clientHeight>0){ h[dvMode]=vp.clientHeight; try{ localStorage.setItem(DVH, JSON.stringify(h)); }catch(e){} }
+    dvMode=mode;
+    vp.style.height = mode ? (h[mode]+'px') : '';
+    requestAnimationFrame(function(){ try{ window._dvRefit(); }catch(e){} });
+  }
   var built=false, on=false, active=null, wrap, rail, drawer, body, main, grid;
 
   function cardByTitle(t){
@@ -10670,6 +10682,7 @@ window.syncOptCards=function(){
       else { s.home.parentNode.insertBefore(c, s.home.nextSibling); if(s.slot.parentNode) s.slot.parentNode.removeChild(s.slot); }
     });
     rail.style.display=on?'':'none'; drawer.style.display=on?'':'none';
+    if(!on) setDvMode(null);
     active=null; wrap.classList.remove('qd-open');
     renderRail();
     if(on) open('job', true);
@@ -10677,14 +10690,14 @@ window.syncOptCards=function(){
   function open(k, noScroll){
     if(!on) return;
     var s=k ? sec(k) : null;
-    if(!s || !isOn(s)){ active=null; wrap.classList.remove('qd-open'); renderRail(); return; }
+    if(!s || !isOn(s)){ active=null; wrap.classList.remove('qd-open'); setDvMode('tall'); renderRail(); return; }
     active=k;
     // a collapsed optional card that has data: show it (same as clicking its "Add detail" chip)
     var c=cardOf(s); if(!s.core && getComputedStyle(c).display==='none'){ c.style.display=''; try{ window.syncOptCards(); }catch(e){} }
     SECTIONS.forEach(function(x){ if(x.slot) x.slot.classList.toggle('active', x===s); });
     var t=(cardOf(s).querySelector('.card-title')||{}).textContent||s.label;
     $('qd-title').textContent = s.name || t.replace(/\s+/g,' ').trim().split(' — ')[0];
-    wrap.classList.add('qd-open'); renderRail(); updPrice();
+    wrap.classList.add('qd-open'); setDvMode('compact'); renderRail(); updPrice();
     // the section opens under the drawing: bring its header into view if it's below the fold
     if(!noScroll) try{ var r=drawer.getBoundingClientRect(); if(r.top > window.innerHeight-160 || r.top < 60) drawer.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){}
   }
