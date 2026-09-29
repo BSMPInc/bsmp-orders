@@ -940,6 +940,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       <div class="field" style="display:flex;align-items:flex-end">
         <div id="nesting-hint" style="font-size:11px;color:var(--text3);line-height:1.4"></div>
       </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px" title="Re-cool: after cutting, the laser blows air back over the same cut path to keep heat (warp) under control. Adds one more trip around the perimeter at cutting speed; pierces are not repeated.">
+          <input id="recool" type="checkbox" onchange="calculate();if(window._qtyBreaksResults&&window._qtyBreaksResults.length)calcQtyBreaks()"> Re-cool pass
+          <span style="font-weight:400;color:var(--text3)">(≈ doubles cut time)</span>
+        </label>
+      </div>
     </div>
     </div><!-- end sheet-fields-wrapper -->
     <div id="cut-info" class="cut-info" style="display:none"></div>
@@ -4153,12 +4159,12 @@ function calculate(){
   // Laser cut time from perimeter
   const spd = LASER_SPEEDS[mat];
   if(spd && perim>0){
-    const cutSec = perim/spd.ips;
-    const pierceSec = pierces*spd.pierce;
-    const totalMin = (cutSec+pierceSec)/60;
+    const lt = laserRunTime(spd, perim, pierces);
+    const totalMin = lt.totalMin;
     const info = document.getElementById('cut-info');
     info.style.display='block';
-    info.textContent = `Cut time/part: ${totalMin.toFixed(2)} min · Cut time/order: ${(totalMin*qty).toFixed(1)} min · Pierce: ${(pierces*spd.pierce).toFixed(1)}s`;
+    info.textContent = `Cut time/part: ${totalMin.toFixed(2)} min · Cut time/order: ${(totalMin*qty).toFixed(1)} min · Pierce: ${lt.pierceSec.toFixed(1)}s`
+      + (lt.recoolSec ? ` · Re-cool: ${perim} in ÷ ${spd.ips} ips = +${lt.recoolSec.toFixed(1)}s (cut ${lt.cutSec.toFixed(1)}s + re-cool ${lt.recoolSec.toFixed(1)}s + pierce ${lt.pierceSec.toFixed(1)}s)` : '');
     // Auto-update laser op run time field
     for(let i=1;i<=opCount;i++){
       const sel=document.getElementById('op-sel-'+i);
@@ -4191,7 +4197,7 @@ function calculate(){
     let mins;
     if(isLaserRun){
       if(spd && perim>0){
-        mins = ((perim/spd.ips)+(pierces*spd.pierce))/60;
+        mins = laserRunTime(spd, perim, pierces).totalMin;
         // Keep field in sync
         if(minsEl) minsEl.value = mins.toFixed(3);
       } else {
@@ -5261,6 +5267,7 @@ function saveQuote(){
     drawingUrl: currentDrawingUrl||'',
 
     // ---- Full snapshot for accurate reload ----
+    recool: !!document.getElementById('recool')?.checked,
     matMode: matMode,
     matPriceMode: matPriceMode,
     nestingEfficiency: document.getElementById('nesting-efficiency')?.value || '85',
@@ -5410,6 +5417,7 @@ function resetForm(){
   document.getElementById('partl').value='';
   document.getElementById('perim').value='';
   document.getElementById('pierces').value='1';
+  { const rc=document.getElementById('recool'); if(rc) rc.checked=false; }
   document.getElementById('notes').value='';
   { const et=document.getElementById('exp-type'); if(et) et.value='none';
     const ea=document.getElementById('exp-amount'); if(ea) ea.value='0'; }
@@ -5634,7 +5642,9 @@ function applyClaudePatch(p){
   if(p.tier) selectTier(p.tier);
   Object.entries(p.fields||{}).forEach(([fid,val])=>{
     const el=document.getElementById(fid); if(!el) return;
-    el.value=String(val); el.dispatchEvent(new Event('change'));
+    if(el.type==='checkbox') el.checked = (val===true || val==='yes' || val==='true');   // e.g. recool
+    else el.value=String(val);
+    el.dispatchEvent(new Event('change'));
   });
   const o=p.ops||{};
   const rows=()=>{ const out=[]; for(let i=1;i<=opCount;i++){ const s=document.getElementById('op-sel-'+i); if(s) out.push({i,s}); } return out; };
@@ -6140,6 +6150,7 @@ function reloadQuote(id){
     }
     sv('parth', q.parth); sv('partl', q.partl);
     sv('perim', q.perim); sv('pierces', q.pierces);
+    { const rc=document.getElementById('recool'); if(rc) rc.checked=!!q.recool; }
     sv('costsheet', q.costsheet);
   }
   sv('purchasing', q.purchasing);
@@ -6318,6 +6329,16 @@ function reloadQuote(id){
   if(q.batchTapEnabled) calcBatchTap();
   calculate();
   if(savedQbs.length) calcQtyBreaks(); else _qbClearResults();
+}
+// Laser run time for one part. Re-cool (2026-09-29, owner): the machine blows back over the same
+// cut path after cutting to keep heat down — one more trip around the perimeter at cut speed,
+// no extra pierces. Every laser-time calculation goes through here so the main price, the op row
+// and the qty-break table always agree.
+function laserRunTime(spd, perim, pierces){
+  const cutSec = perim/spd.ips;
+  const recoolSec = document.getElementById('recool')?.checked ? cutSec : 0;
+  const pierceSec = pierces*spd.pierce;
+  return { cutSec, recoolSec, pierceSec, totalMin:(cutSec+recoolSec+pierceSec)/60 };
 }
 // Saved break quantities of a quote (RTDB may hand back an object with null holes).
 function _qbQtysOf(q){
@@ -6622,7 +6643,7 @@ function calcBreakForQty(qty){
   // Laser cut time
   const spd = LASER_SPEEDS[mat];
   let laserRunMins = 0;
-  if(spd && perim>0) laserRunMins = ((perim/spd.ips)+(pierces*spd.pierce))/60;
+  if(spd && perim>0) laserRunMins = laserRunTime(spd, perim, pierces).totalMin;
 
   // Batch deburr recalc for this qty if enabled
   let batchDeburMins = 0;
