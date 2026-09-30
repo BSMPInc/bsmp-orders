@@ -2722,13 +2722,20 @@ window.quoteWithClaude=async ()=>{
     by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
   FLAGS[t.key]=frec;
   try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){ toast('Could not save the email for Claude: '+e.message, true); return; }
-  const names=[];
-  (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{ if(a.id&&!sigJunk(m,a)&&a.filename) names.push(a.filename); }));
+  // real attachments, plus pictures pasted into the body — customers often put
+  // the sizes / marked-up drawing there (StandardAero bushings, 2026-09-30).
+  // Pasted pictures include the sender's logo, so they're listed separately.
+  const names=[], pics=[];
+  (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{
+    if(!a.id||!a.filename) return;
+    (sigJunk(m,a)?pics:names).push(a.filename);
+  }));
   const who=t.fromName&&t.fromEmail?(t.fromName+' <'+t.fromEmail+'>'):(t.fromName||t.fromEmail||'');
   const text='/quote the RFQ email from '+who+'\n'
     +'Subject: '+(t.subject||'(no subject)')+'\n'
     +'Mail thread: '+t.key+'\n'
-    +(names.length?('Attachments: '+names.join(', ')):'No attachments on the email.')+'\n';
+    +(names.length?('Attachments: '+names.join(', ')):'No attachments on the email.')+'\n'
+    +(pics.length?('Pictures in the email body: '+pics.join(', ')+' (one may be a signature logo)\n'):'');
   let ok=false;
   try{ await navigator.clipboard.writeText(text); ok=true; }
   catch(e){   // older browser / permission: the hidden-textarea copy still works
