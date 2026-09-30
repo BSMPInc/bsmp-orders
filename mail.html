@@ -335,11 +335,13 @@ body.sb-pinned .dock{left:var(--sb)}
 .reply-collapsed i{font-size:16px}
 .reply .reply-row{display:none}
 .reply.open .reply-collapsed{display:none}
-.reply.open .reply-row{display:flex;align-items:flex-start;gap:8px;padding:10px 12px}
+.reply.open .reply-row{display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.reply-tools{display:flex;align-items:center;gap:8px}   /* one line, never wraps — the From box shrinks instead */
+.reply-tools #reply-hint{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}   /* spacer: pushes Send + close right */
 .reply #reply-sig-hint{display:none}
 .reply.open #reply-sig-hint{display:block;padding:0 12px 10px}
-.reply-row select{height:38px;border:1px solid var(--border2);background:#fff;padding:0 8px;font-size:12.5px;flex:none;max-width:190px}
-.reply-row textarea{flex:1;min-width:0;height:38px;min-height:38px;max-height:220px;padding:8px 11px;border:1px solid var(--border2);background:#fff;resize:none;outline:none;font-size:13.5px;line-height:1.45;overflow-y:auto}
+.reply-row select{height:38px;border:1px solid var(--border2);background:#fff;padding:0 8px;font-size:12.5px;flex:0 1 190px;min-width:110px}   /* shrinks first so the toolbar stays one line */
+.reply-row textarea{flex:none;width:100%;box-sizing:border-box;min-width:0;height:130px;min-height:130px;max-height:45vh;padding:8px 11px;border:1px solid var(--border2);background:#fff;resize:none;outline:none;font-size:13.5px;line-height:1.45;overflow-y:auto}
 .reply-row textarea:focus{border-color:var(--accent)}
 .reply-row .btn{flex:none}
 .reply-row .btn.sm{height:38px;width:38px;padding:0;justify-content:center}
@@ -347,7 +349,7 @@ body.sb-pinned .dock{left:var(--sb)}
    so a long list never grows the composer on a 14" laptop */
 .quick-row{display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden}
 .reply .quick-row{display:none}                     /* the reply box shows them once it is open */
-.reply.open .quick-row{display:flex;padding:10px 12px 0}
+.reply.open .quick-row{display:flex;padding:0 12px 10px}   /* sits under the writing box */
 .modal .quick-row{padding:0 0 7px}
 .qr-chip{flex:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);padding:5px 10px;cursor:pointer;font-family:inherit;line-height:1.5}
 .qr-chip:hover{border-color:var(--accent);color:var(--accent)}
@@ -597,18 +599,21 @@ body.sb-pinned .dock{left:var(--sb)}
         <div id="cv-msgs"></div>
         <div class="reply" id="reply-box">
           <div class="reply-collapsed" title="Keyboard: Ctrl+R" onclick="expandReply()"><i class="ti ti-arrow-back-up"></i> Reply</div>
-          <div class="quick-row" id="quick-row"></div>
           <div class="reply-row">
+           <div class="reply-tools">
             <select id="reply-as" title="Sends through Gmail from this address — lands in its real Sent folder, threads correctly" onchange="renderSigHints()"></select>
             <button class="btn sm" id="reply-all-btn" title="Reply all — everyone on the email gets the reply, not just the sender" onclick="toggleReplyAll()"><i class="ti ti-users"></i></button>
-            <textarea id="reply-body" rows="1" placeholder="Write your reply — paste a screenshot right in…" oninput="autoGrowReply(this);window._draftTick('reply')"></textarea>
             <button class="btn sm" id="reply-ai-btn" title="Draft this reply with AI — it reads the whole conversation, the quote / orders / bill linked to it, and how this office normally writes. Jot notes in the box first and it turns them into the reply. Nothing sends by itself." onclick="aiDraftReply()"><i class="ti ti-sparkles"></i></button>
             <button class="btn sm" title="Attach files" onclick="pickAtt('reply')"><i class="ti ti-paperclip"></i></button>
             <button class="btn sm" title="Insert a table" onclick="openTable('reply')"><i class="ti ti-table"></i></button>
+            <span class="hint" id="reply-hint"></span>
             <button class="btn primary" id="reply-send" onclick="sendReply()"><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg> Send</button>
             <button class="btn sm" title="Hide the reply box" onclick="collapseReply()"><i class="ti ti-x"></i></button>
-            <span class="hint" id="reply-hint"></span>
+           </div>
+            <!-- toolbar above, full-width writing box below -->
+            <textarea id="reply-body" rows="5" placeholder="Write your reply — paste a screenshot right in…" oninput="autoGrowReply(this);window._draftTick('reply')"></textarea>
           </div>
+          <div class="quick-row" id="quick-row"></div>
           <div class="out-atts" id="reply-atts"></div>
           <div class="hint" id="reply-ai-hint" style="display:none"></div>
           <div class="hint" id="reply-sig-hint"></div>
@@ -3937,7 +3942,7 @@ async function bodyPaste(ctx,e){
 
 window.expandReply=()=>{ $('reply-box').classList.add('open'); renderQuickRow(); setTimeout(()=>$('reply-body').focus(),30); };
 window.collapseReply=()=>{ $('reply-box').classList.remove('open'); const ta=$('reply-body'); if(ta) ta.style.height=''; };
-window.autoGrowReply=(ta)=>{ ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight+2,220)+'px'; };
+window.autoGrowReply=(ta)=>{ ta.style.height='auto'; ta.style.height=Math.max(130,Math.min(ta.scrollHeight+2,Math.round(window.innerHeight*.45)))+'px'; };
 window.sendReply=()=>{
   if(!CURRENT) return;
   const imgs=window._outInline.reply;
