@@ -666,7 +666,7 @@ const I18N = {
     'Rows on the blank sheet':'Filas en la hoja en blanco','One numbered line per characteristic — set it before printing.':'Una línea numerada por característica — ajústalo antes de imprimir.',
     'Upload scan / photo':'Subir escaneo / foto','Take photo':'Tomar foto','No pages uploaded yet.':'Aún no hay páginas subidas.','Open page':'Abrir página',
     'Customer package':'Paquete para el cliente','One PDF for the customer: cover page, CoCs, the scanned first article, and the material / plating certs.':'Un PDF para el cliente: portada, CoCs, el primer artículo escaneado y los certificados de material / recubrimiento.',
-    'Builds one PDF to email: cover page, CoCs, the scanned first article, then the certs and any extra files, in that order.':'Arma un PDF para enviar por correo: portada, CoCs, el primer artículo escaneado y luego los certificados y archivos extra, en ese orden.',
+    'Builds one PDF to email: cover page, invoice, packing slip, CoCs, the scanned first article, then the certs and any extra files, in that order.':'Arma un PDF para enviar por correo: portada, factura, lista de empaque, CoCs, el primer artículo escaneado y luego los certificados y archivos extra, en ese orden.',
     'Upload the scanned pages first — they are the report.':'Sube primero las páginas escaneadas — son el reporte.','The PDF tools did not load — check the connection and reload.':'Las herramientas PDF no cargaron — revisa la conexión y recarga.',
     'Notes (print on the cover page)':'Notas (se imprimen en la portada)','Certificates of Conformance':'Certificados de Conformidad','Material / plating certs':'Certificados de material / recubrimiento',
     'Other documents (plating certs, customer CoC forms…)':'Otros documentos (certificados de recubrimiento, formatos CoC del cliente…)','Add files':'Agregar archivos',
@@ -676,6 +676,7 @@ const I18N = {
     'Building the package…':'Armando el paquete…','Adding':'Agregando','page':'página','pages':'páginas','check:':'revisa:','Downloaded':'Descargado',
     'Could not include this file:':'No se pudo incluir este archivo:','send it separately.':'envíalo por separado.','Customer package downloaded.':'Paquete para el cliente descargado.',
     'Could not build the package:':'No se pudo armar el paquete:',
+    'Invoice (QuickBooks PDF)':'Factura (PDF de QuickBooks)','Packing slip (QuickBooks PDF)':'Lista de empaque (PDF de QuickBooks)','Add invoice':'Agregar factura','Add packing slip':'Agregar lista de empaque','Invoice #':'Factura #',
     'These files could not be added and are NOT in the package:':'Estos archivos no se pudieron agregar y NO están en el paquete:','Download the package without them?':'¿Descargar el paquete sin ellos?','Not downloaded — missing:':'No se descargó — faltan:','Certificate of Conformance':'Certificado de Conformidad','First article inspection report (handwritten)':'Reporte de inspección de primer artículo (a mano)',
     'Material / plating certifications':'Certificaciones de material / recubrimiento','Other documents':'Otros documentos',
     'Result on the sheet':'Resultado en la hoja','Inspector notes (from the sheet)':'Notas del inspector (de la hoja)',
@@ -2517,17 +2518,20 @@ window.qcFairSheetDel=async (i)=>{
 
 /* ---- customer package (handwritten first article) ----
    One PDF to email the customer, built in the browser with pdf-lib: a BSMP cover page,
-   the CoCs picked (drawn as real text pages), the scanned first-article pages, the
+   the QuickBooks invoice + packing slip PDFs, the CoCs picked (drawn as real text pages),
+   the scanned first-article pages, the
    material / plating cert files, then any extra documents dropped into the dialog
    (plating certs from the vendor, the customer's own CoC form). Nothing is written to the
    database — the extra files are used for this PDF only and are not stored. */
-let _pkgExtra=[];
+// files dropped into the dialog, by slot: the QuickBooks invoice + packing slip PDFs, and anything else
+let _pkgFiles={invoice:[], slip:[], extra:[]};
 window.qcFairPackage=()=>{
   const r=editId?INSPECTIONS[editId]:null; if(!r) return;
   if(!fairSheets(r).length){ alert(t('Upload the scanned pages first — they are the report.')); return; }
   if(typeof PDFLib==='undefined'){ alert(t('The PDF tools did not load — check the connection and reload.')); return; }
-  _pkgExtra=[];
+  _pkgFiles={invoice:[], slip:[], extra:[]};
   const low=s=>String(s||'').trim().toLowerCase();
+  const ord=r.orderId?ORDERS[r.orderId]:null;   // the Orders app keeps the invoice # once the line is invoiced
   // CoCs for the same order — or the same customer (+ PO when the report has one)
   const cocs=vals(COCS).filter(c=>(r.orderId&&c.orderId===r.orderId)||(low(c.customer)&&low(c.customer)===low(r.customer)&&(!r.po||low(c.po)===low(r.po))))
     .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
@@ -2547,7 +2551,7 @@ window.qcFairPackage=()=>{
   ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
   ov.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:680px;width:100%;max-height:94vh;overflow:auto;padding:20px" onclick="event.stopPropagation()">
     <h3 style="margin:0 0 4px">${t('Customer package')}</h3>
-    <p class="muted" style="margin:0 0 12px;font-size:12.5px">${t('Builds one PDF to email: cover page, CoCs, the scanned first article, then the certs and any extra files, in that order.')}</p>
+    <p class="muted" style="margin:0 0 12px;font-size:12.5px">${t('Builds one PDF to email: cover page, invoice, packing slip, CoCs, the scanned first article, then the certs and any extra files, in that order.')}</p>
     <div class="grid2">
       <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="pkg-cust" value="${esc(r.customer||'')}"></div>
       <div class="field"><label class="fl">${t('Customer PO #')}</label><input class="in" id="pkg-po" value="${esc(r.po||'')}"></div>
@@ -2557,12 +2561,23 @@ window.qcFairPackage=()=>{
       <div class="field"><label class="fl">${t('Qty inspected')}</label><input class="in" id="pkg-qty" value="${esc(r.manualQty||'')}"></div>
     </div>
     <div class="field"><label class="fl">${t('Notes (print on the cover page)')}</label><input class="in" id="pkg-notes"></div>
+    <div class="grid2" style="margin-top:4px">
+      <div class="field"><label class="fl">${t('Invoice (QuickBooks PDF)')}</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="btn sm"><i class="ti ti-file-invoice"></i> ${t('Add invoice')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'invoice')"></label>
+          <input class="in" id="pkg-invno" placeholder="${esc(t('Invoice #'))}" value="${esc((ord&&ord.invoice)||'')}" style="max-width:130px;min-height:32px;padding:4px 8px">
+        </div>
+        <div id="pkg-invoice" class="thumbs" style="margin-top:6px"></div></div>
+      <div class="field"><label class="fl">${t('Packing slip (QuickBooks PDF)')}</label>
+        <label class="btn sm"><i class="ti ti-truck-delivery"></i> ${t('Add packing slip')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'slip')"></label>
+        <div id="pkg-slip" class="thumbs" style="margin-top:6px"></div></div>
+    </div>
     <div class="fl" style="margin:10px 0 4px">${t('Certificates of Conformance')}</div>
     <div style="border:1px solid var(--border);border-radius:8px;max-height:150px;overflow:auto;margin-bottom:10px">${cocs.length?cocs.map(cocRow).join(''):`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No CoC for this customer yet — make one on the Certs of Conformance page, or add the customer’s own form below.')}</div>`}</div>
     <div class="fl" style="margin:10px 0 4px;display:flex;align-items:center;gap:8px">${t('Material / plating certs')}<input class="in" placeholder="${esc(t('Search…'))}" oninput="window.qcPkgFilter(this.value)" style="max-width:200px;min-height:30px;padding:4px 8px;font-size:12.5px;margin-left:auto"></div>
     <div id="pkg-certs" style="border:1px solid var(--border);border-radius:8px;max-height:200px;overflow:auto;margin-bottom:10px">${certs.length?certs.map(certRow).join(''):`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No certs in the library yet.')}</div>`}</div>
     <div class="fl" style="margin:10px 0 4px">${t('Other documents (plating certs, customer CoC forms…)')}</div>
-    <label class="btn sm"><i class="ti ti-paperclip"></i> ${t('Add files')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this)"></label>
+    <label class="btn sm"><i class="ti ti-paperclip"></i> ${t('Add files')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'extra')"></label>
     <div id="pkg-extra" class="thumbs" style="margin-top:6px"></div>
     <div class="muted" style="font-size:11.5px;margin-top:4px">${t('Added files go into this PDF only — they are not saved to the app.')}</div>
     <div id="pkg-status" class="muted" style="font-size:12.5px;margin-top:10px;min-height:18px"></div>
@@ -2575,14 +2590,14 @@ window.qcFairPackage=()=>{
   document.body.appendChild(ov);
 };
 window.qcPkgFilter=(q)=>{ q=String(q||'').toLowerCase(); document.querySelectorAll('#pkg-certs .pkg-row').forEach(el=>{ el.style.display=(!q||el.dataset.s.indexOf(q)>=0||el.querySelector('input').checked)?'flex':'none'; }); };
-function qcPkgExtraHtml(){ return _pkgExtra.map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="window.qcPkgDrop(${i})"></i></span>`).join(' '); }
-window.qcPkgAdd=(inp)=>{ [...(inp.files||[])].forEach(f=>_pkgExtra.push(f)); inp.value=''; const h=$('pkg-extra'); if(h) h.innerHTML=qcPkgExtraHtml(); };
-window.qcPkgDrop=(i)=>{ _pkgExtra.splice(i,1); const h=$('pkg-extra'); if(h) h.innerHTML=qcPkgExtraHtml(); };
+function qcPkgFilesRender(slot){ const h=$('pkg-'+slot); if(h) h.innerHTML=(_pkgFiles[slot]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="window.qcPkgDrop('${slot}',${i})"></i></span>`).join(' '); }
+window.qcPkgAdd=(inp,slot)=>{ slot=_pkgFiles[slot]?slot:'extra'; [...(inp.files||[])].forEach(f=>_pkgFiles[slot].push(f)); inp.value=''; qcPkgFilesRender(slot); };
+window.qcPkgDrop=(slot,i)=>{ (_pkgFiles[slot]||[]).splice(i,1); qcPkgFilesRender(slot); };
 window.qcFairPackageBuild=async ()=>{
   const r=editId?INSPECTIONS[editId]:null; if(!r) return;
   const btn=$('pkg-go'), status=$('pkg-status');
   const say=(m,err)=>{ if(status){ status.textContent=m; status.style.color=err?'var(--red)':''; } };
-  const info={ customer:gv('pkg-cust'), po:gv('pkg-po'), part:gv('pkg-part'), rev:gv('pkg-rev'), job:gv('pkg-job'), qty:gv('pkg-qty'), notes:gv('pkg-notes') };
+  const info={ customer:gv('pkg-cust'), po:gv('pkg-po'), part:gv('pkg-part'), rev:gv('pkg-rev'), job:gv('pkg-job'), qty:gv('pkg-qty'), notes:gv('pkg-notes'), invoiceNo:gv('pkg-invno') };
   const certSel=[...document.querySelectorAll('.pkg-cert:checked')].map(x=>CERTS[x.value]).filter(Boolean);
   const cocSel=[...document.querySelectorAll('.pkg-coc:checked')].map(x=>COCS[x.value]).filter(Boolean);
   if(btn) btn.disabled=true;
@@ -2685,6 +2700,10 @@ window.qcFairPackageBuild=async ()=>{
 
     // everything drawn INTO the PDF is English (customer-facing); only the dialog text is translated
     say(t('Building the package…'));
+    // the QuickBooks invoice + packing slip lead the package — what receiving looks for first
+    const addSlot=async(slot)=>{ for(const f of _pkgFiles[slot]){ say(t('Adding')+' '+f.name+'…'); await addDoc(await f.arrayBuffer(),f.type,f.name); } };
+    await section('Invoice'+(info.invoiceNo?' #'+info.invoiceNo.replace(/^#/,''):''),()=>addSlot('invoice'));
+    await section('Packing slip',()=>addSlot('slip'));
     await section('Certificate of Conformance',async()=>{ cocSel.forEach(drawCoc); });
     await section('First article inspection report (handwritten)',async()=>{
       for(const s of fairSheets(r)){ say(t('Adding')+' '+(s.name||t('page'))+'…'); try{ await addDoc(await fetchBytes(s.url),s.type,s.name||''); }catch(e){ console.warn('package sheet fetch failed', e); warnings.push(s.name||'page'); } }
@@ -2696,7 +2715,7 @@ window.qcFairPackageBuild=async ()=>{
         for(const f of files){ say(t('Adding')+' '+(f.name||c.material||'')+'…'); try{ await addDoc(await fetchBytes(f.url),f.type,f.name||''); }catch(e){ console.warn('package cert fetch failed', e); warnings.push(f.name||c.material||c.id); } }
       }
     });
-    await section('Other documents',async()=>{ for(const f of _pkgExtra){ say(t('Adding')+' '+f.name+'…'); await addDoc(await f.arrayBuffer(),f.type,f.name); } });
+    await section('Other documents',()=>addSlot('extra'));
 
     // ── cover page, inserted first now that the page numbers are known ──
     const pg=pdf.insertPage(0,[W,H]); let y=letterhead(pg);
@@ -2706,7 +2725,7 @@ window.qcFairPackageBuild=async ()=>{
     y-=30; pg.drawText('INSPECTION RESULT',{x:M,y,size:8,font:B,color:ink}); pg.drawText(res[0],{x:M+110,y:y-2,size:14,font:B,color:res[1]});
     // a login like ofc.edgar@… shows as "Edgar" (the ofc./ops. prefix is an account type, not part of the name)
     const person=v=>{ const n=String(v||'').split('@')[0].replace(/^(ofc|ops|operator)[._-]+/i,'').replace(/[._-]+/g,' ').trim(); return n.replace(/\b\w/g,ch=>ch.toUpperCase()); };
-    const facts=[['Inspected by',person(r.inspectedBy)],['Inspection date',longDate(r.date)],['Material',r.material],
+    const facts=[['Inspected by',person(r.inspectedBy)],['Inspection date',longDate(r.date)],['Material',r.material],['Invoice #',String(info.invoiceNo||'').replace(/^#/,'')],
       ['Reviewed',(r.reviewedBy&&(r.fairStatus==='Approved'||r.fairStatus==='Rejected'))?(r.fairStatus+' — '+person(r.reviewedBy)+(r.reviewedAt?(', '+new Date(r.reviewedAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})):'')):'']].filter(f=>String(f[1]||'').trim());
     y-=12; facts.forEach(([k,v])=>{ y-=15; pg.drawText(clean(B,k.toUpperCase()),{x:M,y,size:7.5,font:B,color:grey}); pg.drawText(fit(F,9.5,v,W-2*M-110),{x:M+110,y,size:9.5,font:F,color:ink}); });
     if(String(r.manualNotes||'').trim()){ y-=22; pg.drawText('INSPECTOR NOTES',{x:M,y,size:7.5,font:B,color:grey}); wrap(F,9.5,r.manualNotes,W-2*M-110).slice(0,6).forEach((l,i)=>pg.drawText(l,{x:M+110,y:y-i*13,size:9.5,font:F,color:ink})); y-=13*Math.min(6,wrap(F,9.5,r.manualNotes,W-2*M-110).length)-13; }
