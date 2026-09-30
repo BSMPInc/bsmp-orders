@@ -38,7 +38,8 @@
 
 const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/gmail.send';
 const ALLOWED_ORIGINS = ['https://bsmpinc.github.io', 'http://localhost:8742', 'http://127.0.0.1:8742',
-                         'https://bertsmp.com', 'https://www.bertsmp.com', 'http://localhost:8791'];
+                         'https://bertsmp.com', 'https://www.bertsmp.com', 'http://localhost:8791',
+                         'http://localhost:8123'];   // local copy Claude's /quote runs the quote tool on
 
 export default {
   async fetch(request, env) {

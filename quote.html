@@ -11101,6 +11101,20 @@ async function _qFromMailAtt(){
     if(typeof showToast==='function') showToast({title:'Could not pull the drawing from the email', sub:String((e&&e.message)||e)+' — you can still drop the file in by hand.', type:'error', duration:9000});
   }
 }
+// Mail access for Claude's /quote skill (QH.mailRfq): the mail/threads record
+// for an RFQ email, and signed-in calls to the mail worker (thread + attachments).
+window._qMail = {
+  rec: async (key) => (await get(ref(db,'mail/threads/'+key))).val(),
+  fetch: async (path) => {
+    if(!_qUser) throw new Error('not signed in');
+    const s=await get(ref(db,'mail/settings'));
+    const proxy=(((s.val()||{}).proxyUrl)||'').replace(/\/+$/,'');
+    if(!proxy) throw new Error('mail proxy address not set');
+    const r=await fetch(proxy+path,{headers:{Authorization:'Bearer '+(await _qUser.getIdToken())}});
+    if(!r.ok) throw new Error('mail worker '+r.status+': '+(await r.text()).slice(0,200));
+    return r;
+  }
+};
 window._qCloudRemoveQuote = async (id) => {
   if(!_qUser || id==null) return;
   window._qTombstone([id]);

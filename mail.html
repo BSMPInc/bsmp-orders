@@ -2666,7 +2666,8 @@ function renderQcFile(){
     return;
   }
   if(f==='rfq'){
-    slot.innerHTML=`<button class="btn sm" onclick="startQuoteFromEmail()" title="Open the Quote Tool with this customer prefilled — saving the quote links it back here"><i class="ti ti-calculator"></i> Create quote from this email</button>`;
+    slot.innerHTML=`<button class="btn sm" onclick="startQuoteFromEmail()" title="Open the Quote Tool with this customer prefilled — saving the quote links it back here"><i class="ti ti-calculator"></i> Create quote from this email</button>`
+      +` <button class="btn sm" onclick="quoteWithClaude()" title="Copy a /quote request for this email — paste it into Claude (Code tab). Claude pulls the drawings from this email, builds the quotes and links them back here."><i class="ti ti-sparkles"></i> Quote with Claude</button>`;
     return;
   }
   if(f==='invoice'){
@@ -2709,6 +2710,32 @@ window.startQuoteFromEmail=async ()=>{
   const qw=window.open(qUrl,'bsmpQuote');
   if(qw){ try{ qw.focus(); }catch(e){} toast('RFQ sent to Quote — opened in its own tab.'); }
   else location.href=qUrl; // popup blocked: fall back to navigating in place
+};
+// "Quote with Claude": copy a /quote request that names this thread. Claude
+// opens the quote tool, reads the thread + drawings through the mail worker
+// (QH.mailRfq) and saves the quotes with this key, so they link back here.
+window.quoteWithClaude=async ()=>{
+  const t=CURRENT; if(!t) return;
+  // save the snapshot first — Claude finds the thread by it (box + Gmail id)
+  const frec=Object.assign({}, FLAGS[t.key]||{}, {
+    flag:(FLAGS[t.key]&&FLAGS[t.key].flag)||'rfq', meta:threadSnapshot(t),
+    by:(auth.currentUser&&auth.currentUser.email)||'', at:Date.now() });
+  FLAGS[t.key]=frec;
+  try{ await set(ref(db,'mail/threads/'+t.key), frec); }catch(e){ toast('Could not save the email for Claude: '+e.message, true); return; }
+  const names=[];
+  (t.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{ if(a.id&&!sigJunk(m,a)&&a.filename) names.push(a.filename); }));
+  const who=t.fromName&&t.fromEmail?(t.fromName+' <'+t.fromEmail+'>'):(t.fromName||t.fromEmail||'');
+  const text='/quote the RFQ email from '+who+'\n'
+    +'Subject: '+(t.subject||'(no subject)')+'\n'
+    +'Mail thread: '+t.key+'\n'
+    +(names.length?('Attachments: '+names.join(', ')):'No attachments on the email.')+'\n';
+  let ok=false;
+  try{ await navigator.clipboard.writeText(text); ok=true; }
+  catch(e){   // older browser / permission: the hidden-textarea copy still works
+    const ta=document.createElement('textarea'); ta.value=text; ta.style.cssText='position:fixed;left:-9999px';
+    document.body.appendChild(ta); ta.select(); try{ ok=document.execCommand('copy'); }catch(_){} ta.remove();
+  }
+  toast(ok?'Copied — paste it into Claude (Code tab) and press Enter.':'Could not copy — your browser blocked the clipboard.', !ok);
 };
 window.sendBillToApar=async ()=>{
   const t=CURRENT; if(!t) return;
