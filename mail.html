@@ -350,7 +350,10 @@ body.sb-pinned .dock{left:var(--sb)}
 .quick-row{display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden}
 .reply .quick-row{display:none}                     /* the reply box shows them once it is open */
 .reply.open .quick-row{display:flex;padding:0 12px 10px}   /* sits under the writing box */
-.modal .quick-row{padding:0 0 7px}
+.modal .quick-row{padding:7px 0 0}                  /* under the writing box, like the reply box */
+/* new-email window: wider, with a tall writing box */
+.modal.compose{max-width:780px;max-height:94vh}
+.modal.compose #cp-body{min-height:max(200px,34vh);font-size:13.5px;line-height:1.45}
 .qr-chip{flex:none;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);padding:5px 10px;cursor:pointer;font-family:inherit;line-height:1.5}
 .qr-chip:hover{border-color:var(--accent);color:var(--accent)}
 .qr-chip.qr-edit{color:var(--text3);border-style:dashed;padding:5px 9px}
@@ -721,7 +724,7 @@ body.sb-pinned .dock{left:var(--sb)}
 </div>
 
 <div class="modal-bg" id="compose-modal">
-  <div class="modal">
+  <div class="modal compose">
     <h3>New email</h3>
     <label>From</label>
     <select id="cp-from" onchange="renderSigHints();window._draftTick('compose')"></select>
@@ -730,8 +733,8 @@ body.sb-pinned .dock{left:var(--sb)}
     <label>Subject</label>
     <input id="cp-subject" type="text" placeholder="Subject" oninput="window._draftTick('compose')">
     <label>Message</label>
-    <div class="quick-row" id="quick-row-cp"></div>
     <textarea id="cp-body" placeholder="Write your message — paste a screenshot (Ctrl+V) and it's embedded right where the cursor is" oninput="window._draftTick('compose')"></textarea>
+    <div class="quick-row" id="quick-row-cp"></div>
     <div class="out-atts" id="cp-atts"></div>
     <div class="hint" id="cp-sig-hint" style="margin-top:6px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
