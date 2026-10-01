@@ -2741,7 +2741,7 @@ async function pkgBuildPdf(spec, say){
       const hgt=Math.max(...cells.map(c=>c.length))*10.5+6;
       if(state.y-hgt<M+30){ state.pg=pdf.addPage([W,H]); state.y=letterhead(state.pg)-10; if(opt.contTitle) { state.pg.drawText(clean(B,opt.contTitle),{x:M,y:state.y,size:8,font:B,color:grey}); state.y-=18; } head(); }
       cells.forEach((c,i)=>c.forEach((l,j)=>state.pg.drawText(l,{x:xs[i],y:state.y-j*10.5,size:8.5,font:cols[i].bold?B:F,color:(rw.color&&rw.color[i])||ink})));
-      state.y-=hgt; state.pg.drawLine({start:{x:M,y:state.y+6},end:{x:W-M,y:state.y+6},thickness:0.5,color:soft,dashArray:[2,2]});
+      state.y-=hgt; if(!opt.noRules) state.pg.drawLine({start:{x:M,y:state.y+6},end:{x:W-M,y:state.y+6},thickness:0.5,color:soft,dashArray:[2,2]});
     });
   };
   const warnings=[], sections=[];
@@ -2847,11 +2847,11 @@ async function pkgBuildPdf(spec, say){
   const lineRows=(spec.lines.length?spec.lines:spec.fairs.map(f=>({part:f.partNum,rev:f.rev,job:f.job,qty:f.manualQty||'',desc:''}))).slice(0,12).map(l=>{ const fa=faFor(l.part); const r=[l.part,l.rev,l.job,l.qty,l.desc,fa||'—']; r.color=[null,null,null,null,null,fa==='Accepted'?rgb(0.1,0.45,0.2):fa==='Rejected'?rgb(0.7,0.15,0.12):grey]; return r; });
   const st={pg,y:y-26};
   if(lineRows.length){ pg.drawText('PARTS SHIPPED',{x:M,y:st.y,size:8,font:B,color:ink}); st.y-=16;
-    table(st,[{h:'PART NUMBER',w:.22,bold:true},{h:'REV',w:.07},{h:'JOB #',w:.1},{h:'QTY',w:.08},{h:'DESCRIPTION',w:.35},{h:'FIRST ARTICLE',w:.18}],lineRows,{maxLines:2});
+    table(st,[{h:'PART NUMBER',w:.22,bold:true},{h:'REV',w:.07},{h:'JOB #',w:.1},{h:'QTY',w:.08},{h:'DESCRIPTION',w:.35},{h:'FIRST ARTICLE',w:.18}],lineRows,{maxLines:2,noRules:true});   // the cover stays clean: no dashed row lines
     if(spec.lines.length>12){ st.pg.drawText(clean(F,'+ '+(spec.lines.length-12)+' more lines — see the packing slip'),{x:M,y:st.y,size:8.5,font:F,color:grey}); st.y-=14; } }
   st.y-=16; st.pg.drawText('CONTENTS',{x:M,y:st.y,size:8,font:B,color:ink}); st.y-=16;
   const contents=[{title:'This cover page',pr:'page 1'}].concat(sections.map(s=>{ const a=s.first+2, b=s.first+1+s.count; return {title:s.title, pr:s.count>1?('pages '+a+'–'+b):('page '+a), pages:s.count}; }));
-  table(st,[{h:'#',w:.06},{h:'DOCUMENT',w:.74},{h:'PAGES',w:.2}],contents.map((c,i)=>[i+1,c.title,c.pr]),{maxLines:1});
+  table(st,[{h:'#',w:.06},{h:'DOCUMENT',w:.74},{h:'PAGES',w:.2}],contents.map((c,i)=>[i+1,c.title,c.pr]),{maxLines:1,noRules:true});
   if(spec.notes){ st.y-=6; st.pg.drawText('NOTES',{x:M,y:st.y,size:8,font:B,color:ink}); wrap(F,9.5,spec.notes,W-2*M).slice(0,6).forEach((l,i)=>st.pg.drawText(l,{x:M,y:st.y-15-i*13,size:9.5,font:F,color:ink})); }
   pg.drawText(clean(F,'This package accompanies the parts listed above.'+(spec.itar?'  Contains ITAR-restricted information — do not re-export.':'')),{x:M,y:30,size:8,font:F,color:grey});
   const total=pdf.getPageCount();
