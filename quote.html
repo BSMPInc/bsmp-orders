@@ -791,6 +791,12 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
           <option value="dollar">Nearest $1</option>
         </select>
       </div>
+      <div class="field"><label>Shop minimum order</label>
+        <select id="min-order-apply" onchange="calculate()" title="An order under the shop minimum gets its own &quot;Minimum order charge&quot; line that tops it up. The price per part never changes. Set the amount in Settings → Shop Info.">
+          <option value="yes">$225</option>
+          <option value="no">Waived</option>
+        </select>
+      </div>
     </div>
     <div class="grid3" style="margin-top:4px">
       <div class="field">
@@ -1882,6 +1888,15 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
       </div>
       <div class="field" style="display:flex;align-items:flex-end">
         <div style="font-size:11px;color:var(--text3);line-height:1.4">Smallest amount of a sheet billed per order. Prevents tiny-qty parts that nest many-per-sheet from being undercharged, but keeps the charge fair.</div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="field">
+        <label>Shop minimum order ($)</label>
+        <input id="min-order-amount" type="number" min="0" step="5" onchange="saveMinOrder()">
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <div style="font-size:11px;color:var(--text3);line-height:1.4">Smallest order you take. An order under it gets its own "Minimum order charge" line that tops it up to this amount — once per order, so a combined quote only adds it once. Price per part never changes. 0 = no minimum.</div>
       </div>
     </div>
     <div class="grid2" style="margin-top:12px">
@@ -3301,6 +3316,9 @@ function init(){
   // Set minimum material dropdown to saved value
   const msEl = document.getElementById('min-sheet-fraction');
   if(msEl) msEl.value = String(MIN_SHEET);
+  const moEl = document.getElementById('min-order-amount');
+  if(moEl) moEl.value = String(MIN_ORDER);
+  refreshMinOrderLabel();
   const nqEl = document.getElementById('next-quote-number');
   if(nqEl) nqEl.value = QUOTE_COUNTER;
 }
@@ -4307,7 +4325,9 @@ function calculate(){
   const baseJobTotal = finalPrice*qty;
   const expediteFee = (expAmt>0 && expType==='pct') ? Math.round(baseJobTotal*expAmt/100*100)/100
                     : (expAmt>0 && expType==='flat') ? expAmt : 0;
-  const jobTotal = baseJobTotal + expediteFee;
+  // Shop minimum order — tops a small order up, as its own job-level line
+  const minOrderCharge = minOrderOn() ? minOrderTopUp(baseJobTotal + expediteFee) : 0;
+  const jobTotal = baseJobTotal + expediteFee + minOrderCharge;
   const margin = finalPrice>0 ? ((finalPrice-totalCostPart)/finalPrice*100) : 0;
 
   const fmt = v=>'$'+v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4392,14 +4412,15 @@ function calculate(){
       bd+=br(`Rounded up (nearest ${st<1?Math.round(st*100)+'¢':'$'+st})`,'+'+fmt(finalPrice-preRound),fmt(preRound)+' → '+fmt(finalPrice));
     }
   }
-  if(expediteFee>0){
+  if(expediteFee>0 || minOrderCharge>0){
     bd+=br(`Subtotal (×${qty})`,fmt(baseJobTotal));
-    bd+=br(`Expedite fee${expType==='pct' ? ` (${expAmt}% of subtotal)` : ''}`,fmt(expediteFee));
+    if(expediteFee>0) bd+=br(`Expedite fee${expType==='pct' ? ` (${expAmt}% of subtotal)` : ''}`,fmt(expediteFee));
+    if(minOrderCharge>0) bd+=br('Minimum order charge',fmt(minOrderCharge),`tops the order up to the ${fmt(MIN_ORDER)} shop minimum · waive it if this ships with other parts`);
   }
   bd+=`<div class="breakdown-row total"><span class="breakdown-label">Job total (×${qty})</span><span class="breakdown-val">${fmt(jobTotal)}</span></div>`;
   document.getElementById('breakdown').innerHTML=bd;
 
-  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,outMarkup:getOutMarkup(),effMarkup:(totalCostPart>0?markupCost/totalCostPart:markup),expType,expAmt,expediteFee,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
+  window._calc={qty,mat,ph,pl,perim,pierces,matCostPart,laborCostPart,hwCostPart,outCostPart,purchasing,totalCostPart,markupCost,outMarkup:getOutMarkup(),effMarkup:(totalCostPart>0?markupCost/totalCostPart:markup),expType,expAmt,expediteFee,minOrderCharge,minOrder:MIN_ORDER,finalPrice,jobTotal,margin,laborLines,hwLines,outLines,pps,sheetsReq,costSheet,markup,finance,weldCostPart,weld,cncCostPart,cnc,inspCostPart,progCostPart};
   if(typeof renderCostMix==='function') renderCostMix();
 }
 
@@ -4969,7 +4990,7 @@ function copyQuote(){
   d.outLines.forEach(l=>txt+=`\nOutsource — ${l.desc}: ${fmt(l.total)}`);
   if(d.weld && d.weld.enabled){ d.weld.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
   if(d.cnc && d.cnc.enabled){ d.cnc.bdLines.forEach(l=>txt+=`\n${l.label}: ${fmt(l.val)}`); }
-  txt+=`\n\nCost/part: ${fmt(d.totalCostPart)}\nMarkup (${(d.markup*100).toFixed(0)}%): ${fmt(d.markupCost)}\nPrice/part: ${fmt(d.finalPricePart||d.finalPrice)}${(d.expediteFee>0)?`\nExpedite fee: ${fmt(d.expediteFee)}`:''}\nJob total (×${d.qty}): ${fmt(d.jobTotal)}`;
+  txt+=`\n\nCost/part: ${fmt(d.totalCostPart)}\nMarkup (${(d.markup*100).toFixed(0)}%): ${fmt(d.markupCost)}\nPrice/part: ${fmt(d.finalPricePart||d.finalPrice)}${(d.expediteFee>0)?`\nExpedite fee: ${fmt(d.expediteFee)}`:''}${(d.minOrderCharge>0)?`\nMinimum order charge: ${fmt(d.minOrderCharge)}`:''}\nJob total (×${d.qty}): ${fmt(d.jobTotal)}`;
   if(notes) txt+=`\n\nNotes: ${notes}`;
   navigator.clipboard.writeText(txt).then(()=>{
     const btn=event.target.closest('button');
@@ -5011,7 +5032,7 @@ function showToast(opts){
 // Keys included in a backup. API key and one-time UI flags are deliberately excluded.
 const BACKUP_KEYS = ['bsmp_history','bsmp_archive','bsmp_prices','bsmp_rates','bsmp_customers',
   'bsmp_assumptions','bsmp_tier_markups','bsmp_laser_speeds','bsmp_time_standards',
-  'bsmp_min_sheet','bsmp_shopname','bsmp_shoploc','bsmp_quote_counter'];
+  'bsmp_min_sheet','bsmp_min_order','bsmp_shopname','bsmp_shoploc','bsmp_quote_counter'];
 
 function backupArrayLen(s){ try{ const a=JSON.parse(s); return Array.isArray(a)?a.length:0; }catch(e){ return 0; } }
 
@@ -5109,7 +5130,7 @@ function applyRestore(mode, payload){
         const inc=parseInt(d.bsmp_quote_counter)||0, cur=parseInt(localStorage.getItem('bsmp_quote_counter'))||0;
         localStorage.setItem('bsmp_quote_counter', String(Math.max(inc,cur)));
       }
-      ['bsmp_rates','bsmp_assumptions','bsmp_tier_markups','bsmp_laser_speeds','bsmp_time_standards','bsmp_min_sheet','bsmp_shopname','bsmp_shoploc'].forEach(k=>{
+      ['bsmp_rates','bsmp_assumptions','bsmp_tier_markups','bsmp_laser_speeds','bsmp_time_standards','bsmp_min_sheet','bsmp_min_order','bsmp_shopname','bsmp_shoploc'].forEach(k=>{
         if(d[k]!=null && localStorage.getItem(k)===null) localStorage.setItem(k, d[k]);
       });
     }
@@ -5264,6 +5285,7 @@ function saveQuote(){
     pricePerPart: d.finalPrice||d.finalPricePart,
     jobTotal: d.jobTotal,
     expediteFee: d.expediteFee||0,
+    minOrderCharge: d.minOrderCharge||0,
     markup: d.markup,
     finance: d.finance,
     rounding: gv('rounding')||'auto',
@@ -5291,6 +5313,7 @@ function saveQuote(){
     poNumber: document.getElementById('po-number')?.value || '',
     expType: document.getElementById('exp-type')?.value || 'none',
     expAmount: document.getElementById('exp-amount')?.value || '0',
+    minOrderApply: document.getElementById('min-order-apply')?.value || 'no',
     formComplexity: document.getElementById('form-complexity')?.value || '',
     formBendCount: document.getElementById('form-bend-count')?.value || '',
     matwArea: gv('matw-area'), matwPerlb: gv('matw-perlb'), matwScrap: gv('matw-scrap'),
@@ -5435,7 +5458,8 @@ function resetForm(){
   { const rc=document.getElementById('recool'); if(rc) rc.checked=false; }
   document.getElementById('notes').value='';
   { const et=document.getElementById('exp-type'); if(et) et.value='none';
-    const ea=document.getElementById('exp-amount'); if(ea) ea.value='0'; }
+    const ea=document.getElementById('exp-amount'); if(ea) ea.value='0';
+    const mo=document.getElementById('min-order-apply'); if(mo) mo.value='yes'; }   // new quotes carry the shop minimum
   document.getElementById('cut-info').style.display='none';
   document.getElementById('ai-status').className='ai-status';
   document.getElementById('ai-tags').innerHTML='';
@@ -6183,7 +6207,9 @@ function reloadQuote(id){
   sv2('due-date', q.dueDate || '');
   sv2('po-number', q.poNumber || '');
   { const et=document.getElementById('exp-type'); if(et) et.value = q.expType || 'none';
-    const ea=document.getElementById('exp-amount'); if(ea) ea.value = q.expAmount || '0'; }
+    const ea=document.getElementById('exp-amount'); if(ea) ea.value = q.expAmount || '0';
+    // quotes saved before the shop minimum existed reload with it OFF, so their totals don't move
+    const mo=document.getElementById('min-order-apply'); if(mo) mo.value = q.minOrderApply==='yes' ? 'yes' : 'no'; }
   sv2('form-complexity', q.formComplexity || '');
   sv2('form-bend-count', q.formBendCount || '');
   if(q.dueDate) checkRushDue();
@@ -6475,7 +6501,7 @@ function saveShopSettings(){
 }
 
 function exportData(){
-  const data={rates:RATES,customers:CUSTOMERS,history:HISTORY,prices:PRICE_INDEX,laserSpeeds:JSON.parse(localStorage.getItem('bsmp_laser_speeds')||'{}'),minSheet:MIN_SHEET,quoteCounter:QUOTE_COUNTER,archive:ARCHIVE,tierMarkups:TIER_MARKUPS,timeStandards:TIME_STANDARDS,exported:new Date().toISOString()};
+  const data={rates:RATES,customers:CUSTOMERS,history:HISTORY,prices:PRICE_INDEX,laserSpeeds:JSON.parse(localStorage.getItem('bsmp_laser_speeds')||'{}'),minSheet:MIN_SHEET,minOrder:MIN_ORDER,quoteCounter:QUOTE_COUNTER,archive:ARCHIVE,tierMarkups:TIER_MARKUPS,timeStandards:TIME_STANDARDS,exported:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
   a.download=`bsmp-quotes-${new Date().toISOString().slice(0,10)}.json`; a.click();
@@ -6495,6 +6521,12 @@ function importData(input){
         MIN_SHEET = parseFloat(data.minSheet)||0;
         localStorage.setItem('bsmp_min_sheet', String(MIN_SHEET));
         const msEl=document.getElementById('min-sheet-fraction'); if(msEl) msEl.value=String(MIN_SHEET);
+      }
+      if(data.minOrder!==undefined){
+        MIN_ORDER = parseFloat(data.minOrder)||0;
+        localStorage.setItem('bsmp_min_order', String(MIN_ORDER));
+        const moEl=document.getElementById('min-order-amount'); if(moEl) moEl.value=String(MIN_ORDER);
+        refreshMinOrderLabel();
       }
       if(data.quoteCounter!==undefined){
         QUOTE_COUNTER = parseInt(data.quoteCounter,10)||QUOTE_COUNTER;
@@ -9492,6 +9524,41 @@ function resetLaserSpeeds(){
 let MIN_SHEET = parseFloat(localStorage.getItem('bsmp_min_sheet'));
 if(isNaN(MIN_SHEET)) MIN_SHEET = 0.125;
 
+// ===================== SHOP MINIMUM ORDER =====================
+// Smallest order the shop takes (owner, 2026-10-01: $225, "to keep from being
+// overwhelmed by small orders"). It is PER ORDER: an order under it gets its own
+// "Minimum order charge" line topping it up — never baked into price/part, so the
+// part price still makes sense on a reorder. 0 = off. Stored in localStorage.
+// Quotes saved before this existed have no minOrderApply and reload with it OFF,
+// so their totals don't change; new quotes start with it ON.
+let MIN_ORDER = parseFloat(localStorage.getItem('bsmp_min_order'));
+if(isNaN(MIN_ORDER)) MIN_ORDER = 225;
+function minOrderTopUp(orderTotal){
+  if(!(MIN_ORDER>0) || !(orderTotal>0)) return 0;   // nothing priced yet → no charge
+  const gap = Math.round((MIN_ORDER-orderTotal)*100)/100;
+  return gap>0 ? gap : 0;
+}
+function minOrderOn(){ const e=document.getElementById('min-order-apply'); return !!(e && e.value==='yes'); }
+function minOrderMoney(v){ return '$'+(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function minOrderLineDesc(){ return 'Minimum Order Charge (shop minimum '+minOrderMoney(MIN_ORDER)+' per order)'; }
+function refreshMinOrderLabel(){
+  const o=document.querySelector('#min-order-apply option[value="yes"]');
+  if(o) o.textContent = MIN_ORDER>0 ? minOrderMoney(MIN_ORDER).replace('.00','') : 'None set';
+}
+function saveMinOrder(){
+  const v = parseFloat(document.getElementById('min-order-amount').value);
+  MIN_ORDER = (isNaN(v)||v<0) ? 0 : v;
+  localStorage.setItem('bsmp_min_order', String(MIN_ORDER));
+  refreshMinOrderLabel();
+  calculate();
+}
+// Live "→ adds $X" hint next to a print form's minimum checkbox.
+function minOrderHint(hintEl, chk, subtotal){
+  if(!hintEl) return;
+  const add = (chk && chk.checked) ? minOrderTopUp(subtotal) : 0;
+  hintEl.textContent = !(chk && chk.checked) ? '' : (add>0 ? '→ adds '+minOrderMoney(add) : '→ order is already over the minimum');
+}
+
 // ===================== PRICE ROUNDING =====================
 // The final price always rounds UP (never below target margin). The grain comes
 // from the "Round price up to" choice on the quote form and is saved with each
@@ -9659,10 +9726,11 @@ function buildCombinedQuote(){
     return { srcId:q.id, desc: descLines.join('\n'), qty, rate, amt: qty*rate };
   });
 
-  openCombineForm(items, firstCust);
+  // The minimum is per ORDER: on unless every picked quote was set to waive it.
+  openCombineForm(items, firstCust, picked.some(q => q.minOrderApply !== 'no'));
 }
 
-function openCombineForm(items, firstCust){
+function openCombineForm(items, firstCust, applyMin){
   const fmt = v => v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const today = new Date().toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"numeric"});
 
@@ -9715,6 +9783,7 @@ function openCombineForm(items, firstCust){
       </div>
       <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Line items</div>
       ${itemRows}
+      ${MIN_ORDER>0 ? `<label style="font-size:12px;color:#475569;display:flex;align-items:center;gap:6px;cursor:pointer;flex-wrap:wrap;margin-top:8px"><input id="cc-minorder" type="checkbox" ${applyMin!==false?'checked':''} style="width:auto"> Minimum order charge if the whole order is under ${minOrderMoney(MIN_ORDER)} (prints as its own line) <span id="cc-minorder-hint" style="font-weight:700;color:#0f172a"></span></label>` : ''}
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em">Tax (%)</label>
         <input id="cc-tax" type="number" step="0.01" value="0" style="width:100px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
@@ -9727,6 +9796,10 @@ function openCombineForm(items, firstCust){
   document.body.appendChild(overlay);
   document.getElementById("cc-cancel").onclick = () => overlay.remove();
   overlay.addEventListener("click", e => { if(e.target===overlay) overlay.remove(); });
+  const ccSubtotal = () => items.reduce((s,it,idx)=> s + (parseFloat(document.getElementById("ci-qty-"+idx).value)||0)*(parseFloat(document.getElementById("ci-rate-"+idx).value)||0), 0);
+  const ccMinHint = () => minOrderHint(document.getElementById("cc-minorder-hint"), document.getElementById("cc-minorder"), ccSubtotal());
+  overlay.addEventListener("input", ccMinHint); overlay.addEventListener("change", ccMinHint);
+  ccMinHint();
 
   document.getElementById("cc-print").onclick = () => {
     const billto = document.getElementById("cc-billto").value.trim();
@@ -9743,6 +9816,9 @@ function openCombineForm(items, firstCust){
       const rate = parseFloat(document.getElementById("ci-rate-"+idx).value)||0;
       return { desc, qty, rate, amt: qty*rate };
     });
+    const ccMinChk = document.getElementById("cc-minorder");
+    const ccMin = (ccMinChk && ccMinChk.checked) ? minOrderTopUp(finalItems.reduce((s,i)=>s+i.amt,0)) : 0;
+    if(ccMin > 0) finalItems.push({desc: minOrderLineDesc(), qty: 1, rate: ccMin, amt: ccMin});
     const subtotal = finalItems.reduce((s,i)=>s+i.amt,0);
     const tax = subtotal*(taxPct/100);
     const total = subtotal+tax;
@@ -9801,7 +9877,7 @@ function printCustomerQuote(sourceId){
       }
     });
   }
-  openCustomerQuoteModal({ customer, descLines, qty, pricePerPart, expediteFee: d.expediteFee||0, lockedQuoteNo, srcQuote, showTwoLines:true });
+  openCustomerQuoteModal({ customer, descLines, qty, pricePerPart, expediteFee: d.expediteFee||0, minOrderApply: minOrderOn(), lockedQuoteNo, srcQuote, showTwoLines:true });
 }
 
 function openCustomerQuoteModal(prefill){
@@ -9811,6 +9887,8 @@ function openCustomerQuoteModal(prefill){
   const qty = prefill.qty || 0;
   const pricePerPart = prefill.pricePerPart || 0;
   const expediteFee = prefill.expediteFee || 0;
+  const applyMin = prefill.minOrderApply !== false;   // assembly prints don't pass it → on
+  const minRow = MIN_ORDER>0 ? `<div style="grid-column:1/3"><label style="font-size:12px;color:#475569;display:flex;align-items:center;gap:6px;cursor:pointer;flex-wrap:wrap"><input id="cq-minorder" type="checkbox" ${applyMin?'checked':''} style="width:auto"> Minimum order charge if the order is under ${minOrderMoney(MIN_ORDER)} (prints as its own line) <span id="cq-minorder-hint" style="font-weight:700;color:#0f172a"></span></label></div>` : '';
   const lockedQuoteNo = prefill.lockedQuoteNo || null;
   const srcQuote = prefill.srcQuote || null;
   const showTwoLines = prefill.showTwoLines !== false;
@@ -9863,6 +9941,7 @@ function openCustomerQuoteModal(prefill){
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Expedite fee ($) <span style="font-weight:400;text-transform:none">— prints as its own line item; 0 to omit</span></label>
           <input id="cq-expedite" type="number" step="0.01" min="0" value="${expediteFee.toFixed(2)}" style="width:120px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
         </div>
+        ${minRow}
         ${twoLinesRow}
         <div style="grid-column:1/3">
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Tax (%)</label>
@@ -9882,6 +9961,15 @@ function openCustomerQuoteModal(prefill){
 
   document.getElementById("cq-cancel").onclick = () => overlay.remove();
   overlay.addEventListener("click", e => { if(e.target===overlay) overlay.remove(); });
+  // order subtotal as it will print (part lines + expedite), for the minimum-order hint and line
+  const cqOrderSubtotal = () => {
+    const q = parseFloat(document.getElementById("cq-qty").value)||0, r = parseFloat(document.getElementById("cq-rate").value)||0;
+    const two = (showTwoLines && document.getElementById("cq-twolines")) ? document.getElementById("cq-twolines").checked : false;
+    return q*r*(two?2:1) + (parseFloat(document.getElementById("cq-expedite")?.value)||0);
+  };
+  const cqMinHint = () => minOrderHint(document.getElementById("cq-minorder-hint"), document.getElementById("cq-minorder"), cqOrderSubtotal());
+  ["cq-qty","cq-rate","cq-expedite","cq-twolines","cq-minorder"].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener("input",cqMinHint); el.addEventListener("change",cqMinHint); } });
+  cqMinHint();
 
   document.getElementById("cq-print").onclick = () => {
     const billto = document.getElementById("cq-billto").value.trim();
@@ -9924,6 +10012,9 @@ function openCustomerQuoteModal(prefill){
     }
     const cqExpedite = parseFloat(document.getElementById("cq-expedite")?.value)||0;
     if(cqExpedite > 0) items.push({desc: "Expedite Fee — Expedited Lead Time", qty: 1, rate: cqExpedite, amt: cqExpedite});
+    const cqMinChk = document.getElementById("cq-minorder");
+    const cqMin = (cqMinChk && cqMinChk.checked) ? minOrderTopUp(items.reduce((s,i)=>s+i.amt,0)) : 0;
+    if(cqMin > 0) items.push({desc: minOrderLineDesc(), qty: 1, rate: cqMin, amt: cqMin});
     const subtotal = items.reduce((s,i)=>s+i.amt,0);
     const tax = subtotal * (taxPct/100);
     const total = subtotal + tax;
@@ -9981,6 +10072,10 @@ function printQtyBreaks(){
 
   // Build break rows from current results
   const breaks = window._qtyBreaks.map(r=>({ qty:r.qty, price:r.finalPrice, total:r.jobTotal }));
+  // A schedule lists price per part, so the minimum can't be a line here: note it
+  // instead, but only when one of the quantities shown would actually fall under it.
+  const minNote = (minOrderOn() && breaks.some(b => minOrderTopUp(b.total) > 0))
+    ? `Orders under ${minOrderMoney(MIN_ORDER)} carry a minimum order charge that brings the order total to ${minOrderMoney(MIN_ORDER)}.` : '';
 
   const today = new Date().toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"numeric"});
 
@@ -10042,7 +10137,7 @@ function printQtyBreaks(){
 
     if(quoteno === String(peekNextQuoteNumber())) consumeQuoteNumber();
     overlay.remove();
-    openQtyBreakPrintWindow({billto, shipto, quoteno, date, leadtime, desc, breaks, showTotal});
+    openQtyBreakPrintWindow({billto, shipto, quoteno, date, leadtime, desc, breaks, showTotal, minNote});
   };
 }
 
@@ -10218,6 +10313,7 @@ function openQtyBreakPrintWindow(q){
       <tbody>${rows}</tbody>
     </table>
     <div class="note">Pricing is per piece at the quantities shown. Final pricing based on quantity ordered. Quote valid for 30 days.</div>
+    ${q.minNote ? `<div class="note" style="margin-top:6px">${esc(q.minNote)}</div>` : ''}
     </div><!-- /body-content -->
     <div class="footer">
       <div class="sig">Accepted By</div>
