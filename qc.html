@@ -410,6 +410,7 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
       <div class="nav-item mgr-only" id="nav-coc" onclick="showPage('coc')"><i class="ti ti-certificate"></i><span class="nav-label" data-t="nav:coc">Certs of Conformance</span></div>
+      <div class="nav-item mgr-only" id="nav-packages" onclick="showPage('packages')"><i class="ti ti-package"></i><span class="nav-label" data-t="nav:packages">Ship Packages</span></div>
       <div class="nav-item" id="nav-resources" onclick="showPage('resources')"><i class="ti ti-book-2"></i><span class="nav-label" data-t="nav:resources">Resources</span></div>
       <div class="nav-sec" data-t="Setup">Setup</div>
       <div class="nav-item" id="nav-settings" onclick="showPage('settings')"><i class="ti ti-settings"></i><span class="nav-label" data-t="Settings">Settings</span></div>
@@ -463,7 +464,7 @@ body.role-operator .mgr-only{display:none!important}
 const I18N = {
   en: {
     'dock:start':'Start', 'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs', 'dock:materialcerts':'Certs',
-    'dock:drawcheck':'Drawing Check', 'dock:settings':'Settings', 'nav:coc':'Certs of Conformance',
+    'dock:drawcheck':'Drawing Check', 'dock:settings':'Settings', 'nav:coc':'Certs of Conformance', 'nav:packages':'Ship Packages',
     'nav:materialcerts':'Material Certs', 'nav:resources':'Resources', 'dock:resources':'Resources',
     'msr:hole':'Hole Ø'
   },
@@ -722,6 +723,7 @@ const I18N = {
     'measured — no deviations so far':'medidas — sin desviaciones hasta ahora',
     'All characteristics in tolerance':'Todas las características dentro de tolerancia',
     'Report status:':'Estado del reporte:',
+    'nav:packages':'Paquetes de envío','Ship Packages':'Paquetes de envío','Ship packages':'Paquetes de envío','One PDF per shipment — invoice, packing slip, CoCs, first articles and certs':'Un PDF por envío — factura, lista de empaque, CoCs, primeros artículos y certificados','One PDF per shipment: invoice, packing slip, CoCs, first articles and certs. Every package you build is kept here.':'Un PDF por envío: factura, lista de empaque, CoCs, primeros artículos y certificados. Cada paquete que armas se guarda aquí.','New ship package':'Nuevo paquete de envío','Search customer, PO, part, invoice…':'Buscar cliente, PO, parte, factura…','Package':'Paquete','Customer / PO':'Cliente / PO','Parts':'Partes','Pages':'Páginas','Open':'Abrir','No copy kept':'Sin copia guardada','Delete from history':'Borrar del historial','No packages match.':'Ningún paquete coincide.','No packages yet — click New ship package.':'Aún no hay paquetes — haz clic en Nuevo paquete de envío.','Delete package':'¿Borrar el paquete','from the history? (The PDF you sent is not affected.)':'del historial? (El PDF que enviaste no se afecta.)','Pick the order, check what goes in, then Build & save — you get the PDF and a copy is kept in the history.':'Elige la orden, revisa qué va incluido y luego Armar y guardar — recibes el PDF y se guarda una copia en el historial.','Order / PO':'Orden / PO','Shipment info':'Datos del envío','Ship date':'Fecha de envío','Invoice & packing slip (QuickBooks PDFs)':'Factura y lista de empaque (PDFs de QuickBooks)','First articles':'Primeros artículos','Search orders — customer, PO, part or job #':'Buscar órdenes — cliente, PO, parte o # de trabajo','Type at least 2 letters — customer, PO, part or job #.':'Escribe al menos 2 letras — cliente, PO, parte o # de trabajo.','No matching orders.':'No hay órdenes que coincidan.','No order in the system? Skip this and fill in the shipment info below.':'¿No hay orden en el sistema? Sáltate esto y llena los datos del envío abajo.','Change order':'Cambiar orden','Tick all lines':'Marcar todas las líneas','this shipment':'este envío','No certs match.':'Ningún certificado coincide.','No CoC for this customer yet — make one on the Certs of Conformance page, or add the customer’s own form under Other documents.':'Aún no hay CoC para este cliente — haz uno en la página de Certificados de Conformidad o agrega el formato del cliente en Otros documentos.','No first article for these parts — that’s normal on a repeat order.':'No hay primer artículo para estas partes — es normal en una orden repetida.','Uploaded files go into the package PDF; the finished PDF is what gets kept, not the separate files.':'Los archivos subidos van dentro del PDF del paquete; lo que se guarda es el PDF terminado, no los archivos por separado.','Build & save PDF':'Armar y guardar PDF','Nothing to package yet — pick an order or add a document.':'Aún no hay nada que empaquetar — elige una orden o agrega un documento.','Build the package without them?':'¿Armar el paquete sin ellos?','Not built — missing:':'No se armó — faltan:','Saving a copy…':'Guardando una copia…','the PDF copy could not be uploaded':'no se pudo subir la copia del PDF','the PDF is over 24 MB, so only the record was kept':'el PDF pasa de 24 MB, así que solo se guardó el registro','The PDF downloaded, but the history could not be saved.':'El PDF se descargó, pero el historial no se pudo guardar.','If this says permission denied, the qc/packages database rule has not been published yet.':'Si dice permiso denegado, la regla de base de datos qc/packages aún no se ha publicado.','Downloaded — history NOT saved.':'Descargado — historial NO guardado.','built':'armado','characteristics':'características','No result':'Sin resultado','Accepted':'Aceptado','Rejected':'Rechazado','Open Ship Packages with this first article and its order — invoice, packing slip, CoCs, certs and this report in one PDF.':'Abre Paquetes de envío con este primer artículo y su orden — factura, lista de empaque, CoCs, certificados y este reporte en un PDF.',
     'nav:coc':'Certificados de conformidad','Certificates of Conformance':'Certificados de conformidad','Certificates':'Certificados',
     'New certificate':'Nuevo certificado','New certificate of conformance':'Nuevo certificado de conformidad','Save & print':'Guardar e imprimir',
     'Customer PO':'PO del cliente','Part number':'Número de parte','Drawing revision':'Revisión del dibujo','Quantity shipped':'Cantidad enviada',
@@ -747,7 +749,7 @@ window.qcSetLang=(l)=>{ LANG=l; try{localStorage.setItem('bsmp_qc_lang',l);}catc
 
 /* ---------- state ---------- */
 window.QC_USER=null; window.QC_ROLE='manager';
-let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={}, DRAWCHECKS={}, COCS={};
+let INSPECTIONS={}, NCRS={}, CERTS={}, ORDERS={}, QUOTES={}, AUDIT={}, DRAWINGS={}, DRAWCHECKS={}, COCS={}, PACKAGES={};
 let DRAW_FILTER='', DRAW_FOLDER=null;   // DRAW_FOLDER: null = folder view, ''=Unfiled, else customer name
 // qc.html?cert=<id> (links from the mail app) → open the cert library on that cert
 let _deepCert=new URLSearchParams(location.search).get('cert')||'';
@@ -791,6 +793,7 @@ window.qcOnData=(name,val)=>{
   else if(name==='drawings') DRAWINGS=val||{};
   else if(name==='drawingChecks') DRAWCHECKS=val||{};
   else if(name==='cocs') COCS=val||{};
+  else if(name==='packages') PACKAGES=val||{};
   render();
 };
 window.qcOnAuth=(user,role)=>{
@@ -859,13 +862,14 @@ const META={
   ncr:['Nonconformances','Flagged parts and corrective action'],
   certs:['Material Certs','Mill & material certifications'],
   coc:['Certificates of Conformance','Signed statement that shipped parts meet the PO, drawing and specs'],
+  packages:['Ship Packages','One PDF per shipment — invoice, packing slip, CoCs, first articles and certs'],
   drawcheck:['Drawing Check','Compare your model drawing to the customer’s before you cut'],
   drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks'],
   settings:['Settings','AI connection for this device'],
   resources:['Resources','Guides, manuals and maintenance schedules']
 };
 window.showPage=(p)=>{
-  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck'||p==='coc')) p='inspections';
+  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck'||p==='coc'||p==='packages')) p='inspections';
   if(typeof qcBoxConfirmKill==='function') qcBoxConfirmKill();   // don't leave a confirm card floating over another page
   page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
   if(p==='selfcheck'||p==='start'){
@@ -881,7 +885,7 @@ window.showPage=(p)=>{
   render();
 };
 function setActive(){
-  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings',resources:'nav-resources'};
+  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',packages:'nav-packages',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings',resources:'nav-resources'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
   const dockMap={start:'dock-start',selfcheck:'dock-start',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',drawcheck:'dock-drawcheck',settings:'dock-settings',resources:'dock-resources'};
@@ -905,6 +909,7 @@ function render(){
   else if(page==='ncr') c.innerHTML=viewNcr();
   else if(page==='certs') c.innerHTML=viewCerts();
   else if(page==='coc') c.innerHTML=viewCoc();
+  else if(page==='packages') c.innerHTML=viewPackages();
   else if(page==='drawcheck') c.innerHTML=viewDrawCheck();
   else if(page==='drawings') c.innerHTML=viewDrawings();
   else if(page==='settings') c.innerHTML=viewSettings();
@@ -2516,250 +2521,388 @@ window.qcFairSheetDel=async (i)=>{
   }catch(e){ qcToast(t('NOT saved:')+' '+((e&&e.message)||e),'err'); }
 };
 
-/* ---- customer package (handwritten first article) ----
-   One PDF to email the customer, built in the browser with pdf-lib: a BSMP cover page,
-   the QuickBooks invoice + packing slip PDFs, the CoCs picked (drawn as real text pages),
-   the scanned first-article pages, the
-   material / plating cert files, then any extra documents dropped into the dialog
-   (plating certs from the vendor, the customer's own CoC form). Nothing is written to the
-   database — the extra files are used for this PDF only and are not stored. */
-// files dropped into the dialog, by slot: the QuickBooks invoice + packing slip PDFs, and anything else
-let _pkgFiles={invoice:[], slip:[], extra:[]};
+/* =================== SHIP PACKAGES ===================
+   One PDF per shipment for the customer, built in the browser with pdf-lib:
+   cover page → QuickBooks invoice → packing slip → CoCs → first-article reports
+   (handwritten = the scanned pages; typed = drawn as a measurement table + the ballooned
+   drawing) → material / plating certs → any extra files. Every package is kept: the PDF
+   goes to Storage (qc/packages/…) and a history record to qc/packages/<id> (PKG-0001…).
+   The builder's picks live in _pkg and the page is drawn from it — render() runs on every
+   data update, so nothing typed may live only in the DOM. Everything drawn INTO the PDF is
+   English (customer-facing); only the page around it is translated. */
+let _pkg=null;            // the package being built (null = the history list)
+let _pkgListQ='';
+const PKG_MAX_MB=24;      // the Storage rule caps qc/** uploads at 25 MB
+const pkgLow=s=>String(s||'').trim().toLowerCase();
+const pkgPart=o=>(o&&(o.part||o.partNum))||'';
+function pkgNextNo(){ let max=0; vals(PACKAGES).forEach(p=>{ const m=String(p.no||'').match(/(\d+)\s*$/); if(m) max=Math.max(max,parseInt(m[1],10)); }); return 'PKG-'+String(max+1).padStart(4,'0'); }
+function pkgFairs(){ return vals(INSPECTIONS).filter(i=>i.type==='fair'&&!i.deleted); }
+function pkgCertFiles(c){ return (c.files?vals(c.files):(c.file?[c.file]:[])).filter(f=>f&&f.url); }
+function pkgNew(){ return {q:'', anchor:null, orderIds:new Set(), cocIds:new Set(), fairIds:new Set(), certIds:new Set(), seen:new Set(), certQ:'',
+  files:{invoice:[],slip:[],extra:[]}, info:{customer:'',po:'',invoiceNo:'',shipDate:todayISO(),notes:''}, busy:false, status:'', statusErr:false}; }
+// every line on the anchor order's customer + PO — one shipment usually covers several
+function pkgPoLines(){ if(!_pkg||!_pkg.anchor) return []; const a=_pkg.anchor;
+  return vals(ORDERS).filter(o=>!o.archived&&pkgLow(o.customer)===pkgLow(a.customer)&&pkgLow(o.po||'verbal')===pkgLow(a.po||'verbal'))
+    .sort((x,y)=>String(x.job||'').localeCompare(String(y.job||''),undefined,{numeric:true})); }
+function pkgLines(){ return _pkg?[..._pkg.orderIds].map(id=>ORDERS[id]).filter(Boolean):[]; }
+// what belongs with the ticked lines: CoCs + first articles for those orders or parts, certs linked to them
+function pkgSuggest(){
+  const lines=pkgLines(), ids=new Set(lines.map(o=>o.id)), parts=new Set(lines.map(o=>pkgLow(pkgPart(o))).filter(Boolean));
+  const cust=pkgLow(_pkg.info.customer), po=pkgLow(_pkg.info.po);
+  const cocs=vals(COCS).filter(c=>ids.has(c.orderId)||(cust&&pkgLow(c.customer)===cust&&(!po||!c.po||pkgLow(c.po)===po)&&(!parts.size||parts.has(pkgLow(c.part)))));
+  const fairs=pkgFairs().filter(f=>ids.has(f.orderId)||(parts.has(pkgLow(f.partNum))&&(!cust||pkgLow(f.customer)===cust)));
+  const certIds=new Set([...lines.flatMap(o=>cocOrderCerts(o.id).map(c=>c.id)), ...vals(COCS).filter(c=>_pkg.cocIds.has(c.id)).flatMap(c=>c.certIds||[])]);
+  return {cocs, fairs, certIds};
+}
+// tick whatever is newly suggested — never un-ticks something the user chose
+function pkgAutoTick(){
+  let s=pkgSuggest();
+  s.cocs.forEach(c=>{ if(!_pkg.seen.has('c:'+c.id)){ _pkg.seen.add('c:'+c.id); _pkg.cocIds.add(c.id); } });
+  s.fairs.forEach(f=>{ if(!_pkg.seen.has('f:'+f.id)){ _pkg.seen.add('f:'+f.id); _pkg.fairIds.add(f.id); } });
+  s=pkgSuggest();   // certs listed on the CoCs just ticked
+  s.certIds.forEach(id=>{ if(!_pkg.seen.has('k:'+id)){ _pkg.seen.add('k:'+id); _pkg.certIds.add(id); } });
+}
+function pkgInfoFromLines(){
+  const ls=pkgLines();
+  const inv=[...new Set(ls.map(o=>o.invoice).filter(Boolean))]; if(inv.length===1) _pkg.info.invoiceNo=String(inv[0]);
+  const sd=[...new Set(ls.map(o=>o.shipDate).filter(Boolean))]; if(sd.length===1) _pkg.info.shipDate=sd[0];
+}
+function pkgUseOrder(o){
+  _pkg.anchor={customer:o.customer||'', po:o.po||''};
+  _pkg.orderIds=new Set([o.id]);
+  _pkg.info.customer=o.customer||''; _pkg.info.po=o.po||'';
+  pkgInfoFromLines(); pkgAutoTick();
+}
+window.qcPkgNew=()=>{ if(!isMgr()) return; _pkg=pkgNew(); page='packages'; editId=null; render(); setTimeout(()=>{ const el=$('pkg-q'); if(el) el.focus(); },30); };
+window.qcPkgClose=()=>{ _pkg=null; render(); };
+// shortcut from a first article: the builder, pre-filled with its order and this report
 window.qcFairPackage=()=>{
   const r=editId?INSPECTIONS[editId]:null; if(!r) return;
-  if(!fairSheets(r).length){ alert(t('Upload the scanned pages first — they are the report.')); return; }
-  if(typeof PDFLib==='undefined'){ alert(t('The PDF tools did not load — check the connection and reload.')); return; }
-  _pkgFiles={invoice:[], slip:[], extra:[]};
-  const low=s=>String(s||'').trim().toLowerCase();
-  const ord=r.orderId?ORDERS[r.orderId]:null;   // the Orders app keeps the invoice # once the line is invoiced
-  // CoCs for the same order — or the same customer (+ PO when the report has one)
-  const cocs=vals(COCS).filter(c=>(r.orderId&&c.orderId===r.orderId)||(low(c.customer)&&low(c.customer)===low(r.customer)&&(!r.po||low(c.po)===low(r.po))))
-    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
-  // pre-tick a CoC for this order, or for the same part (+ PO) — a split / re-entered line gets a new order id
-  const cocMatch=c=>(r.orderId&&c.orderId===r.orderId)||(!!low(c.part)&&low(c.part)===low(r.partNum)&&(!r.po||!c.po||low(c.po)===low(r.po)));
-  // certs linked to this job, or listed on a matching CoC, come first and pre-ticked; the rest stay available (newest first)
-  const linked=new Set([...(r.orderId?cocOrderCerts(r.orderId).map(c=>c.id):[]), ...cocs.filter(cocMatch).flatMap(c=>c.certIds||[])]);
-  const certs=vals(CERTS).sort((a,b)=>((linked.has(b.id)?1:0)-(linked.has(a.id)?1:0))||((b.createdAt||0)-(a.createdAt||0)));
-  const certRow=c=>{
+  _pkg=pkgNew();
+  const o=r.orderId?ORDERS[r.orderId]:null;
+  if(o) pkgUseOrder(o); else { _pkg.info.customer=r.customer||''; _pkg.info.po=r.po||''; pkgAutoTick(); }
+  _pkg.fairIds.add(r.id); _pkg.seen.add('f:'+r.id);
+  editId=null; page='packages'; render();
+};
+function pkgRedraw(id,html){ const el=$(id); if(el) el.innerHTML=html; }
+window.qcPkgSearch=(v)=>{ _pkg.q=v; pkgRedraw('pkg-order-results', pkgOrderResultsHtml()); };
+window.qcPkgPick=(id)=>{ const o=ORDERS[id]; if(!o) return; _pkg.q=''; pkgUseOrder(o); render(); };
+window.qcPkgUnanchor=()=>{ _pkg.anchor=null; _pkg.orderIds=new Set(); render(); setTimeout(()=>{ const el=$('pkg-q'); if(el) el.focus(); },30); };
+window.qcPkgLine=(id,on)=>{ on?_pkg.orderIds.add(id):_pkg.orderIds.delete(id); pkgInfoFromLines(); pkgAutoTick(); render(); };
+window.qcPkgAllLines=()=>{ pkgPoLines().forEach(o=>_pkg.orderIds.add(o.id)); pkgInfoFromLines(); pkgAutoTick(); render(); };
+window.qcPkgToggle=(kind,id,on)=>{ const s=_pkg[kind]; if(!s) return; on?s.add(id):s.delete(id); if(kind==='cocIds'){ pkgAutoTick(); render(); } };
+window.qcPkgInfo=(k,v)=>{ if(_pkg) _pkg.info[k]=v; };
+window.qcPkgCertQ=(v)=>{ _pkg.certQ=v; pkgRedraw('pkg-certs', pkgCertsHtml()); };
+function pkgFilesHtml(slot){ return (_pkg.files[slot]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="window.qcPkgDrop('${slot}',${i})"></i></span>`).join(' '); }
+window.qcPkgAdd=(inp,slot)=>{ slot=_pkg.files[slot]?slot:'extra'; [...(inp.files||[])].forEach(f=>_pkg.files[slot].push(f)); inp.value=''; pkgRedraw('pkg-'+slot, pkgFilesHtml(slot)); };
+window.qcPkgDrop=(slot,i)=>{ (_pkg.files[slot]||[]).splice(i,1); pkgRedraw('pkg-'+slot, pkgFilesHtml(slot)); };
+
+function pkgOrderResultsHtml(){
+  const q=pkgLow(_pkg.q);
+  if(q.length<2) return `<div class="muted" style="font-size:12.5px;padding:6px 2px">${t('Type at least 2 letters — customer, PO, part or job #.')}</div>`;
+  const hits=vals(ORDERS).filter(o=>!o.archived&&[o.customer,o.po,pkgPart(o),o.job,o.desc].filter(Boolean).join(' ').toLowerCase().indexOf(q)>=0)
+    .sort((a,b)=>String(b.job||'').localeCompare(String(a.job||''),undefined,{numeric:true})).slice(0,12);
+  if(!hits.length) return `<div class="muted" style="font-size:12.5px;padding:6px 2px">${t('No matching orders.')}</div>`;
+  return hits.map(o=>`<div onclick="window.qcPkgPick('${esc(o.id)}')" style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px"><b>${esc(o.customer||'—')}</b> · PO ${esc(o.po||'verbal')} · ${esc(pkgPart(o)||'—')} · ${t('Job')} ${esc(o.job||'—')} <span class="muted">${esc(o.status||'')}</span></div>`).join('');
+}
+function pkgFairLabel(f){
+  const res=f.mode==='manual'?(f.manualResult==='accept'?t('Accepted'):f.manualResult==='reject'?t('Rejected'):t('No result')):t(f.fairStatus||'Draft');
+  const kind=f.mode==='manual'?t('Handwritten'):f.mode==='as9102'?'AS9102':t('Simple FAR');
+  return [f.partNum||'—', f.rev?('Rev '+f.rev):'', f.po?('PO '+f.po):'', kind, res, f.mode==='manual'?(fairSheets(f).length+' '+t('pages')):(((f.characteristics?vals(f.characteristics):[]).length)+' '+t('characteristics'))].filter(Boolean).join(' · ');
+}
+function pkgCertsHtml(){
+  const sug=pkgSuggest().certIds, q=pkgLow(_pkg.certQ);
+  const list=vals(CERTS).sort((a,b)=>((sug.has(b.id)||_pkg.certIds.has(b.id)?1:0)-(sug.has(a.id)||_pkg.certIds.has(a.id)?1:0))||((b.createdAt||0)-(a.createdAt||0)));
+  const rows=list.map(c=>{
     const label=[c.material,c.spec,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):'',c.supplier].filter(Boolean).join(' · ');
-    const n=(c.files?vals(c.files):(c.file?[c.file]:[])).filter(f=>f&&f.url).length;
-    return `<label class="pkg-row" data-s="${esc([label,c.po].join(' ').toLowerCase())}" style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" class="pkg-cert" value="${esc(c.id)}" ${linked.has(c.id)?'checked':''} style="width:auto;min-height:0;flex:none"> <span style="font-size:13px;flex:1">${esc(label||c.id)}${linked.has(c.id)?` <span class="badge ok">${t('this job')}</span>`:''}</span>${n?'':`<span class="muted" style="font-size:11px">${t('no file')}</span>`}</label>`;
-  };
-  const cocRow=c=>`<label style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" class="pkg-coc" value="${esc(c.id)}" ${cocMatch(c)?'checked':''} style="width:auto;min-height:0;flex:none"> <span style="font-size:13px">${esc([c.no,c.part,c.rev?('Rev '+c.rev):'',c.po?('PO '+c.po):'',c.qty?(c.qty+' pcs'):''].filter(Boolean).join(' · '))}</span></label>`;
-  const ov=document.createElement('div');
-  ov.id='pkg-overlay';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
-  ov.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:680px;width:100%;max-height:94vh;overflow:auto;padding:20px" onclick="event.stopPropagation()">
-    <h3 style="margin:0 0 4px">${t('Customer package')}</h3>
-    <p class="muted" style="margin:0 0 12px;font-size:12.5px">${t('Builds one PDF to email: cover page, invoice, packing slip, CoCs, the scanned first article, then the certs and any extra files, in that order.')}</p>
-    <div class="grid2">
-      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="pkg-cust" value="${esc(r.customer||'')}"></div>
-      <div class="field"><label class="fl">${t('Customer PO #')}</label><input class="in" id="pkg-po" value="${esc(r.po||'')}"></div>
-      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="pkg-part" value="${esc(r.partNum||'')}"></div>
-      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="pkg-rev" value="${esc(r.rev||'')}"></div>
-      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="pkg-job" value="${esc(r.job||'')}"></div>
-      <div class="field"><label class="fl">${t('Qty inspected')}</label><input class="in" id="pkg-qty" value="${esc(r.manualQty||'')}"></div>
+    const on=_pkg.certIds.has(c.id);
+    if(q && !on && [label,c.po].join(' ').toLowerCase().indexOf(q)<0) return '';
+    return `<label style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" ${on?'checked':''} onchange="window.qcPkgToggle('certIds','${esc(c.id)}',this.checked)" style="width:auto;min-height:0;flex:none"> <span style="font-size:13px;flex:1">${esc(label||c.id)}${sug.has(c.id)?` <span class="badge ok">${t('this shipment')}</span>`:''}</span>${pkgCertFiles(c).length?'':`<span class="muted" style="font-size:11px">${t('no file')}</span>`}</label>`;
+  }).join('');
+  return rows||`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No certs match.')}</div>`;
+}
+function viewPackages(){ return _pkg?viewPackageBuild():viewPackageList(); }
+function viewPackageList(){
+  const q=pkgLow(_pkgListQ);
+  const list=vals(PACKAGES).filter(p=>!q||[p.no,p.customer,p.po,p.invoiceNo,(p.lines||[]).map(l=>l.part+' '+l.job).join(' ')].join(' ').toLowerCase().indexOf(q)>=0)
+    .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const rows=list.map(p=>`<tr>
+    <td><b>${esc(p.no||'—')}</b><div class="muted" style="font-size:12px">${fmtWhen(p.createdAt)}</div></td>
+    <td>${esc(p.customer||'—')}<div class="muted" style="font-size:12px">PO ${esc(p.po||'—')}</div></td>
+    <td style="font-size:12.5px">${(p.lines||[]).map(l=>esc(l.part||'—')+(l.rev?' <span class="muted">Rev '+esc(l.rev)+'</span>':'')).join('<br>')||'—'}</td>
+    <td>${esc(p.invoiceNo||'—')}</td>
+    <td>${esc(String(p.pages||'—'))}</td>
+    <td>${esc(String(p.createdBy||'').split('@')[0])}</td>
+    <td style="text-align:right;white-space:nowrap">${p.fileUrl?`<a class="btn sm" href="${esc(p.fileUrl)}" target="_blank" rel="noopener" style="text-decoration:none"><i class="ti ti-file-type-pdf"></i> ${t('Open')}</a>`:`<span class="muted" style="font-size:11.5px">${t('No copy kept')}</span>`}
+      ${isMgr()?` <button class="icon-btn" title="${esc(t('Delete from history'))}" onclick="window.qcPkgDelete('${esc(p.id)}')"><i class="ti ti-trash"></i></button>`:''}</td>
+  </tr>`).join('');
+  return `<div class="toolbar" style="margin-bottom:12px">
+      <button class="btn primary" onclick="window.qcPkgNew()"><i class="ti ti-package"></i> ${t('New ship package')}</button>
+      <input class="in" placeholder="${esc(t('Search customer, PO, part, invoice…'))}" value="${esc(_pkgListQ)}" oninput="window.qcPkgListFilter(this.value)" style="max-width:320px">
     </div>
-    <div class="field"><label class="fl">${t('Notes (print on the cover page)')}</label><input class="in" id="pkg-notes"></div>
-    <div class="grid2" style="margin-top:4px">
-      <div class="field"><label class="fl">${t('Invoice (QuickBooks PDF)')}</label>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <label class="btn sm"><i class="ti ti-file-invoice"></i> ${t('Add invoice')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'invoice')"></label>
-          <input class="in" id="pkg-invno" placeholder="${esc(t('Invoice #'))}" value="${esc((ord&&ord.invoice)||'')}" style="max-width:130px;min-height:32px;padding:4px 8px">
-        </div>
-        <div id="pkg-invoice" class="thumbs" style="margin-top:6px"></div></div>
-      <div class="field"><label class="fl">${t('Packing slip (QuickBooks PDF)')}</label>
-        <label class="btn sm"><i class="ti ti-truck-delivery"></i> ${t('Add packing slip')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'slip')"></label>
-        <div id="pkg-slip" class="thumbs" style="margin-top:6px"></div></div>
-    </div>
-    <div class="fl" style="margin:10px 0 4px">${t('Certificates of Conformance')}</div>
-    <div style="border:1px solid var(--border);border-radius:8px;max-height:150px;overflow:auto;margin-bottom:10px">${cocs.length?cocs.map(cocRow).join(''):`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No CoC for this customer yet — make one on the Certs of Conformance page, or add the customer’s own form below.')}</div>`}</div>
-    <div class="fl" style="margin:10px 0 4px;display:flex;align-items:center;gap:8px">${t('Material / plating certs')}<input class="in" placeholder="${esc(t('Search…'))}" oninput="window.qcPkgFilter(this.value)" style="max-width:200px;min-height:30px;padding:4px 8px;font-size:12.5px;margin-left:auto"></div>
-    <div id="pkg-certs" style="border:1px solid var(--border);border-radius:8px;max-height:200px;overflow:auto;margin-bottom:10px">${certs.length?certs.map(certRow).join(''):`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No certs in the library yet.')}</div>`}</div>
-    <div class="fl" style="margin:10px 0 4px">${t('Other documents (plating certs, customer CoC forms…)')}</div>
-    <label class="btn sm"><i class="ti ti-paperclip"></i> ${t('Add files')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'extra')"></label>
-    <div id="pkg-extra" class="thumbs" style="margin-top:6px"></div>
-    <div class="muted" style="font-size:11.5px;margin-top:4px">${t('Added files go into this PDF only — they are not saved to the app.')}</div>
-    <div id="pkg-status" class="muted" style="font-size:12.5px;margin-top:10px;min-height:18px"></div>
+    <div class="page-head"><h2>${t('Ship packages')}</h2><p>${t('One PDF per shipment: invoice, packing slip, CoCs, first articles and certs. Every package you build is kept here.')}</p></div>
+    <div class="card">${list.length?`<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>${t('Package')}</th><th>${t('Customer / PO')}</th><th>${t('Parts')}</th><th>${t('Invoice #')}</th><th>${t('Pages')}</th><th>${t('By')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+      :`<div class="empty"><i class="ti ti-package"></i>${q?t('No packages match.'):t('No packages yet — click New ship package.')}</div>`}</div>`;
+}
+window.qcPkgListFilter=(v)=>{ _pkgListQ=v||''; render(); const el=document.querySelector('.toolbar input.in'); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } };
+window.qcPkgDelete=async(id)=>{
+  const p=PACKAGES[id]; if(!p||!isMgr()) return;
+  if(!confirm(t('Delete package')+' '+(p.no||'')+' '+t('from the history? (The PDF you sent is not affected.)'))) return;
+  try{ await dbRemove('qc/packages/'+id); delete PACKAGES[id]; render(); }catch(e){ alert(t('Could not delete.')+' '+((e&&e.message)||'')); }
+};
+function viewPackageBuild(){
+  const P=_pkg, inf=P.info, sug=pkgSuggest();
+  const sec=(title,body)=>`<div class="card-title" style="margin-top:16px"><i class="ti ti-point-filled" style="font-size:10px"></i> ${title}</div>${body}`;
+  const box=(inner,max)=>`<div style="border:1px solid var(--border);border-radius:8px;max-height:${max||200}px;overflow:auto">${inner}</div>`;
+  let orderHtml;
+  if(!P.anchor){
+    orderHtml=`<input class="in" id="pkg-q" placeholder="${esc(t('Search orders — customer, PO, part or job #'))}" value="${esc(P.q)}" oninput="window.qcPkgSearch(this.value)">
+      <div id="pkg-order-results" style="margin-top:6px">${pkgOrderResultsHtml()}</div>
+      <div class="muted" style="font-size:11.5px;margin-top:6px">${t('No order in the system? Skip this and fill in the shipment info below.')}</div>`;
+  } else {
+    const lines=pkgPoLines();
+    orderHtml=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b>${esc(P.anchor.customer||'—')}</b> · PO ${esc(P.anchor.po||'verbal')}
+        <button class="btn sm" onclick="window.qcPkgUnanchor()">${t('Change order')}</button>
+        ${lines.length>1?`<button class="btn sm" onclick="window.qcPkgAllLines()">${t('Tick all lines')}</button>`:''}</div>
+      ${box(lines.map(o=>`<label style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" ${P.orderIds.has(o.id)?'checked':''} onchange="window.qcPkgLine('${esc(o.id)}',this.checked)" style="width:auto;min-height:0;flex:none"> <span style="font-size:13px;flex:1"><b>${esc(pkgPart(o)||'—')}</b>${cocGuessRev(o)?' · Rev '+esc(cocGuessRev(o)):''} · ${t('Job')} ${esc(o.job||'—')} · ${esc(String(o.qty||'—'))} pcs <span class="muted">${esc(o.status||'')}${o.invoice?' · Inv '+esc(o.invoice):''}</span></span></label>`).join(''),220)}`;
+  }
+  const cust=pkgLow(inf.customer);
+  const cocList=vals(COCS).filter(c=>P.cocIds.has(c.id)||sug.cocs.some(s=>s.id===c.id)||(cust&&pkgLow(c.customer)===cust)).sort((a,b)=>((P.cocIds.has(b.id)?1:0)-(P.cocIds.has(a.id)?1:0))||((b.createdAt||0)-(a.createdAt||0)));
+  const fairList=pkgFairs().filter(f=>P.fairIds.has(f.id)||sug.fairs.some(s=>s.id===f.id)||(cust&&pkgLow(f.customer)===cust)).sort((a,b)=>((P.fairIds.has(b.id)?1:0)-(P.fairIds.has(a.id)?1:0))||((b.createdAt||0)-(a.createdAt||0)));
+  const chk=(kind,id,on,label,tag)=>`<label style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" ${on?'checked':''} onchange="window.qcPkgToggle('${kind}','${esc(id)}',this.checked)" style="width:auto;min-height:0;flex:none"> <span style="font-size:13px">${esc(label)}${tag?` <span class="badge ok">${t('this shipment')}</span>`:''}</span></label>`;
+  return `<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="window.qcPkgClose()"><i class="ti ti-arrow-left"></i> ${t('Ship packages')}</button></div>
+  <div class="page-head"><h2>${t('New ship package')}</h2><p>${t('Pick the order, check what goes in, then Build & save — you get the PDF and a copy is kept in the history.')}</p></div>
+  <div class="card">
+    ${sec(t('Order / PO'), orderHtml)}
+    ${sec(t('Shipment info'), `<div class="grid2">
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" value="${esc(inf.customer)}" oninput="window.qcPkgInfo('customer',this.value)"></div>
+      <div class="field"><label class="fl">${t('Customer PO #')}</label><input class="in" value="${esc(inf.po)}" oninput="window.qcPkgInfo('po',this.value)"></div>
+      <div class="field"><label class="fl">${t('Invoice #')}</label><input class="in" value="${esc(inf.invoiceNo)}" oninput="window.qcPkgInfo('invoiceNo',this.value)"></div>
+      <div class="field"><label class="fl">${t('Ship date')}</label><input class="in" type="date" value="${esc(inf.shipDate)}" oninput="window.qcPkgInfo('shipDate',this.value)"></div></div>
+      <div class="field"><label class="fl">${t('Notes (print on the cover page)')}</label><input class="in" value="${esc(inf.notes)}" oninput="window.qcPkgInfo('notes',this.value)"></div>`)}
+    ${sec(t('Invoice & packing slip (QuickBooks PDFs)'), `<div class="grid2">
+      <div class="field"><label class="btn sm"><i class="ti ti-file-invoice"></i> ${t('Add invoice')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'invoice')"></label><div id="pkg-invoice" class="thumbs" style="margin-top:6px">${pkgFilesHtml('invoice')}</div></div>
+      <div class="field"><label class="btn sm"><i class="ti ti-truck-delivery"></i> ${t('Add packing slip')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'slip')"></label><div id="pkg-slip" class="thumbs" style="margin-top:6px">${pkgFilesHtml('slip')}</div></div></div>`)}
+    ${sec(t('Certificates of Conformance'), box(cocList.length?cocList.map(c=>chk('cocIds',c.id,P.cocIds.has(c.id),[c.no,c.part,c.rev?('Rev '+c.rev):'',c.po?('PO '+c.po):'',c.qty?(c.qty+' pcs'):''].filter(Boolean).join(' · '),sug.cocs.some(s=>s.id===c.id))).join(''):`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No CoC for this customer yet — make one on the Certs of Conformance page, or add the customer’s own form under Other documents.')}</div>`,160))}
+    ${sec(t('First articles'), box(fairList.length?fairList.map(f=>chk('fairIds',f.id,P.fairIds.has(f.id),pkgFairLabel(f),sug.fairs.some(s=>s.id===f.id))).join(''):`<div class="muted" style="padding:9px 10px;font-size:12.5px">${t('No first article for these parts — that’s normal on a repeat order.')}</div>`,160))}
+    ${sec(t('Material / plating certs'), `<input class="in" placeholder="${esc(t('Search…'))}" value="${esc(P.certQ)}" oninput="window.qcPkgCertQ(this.value)" style="max-width:260px;min-height:32px;padding:4px 8px;margin-bottom:6px">${box(`<div id="pkg-certs">${pkgCertsHtml()}</div>`,220)}`)}
+    ${sec(t('Other documents (plating certs, customer CoC forms…)'), `<label class="btn sm"><i class="ti ti-paperclip"></i> ${t('Add files')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="window.qcPkgAdd(this,'extra')"></label><div id="pkg-extra" class="thumbs" style="margin-top:6px">${pkgFilesHtml('extra')}</div>`)}
+    <div class="muted" style="font-size:11.5px;margin-top:10px">${t('Uploaded files go into the package PDF; the finished PDF is what gets kept, not the separate files.')}</div>
+    <div id="pkg-status" style="font-size:12.5px;margin-top:10px;min-height:18px;color:${P.statusErr?'var(--red)':'var(--text3)'}">${esc(P.status||'')}</div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-      <button class="btn" onclick="document.getElementById('pkg-overlay').remove()">${t('Cancel')}</button>
-      <button class="btn primary" id="pkg-go" onclick="window.qcFairPackageBuild()"><i class="ti ti-download"></i> ${t('Download PDF')}</button>
+      <button class="btn" onclick="window.qcPkgClose()">${t('Cancel')}</button>
+      <button class="btn primary" id="pkg-go" ${P.busy?'disabled':''} onclick="window.qcPkgBuild()"><i class="ti ti-package-export"></i> ${t('Build & save PDF')}</button>
     </div>
   </div>`;
-  ov.onclick=()=>ov.remove();
-  document.body.appendChild(ov);
-};
-window.qcPkgFilter=(q)=>{ q=String(q||'').toLowerCase(); document.querySelectorAll('#pkg-certs .pkg-row').forEach(el=>{ el.style.display=(!q||el.dataset.s.indexOf(q)>=0||el.querySelector('input').checked)?'flex':'none'; }); };
-function qcPkgFilesRender(slot){ const h=$('pkg-'+slot); if(h) h.innerHTML=(_pkgFiles[slot]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="window.qcPkgDrop('${slot}',${i})"></i></span>`).join(' '); }
-window.qcPkgAdd=(inp,slot)=>{ slot=_pkgFiles[slot]?slot:'extra'; [...(inp.files||[])].forEach(f=>_pkgFiles[slot].push(f)); inp.value=''; qcPkgFilesRender(slot); };
-window.qcPkgDrop=(slot,i)=>{ (_pkgFiles[slot]||[]).splice(i,1); qcPkgFilesRender(slot); };
-window.qcFairPackageBuild=async ()=>{
-  const r=editId?INSPECTIONS[editId]:null; if(!r) return;
-  const btn=$('pkg-go'), status=$('pkg-status');
-  const say=(m,err)=>{ if(status){ status.textContent=m; status.style.color=err?'var(--red)':''; } };
-  const info={ customer:gv('pkg-cust'), po:gv('pkg-po'), part:gv('pkg-part'), rev:gv('pkg-rev'), job:gv('pkg-job'), qty:gv('pkg-qty'), notes:gv('pkg-notes'), invoiceNo:gv('pkg-invno') };
-  const certSel=[...document.querySelectorAll('.pkg-cert:checked')].map(x=>CERTS[x.value]).filter(Boolean);
-  const cocSel=[...document.querySelectorAll('.pkg-coc:checked')].map(x=>COCS[x.value]).filter(Boolean);
-  if(btn) btn.disabled=true;
-  try{
-    const {PDFDocument, StandardFonts, rgb}=PDFLib;
-    const pdf=await PDFDocument.create();
-    const F=await pdf.embedFont(StandardFonts.Helvetica), B=await pdf.embedFont(StandardFonts.HelveticaBold);
-    const W=612, H=792, M=46;
-    const ink=rgb(0.13,0.13,0.13), grey=rgb(0.4,0.4,0.4), soft=rgb(0.8,0.8,0.8);
-    // the standard fonts only know WinAnsi — swap anything they can't draw instead of failing the whole PDF
-    const clean=(font,s)=>{ let out=''; for(const ch of String(s==null?'':s).replace(/\r/g,'').replace(/\t/g,'  ')){ if(ch==='\n'){ out+=ch; continue; } try{ font.encodeText(ch); out+=ch; }catch(e){ out+='?'; } } return out; };
-    const wrap=(font,size,text,maxW)=>{ const lines=[]; clean(font,text).split('\n').forEach(par=>{ let cur=''; par.split(/\s+/).filter(Boolean).forEach(wd=>{ const tryS=cur?cur+' '+wd:wd; if(font.widthOfTextAtSize(tryS,size)<=maxW) cur=tryS; else { if(cur) lines.push(cur); cur=wd; while(font.widthOfTextAtSize(cur,size)>maxW && cur.length>1){ let k=cur.length-1; while(k>1&&font.widthOfTextAtSize(cur.slice(0,k),size)>maxW) k--; lines.push(cur.slice(0,k)); cur=cur.slice(k); } } }); lines.push(cur); }); return lines; };
-    const fit=(font,size,text,maxW)=>{ let s=clean(font,text); if(font.widthOfTextAtSize(s,size)<=maxW) return s; while(s.length>1&&font.widthOfTextAtSize(s+'…',size)>maxW) s=s.slice(0,-1); return s+'…'; };
-    let logoImg=null;
-    try{ const lg=(typeof BSMP_PRINT_LOGO!=='undefined'&&BSMP_PRINT_LOGO)||''; if(lg){ const bytes=await (await fetch(lg)).arrayBuffer(); logoImg=/^data:image\/png/i.test(lg)?await pdf.embedPng(bytes):await pdf.embedJpg(bytes); } }catch(e){ console.warn('package logo failed', e); }
-    // BSMP letterhead — same block as the CoC / cert cover prints; returns the y below it
-    const letterhead=(pg)=>{
-      pg.drawText("BERT'S SHEET METAL PRODUCTS INC.",{x:M,y:H-M-10,size:10,font:B,color:rgb(0,0,0)});
-      ['9521 Irondale Ave','Chatsworth, CA 91311','+1 818 775 0104','info@bertsmp.com'].forEach((l,i)=>pg.drawText(l,{x:M,y:H-M-26-i*11.5,size:8.5,font:F,color:ink}));
-      if(logoImg){ const w=170, h=logoImg.height*w/logoImg.width; pg.drawImage(logoImg,{x:W-M-w,y:H-M-h+2,width:w,height:h}); }
-      return H-M-86;
-    };
-    // a band of LABEL / value columns between two heavy rules
-    const band=(pg,y,cols)=>{
-      // each column gets room in proportion to what it has to show (a long customer name, a spelled-out date)
-      const need=cols.map(([lab,val])=>Math.max(B.widthOfTextAtSize(clean(B,lab),7), Math.min(F.widthOfTextAtSize(clean(F,val||'—'),9),150))+10);
-      const k=(W-2*M)/need.reduce((a,b)=>a+b,0);
-      const lines=cols.map(([,val],i)=>wrap(F,9,val||'—',need[i]*k-8).slice(0,2));
-      const hgt=lines.some(l=>l.length>1)?50:38;
-      pg.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:1.5,color:rgb(0,0,0)});
-      let x=M;
-      cols.forEach(([lab],i)=>{ pg.drawText(clean(B,lab),{x,y:y-15,size:7,font:B,color:ink}); lines[i].forEach((l,j)=>pg.drawText(fit(F,9,l,need[i]*k-8),{x,y:y-28-j*11.5,size:9,font:F,color:ink})); x+=need[i]*k; });
-      pg.drawLine({start:{x:M,y:y-hgt},end:{x:W-M,y:y-hgt},thickness:1.5,color:rgb(0,0,0)});
-      return y-hgt;
-    };
-    const longDate=(v)=>{ if(!v) return ''; const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/); const d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(v); return isNaN(d)?String(v):d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); };
-    const sections=[];   // [{title, first, count}] — for the cover's contents table
-    const warnings=[];
-    // an image page: fit on a letter sheet, turned landscape when the picture is wide
-    const imagePage=async(bytes,type,name)=>{
-      let img;
-      if(/png/i.test(type)||/\.png$/i.test(name)) img=await pdf.embedPng(bytes);
-      else if(/jpe?g/i.test(type)||/\.jpe?g$/i.test(name)) img=await pdf.embedJpg(bytes);
-      else {   // webp / gif / anything else the browser can show: re-encode as JPEG
-        const url=URL.createObjectURL(new Blob([bytes],{type:type||'image/*'}));
-        try{
-          const im=await new Promise((ok,bad)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=bad; i.src=url; });
-          const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0);
-          img=await pdf.embedJpg(await (await new Promise(ok=>c.toBlob(ok,'image/jpeg',0.9))).arrayBuffer());
-        } finally { URL.revokeObjectURL(url); }
-      }
-      const land=img.width>img.height, pw=land?H:W, ph=land?W:H, pad=18;
-      const s=Math.min((pw-2*pad)/img.width,(ph-2*pad)/img.height);
-      const pg=pdf.addPage([pw,ph]); pg.drawImage(img,{x:(pw-img.width*s)/2,y:(ph-img.height*s)/2,width:img.width*s,height:img.height*s});
-    };
-    // one document (PDF pages copied as-is, or an image) — a file that can't be read gets a note page instead
-    const addDoc=async(bytes,type,name)=>{
-      const isPdf=/pdf/i.test(type||'')||/\.pdf$/i.test(name||'');
+}
+
+// ── the PDF engine ────────────────────────────────────────────────────────
+async function pkgBuildPdf(spec, say){
+  const {PDFDocument, StandardFonts, rgb}=PDFLib;
+  const pdf=await PDFDocument.create();
+  const F=await pdf.embedFont(StandardFonts.Helvetica), B=await pdf.embedFont(StandardFonts.HelveticaBold);
+  const W=612, H=792, M=46;
+  const ink=rgb(0.13,0.13,0.13), grey=rgb(0.4,0.4,0.4), soft=rgb(0.8,0.8,0.8), black=rgb(0,0,0);
+  // the standard fonts only know WinAnsi — swap anything they can't draw instead of failing the whole PDF
+  const clean=(font,s)=>{ let out=''; for(const ch of String(s==null?'':s).replace(/\r/g,'').replace(/\t/g,'  ')){ if(ch==='\n'){ out+=ch; continue; } try{ font.encodeText(ch); out+=ch; }catch(e){ out+='?'; } } return out; };
+  const wrap=(font,size,text,maxW)=>{ const lines=[]; clean(font,text).split('\n').forEach(par=>{ let cur=''; par.split(/\s+/).filter(Boolean).forEach(wd=>{ const tryS=cur?cur+' '+wd:wd; if(font.widthOfTextAtSize(tryS,size)<=maxW) cur=tryS; else { if(cur) lines.push(cur); cur=wd; while(font.widthOfTextAtSize(cur,size)>maxW && cur.length>1){ let k=cur.length-1; while(k>1&&font.widthOfTextAtSize(cur.slice(0,k),size)>maxW) k--; lines.push(cur.slice(0,k)); cur=cur.slice(k); } } }); lines.push(cur); }); return lines; };
+  const fit=(font,size,text,maxW)=>{ let s=clean(font,text); if(font.widthOfTextAtSize(s,size)<=maxW) return s; while(s.length>1&&font.widthOfTextAtSize(s+'…',size)>maxW) s=s.slice(0,-1); return s+'…'; };
+  const right=(pg,s,font,size,y,color)=>{ s=clean(font,s); pg.drawText(s,{x:W-M-font.widthOfTextAtSize(s,size),y,size,font,color:color||ink}); };
+  const longDate=(v)=>{ if(!v) return ''; const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})$/); const d=m?new Date(+m[1],+m[2]-1,+m[3]):new Date(v); return isNaN(d)?String(v):d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'}); };
+  const person=v=>{ const n=String(v||'').split('@')[0].replace(/^(ofc|ops|operator)[._-]+/i,'').replace(/[._-]+/g,' ').trim(); return n.replace(/\b\w/g,ch=>ch.toUpperCase()); };
+  let logoImg=null;
+  try{ const lg=(typeof BSMP_PRINT_LOGO!=='undefined'&&BSMP_PRINT_LOGO)||''; if(lg){ const bytes=await (await fetch(lg)).arrayBuffer(); logoImg=/^data:image\/png/i.test(lg)?await pdf.embedPng(bytes):await pdf.embedJpg(bytes); } }catch(e){ console.warn('package logo failed', e); }
+  // BSMP letterhead — same block as the CoC / cert cover prints; returns the y below it
+  const letterhead=(pg)=>{
+    pg.drawText("BERT'S SHEET METAL PRODUCTS INC.",{x:M,y:H-M-10,size:10,font:B,color:black});
+    ['9521 Irondale Ave','Chatsworth, CA 91311','+1 818 775 0104','info@bertsmp.com'].forEach((l,i)=>pg.drawText(l,{x:M,y:H-M-26-i*11.5,size:8.5,font:F,color:ink}));
+    if(logoImg){ const w=170, h=logoImg.height*w/logoImg.width; pg.drawImage(logoImg,{x:W-M-w,y:H-M-h+2,width:w,height:h}); }
+    return H-M-86;
+  };
+  // a band of LABEL / value columns between two heavy rules; columns sized to their content, values wrap to 2 lines
+  const band=(pg,y,cols)=>{
+    const need=cols.map(([lab,val])=>Math.max(B.widthOfTextAtSize(clean(B,lab),7), Math.min(F.widthOfTextAtSize(clean(F,val||'—'),9),150))+10);
+    const k=(W-2*M)/need.reduce((a,b)=>a+b,0);
+    const lines=cols.map(([,val],i)=>wrap(F,9,val||'—',need[i]*k-8).slice(0,2));
+    const hgt=lines.some(l=>l.length>1)?50:38;
+    pg.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:1.5,color:black});
+    let x=M;
+    cols.forEach(([lab],i)=>{ pg.drawText(clean(B,lab),{x,y:y-15,size:7,font:B,color:ink}); lines[i].forEach((l,j)=>pg.drawText(fit(F,9,l,need[i]*k-8),{x,y:y-28-j*11.5,size:9,font:F,color:ink})); x+=need[i]*k; });
+    pg.drawLine({start:{x:M,y:y-hgt},end:{x:W-M,y:y-hgt},thickness:1.5,color:black});
+    return y-hgt;
+  };
+  // a simple table with a header row; cols = [{h, w(fraction), bold?}], rows = [[cells]]; new pages repeat the header
+  const table=(state,cols,rows,opt)=>{
+    opt=opt||{}; const tw=W-2*M, xs=[]; let acc=M; cols.forEach(c=>{ xs.push(acc); acc+=c.w*tw; });
+    const head=()=>{ cols.forEach((c,i)=>state.pg.drawText(clean(B,c.h),{x:xs[i],y:state.y,size:7,font:B,color:ink})); state.pg.drawLine({start:{x:M,y:state.y-5},end:{x:W-M,y:state.y-5},thickness:0.8,color:black}); state.y-=18; };
+    head();
+    rows.forEach(rw=>{
+      const cells=rw.map((v,i)=>wrap(cols[i].bold?B:F,8.5,v==null||v===''?'—':String(v),cols[i].w*tw-6).slice(0,opt.maxLines||3));
+      const hgt=Math.max(...cells.map(c=>c.length))*10.5+6;
+      if(state.y-hgt<M+30){ state.pg=pdf.addPage([W,H]); state.y=letterhead(state.pg)-10; if(opt.contTitle) { state.pg.drawText(clean(B,opt.contTitle),{x:M,y:state.y,size:8,font:B,color:grey}); state.y-=18; } head(); }
+      cells.forEach((c,i)=>c.forEach((l,j)=>state.pg.drawText(l,{x:xs[i],y:state.y-j*10.5,size:8.5,font:cols[i].bold?B:F,color:(rw.color&&rw.color[i])||ink})));
+      state.y-=hgt; state.pg.drawLine({start:{x:M,y:state.y+6},end:{x:W-M,y:state.y+6},thickness:0.5,color:soft,dashArray:[2,2]});
+    });
+  };
+  const warnings=[], sections=[];
+  // an image page: fit on a letter sheet, turned landscape when the picture is wide
+  const imagePage=async(bytes,type,name)=>{
+    let img;
+    if(/png/i.test(type)||/\.png$/i.test(name)) img=await pdf.embedPng(bytes);
+    else if(/jpe?g/i.test(type)||/\.jpe?g$/i.test(name)) img=await pdf.embedJpg(bytes);
+    else {   // webp / gif / anything else the browser can show: re-encode as JPEG
+      const url=URL.createObjectURL(new Blob([bytes],{type:type||'image/*'}));
       try{
-        if(isPdf){ const src=await PDFDocument.load(bytes,{ignoreEncryption:true}); (await pdf.copyPages(src,src.getPageIndices())).forEach(p=>pdf.addPage(p)); }
-        else await imagePage(bytes,type,name);
-      }catch(e){ console.warn('package file failed', name, e); warnings.push(name); }
-    };
-    const fetchBytes=async(url)=>{ const res=await fetch(url); if(!res.ok) throw new Error('HTTP '+res.status); return res.arrayBuffer(); };
-    const section=async(title,fn)=>{ const first=pdf.getPageCount(); await fn(); const count=pdf.getPageCount()-first; if(count) sections.push({title,first,count}); };
+        const im=await new Promise((ok,bad)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=bad; i.src=url; });
+        const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight; c.getContext('2d').drawImage(im,0,0);
+        img=await pdf.embedJpg(await (await new Promise(ok=>c.toBlob(ok,'image/jpeg',0.9))).arrayBuffer());
+      } finally { URL.revokeObjectURL(url); }
+    }
+    const land=img.width>img.height, pw=land?H:W, ph=land?W:H, pad=18;
+    const s=Math.min((pw-2*pad)/img.width,(ph-2*pad)/img.height);
+    const pg=pdf.addPage([pw,ph]); pg.drawImage(img,{x:(pw-img.width*s)/2,y:(ph-img.height*s)/2,width:img.width*s,height:img.height*s});
+  };
+  // one document (PDF pages copied as-is, or an image). A file that fails is left OUT — a customer never gets an error page
+  const addDoc=async(bytes,type,name)=>{
+    const isPdf=/pdf/i.test(type||'')||/\.pdf$/i.test(name||'');
+    try{
+      if(isPdf){ const src=await PDFDocument.load(bytes,{ignoreEncryption:true}); (await pdf.copyPages(src,src.getPageIndices())).forEach(p=>pdf.addPage(p)); }
+      else await imagePage(bytes,type,name);
+    }catch(e){ console.warn('package file failed', name, e); warnings.push(name||'file'); }
+  };
+  const addUrl=async(url,type,name)=>{ say('Adding '+(name||'file')+'…'); try{ const res=await fetch(url); if(!res.ok) throw new Error('HTTP '+res.status); await addDoc(await res.arrayBuffer(),type,name||''); }catch(e){ console.warn('package fetch failed', name, e); warnings.push(name||'file'); } };
+  const addFile=async(f)=>{ say('Adding '+f.name+'…'); await addDoc(await f.arrayBuffer(),f.type,f.name); };
+  const section=async(title,fn)=>{ const first=pdf.getPageCount(); await fn(); const count=pdf.getPageCount()-first; if(count) sections.push({title,first,count}); };
 
-    // ── CoCs, drawn like qcCocPrint ─────────────────────────────────────
-    const drawCoc=(c)=>{
-      let pg=pdf.addPage([W,H]); let y=letterhead(pg);
-      pg.drawText('Certificate of Conformance',{x:M,y:y-18,size:22,font:F,color:rgb(0.23,0.23,0.23)});
-      pg.drawText(fit(B,9,'CERTIFICATE NO. '+(c.no||'—'),200),{x:W-M-B.widthOfTextAtSize(fit(B,9,'CERTIFICATE NO. '+(c.no||'—'),200),9),y:y-8,size:9,font:B,color:ink});
-      const ds=clean(F,'DATE '+longDate(c.date||todayISO())); pg.drawText(ds,{x:W-M-F.widthOfTextAtSize(ds,9),y:y-21,size:9,font:F,color:ink});
-      y=band(pg,y-34,[['CUSTOMER',c.customer],['CUSTOMER PO',c.po],['JOB #',c.job],['PART NUMBER',c.part],['REVISION',c.rev],['QUANTITY',c.qty],['SHIP DATE',longDate(c.shipDate)]]);
-      const need=(h)=>{ if(y-h<M+40){ pg=pdf.addPage([W,H]); y=letterhead(pg); } };
-      const para=(title,text)=>{ if(!String(text||'').trim()) return; need(40); pg.drawText(title,{x:M,y:y-22,size:8,font:B,color:ink}); y-=30;
-        wrap(F,9.5,text,W-2*M).forEach(l=>{ need(14); pg.drawText(l,{x:M,y:y-4,size:9.5,font:F,color:ink}); y-=13.5; }); };
-      if(c.desc){ y-=6; pg.drawText(fit(F,9.5,'DESCRIPTION  '+c.desc,W-2*M),{x:M,y:y-12,size:9.5,font:F,color:ink}); y-=16; }
-      const mats=(c.certIds||[]).map(x=>CERTS[x]).filter(Boolean);
-      const rows=mats.length?mats.map(m=>[m.material,m.spec,m.heatLot,m.supplier,m.certNo]):((c.material||c.heatLot)?[[c.material,'',c.heatLot,'','']]:[]);
-      if(rows.length){
-        need(60); pg.drawText('MATERIAL',{x:M,y:y-22,size:8,font:B,color:ink}); y-=34;
-        const cx=[0,.30,.52,.70,.87].map(f=>M+f*(W-2*M)), cw=[.28,.2,.16,.15,.13].map(f=>f*(W-2*M));
-        ['MATERIAL','SPECIFICATION','HEAT / LOT','SUPPLIER','CERT #'].forEach((h,i)=>pg.drawText(h,{x:cx[i],y,size:7,font:B,color:ink}));
-        pg.drawLine({start:{x:M,y:y-5},end:{x:W-M,y:y-5},thickness:0.8,color:rgb(0,0,0)}); y-=18;
-        rows.forEach(rw=>{ const first=wrap(B,9,rw[0]||'—',cw[0]).slice(0,2), extra=(first.length-1)*11; need(18+extra);
-          first.forEach((l,j)=>pg.drawText(fit(B,9,l,cw[0]),{x:cx[0],y:y-j*11,size:9,font:B,color:ink}));
-          rw.slice(1).forEach((v,i)=>pg.drawText(fit(F,9,v||'—',cw[i+1]),{x:cx[i+1],y,size:9,font:F,color:ink}));
-          pg.drawLine({start:{x:M,y:y-6-extra},end:{x:W-M,y:y-6-extra},thickness:0.5,color:soft,dashArray:[2,2]}); y-=17+extra; });
-      }
-      para('WORK PERFORMED',c.work);
-      para('OUTSIDE PROCESSES',c.processes);
-      para('DRAWING / SPECIFICATIONS',c.specs);
-      para('STATEMENT OF CONFORMANCE',c.statement||COC_STATEMENT_DEFAULT);
-      need(80); y-=50;
-      pg.drawLine({start:{x:M,y},end:{x:M+280,y},thickness:0.8,color:rgb(0,0,0)}); pg.drawLine({start:{x:M+320,y},end:{x:W-M,y},thickness:0.8,color:rgb(0,0,0)});
-      pg.drawText('Authorized signature',{x:M,y:y-11,size:8,font:F,color:grey}); pg.drawText('Date',{x:M+320,y:y-11,size:8,font:F,color:grey});
-      if(c.signerName) pg.drawText(clean(B,c.signerName),{x:M,y:y-26,size:9.5,font:B,color:rgb(0,0,0)});
-      if(c.signerTitle) pg.drawText(clean(F,c.signerTitle),{x:M,y:y-38,size:8.5,font:F,color:grey});
-    };
+  // CoC, drawn like qcCocPrint
+  const drawCoc=(c)=>{
+    const st={pg:pdf.addPage([W,H])}; st.y=letterhead(st.pg);
+    st.pg.drawText('Certificate of Conformance',{x:M,y:st.y-18,size:22,font:F,color:rgb(0.23,0.23,0.23)});
+    right(st.pg,'CERTIFICATE NO. '+(c.no||'—'),B,9,st.y-8); right(st.pg,'DATE '+longDate(c.date||todayISO()),F,9,st.y-21);
+    st.y=band(st.pg,st.y-34,[['CUSTOMER',c.customer],['CUSTOMER PO',c.po],['JOB #',c.job],['PART NUMBER',c.part],['REVISION',c.rev],['QUANTITY',c.qty],['SHIP DATE',longDate(c.shipDate)]]);
+    const need=(h)=>{ if(st.y-h<M+40){ st.pg=pdf.addPage([W,H]); st.y=letterhead(st.pg); } };
+    const para=(title,text)=>{ if(!String(text||'').trim()) return; need(40); st.pg.drawText(title,{x:M,y:st.y-22,size:8,font:B,color:ink}); st.y-=30;
+      wrap(F,9.5,text,W-2*M).forEach(l=>{ need(14); st.pg.drawText(l,{x:M,y:st.y-4,size:9.5,font:F,color:ink}); st.y-=13.5; }); };
+    if(c.desc){ st.y-=6; st.pg.drawText(fit(F,9.5,'DESCRIPTION  '+c.desc,W-2*M),{x:M,y:st.y-12,size:9.5,font:F,color:ink}); st.y-=16; }
+    const mats=(c.certIds||[]).map(x=>CERTS[x]).filter(Boolean);
+    const rows=mats.length?mats.map(m=>[m.material,m.spec,m.heatLot,m.supplier,m.certNo]):((c.material||c.heatLot)?[[c.material,'',c.heatLot,'','']]:[]);
+    if(rows.length){ need(60); st.pg.drawText('MATERIAL',{x:M,y:st.y-22,size:8,font:B,color:ink}); st.y-=34;
+      table(st,[{h:'MATERIAL',w:.3,bold:true},{h:'SPECIFICATION',w:.22},{h:'HEAT / LOT',w:.18},{h:'SUPPLIER',w:.17},{h:'CERT #',w:.13}],rows,{maxLines:2}); }
+    para('WORK PERFORMED',c.work); para('OUTSIDE PROCESSES',c.processes); para('DRAWING / SPECIFICATIONS',c.specs);
+    para('STATEMENT OF CONFORMANCE',c.statement||COC_STATEMENT_DEFAULT);
+    need(80); st.y-=50;
+    st.pg.drawLine({start:{x:M,y:st.y},end:{x:M+280,y:st.y},thickness:0.8,color:black}); st.pg.drawLine({start:{x:M+320,y:st.y},end:{x:W-M,y:st.y},thickness:0.8,color:black});
+    st.pg.drawText('Authorized signature',{x:M,y:st.y-11,size:8,font:F,color:grey}); st.pg.drawText('Date',{x:M+320,y:st.y-11,size:8,font:F,color:grey});
+    if(c.signerName) st.pg.drawText(clean(B,c.signerName),{x:M,y:st.y-26,size:9.5,font:B,color:black});
+    if(c.signerTitle) st.pg.drawText(clean(F,c.signerTitle),{x:M,y:st.y-38,size:8.5,font:F,color:grey});
+  };
+  // a typed first article (Simple FAR / AS9102): header + the characteristics table, then the ballooned drawing
+  const drawFair=async(r)=>{
+    const st={pg:pdf.addPage([W,H])}; st.y=letterhead(st.pg);
+    st.pg.drawText('First Article Inspection Report',{x:M,y:st.y-18,size:20,font:F,color:rgb(0.23,0.23,0.23)});
+    right(st.pg,(r.mode==='as9102'?'AS9102':'SIMPLE FAR'),B,9,st.y-8); right(st.pg,'DATE '+longDate(r.date),F,9,st.y-21);
+    st.y=band(st.pg,st.y-34,[['PART NUMBER',r.partNum],['REV',r.rev],['CUSTOMER',r.customer],['CUSTOMER PO',r.po],['JOB #',r.job],['MATERIAL',r.material]]);
+    const rev=(r.reviewedBy&&(r.fairStatus==='Approved'||r.fairStatus==='Rejected'))?(r.fairStatus+' — '+person(r.reviewedBy)+(r.reviewedAt?', '+longDate(new Date(r.reviewedAt).toISOString().slice(0,10)):'')):(r.fairStatus||'Draft');
+    st.y-=18; [['INSPECTED BY',person(r.inspectedBy)],['STATUS',rev]].forEach(([k,v])=>{ st.pg.drawText(k,{x:M,y:st.y,size:7.5,font:B,color:grey}); st.pg.drawText(fit(F,9.5,v||'—',W-2*M-110),{x:M+110,y:st.y,size:9.5,font:F,color:ink}); st.y-=15; });
+    const chars=(Array.isArray(r.characteristics)?r.characteristics:vals(r.characteristics)).filter(Boolean).slice().sort((a,b)=>(+a.no||0)-(+b.no||0));
+    const saveTol=_fairTolDefaults; _fairTolDefaults=Object.assign({},DEFAULT_TOL_DEFAULTS,r.tolDefaults||{});
+    let ok=0,oot=0,none=0;
+    try{
+      const rows=chars.map(c=>{
+        const has=String(c.result||'').trim()!=='', d=has?qcDev(c.requirement,c.tol,c.result):null, txt=isTextChar(c);
+        const stt=!has?'—':(d.oot?'OUT':'OK'); if(!has) none++; else if(d.oot) oot++; else ok++;
+        const row=[c.no, c.requirement, resolveTol(c.requirement||'',c.tol||'').str, c.result, txt?'':(d?d.devStr:''), stt, c.notes];
+        row.color=[null,null,null,null,null, stt==='OUT'?rgb(0.7,0.15,0.12):stt==='OK'?rgb(0.1,0.45,0.2):grey,null];
+        return row;
+      });
+      st.y-=10;
+      table(st,[{h:'#',w:.05},{h:'REQUIREMENT',w:.3},{h:'TOLERANCE',w:.13},{h:'RESULT',w:.13},{h:'DEVIATION',w:.11},{h:'STATUS',w:.08,bold:true},{h:'NOTES',w:.2}],rows,{contTitle:'First Article — '+(r.partNum||'')+(r.rev?' Rev '+r.rev:'')+' (continued)'});
+    } finally { _fairTolDefaults=saveTol; }
+    st.y-=8; if(st.y<M+30){ st.pg=pdf.addPage([W,H]); st.y=letterhead(st.pg); }
+    st.pg.drawText(clean(F,chars.length+' characteristics · '+ok+' in tolerance · '+oot+' out of tolerance · '+none+' not measured'),{x:M,y:st.y,size:8.5,font:B,color:oot?rgb(0.7,0.15,0.12):ink});
+    const dw=(r.ballooned&&r.ballooned.url)?r.ballooned:((r.drawing&&r.drawing.url)?r.drawing:null);
+    if(dw) await addUrl(dw.url,dw.type||'',dw.name||'drawing');
+  };
 
-    // everything drawn INTO the PDF is English (customer-facing); only the dialog text is translated
-    say(t('Building the package…'));
-    // the QuickBooks invoice + packing slip lead the package — what receiving looks for first
-    const addSlot=async(slot)=>{ for(const f of _pkgFiles[slot]){ say(t('Adding')+' '+f.name+'…'); await addDoc(await f.arrayBuffer(),f.type,f.name); } };
-    await section('Invoice'+(info.invoiceNo?' #'+info.invoiceNo.replace(/^#/,''):''),()=>addSlot('invoice'));
-    await section('Packing slip',()=>addSlot('slip'));
-    await section('Certificate of Conformance',async()=>{ cocSel.forEach(drawCoc); });
-    await section('First article inspection report (handwritten)',async()=>{
-      for(const s of fairSheets(r)){ say(t('Adding')+' '+(s.name||t('page'))+'…'); try{ await addDoc(await fetchBytes(s.url),s.type,s.name||''); }catch(e){ console.warn('package sheet fetch failed', e); warnings.push(s.name||'page'); } }
-    });
-    await section('Material / plating certifications',async()=>{
-      for(const c of certSel){
-        const files=(c.files?vals(c.files):(c.file?[c.file]:[])).filter(f=>f&&f.url);
-        if(!files.length){ warnings.push((c.material||c.id)+' ('+t('no file')+')'); continue; }
-        for(const f of files){ say(t('Adding')+' '+(f.name||c.material||'')+'…'); try{ await addDoc(await fetchBytes(f.url),f.type,f.name||''); }catch(e){ console.warn('package cert fetch failed', e); warnings.push(f.name||c.material||c.id); } }
-      }
-    });
-    await section('Other documents',()=>addSlot('extra'));
+  // ── the body, in order ──
+  await section('Invoice'+(spec.invoiceNo?' #'+String(spec.invoiceNo).replace(/^#/,''):''),async()=>{ for(const f of spec.files.invoice) await addFile(f); });
+  await section('Packing slip',async()=>{ for(const f of spec.files.slip) await addFile(f); });
+  for(const c of spec.cocs) await section('Certificate of Conformance '+(c.no||'')+(c.part?' — '+c.part:''),async()=>{ drawCoc(c); });
+  for(const r of spec.fairs) await section('First article report — '+(r.partNum||'')+(r.rev?' Rev '+r.rev:'')+(r.mode==='manual'?' (handwritten)':''),async()=>{
+    if(r.mode==='manual'){ for(const s of fairSheets(r)) await addUrl(s.url,s.type,s.name||'page'); }
+    else await drawFair(r);
+  });
+  await section('Material / plating certifications',async()=>{
+    for(const c of spec.certs){ const fs=pkgCertFiles(c); if(!fs.length){ warnings.push((c.material||c.id)+' (no file)'); continue; } for(const f of fs) await addUrl(f.url,f.type,f.name||c.material||''); }
+  });
+  await section('Other documents',async()=>{ for(const f of spec.files.extra) await addFile(f); });
 
-    // ── cover page, inserted first now that the page numbers are known ──
-    const pg=pdf.insertPage(0,[W,H]); let y=letterhead(pg);
-    pg.drawText('First Article Inspection Package',{x:M,y:y-20,size:24,font:F,color:rgb(0.23,0.23,0.23)});
-    y=band(pg,y-38,[['CUSTOMER',info.customer],['CUSTOMER PO',info.po],['JOB #',info.job],['PART NUMBER',info.part],['REV',info.rev],['QTY INSPECTED',info.qty]]);
-    const res=r.manualResult==='accept'?['ACCEPTED',rgb(0.1,0.45,0.2)]:r.manualResult==='reject'?['REJECTED',rgb(0.7,0.15,0.12)]:['SEE REPORT',ink];
-    y-=30; pg.drawText('INSPECTION RESULT',{x:M,y,size:8,font:B,color:ink}); pg.drawText(res[0],{x:M+110,y:y-2,size:14,font:B,color:res[1]});
-    // a login like ofc.edgar@… shows as "Edgar" (the ofc./ops. prefix is an account type, not part of the name)
-    const person=v=>{ const n=String(v||'').split('@')[0].replace(/^(ofc|ops|operator)[._-]+/i,'').replace(/[._-]+/g,' ').trim(); return n.replace(/\b\w/g,ch=>ch.toUpperCase()); };
-    const facts=[['Inspected by',person(r.inspectedBy)],['Inspection date',longDate(r.date)],['Material',r.material],['Invoice #',String(info.invoiceNo||'').replace(/^#/,'')],
-      ['Reviewed',(r.reviewedBy&&(r.fairStatus==='Approved'||r.fairStatus==='Rejected'))?(r.fairStatus+' — '+person(r.reviewedBy)+(r.reviewedAt?(', '+new Date(r.reviewedAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})):'')):'']].filter(f=>String(f[1]||'').trim());
-    y-=12; facts.forEach(([k,v])=>{ y-=15; pg.drawText(clean(B,k.toUpperCase()),{x:M,y,size:7.5,font:B,color:grey}); pg.drawText(fit(F,9.5,v,W-2*M-110),{x:M+110,y,size:9.5,font:F,color:ink}); });
-    if(String(r.manualNotes||'').trim()){ y-=22; pg.drawText('INSPECTOR NOTES',{x:M,y,size:7.5,font:B,color:grey}); wrap(F,9.5,r.manualNotes,W-2*M-110).slice(0,6).forEach((l,i)=>pg.drawText(l,{x:M+110,y:y-i*13,size:9.5,font:F,color:ink})); y-=13*Math.min(6,wrap(F,9.5,r.manualNotes,W-2*M-110).length)-13; }
-    // contents — page numbers count the cover as page 1
-    y-=30; pg.drawText('CONTENTS',{x:M,y,size:8,font:B,color:ink}); y-=12;
-    pg.drawLine({start:{x:M,y},end:{x:W-M,y},thickness:0.8,color:rgb(0,0,0)}); y-=16;
-    pg.drawText('1',{x:M,y,size:9.5,font:F,color:grey}); pg.drawText('This cover page',{x:M+22,y,size:9.5,font:F,color:ink}); pg.drawText('page 1',{x:W-M-F.widthOfTextAtSize('page 1',9.5),y,size:9.5,font:F,color:grey}); y-=17;
-    sections.forEach((s,i)=>{
-      const a=s.first+2, b=s.first+1+s.count, pr=s.count>1?('pages '+a+'–'+b):('page '+a);
-      pg.drawText(String(i+2),{x:M,y,size:9.5,font:F,color:grey}); pg.drawText(fit(F,9.5,s.title,W-2*M-120),{x:M+22,y,size:9.5,font:F,color:ink});
-      pg.drawText(clean(F,pr),{x:W-M-F.widthOfTextAtSize(clean(F,pr),9.5),y,size:9.5,font:F,color:grey}); y-=17;
-    });
-    if(info.notes){ y-=14; pg.drawText('NOTES',{x:M,y,size:8,font:B,color:ink}); wrap(F,9.5,info.notes,W-2*M).slice(0,8).forEach((l,i)=>pg.drawText(l,{x:M,y:y-15-i*13,size:9.5,font:F,color:ink})); }
-    const foot=clean(F,'This package accompanies the parts listed above and is not an invoice.'+(r.itar?'  Contains ITAR-restricted information — do not re-export.':''));
-    pg.drawText(foot,{x:M,y:30,size:8,font:F,color:grey});
-    // page numbers on every page after the cover (bottom right, small)
-    const total=pdf.getPageCount();
-    pdf.getPages().forEach((p,i)=>{ const {width}=p.getSize(); const s='Page '+(i+1)+' of '+total; p.drawText(s,{x:width-M-F.widthOfTextAtSize(s,7.5),y:14,size:7.5,font:F,color:grey}); });
-    pdf.setTitle(clean(F,[info.customer,info.part,'First Article Package'].filter(Boolean).join(' - ')));
-    pdf.setAuthor("Bert's Sheet Metal Products Inc.");
+  // ── cover page, inserted first now that the page numbers are known ──
+  const pg=pdf.insertPage(0,[W,H]); let y=letterhead(pg);
+  pg.drawText('Shipment Package',{x:M,y:y-20,size:24,font:F,color:rgb(0.23,0.23,0.23)});
+  right(pg,'PACKAGE NO. '+spec.no,B,9,y-8); right(pg,'DATE '+longDate(spec.date),F,9,y-21);
+  y=band(pg,y-38,[['CUSTOMER',spec.customer],['CUSTOMER PO',spec.po],['INVOICE #',String(spec.invoiceNo||'').replace(/^#/,'')],['SHIP DATE',longDate(spec.shipDate)]]);
+  // parts shipped, with each line's first-article result
+  const faFor=(part)=>{ const f=spec.fairs.find(x=>pkgLow(x.partNum)===pkgLow(part)); if(!f) return ''; return f.mode==='manual'?(f.manualResult==='accept'?'Accepted':f.manualResult==='reject'?'Rejected':'See report'):(f.fairStatus==='Approved'?'Accepted':f.fairStatus==='Rejected'?'Rejected':'See report'); };
+  const lineRows=(spec.lines.length?spec.lines:spec.fairs.map(f=>({part:f.partNum,rev:f.rev,job:f.job,qty:f.manualQty||'',desc:''}))).slice(0,12).map(l=>{ const fa=faFor(l.part); const r=[l.part,l.rev,l.job,l.qty,l.desc,fa||'—']; r.color=[null,null,null,null,null,fa==='Accepted'?rgb(0.1,0.45,0.2):fa==='Rejected'?rgb(0.7,0.15,0.12):grey]; return r; });
+  const st={pg,y:y-26};
+  if(lineRows.length){ pg.drawText('PARTS SHIPPED',{x:M,y:st.y,size:8,font:B,color:ink}); st.y-=16;
+    table(st,[{h:'PART NUMBER',w:.22,bold:true},{h:'REV',w:.07},{h:'JOB #',w:.1},{h:'QTY',w:.08},{h:'DESCRIPTION',w:.35},{h:'FIRST ARTICLE',w:.18}],lineRows,{maxLines:2});
+    if(spec.lines.length>12){ st.pg.drawText(clean(F,'+ '+(spec.lines.length-12)+' more lines — see the packing slip'),{x:M,y:st.y,size:8.5,font:F,color:grey}); st.y-=14; } }
+  st.y-=16; st.pg.drawText('CONTENTS',{x:M,y:st.y,size:8,font:B,color:ink}); st.y-=16;
+  const contents=[{title:'This cover page',pr:'page 1'}].concat(sections.map(s=>{ const a=s.first+2, b=s.first+1+s.count; return {title:s.title, pr:s.count>1?('pages '+a+'–'+b):('page '+a), pages:s.count}; }));
+  table(st,[{h:'#',w:.06},{h:'DOCUMENT',w:.74},{h:'PAGES',w:.2}],contents.map((c,i)=>[i+1,c.title,c.pr]),{maxLines:1});
+  if(spec.notes){ st.y-=6; st.pg.drawText('NOTES',{x:M,y:st.y,size:8,font:B,color:ink}); wrap(F,9.5,spec.notes,W-2*M).slice(0,6).forEach((l,i)=>st.pg.drawText(l,{x:M,y:st.y-15-i*13,size:9.5,font:F,color:ink})); }
+  pg.drawText(clean(F,'This package accompanies the parts listed above.'+(spec.itar?'  Contains ITAR-restricted information — do not re-export.':'')),{x:M,y:30,size:8,font:F,color:grey});
+  const total=pdf.getPageCount();
+  pdf.getPages().forEach((p,i)=>{ const {width}=p.getSize(); const s='Page '+(i+1)+' of '+total; p.drawText(s,{x:width-M-F.widthOfTextAtSize(s,7.5),y:14,size:7.5,font:F,color:grey}); });
+  pdf.setTitle(clean(F,[spec.customer,spec.po?'PO '+spec.po:'',spec.no,'Shipment Package'].filter(Boolean).join(' - ')));
+  pdf.setAuthor("Bert's Sheet Metal Products Inc.");
+  return {bytes:await pdf.save(), total, contents:contents.slice(1).map(c=>({title:c.title,pages:c.pages})), warnings};
+}
 
-    if(warnings.length && !confirm(t('These files could not be added and are NOT in the package:')+'\n\n• '+warnings.join('\n• ')+'\n\n'+t('Download the package without them?'))){ say(t('Not downloaded — missing:')+' '+warnings.join(', '), true); return; }
-    const bytes=await pdf.save();
-    const fname=([info.customer,info.part+(info.rev?' Rev '+info.rev:''),info.po?'PO '+info.po:'','First Article Package'].filter(s=>String(s||'').trim()).join(' - ')).replace(/[\\/:*?"<>|]+/g,'-')+'.pdf';
-    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'})); a.download=fname;
+window.qcPkgBuild=async()=>{
+  const P=_pkg; if(!P||P.busy) return;
+  if(typeof PDFLib==='undefined'){ alert(t('The PDF tools did not load — check the connection and reload.')); return; }
+  const setStatus=(m,err)=>{ P.status=m; P.statusErr=!!err; const el=$('pkg-status'); if(el){ el.textContent=m; el.style.color=err?'var(--red)':'var(--text3)'; } };
+  const lines=pkgLines(), cocs=[...P.cocIds].map(id=>COCS[id]).filter(Boolean), fairs=[...P.fairIds].map(id=>INSPECTIONS[id]).filter(Boolean), certs=[...P.certIds].map(id=>CERTS[id]).filter(Boolean);
+  const nothing=!lines.length&&!cocs.length&&!fairs.length&&!certs.length&&!P.files.invoice.length&&!P.files.slip.length&&!P.files.extra.length;
+  if(nothing){ alert(t('Nothing to package yet — pick an order or add a document.')); return; }
+  P.busy=true; const btn=$('pkg-go'); if(btn) btn.disabled=true;
+  const id=newId('pkg'), no=pkgNextNo(), inf=P.info;
+  try{
+    setStatus(t('Building the package…'));
+    const spec={ no, date:todayISO(), customer:inf.customer, po:inf.po, invoiceNo:inf.invoiceNo, shipDate:inf.shipDate, notes:inf.notes,
+      lines:lines.map(o=>({orderId:o.id, part:pkgPart(o), rev:cocGuessRev(o), job:o.job||'', qty:o.qty||'', desc:o.desc||''})),
+      cocs, fairs, certs, files:P.files, itar:fairs.some(f=>f.itar)||certs.some(c=>c.itar) };
+    const out=await pkgBuildPdf(spec, m=>setStatus(m));
+    if(out.warnings.length && !confirm(t('These files could not be added and are NOT in the package:')+'\n\n• '+out.warnings.join('\n• ')+'\n\n'+t('Build the package without them?'))){ setStatus(t('Not built — missing:')+' '+out.warnings.join(', '), true); return; }
+    const fileName=([inf.customer, inf.po?'PO '+inf.po:'', no, 'Shipment Package'].filter(s=>String(s||'').trim()).join(' - ')).replace(/[\\/:*?"<>|]+/g,'-')+'.pdf';
+    // the customer's copy first — it must not depend on the upload working
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([out.bytes],{type:'application/pdf'})); a.download=fileName;
     document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },4000);
-    try{ await qcLogAudit([{ inspectionId:editId, partNum:r.partNum||'', field:'package', action:'package-built', note:fname+' · '+total+' pages' }]); }catch(e){ console.error('audit log failed', e); }
-    say(t('Downloaded')+' '+fname+' ('+total+' '+t('pages')+')'+(warnings.length?' — '+t('check:')+' '+warnings.join(', '):''), warnings.length>0);
-    qcToast(t('Customer package downloaded.'),'ok');
+    // then keep a copy + the history record
+    let fileUrl='', note='';
+    if(out.bytes.length<=PKG_MAX_MB*1024*1024){
+      setStatus(t('Saving a copy…'));
+      try{ fileUrl=await upload(new File([out.bytes],fileName,{type:'application/pdf'}),'packages'); }catch(e){ console.warn('package upload failed', e); note=t('the PDF copy could not be uploaded'); }
+    } else note=t('the PDF is over 24 MB, so only the record was kept');
+    const rec={ id, no, createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'',
+      customer:inf.customer||'', po:inf.po||'', invoiceNo:inf.invoiceNo||'', shipDate:inf.shipDate||'', notes:inf.notes||'',
+      orderIds:lines.map(o=>o.id), lines:spec.lines.map(l=>({orderId:l.orderId, part:l.part, rev:l.rev, job:l.job, qty:l.qty})),
+      cocIds:cocs.map(c=>c.id), fairIds:fairs.map(f=>f.id), certIds:certs.map(c=>c.id),
+      attached:[...P.files.invoice.map(f=>'Invoice: '+f.name), ...P.files.slip.map(f=>'Packing slip: '+f.name), ...P.files.extra.map(f=>f.name)],
+      contents:out.contents, pages:out.total, fileName, fileUrl, size:out.bytes.length, missing:out.warnings };
+    try{ await dbSet('qc/packages/'+id, rec); }
+    catch(e){ alert(t('The PDF downloaded, but the history could not be saved.')+'\n'+((e&&e.message)||'')+'\n\n'+t('If this says permission denied, the qc/packages database rule has not been published yet.')); setStatus(t('Downloaded — history NOT saved.'), true); return; }
+    PACKAGES[id]=rec; _pkg=null; render();
+    qcToast(no+' '+t('built')+' ('+out.total+' '+t('pages')+')'+(note?' — '+note:''), note?'err':'ok');
   }catch(e){
     console.error('package build failed', e);
-    say(t('Could not build the package:')+' '+((e&&e.message)||e), true);
-  }finally{ if(btn) btn.disabled=false; }
+    setStatus(t('Could not build the package:')+' '+((e&&e.message)||e), true);
+  }finally{ P.busy=false; const b=$('pkg-go'); if(b) b.disabled=false; }
 };
+
 
 function charRow(i,c){
   c=c||{};
@@ -2859,7 +3002,7 @@ function viewFair(){
     <button class="btn primary fair-save-btn" onclick="window.qcSaveFair('keep')"><i class="ti ti-device-floppy"></i> ${t('Save')}</button>
     <button class="btn" onclick="window.qcFairPrintBlank()" title="${esc(t('Print blank FAI sheet: a paper copy with the ballooned drawing — the inspector hand-writes the results.'))}"><i class="ti ti-printer"></i> ${t('Print blank FAI sheet')}</button>
     <button class="btn fair-dim-only" onclick="window.qcFairPrintReport()" title="${esc(t('Print the filled report — recorded results, deviations, and pass/fail on BSMP paper.'))}"><i class="ti ti-file-check"></i> ${t('Print report')}</button>
-    ${r?`<button class="btn fair-manual-only" onclick="window.qcFairPackage()" title="${esc(t('One PDF for the customer: cover page, CoCs, the scanned first article, and the material / plating certs.'))}"><i class="ti ti-file-zip"></i> ${t('Customer package')}</button>`:''}
+    ${r?`<button class="btn fair-manual-only" onclick="window.qcFairPackage()" title="${esc(t('Open Ship Packages with this first article and its order — invoice, packing slip, CoCs, certs and this report in one PDF.'))}"><i class="ti ti-package"></i> ${t('Customer package')}</button>`:''}
     <button class="btn" onclick="showPage('fairs')">${t('Close')}</button>
   </div>
   <div class="card" id="fair-card">
@@ -5243,6 +5386,7 @@ function startListeners(){
   onValue(ref(db,'qc/drawings'),    s=> window.qcOnData('drawings', s.val()||{}));
   onValue(ref(db,'qc/drawingChecks'), s=> window.qcOnData('drawingChecks', s.val()||{}));
   onValue(ref(db,'qc/cocs'),        s=> window.qcOnData('cocs', s.val()||{}));
+  onValue(ref(db,'qc/packages'),    s=> window.qcOnData('packages', s.val()||{}), e=> console.warn('qc/packages not readable yet', e));
   onValue(ref(db,'orders'),         s=> window.qcOnData('orders', s.val()||{}));
   onValue(ref(db,'quotes'),         s=> window.qcOnData('quotes', s.val()||{}));
   startConnectionWatch();
