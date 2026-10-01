@@ -1836,7 +1836,7 @@ body.sb-hidden .topbar{padding-left:24px}
             <th style="width:80px">Invoice #</th>
             <th style="width:80px">Payment</th>
             <th style="width:96px">Archived</th>
-            <th style="width:104px"></th>
+            <th style="width:142px"></th>
           </tr></thead>
           <tbody id="archive-tbody"></tbody>
         </table>
@@ -3894,6 +3894,7 @@ function detailInner(r){
       <div class="detail-actions">
         <button class="act-ico" title="Edit full details" aria-label="Edit full details" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i></button>
         <button class="act-ico primary" title="Add part to this PO" aria-label="Add part to this PO" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i></button>
+        <button class="act-ico" title="Duplicate order — a reorder of this part: same customer, part, qty, price, drawing and steps, with a new PO and job #" aria-label="Duplicate order" onclick="window.duplicateOrder('${r.id}');event.stopPropagation()"><i class="ti ti-copy"></i></button>
         <button class="act-ico" title="Split order — turn in a partial qty now, or split off a production run to track separately; the balance stays due on the same PO" aria-label="Split order" onclick="window.openSplit('${r.id}');event.stopPropagation()"><i class="ti ti-scissors"></i></button>
         <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
         <button class="act-ico green" title="Customer confirmation" aria-label="Customer confirmation" onclick="window._showConfirmation('${r.id}');event.stopPropagation()"><i class="ti ti-receipt"></i></button>
@@ -5034,7 +5035,7 @@ function _snapEditForm(){
     buildOnly:document.getElementById('f-buildonly').checked};
 }
 window.openAdd=()=>{
-  editId=null;_prefillSteps=null;document.getElementById('modal-title').textContent='Add New Order';document.getElementById('save-btn').innerHTML='<i class="ti ti-check"></i> Save Order';
+  editId=null;_prefillSteps=null;_prefillDrawing=null;_prefillDupOf=null;document.getElementById('modal-title').textContent='Add New Order';document.getElementById('save-btn').innerHTML='<i class="ti ti-check"></i> Save Order';
   ['customer','po','job','part','desc','notes','invoice'].forEach(f=>document.getElementById('f-'+f).value='');
   ['qty','cost'].forEach(f=>document.getElementById('f-'+f).value='');
   document.getElementById('f-status').value='Received';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
@@ -5092,6 +5093,63 @@ window.addPartToPO = (id) => {
   document.getElementById('f-qty').value='';
   document.getElementById('f-cost').value='';
   setTimeout(()=>document.getElementById('f-part').focus(), 60);
+};
+
+// ── Duplicate order (reorder) ────────────────────────────────────────────────
+// A repeat order of a part we've made before: opens the Add form pre-filled from
+// the old line — customer, part, description, qty, price, the drawing and the
+// process steps — with a blank PO, a fresh job number, today as the order date
+// and no due date. Nothing carries over that belongs to the OLD job: completion,
+// done counts, pinned dates, holds, invoice/payment, split history, the PO email,
+// or purchase-line POs (vendors and what to buy stay; their POs/receipts reset).
+// Nothing is written until Save, so Cancel leaves no trace.
+let _prefillDrawing = null, _prefillDupOf = null;
+function stepsForReorder(steps){
+  return normList(steps).map(s=>{
+    const c = JSON.parse(JSON.stringify(s));
+    c.done=false; c.doneAt=null; c.qtyDone=null;
+    delete c.start; delete c.end; delete c.manual; delete c.conflict;   // dates belong to the old job
+    // legacy single-line purchase fields
+    if('vendorPO' in c) c.vendorPO=''; if('poAt' in c) c.poAt='';
+    if('sentAt' in c) c.sentAt=''; if('receivedAt' in c) c.receivedAt='';
+    const L = normList(s.lines);
+    if(L.length){
+      c.lines = L.map(l=>newStepLine({ desc:l.desc||'', pn:l.pn||'', qtyPer:l.qtyPer||'', uom:l.uom||'', cost:l.cost||'',
+        vendor:l.vendor||'',
+        // a typed buy qty only survives when there's no per-piece qty to recompute it from
+        qty:(l.qtyPer!==''&&l.qtyPer!=null) ? '' : (l.qty!=null?l.qty:'') }));
+    }
+    return c;
+  });
+}
+window.duplicateOrder = (id) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  if(document.getElementById('orders-page')?.style.display!=='block') window.showPage('orders');   // e.g. from the Archive
+  openAdd();
+  document.getElementById('modal-title').textContent = 'Duplicate order' + (r.po ? ' (reorder of PO ' + r.po + ')' : '');
+  document.getElementById('save-btn').innerHTML = '<i class="ti ti-copy"></i> Create order';
+  const sel = document.getElementById('f-customer-select');
+  const hasOption = Array.from(sel.options).some(o=>o.value===r.customer);
+  if(hasOption){ sel.value=r.customer; document.getElementById('f-customer').style.display='none'; document.getElementById('f-customer').value=r.customer; }
+  else { sel.value='__new__'; const ci=document.getElementById('f-customer'); ci.style.display='block'; ci.value=r.customer||''; }
+  document.getElementById('f-part').value = r.part||'';
+  document.getElementById('f-desc').value = r.desc||'';
+  document.getElementById('f-qty').value = r.qty||'';
+  document.getElementById('f-buildonly').checked = !!r.buildOnly; window._toggleBuildOnly(!!r.buildOnly);
+  if(!r.buildOnly) document.getElementById('f-cost').value = r.cost||'';
+  document.getElementById('f-po').value = '';
+  document.getElementById('f-ordered').value = new Date().toLocaleDateString('en-CA');   // today, local YYYY-MM-DD
+  document.getElementById('f-due').value = '';
+  // a NEW job base: suggestJobNumber(customer,'') would append to any of this
+  // customer's other blank-PO orders, and the reorder is its own job
+  document.getElementById('f-job').value = baseToString(jobCounter.letter, jobCounter.num) + '-1';
+  _prefillSteps = (r.schedule && r.schedule.steps) ? stepsForReorder(r.schedule.steps) : null;
+  // share an uploaded drawing by URL only (same as Split) — removing it from one
+  // order must never delete the file the other order still points at
+  _prefillDrawing = (r.drawing && r.drawing.url)
+    ? {url:r.drawing.url, label:r.drawing.label||r.drawing.name||'Drawing', name:r.drawing.name||'', ctype:r.drawing.ctype||''} : null;
+  _prefillDupOf = r.id;
+  setTimeout(()=>document.getElementById('f-po').focus(), 60);
 };
 
 // ── Split order (partial delivery) ───────────────────────────────────────────
@@ -5235,7 +5293,10 @@ window.saveOrder=()=>{
     schedule:ex.schedule||null};
   // if adding a part with copied process steps, seed its schedule
   if(!editId && _prefillSteps){ order.schedule = { steps: _prefillSteps }; }
-  _prefillSteps = null;
+  // duplicated from an older order: its drawing (by URL) and where it came from
+  if(!editId && _prefillDrawing) order.drawing = _prefillDrawing;
+  if(!editId && _prefillDupOf) order.dupOf = _prefillDupOf;
+  _prefillSteps = null; _prefillDrawing = null; _prefillDupOf = null;
   if(editId){const i=orders.findIndex(o=>o.id===editId);orders[i]=order;}else{orders.unshift(order);revealNewOrder(order.id);}
   maybeAdvanceCounter(order.job);
   saveDB();render();closeModal('add-modal');
@@ -7073,6 +7134,7 @@ function renderTrash(){
 }
 
 function renderArchive(){
+  const tb=document.getElementById('archive-tbody'); if(!tb) return;   // dropped by an old upload (fc78c52) — the page threw "tb is not defined"
   const q=(document.getElementById('archive-search')?.value||'').toLowerCase();
   let rows=orders.filter(r=>r.archived);
   if(q) rows=rows.filter(r=>[r.customer,r.po,r.job,r.part,r.desc,r.invoice].join(' ').toLowerCase().includes(q));
@@ -7095,7 +7157,8 @@ function renderArchive(){
       <td>${r.invoice||''}${r.invoiceDate?`<div style="font-size:11px;color:var(--text3)">${fmtDate(r.invoiceDate)}</div>`:''}</td>
       <td><span class="status-badge ${payCls}" style="cursor:pointer" title="Change payment status" onclick="window._pp('${r.id}',event)">${PAY_LABEL[r.payment||'Unpaid']||r.payment||'Open'}</span></td>
       <td style="font-size:12px;color:var(--text2)">${arch}</td>
-      <td><button class="btn sm" onclick="window._unarchiveOrder('${r.id}')"><i class="ti ti-arrow-back-up"></i> Restore</button></td>
+      <td style="white-space:nowrap"><button class="btn sm" onclick="window._unarchiveOrder('${r.id}')"><i class="ti ti-arrow-back-up"></i> Restore</button>
+        <button class="btn sm" title="Duplicate — start a new order for this part (new PO and job #)" aria-label="Duplicate order" onclick="window.duplicateOrder('${r.id}')"><i class="ti ti-copy"></i></button></td>
     </tr>`;
   }).join('');
 }
