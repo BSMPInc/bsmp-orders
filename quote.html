@@ -5359,6 +5359,7 @@ function saveQuote(){
     // Machine ops (tap/drill/csink)
     batchTapEnabled: gc('batch-tap-enabled'),
     btHandleMin: gv('bt-handle-min'), btHandleMax: gv('bt-handle-max'),
+    machineOpRows: machineOpRowsData(),
     // Bar stock fields
     barShape: gv('bar-shape'), barLength: gv('bar-length'), barCost: gv('bar-cost'),
     barPartLength: gv('bar-part-length'), barKerf: gv('bar-kerf'),
@@ -5498,6 +5499,7 @@ function resetForm(){
     weldNdtManual=false;
     const cc=document.getElementById('cnc-enabled'); if(cc){ cc.checked=false; toggleCnc(); }
     cncRunManual=false; cncLbManual=false; cncMrrManual=false;
+    clearMachineOps();
     const wCard=document.getElementById('weld-card'); if(wCard) wCard.style.display='none';
     const cCard=document.getElementById('cnc-card'); if(cCard) cCard.style.display='none';
     if(typeof syncOptCards==='function') syncOptCards(); }
@@ -6312,14 +6314,19 @@ function reloadQuote(id){
   // ---- Machine ops (tap/drill/csink) ----
   sv('bt-handle-min', q.btHandleMin);
   sv('bt-handle-max', q.btHandleMax);
-  const btCb=document.getElementById('batch-tap-enabled');
-  btCb.checked=false;
-  document.getElementById('batch-tap-inputs').style.display='none';
-  document.getElementById('batch-tap-label').style.background='var(--surface)';
-  document.getElementById('batch-tap-label').style.borderColor='var(--border2)';
-  document.getElementById('batch-tap-label').style.color='var(--text2)';
-  document.getElementById('batch-tap-dot').style.background='var(--border2)';
-  if(q.batchTapEnabled) toggleBatchTap();
+  // Rebuild this quote's own rows (batch mode still off, so nothing recalculates yet), then set the
+  // switch directly. Never toggle or add a default row here: that used to put a "Tap x2" row on
+  // every reopened quote and rewrite a 903 op's minutes.
+  clearMachineOps();
+  const savedMops=(Array.isArray(q.machineOpRows)?q.machineOpRows:Object.values(q.machineOpRows||{})).filter(Boolean);
+  savedMops.forEach(r=>addMachineOpRow(parseInt(r.type)||0, r.holes, r.smin, r.smax));
+  if(q.batchTapEnabled){
+    setBatchTapUI(true);
+    if(!savedMops.length){
+      const res=document.getElementById('batch-tap-result'); res.style.display='block';
+      res.innerHTML='Saved before calculator rows were kept: the 901–904 minutes above are as quoted. Add rows here to recalculate them.';
+    }
+  }
 
   // ---- Welding estimator ----
   const weCb=document.getElementById('weld-enabled');
@@ -6383,7 +6390,7 @@ function reloadQuote(id){
   calcSheetLoading();
   calcInspection();
   if(q.batchDeburrEnabled) calcBatchDeburr();
-  if(q.batchTapEnabled) calcBatchTap();
+  if(q.batchTapEnabled && savedMops.length) calcBatchTap();
   calculate();
   if(savedQbs.length) calcQtyBreaks(); else _qbClearResults();
 }
@@ -7197,22 +7204,48 @@ function removeMachineOpRow(id){
   calcBatchTap();
 }
 
-function toggleBatchTap(){
-  const cb = document.getElementById('batch-tap-enabled');
-  cb.checked = !cb.checked;
-  const enabled = cb.checked;
+// Show batch mode on/off without adding or recalculating anything.
+function setBatchTapUI(enabled){
+  document.getElementById('batch-tap-enabled').checked = !!enabled;
   document.getElementById('batch-tap-inputs').style.display = enabled ? 'block' : 'none';
   const label = document.getElementById('batch-tap-label');
   const dot = document.getElementById('batch-tap-dot');
   if(enabled){
     label.style.background='#f0fdf4'; label.style.borderColor='#4ade80'; label.style.color='#166534';
     dot.style.background='#22c55e';
-    if(machineOpRowCount===0) addMachineOpRow(0,2,3,5);
   } else {
     label.style.background='var(--surface)'; label.style.borderColor='var(--border2)'; label.style.color='var(--text2)';
     dot.style.background='var(--border2)';
   }
-  if(enabled) calcBatchTap();
+}
+// Empty the calculator. Rows left over from the previous quote used to stay in the DOM and
+// rewrite the next quote's 901-904 minutes (found on Macro-Blue 610-0767, 2026-10-02).
+function clearMachineOps(){
+  document.getElementById('machine-ops-rows').innerHTML='';
+  machineOpRowCount = 0;
+  const res=document.getElementById('batch-tap-result'); res.style.display='none'; res.innerHTML='';
+  setBatchTapUI(false);
+}
+// The calculator rows, saved with the quote so reopening it shows (and recalculates) the same thing.
+function machineOpRowsData(){
+  const rows=[];
+  for(let i=1; i<=machineOpRowCount; i++){
+    const t=document.getElementById('mop-type-'+i); if(!t) continue;
+    rows.push({ type: parseInt(t.value)||0,
+      holes: parseFloat(document.getElementById('mop-holes-'+i).value)||1,
+      smin: parseFloat(document.getElementById('mop-smin-'+i).value)||1,
+      smax: parseFloat(document.getElementById('mop-smax-'+i).value)||1 });
+  }
+  return rows;
+}
+
+function toggleBatchTap(){
+  const enabled = !document.getElementById('batch-tap-enabled').checked;
+  setBatchTapUI(enabled);
+  if(enabled){
+    if(machineOpRowCount===0) addMachineOpRow(0,2,3,5);
+    calcBatchTap();
+  }
 }
 
 function calcBatchTap(){
@@ -11002,7 +11035,7 @@ async function _qSnapBackfill(){
   }
 }
 // RTDB drops empty arrays / empty strings, so compare and restore on a normalised shape.
-const _Q_ARRAYS = ['laborLines','hwLines','outLines','qtyBreaks','matBreakRows','weldRows','gangParts'];
+const _Q_ARRAYS = ['laborLines','hwLines','outLines','qtyBreaks','matBreakRows','weldRows','gangParts','machineOpRows'];
 function _qFixArrays(r){ _Q_ARRAYS.forEach(k=>{ if(!Array.isArray(r[k])) r[k] = r[k] ? Object.values(r[k]) : []; }); return r; }
 function _qSig(q){
   const s={};
