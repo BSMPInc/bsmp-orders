@@ -3883,9 +3883,36 @@ const MATERIAL_DENSITY = {
   'Alu-6061T6': 0.098, // 6061-T6 aluminum
   'Alu-2024': 0.100    // 2024 aluminum
 };
-// Map the combined material string (e.g. "0.118 thk 316 SS") back to a density key.
 function densityForMaterialType(typeKey){
   return MATERIAL_DENSITY[typeKey] || 0.284; // default to steel if unknown
+}
+// Map the combined material string (e.g. "0.118 thk 316 SS") back to a material-type key ('' if unknown).
+function materialTypeFromName(matVal){
+  const s = String(matVal||'');
+  if (s.includes('Galv')) return 'Galv';
+  if (s.includes('CRS')) return 'CRS';
+  if (s.includes('316 SS')) return 'SS-316';
+  if (s.includes('304 SS') || s.includes('thk SS')) return 'SS-304';
+  if (s.includes('5052')) return 'Alu-5052';
+  if (s.includes('6061-T6')) return 'Alu-6061T6';
+  if (s.includes('6061')) return 'Alu-6061';
+  if (s.includes('2024')) return 'Alu-2024';
+  if (s.includes('Alu')) return 'Alu-5052';
+  return '';
+}
+// Density for weight pricing, read from the material NAME first. The "Material type" dropdown can be
+// stale when the material is set any other way (reloaded quote, helper script, custom name): HL337
+// "0.187 thk 304 SS" was weighed as 5052 aluminum (2026-10-02). The dropdown is only the last fallback.
+function densityForMaterial(matStr){
+  const s = String(matStr||'');
+  if (/titan/i.test(s)) return 0.163;
+  if (/brass/i.test(s)) return 0.307;
+  if (/copper/i.test(s)) return 0.324;
+  const t = materialTypeFromName(s);
+  if (t) return densityForMaterialType(t);
+  if (/\b(HRS|A36|steel)\b/i.test(s)) return 0.284;
+  const typeSel = document.getElementById('material-type');
+  return densityForMaterialType(typeSel ? typeSel.value : '');
 }
 
 const MATERIAL_THICKNESSES = {
@@ -4031,16 +4058,7 @@ function syncMaterialSelects(matVal) {
   if (!matVal) return;
   const typeSel = document.getElementById('material-type');
   const thkSel = document.getElementById('material-thickness');
-  let type = '';
-  if (matVal.includes('Galv')) type = 'Galv';
-  else if (matVal.includes('CRS')) type = 'CRS';
-  else if (matVal.includes('316 SS')) type = 'SS-316';
-  else if (matVal.includes('304 SS') || matVal.includes('thk SS')) type = 'SS-304';
-  else if (matVal.includes('5052')) type = 'Alu-5052';
-  else if (matVal.includes('6061-T6')) type = 'Alu-6061T6';
-  else if (matVal.includes('6061')) type = 'Alu-6061';
-  else if (matVal.includes('2024')) type = 'Alu-2024';
-  else if (matVal.includes('Alu')) type = 'Alu-5052';
+  const type = materialTypeFromName(matVal);
   if (type) {
     typeSel.value = type;
     onMaterialTypeChange();
@@ -4148,9 +4166,8 @@ function calculate(){
       matCostPart = gangMat;
     } else if(matPriceMode === 'weight'){
       // ---- WEIGHT-BASED MATERIAL PRICING ----
-      // Density for the selected material type.
-      const matType = document.getElementById('material-type').value;
-      const density = densityForMaterialType(matType);  // lb/in^3
+      // Density from the material name (the type dropdown can be stale).
+      const density = densityForMaterial(mat);           // lb/in^3
       const thickInch = guessThicknessInch(mat);         // numeric thickness in inches
       // Blank area: auto from part H x L unless the user overrode it.
       const autoArea = (ph && pl) ? (ph * pl) : 0;
@@ -4362,8 +4379,7 @@ function calculate(){
   const br=(label,val,sub='')=>`<div class="breakdown-row"><span class="breakdown-label">${label}${sub?`<span class="breakdown-sub">${sub}</span>`:''}</span><span class="breakdown-val">${val}</span></div>`;
   let matBasisNote;
   if(matMode!=='bar' && matPriceMode==='weight'){
-    const matType=document.getElementById('material-type').value;
-    const dens=densityForMaterialType(matType);
+    const dens=densityForMaterial(mat);
     const tIn=guessThicknessInch(mat);
     const area=(matwAreaManual&&parseFloat(document.getElementById('matw-area').value)>0)?parseFloat(document.getElementById('matw-area').value):((ph&&pl)?ph*pl:0);
     const scrap=parseFloat(document.getElementById('matw-scrap').value)||0;
@@ -6667,9 +6683,8 @@ function calcBreakForQty(qty){
 
     if(matPriceMode === 'weight'){
       // ---- WEIGHT-BASED MATERIAL PRICING ----
-      // Density for the selected material type.
-      const matType = document.getElementById('material-type').value;
-      const density = densityForMaterialType(matType);  // lb/in^3
+      // Density from the material name (the type dropdown can be stale).
+      const density = densityForMaterial(mat);           // lb/in^3
       const thickInch = guessThicknessInch(mat);         // numeric thickness in inches
       // Blank area: auto from part H x L unless the user overrode it.
       const autoArea = (ph && pl) ? (ph * pl) : 0;
