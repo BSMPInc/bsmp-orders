@@ -47,6 +47,28 @@ A read-only library of company documents: guides, equipment manuals, quality doc
 - **To add or revise a document:** put the file in `docs/<area>/` (commit it — `.gitattributes` marks PDFs binary), add/edit the `RESOURCES` row, bump `RES_UPDATED`. PDF builders live in `dev/` (`build_compressor_guide.py`, `build_compliance_guide.py`) and write straight into `docs/`.
 - ⚠️ The repo is **public**, so everything in `docs/` is public too. Never put passwords, serials, pricing or customer data in a resource document.
 
+## App update check (added 2026-10-05)
+
+A classic `<script>` just before `</body>`, the SAME block in orders.html and qc.html
+(keep them identical; search "App update check"). Shop tablets stay open for days and
+only get new app code on reload, so:
+- Every 5 min, on wake (`visibilitychange`) and on `online`, it sends a HEAD request (no-store) for
+  the page; if ETag / Last-Modified / size changed since its last look, it GETs the
+  page and fingerprints every inline `<style>` + `<script>` (FNV hash). The running
+  page's fingerprint is taken when the block runs, before any app code. Different =
+  a new version. GitHub Pages redeploys bump every file's ETag, so the content check
+  is what decides; no version number to bump by hand.
+- New version → green "A new version of this app is ready · Update / Later" bar at the
+  top (Later hides it 30 min; Spanish in QC via the classic-script `LANG`). After 3 min
+  with no pointer/key/touch/wheel input it reloads by itself, unless an input has focus
+  or anything `position:fixed` covers the middle of the screen (any dialog, viewer,
+  sign-in, QC full-screen FAR).
+- `window.bsmpAppVersion()` = `document.lastModified` formatted (= when GitHub Pages
+  published the loaded page). Shown in orders' Help modal (`[data-app-version]`) and
+  QC Settings. `window.bsmpCheckForUpdate()` runs a check now (handy for testing:
+  edit a local file, call it, the bar appears).
+- A change that touches ONLY static body markup (no CSS/JS) isn't detected.
+
 ## Core areas (where to work)
 
 - **Self-checks:** `viewSelfCheck`, `qcSaveSelf`, `qcPickResult`. Flagging a self-check auto-creates a linked NCR.

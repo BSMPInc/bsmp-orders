@@ -2277,6 +2277,7 @@ body.sb-hidden .topbar{padding-left:24px}
       <div class="help-sec"><b><i class="ti ti-menu-2"></i> Getting around</b><br>
         The <b>☰ menu button</b> (top-left) shows or hides the side menu — handy on a tablet. On a computer you can also just move the mouse to the left edge to peek at it.</div>
       <div style="font-size:12px;color:var(--text3);margin-top:6px">Tip: most things on a job — status, dates, prices — can be clicked and edited right in place.</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px"><i class="ti ti-refresh"></i> App version: <b data-app-version></b>. The app checks for a newer version every few minutes and shows an <b>Update</b> bar when there is one; an idle tablet updates by itself.</div>
     </div>
     <div style="margin-top:18px;display:flex;justify-content:flex-end"><button class="btn green" onclick="closeModal('help-modal')">Got it</button></div>
   </div>
@@ -10611,6 +10612,100 @@ window.openHelp = () => { document.getElementById('help-modal').style.display='f
   apply();
 })();
 document.getElementById('login-pass').addEventListener('keydown', e=>{ if(e.key==='Enter') window._login(); });
+</script>
+<script>
+/* ── App update check (same block in orders.html and qc.html) ──
+   Order data is live, but the app's own code only changes when the page reloads, so a
+   shop tablet left open keeps running yesterday's version. Every few minutes (and when
+   the tablet wakes up) this asks the site whether the page changed; if it did, it shows
+   an "Update" bar, and reloads by itself once the device has sat idle for a few minutes
+   with no dialog open and nothing being typed. Nothing is lost on reload: every change
+   is saved to the database as it's made.
+   "Changed" = the inline <script>/<style> code of the page on the site differs from the
+   code this page is running (fingerprinted when this block runs, before any app code
+   can add elements), so there is no version number to bump by hand. A cheap HEAD request
+   (ETag / Last-Modified / size) gates the full download. */
+(function(){
+  var CHECK_EVERY = 5*60*1000, IDLE_RELOAD = 3*60*1000, FIRST_CHECK = 45*1000;
+  function lang(){ try{ return (typeof LANG!=='undefined' && LANG==='es') ? 'es' : 'en'; }catch(e){ return 'en'; } }
+  var TXT = {
+    en:{msg:'A new version of this app is ready.', btn:'Update', later:'Later', auto:'It updates by itself when this screen is idle.', ver:'Version'},
+    es:{msg:'Hay una nueva versión de esta app.', btn:'Actualizar', later:'Después', auto:'Se actualiza sola cuando la pantalla no se usa.', ver:'Versión'}
+  };
+  function T(k){ return (TXT[lang()]||TXT.en)[k]; }
+  function hash(str){ var h=0x811c9dc5; for(var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,0x01000193); } return (h>>>0).toString(36)+':'+str.length; }
+  function fingerprint(doc){
+    var parts=[]; var els=doc.querySelectorAll('style, script:not([src])');
+    for(var i=0;i<els.length;i++){ parts.push(els[i].tagName+'|'+els[i].textContent); }
+    return hash(parts.join('\u0001'));
+  }
+  var running = fingerprint(document);          // the code this page is running
+  var lastKey = null, newFound = false, lastAct = Date.now(), dismissedAt = 0;
+  ['pointerdown','keydown','touchstart','wheel'].forEach(function(ev){ document.addEventListener(ev, function(){ lastAct=Date.now(); }, {capture:true, passive:true}); });
+
+  // Version label = when the loaded page was published (GitHub Pages' Last-Modified).
+  function versionText(){
+    var d=new Date(document.lastModified);
+    if(isNaN(d)) return '';
+    return d.toLocaleString(lang()==='es'?'es-US':'en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+  }
+  window.bsmpAppVersion = versionText;
+  function fillVersion(){ var els=document.querySelectorAll('[data-app-version]'); for(var i=0;i<els.length;i++) els[i].textContent=versionText(); }
+  fillVersion();
+
+  function busy(){
+    var a=document.activeElement;
+    if(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return true;
+    if(a && a.isContentEditable) return true;
+    // anything fixed-position over the middle of the screen = a dialog, viewer or sign-in is open
+    var el=document.elementFromPoint(Math.round(innerWidth/2), Math.round(innerHeight/2));
+    for(; el && el!==document.body && el!==document.documentElement; el=el.parentElement){
+      if(el.id==='app-update-bar') continue;
+      if(getComputedStyle(el).position==='fixed') return true;
+    }
+    return false;
+  }
+  function showBar(){
+    if(document.getElementById('app-update-bar')) return;
+    var el=document.createElement('div');
+    el.id='app-update-bar'; el.setAttribute('role','status');
+    el.style.cssText='position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:12px;flex-wrap:wrap;max-width:calc(100vw - 24px);background:#0f7a4f;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);font:600 13.5px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif';
+    el.innerHTML='<span style="font-size:18px;line-height:1" aria-hidden="true">&#8635;</span>'
+      +'<span style="flex:1;min-width:180px"><span>'+T('msg')+'</span><br><span style="font-weight:400;font-size:12px;opacity:.9">'+T('auto')+'</span></span>'
+      +'<button type="button" id="aub-go" style="flex:none;background:#fff;color:#0f7a4f;border:0;border-radius:8px;padding:8px 14px;font:800 13px system-ui,-apple-system,sans-serif;cursor:pointer">'+T('btn')+'</button>'
+      +'<button type="button" id="aub-later" style="flex:none;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.55);border-radius:8px;padding:7px 11px;font:600 12.5px system-ui,-apple-system,sans-serif;cursor:pointer">'+T('later')+'</button>';
+    document.body.appendChild(el);
+    el.querySelector('#aub-go').onclick=function(){ location.reload(); };
+    el.querySelector('#aub-later').onclick=function(){ dismissedAt=Date.now(); el.remove(); };
+  }
+  function onNewVersion(){
+    newFound=true;
+    if(!dismissedAt || Date.now()-dismissedAt > 30*60*1000) showBar();   // "Later" hides it for 30 min
+    if(Date.now()-lastAct > IDLE_RELOAD && !busy()) location.reload();
+  }
+  async function check(){
+    if(newFound){ onNewVersion(); return; }
+    if(!navigator.onLine) return;
+    try{
+      var url=location.pathname;
+      var h=await fetch(url,{method:'HEAD',cache:'no-store'});
+      if(!h.ok) return;
+      var key=(h.headers.get('etag')||'')+'|'+(h.headers.get('last-modified')||'')+'|'+(h.headers.get('content-length')||'');
+      if(key===lastKey) return;                  // nothing published since the last look
+      var r=await fetch(url,{cache:'no-store'});
+      if(!r.ok) return;
+      var doc=new DOMParser().parseFromString(await r.text(),'text/html');
+      lastKey=key;
+      if(fingerprint(doc)!==running) onNewVersion();
+    }catch(e){ /* offline or blocked: try again next time */ }
+  }
+  setTimeout(check, FIRST_CHECK);
+  setInterval(check, CHECK_EVERY);
+  setInterval(function(){ if(newFound && Date.now()-lastAct > IDLE_RELOAD && !busy()) location.reload(); }, 30*1000);
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible') setTimeout(check, 1500); });
+  window.addEventListener('online', function(){ setTimeout(check, 3000); });
+  window.bsmpCheckForUpdate = check;
+})();
 </script>
 </body>
 </html>

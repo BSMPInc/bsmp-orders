@@ -160,6 +160,28 @@ which is what collapses):
   and stays open; other groups start collapsed (`_dispOpened` / `bsmp_disp_opened`
   remembers the ones they open). Managers keep `_dispCollapsed` as before.
 
+## App update check (added 2026-10-05)
+
+A classic `<script>` just before `</body>`, the SAME block in orders.html and qc.html
+(keep them identical; search "App update check"). Shop tablets stay open for days and
+only get new app code on reload, so:
+- Every 5 min, on wake (`visibilitychange`) and on `online`, it sends a HEAD request (no-store) for
+  the page; if ETag / Last-Modified / size changed since its last look, it GETs the
+  page and fingerprints every inline `<style>` + `<script>` (FNV hash). The running
+  page's fingerprint is taken when the block runs, before any app code. Different =
+  a new version. GitHub Pages redeploys bump every file's ETag, so the content check
+  is what decides; no version number to bump by hand.
+- New version → green "A new version of this app is ready · Update / Later" bar at the
+  top (Later hides it 30 min; Spanish in QC via the classic-script `LANG`). After 3 min
+  with no pointer/key/touch/wheel input it reloads by itself, unless an input has focus
+  or anything `position:fixed` covers the middle of the screen (any dialog, viewer,
+  sign-in, QC full-screen FAR).
+- `window.bsmpAppVersion()` = `document.lastModified` formatted (= when GitHub Pages
+  published the loaded page). Shown in orders' Help modal (`[data-app-version]`) and
+  QC Settings. `window.bsmpCheckForUpdate()` runs a check now (handy for testing:
+  edit a local file, call it, the bar appears).
+- A change that touches ONLY static body markup (no CSS/JS) isn't detected.
+
 ## Core areas (where to work)
 
 - **Scheduling engine (the heart of the app):** `computeGlobalSchedule`, `computeStepDates`, `computeMustStart`, `ensureSchedule` / `getSched` / `invalidateSched`. Working-time math: `addWorkingDays`, `addWorkingHours`, `addBusinessDays`, `bizDaysBetween`, `nextBusinessDayStart`, `atWorkStart`, `workEnd`, `isWeekend`, `usHolidays`-style checks. Steps can be internal or external/outsourced (`isExternal`, `gatherExternalSteps`, `firstExtStep`).
