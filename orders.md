@@ -91,8 +91,9 @@ tabs + table, unchanged.
 - **Board:** three columns Now / Next / Waiting (`QB_COLS`). One card per part (order
   row): drawing thumbnail, customer, part/desc, job, qty, due, the part's current
   operation (`qbCurStep` = first enabled, not-done step in run order), who has it
-  (`.qb-who`: that step's assignee chip; an outside step with no assignee shows its
-  vendor; otherwise an amber "Unassigned") and an ops progress bar. Filter chips above the columns by current operation.
+  (`qbWhoHtml` → `.qb-who`: that step's assignee chip; an outside step with no
+  assignee shows its vendor; otherwise an amber "Unassigned"; Today cards show the
+  same line) and an ops progress bar. Filter chips above the columns by current operation.
 - **Data:** placement lives on the order itself as `r.qb = {col, seq, by, at, since}`,
   saved through `saveDB()` like any other order edit, so **no new RTDB path or rule**.
   `qbPlace` renumbers `seq` (10, 20, …) in the target column; `_qbRemove` deletes `r.qb`.

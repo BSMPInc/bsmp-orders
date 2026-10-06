@@ -6856,6 +6856,14 @@ function qbThumbHtml(r, size){
   return `<div class="${c}" title="Drawing (tap to view)"><i class="ti ti-file-type-pdf"></i></div>`;
 }
 
+// Who has the part right now (board + Today cards): the current step's assignee; an
+// outside step with nobody assigned shows its vendor; otherwise an amber "Unassigned".
+function qbWhoHtml(cur){
+  if(!cur) return '';
+  if(cur.assignee && personById(cur.assignee)) return `<div class="qb-who">${personChip(cur.assignee)}</div>`;
+  if(isExternal(cur.name) && !cur.name.startsWith('Purchasing-') && cur.vendor) return `<div class="qb-who"><i class="ti ti-truck-delivery"></i><span class="pc-name">${esc2(cur.vendor)}</span></div>`;
+  return `<div class="qb-who none"><i class="ti ti-user-question"></i>Unassigned</div>`;
+}
 function qbCardHtml(r, mgr){
   const cur=qbCurStep(r), pg=qbProgress(r);
   const allDone = pg.total>0 && pg.done===pg.total;
@@ -6866,11 +6874,7 @@ function qbCardHtml(r, mgr){
       ? `<span class="qb-step" style="color:${PROCESS_COLORS[cur.name]||'#5b6675'}">${procIcon(cur.name,14)}${esc2(shortProc(cur.name))}${cur.qtyDone?` · ${cur.qtyDone}/${r.qty||'?'}`:''}</span>`
       : `<span class="qb-step" style="color:var(--text3)">No operations set</span>`;
   const hold = cur ? holdChipHtml(holdActive(r, cur.name)) : '';
-  // who has the part right now: the current step's assignee (outside steps: the vendor)
-  const who = !cur ? ''
-    : (cur.assignee && personById(cur.assignee)) ? `<div class="qb-who">${personChip(cur.assignee)}</div>`
-    : (isExternal(cur.name) && !cur.name.startsWith('Purchasing-') && cur.vendor) ? `<div class="qb-who"><i class="ti ti-truck-delivery"></i><span class="pc-name">${esc2(cur.vendor)}</span></div>`
-    : `<div class="qb-who none"><i class="ti ti-user-question"></i>Unassigned</div>`;
+  const who = qbWhoHtml(cur);
   return `<div class="qb-card${allDone?' all-done':''}" data-qbid="${r.id}"${mgr?' draggable="true"':''} role="button" tabindex="0" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter')window._qbOpen('${r.id}')">
     ${qbThumbHtml(r)}
     <div class="qb-info">
@@ -7603,6 +7607,7 @@ function dispCardTop(r, stepChip, extraChips){
         <div class="qb-part">${r.part?`<b>${esc2(r.part)}</b>`:''}${r.part&&r.desc?' · ':''}${esc2(r.desc||'')}</div>
         <div class="qb-meta dc-meta">${r.job?`<span>Job ${esc2(r.job)}</span>`:''}<span>Qty ${r.qty||'—'}</span><span class="${over?'late':''}">Due ${r.due?fmtDate(r.due):'—'}</span>${extraChips.meta||''}</div>
         <div class="dc-chips">${stepChip}${extraChips.chips||''}</div>
+        ${extraChips.who||''}
       </div>
     </div>`;
 }
@@ -7630,7 +7635,7 @@ function dispatchRow(it, idx, total){
   return `<div class="disp-card${hold?' held':''}" data-oid="${r.id}" role="button" tabindex="0" title="Open the part card (drawing + operations)" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)window._qbOpen('${r.id}')">
     ${dispSeqBadge(idx)}
     ${r.priority===0?'<span class="qb-hot">HOT</span>':''}
-    ${dispCardTop(r, stepChip, {chips, meta})}
+    ${dispCardTop(r, stepChip, {chips, meta, who:qbWhoHtml(step)})}
     <div class="dc-actions">${done}${mgr}</div>
   </div>`;
 }
