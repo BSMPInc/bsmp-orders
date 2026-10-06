@@ -10,6 +10,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- pdf.js: first-page thumbnails of PDF drawings on the Work Queues board (same version as quote/qc) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>try{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -227,6 +230,73 @@ select:focus{border-color:var(--green)}
 @keyframes rowflash{0%{background:#fff6d6}100%{background:transparent}}
 .row-flash td{animation:rowflash 1.6s ease-out}
 .ci-row.row-flash{animation:rowflash 1.6s ease-out}
+/* ── Work Queues board: Now / Next / Waiting columns of part cards ── */
+.qv-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.qv-toggle{display:inline-flex;border:1px solid var(--border2);background:var(--card)}
+.qv-toggle button{font:inherit;font-size:13px;font-weight:600;padding:8px 14px;border:0;background:transparent;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.qv-toggle button.active{background:var(--navy3);color:#fff}
+.qv-help{font-size:12px;color:var(--text3)}
+.qb-filter{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.qb-filter .qt-dot{width:9px;height:9px;display:inline-block;flex:none}
+.qb-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}
+.qb-col{background:var(--card);border:1px solid var(--border);border-top:4px solid var(--qbc,#8a93a5);min-height:240px;display:flex;flex-direction:column}
+.qb-col-h{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;flex-wrap:wrap}
+.qb-col-h b{font-size:16px}
+.qb-col-hint{font-size:11px;color:var(--text3)}
+.qb-col-body{display:flex;flex-direction:column;gap:10px;padding:6px 10px 12px;flex:1}
+.qb-col.drag-over{background:#fbf6ea}
+.qb-card{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;background:#fff;border:1px solid var(--border2);padding:8px;cursor:pointer;position:relative;transition:border-color .12s,box-shadow .12s}
+.qb-card:hover{border-color:var(--navy3);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.qb-card.dragging{opacity:.4}
+.qb-card.row-flash{animation:rowflash 1.6s ease-out}
+.qb-card.all-done{background:#f1f8f3;border-color:#bfe0cb}
+.qb-thumb{width:104px;height:80px;border:1px solid var(--border);background:#f6f5f1;display:flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
+.qb-thumb img{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
+.qb-thumb .ti{font-size:30px;color:var(--text3)}
+.qb-info{min-width:0;display:flex;flex-direction:column;gap:3px}
+.qb-cust{font-size:15.5px;font-weight:800;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:34px}
+.qb-part{font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qb-meta{font-size:11.5px;color:var(--text2);display:flex;gap:4px 10px;flex-wrap:wrap}
+.qb-meta .over{color:var(--red);font-weight:700}
+.qb-step{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;align-self:flex-start;padding:2px 9px;border:1px solid currentColor;border-radius:12px;background:#fff;max-width:100%}
+.qb-prog{height:5px;background:var(--border);margin-top:3px}
+.qb-prog span{display:block;height:100%;background:var(--green)}
+.qb-hot{position:absolute;top:7px;right:7px;font-size:10px;font-weight:800;color:#fff;background:#A32D2D;padding:1px 6px;border-radius:8px}
+.qb-empty{font-size:12.5px;color:var(--text3);text-align:center;padding:26px 10px;border:1px dashed var(--border2)}
+@media (max-width:980px){ .qb-cols{grid-template-columns:1fr} }
+@media (pointer: coarse){ .qv-toggle button{padding:11px 16px;font-size:14px} .qb-cust{font-size:17px} }
+/* card dialog: big drawing on the left, the part's operations on the right */
+.modal.qbd{width:1240px;max-width:97vw;height:93vh;max-height:93vh;padding:0;display:flex;flex-direction:column;overflow:hidden}
+.qbd-head{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--card)}
+.qbd-title{flex:1;min-width:0}
+.qbd-cust{font-size:20px;font-weight:800;line-height:1.15}
+.qbd-sub{font-size:13px;color:var(--text);margin-top:2px}
+.qbd-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.qbd-chip{font-size:11.5px;font-weight:600;color:var(--text2);border:1px solid var(--border2);padding:2px 8px;background:#fff}
+.qbd-chip.over{color:var(--red);border-color:var(--red)}
+.qbd-body{flex:1;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(340px,1fr);min-height:0}
+.qbd-draw{background:#3a3a3a;position:relative;min-height:0;overflow:auto;display:flex;align-items:flex-start;justify-content:center}
+.qbd-draw img{max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;cursor:zoom-in;background:#fff}
+.qbd-draw iframe{width:100%;height:100%;border:0;background:#fff}
+.qbd-draw .qbd-nodraw{color:#ddd;font-size:14px;margin:auto;text-align:center;padding:20px}
+.qbd-full{position:absolute;top:10px;right:10px;z-index:2}
+.qbd-ops{overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;border-left:1px solid var(--border);background:var(--bg)}
+.qbd-ops-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--text2)}
+.qbd-op{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border2);background:#fff}
+.qbd-op.done{background:#f1f8f3;border-color:#bfe0cb}
+.qbd-op.pending .qbd-op-name{color:var(--text2)}
+.qbd-op-name{display:flex;align-items:center;gap:7px;font-weight:700;font-size:14.5px}
+.qbd-op-sub{font-size:11.5px;color:var(--text2);margin-top:3px;display:flex;gap:6px 10px;flex-wrap:wrap;align-items:center}
+.qbd-qty{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);white-space:nowrap}
+.qbd-place{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px}
+.qbd-place .btn.on{background:var(--navy3);border-color:var(--navy3);color:#fff}
+@media (max-width:900px){ .qbd-body{grid-template-columns:1fr;grid-template-rows:42vh minmax(0,1fr)} .qbd-ops{border-left:0;border-top:1px solid var(--border)} }
+/* "Add jobs" picker */
+.qba-list{max-height:62vh;overflow-y:auto;border-top:1px solid var(--border)}
+.qba-row{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border)}
+.qba-row .qb-thumb{width:80px;height:62px}
+.qba-btns{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:640px){ .qba-row{grid-template-columns:64px minmax(0,1fr)} .qba-row .qb-thumb{width:64px;height:50px} .qba-btns{grid-column:1 / -1;justify-content:flex-start} }
 /* Operator (restricted) role — hide manager-only chrome */
 body.role-operator .mgr-only{display:none !important}
 body.role-operator .op-only{display:block !important}
@@ -1616,6 +1686,16 @@ body.sb-hidden .topbar{padding-left:24px}
 
   <!-- Work Queues Page -->
   <div id="queues-page" style="display:none">
+    <div class="qv-bar">
+      <div class="qv-toggle" role="group" aria-label="Work Queues view">
+        <button id="qv-board" type="button" onclick="setQueueView('board')"><i class="ti ti-layout-columns"></i> Board</button>
+        <button id="qv-list" type="button" onclick="setQueueView('list')"><i class="ti ti-list"></i> List</button>
+      </div>
+      <span class="qv-help" id="qv-help">Tap a card to see the drawing and check off operations.</span>
+      <button class="btn sm mgr-only" id="qb-add-btn" type="button" style="margin-left:auto" onclick="window._qbAddOpen()"><i class="ti ti-plus"></i> Add jobs to board</button>
+    </div>
+    <div id="qb-wrap"></div>
+    <div id="ql-wrap">
     <div id="queue-tabs" class="queue-tabs"></div>
     <div class="table-card">
       <div class="table-card-header">
@@ -1626,6 +1706,7 @@ body.sb-hidden .topbar{padding-left:24px}
         </div>
       </div>
       <div id="queue-body"></div>
+    </div>
     </div>
   </div>
 
@@ -2090,6 +2171,28 @@ body.sb-hidden .topbar{padding-left:24px}
 </div>
 
 <!-- Drawing Viewer (zoomable lightbox) -->
+<!-- Work Queues board: one part's card opened (drawing + operations). z 60 so the
+     confirm-done (70) and full drawing viewer (90) open on top of it. -->
+<div class="modal-bg" id="qb-modal" style="display:none;z-index:60" onclick="if(event.target===this)window._qbClose()">
+  <div class="modal qbd" role="dialog" aria-modal="true" aria-labelledby="qbd-cust">
+    <div class="qbd-head" id="qbd-head"></div>
+    <div class="qbd-body">
+      <div class="qbd-draw" id="qbd-draw"></div>
+      <div class="qbd-ops" id="qbd-ops"></div>
+    </div>
+  </div>
+</div>
+<!-- Work Queues board: pick open parts to put on the board -->
+<div class="modal-bg" id="qb-add-modal" style="display:none;z-index:60" onclick="if(event.target===this)closeModal('qb-add-modal')">
+  <div class="modal" style="width:820px">
+    <div class="modal-header"><i class="ti ti-layout-columns"></i><h2>Add jobs to the board</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('qb-add-modal')"><i class="ti ti-x"></i></button></div>
+    <input id="qba-search" type="search" placeholder="Search customer, part, job # or PO…" autocomplete="off" oninput="window._qbAddSearch(this.value)" style="width:100%;font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--border2);margin-bottom:6px">
+    <div id="qba-msg" style="font-size:12px;color:var(--green);min-height:18px;font-weight:600"></div>
+    <div class="qba-list" id="qba-list"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="draw-modal" style="display:none;z-index:90">
   <div class="modal" style="max-width:94vw;width:1100px;height:92vh;padding:0;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card)">
@@ -2734,6 +2837,7 @@ function startDataListeners(){
     tryRevealDeepOrder();
     if(document.getElementById('archive-page')?.style.display==='block') renderArchive();
     if(document.getElementById('board-page')?.style.display!=='none') renderBoardPage();
+    queuesLiveRefresh();   // Work Queues (board or list) follows other devices' changes
   }, () => setSyncStatus('error'));
   startCustomerListener();
   startTeamListener();
@@ -6425,6 +6529,9 @@ function renderOfficeQueue(officeOrders, name){
     + section('Ready to Invoice',   officeOrders.filter(r=>r.status==='Ready for Invoice'));
 }
 function renderQueues(){
+  qbApplyView();
+  if(_queueView==='board'){ renderQueueBoard(); return; }
+  if(_qbOpenId) renderQbDialog();
   const tabsEl=document.getElementById('queue-tabs'); if(!tabsEl) return;
   const live = orders.filter(r=>!r.archived);
   const officeOrders = live.filter(r=>OFFICE_STATUSES.includes(r.status));
@@ -6589,6 +6696,392 @@ function renderQueues(){
     <tbody>${trs}</tbody>
   </table></div>`;
 }
+
+// ══════════════ WORK QUEUES BOARD (Now / Next / Waiting) ══════════════
+// The Board view of Work Queues: one card per part (order row), placed by a manager
+// in one of three columns. Placement lives ON THE ORDER as r.qb = {col, seq, by, at}
+// so it saves through saveDB() like everything else (no new Firebase path or rule).
+// Cards show the drawing thumbnail + customer; tapping a card opens a dialog with the
+// big drawing and the part's operations, where operators enter qty and check steps off
+// (same _stepQty / _toggleStepDone handlers the List view uses).
+const QB_COLS = [
+  {k:'now',  label:'Now',     hint:'On the floor now',                     color:'#0f7a4f'},
+  {k:'next', label:'Next',    hint:'Up next',                              color:'#BA7517'},
+  {k:'wait', label:'Waiting', hint:'Parked: material, PO or outside work', color:'#8a93a5'},
+];
+const QB_COL_KEYS = QB_COLS.map(c=>c.k);
+const QB_HIDE_STATUSES = ['Invoiced','Completed','Ready for Invoice'];   // not offered in "Add jobs"
+let _queueView = (()=>{ try{ return localStorage.getItem('bsmp_queue_view')==='list' ? 'list' : 'board'; }catch(e){ return 'board'; } })();
+let _qbProc = '';            // board filter: '' all, a step name, or '__done__'
+let _qbOpenId = null;        // order id whose dialog is open
+let _qbDrawKey = null;       // what the dialog's drawing pane is showing (avoid reloading the PDF on every repaint)
+let _qbDlgDirty = false;     // a repaint was skipped while someone was typing in the dialog
+let _qbDragId = null;
+let _qPendingRefresh = false;
+let _qbAddQ = '';
+
+window.setQueueView = (v) => {
+  _queueView = v==='list' ? 'list' : 'board';
+  try{ localStorage.setItem('bsmp_queue_view', _queueView); }catch(e){}
+  renderQueues();
+};
+function qbApplyView(){
+  const board = _queueView==='board';
+  const bw=document.getElementById('qb-wrap'), lw=document.getElementById('ql-wrap');
+  if(bw) bw.style.display = board ? '' : 'none';
+  if(lw) lw.style.display = board ? 'none' : '';
+  document.getElementById('qv-board')?.classList.toggle('active', board);
+  document.getElementById('qv-list')?.classList.toggle('active', !board);
+  const add=document.getElementById('qb-add-btn'); if(add) add.style.display = board ? '' : 'none';
+  const help=document.getElementById('qv-help'); if(help) help.style.display = board ? '' : 'none';
+}
+function qbOnBoard(r){ return !!(r && !r.archived && r.qb && QB_COL_KEYS.includes(r.qb.col)); }
+function qbCurStep(r){ return enabledOrdered(ensureSchedule(r)).find(s=>!s.done) || null; }
+function qbProgress(r){ const ord=enabledOrdered(ensureSchedule(r)); return {done:ord.filter(s=>s.done).length, total:ord.length}; }
+function qbSort(a,b){
+  const sa=(a.qb&&a.qb.seq!=null)?a.qb.seq:1e9, sb=(b.qb&&b.qb.seq!=null)?b.qb.seq:1e9;
+  const da=a.due?new Date(a.due+'T00:00:00').getTime():8.64e15, db_=b.due?new Date(b.due+'T00:00:00').getTime():8.64e15;
+  return (sa-sb) || (da-db_);
+}
+function qbWho(){ return ((auth.currentUser&&auth.currentUser.email)||'').toLowerCase(); }
+function qbIsOver(r){ return r.due && new Date(r.due+'T00:00:00') < new Date(new Date().toDateString()); }
+function qbIsPdf(d){ return /\.pdf(\?|$)/i.test(d.url||'') || (d.ctype||'')==='application/pdf'; }
+function qbIsImg(d){ return isImageUrl(d.url) || (d.ctype||'').startsWith('image/'); }
+
+// ── drawing thumbnails ── images show as-is; PDFs get their first page rendered by
+// pdf.js (needs Storage CORS for this site's origin, so on localhost they fall back to
+// an icon). Rendered thumbs are cached in memory and in localStorage (newest 60).
+const _qbThumbs = {};          // url -> dataURL | 'loading' | 'fail'
+let _qbThumbQueue = [], _qbThumbBusy = false, _qbThumbRepaint = null;
+function qbThumbKey(url){ let h=0; for(let i=0;i<url.length;i++){ h=(h*31+url.charCodeAt(i))|0; } return 'bsmp_qbt_'+(h>>>0).toString(36); }
+function qbThumbCached(url){
+  if(_qbThumbs[url]) return _qbThumbs[url];
+  try{ const v=localStorage.getItem(qbThumbKey(url)); if(v){ _qbThumbs[url]=v; return v; } }catch(e){}
+  return null;
+}
+function qbThumbStore(url, data){
+  try{
+    const key=qbThumbKey(url);
+    let idx=[]; try{ idx=JSON.parse(localStorage.getItem('bsmp_qbt_index')||'[]')||[]; }catch(e){}
+    idx=idx.filter(k=>k!==key); idx.push(key);
+    while(idx.length>60){ const old=idx.shift(); try{ localStorage.removeItem(old); }catch(e){} }
+    localStorage.setItem(key, data);
+    localStorage.setItem('bsmp_qbt_index', JSON.stringify(idx));
+  }catch(e){ /* storage full or blocked: memory cache still works */ }
+}
+async function qbThumbPump(){
+  if(_qbThumbBusy) return; _qbThumbBusy=true;
+  while(_qbThumbQueue.length){
+    const url=_qbThumbQueue.shift();
+    try{
+      if(!window.pdfjsLib) throw new Error('no pdf.js');
+      const pdf=await pdfjsLib.getDocument({url}).promise;
+      const page=await pdf.getPage(1);
+      const v0=page.getViewport({scale:1});
+      const vp=page.getViewport({scale: 360/Math.max(v0.width, v0.height)});
+      const c=document.createElement('canvas'); c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+      const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+      await page.render({canvasContext:ctx, viewport:vp}).promise;
+      const data=c.toDataURL('image/jpeg', 0.75);
+      _qbThumbs[url]=data; qbThumbStore(url, data);
+      try{ pdf.destroy(); }catch(e){}
+    }catch(e){ _qbThumbs[url]='fail'; }
+    clearTimeout(_qbThumbRepaint); _qbThumbRepaint=setTimeout(queuesLiveRefresh, 200);
+  }
+  _qbThumbBusy=false;
+}
+function qbThumbHtml(r){
+  const d=r.drawing||{};
+  if(!d.url) return `<div class="qb-thumb" title="No drawing attached"><i class="ti ti-photo-off"></i></div>`;
+  if(qbIsImg(d)) return `<div class="qb-thumb"><img src="${esc2(d.url)}" loading="lazy" alt="Drawing"></div>`;
+  const t=qbThumbCached(d.url);
+  if(t && t!=='fail' && t!=='loading') return `<div class="qb-thumb"><img src="${t}" alt="Drawing"></div>`;
+  if(!t && qbIsPdf(d)){ _qbThumbs[d.url]='loading'; _qbThumbQueue.push(d.url); qbThumbPump(); }
+  return `<div class="qb-thumb" title="Drawing (tap the card to view)"><i class="ti ti-file-type-pdf"></i></div>`;
+}
+
+function qbCardHtml(r, mgr){
+  const cur=qbCurStep(r), pg=qbProgress(r);
+  const allDone = pg.total>0 && pg.done===pg.total;
+  const over = qbIsOver(r) && !allDone;
+  const step = allDone
+    ? `<span class="qb-step" style="color:var(--green)"><i class="ti ti-circle-check-filled"></i>All operations done</span>`
+    : cur
+      ? `<span class="qb-step" style="color:${PROCESS_COLORS[cur.name]||'#5b6675'}">${procIcon(cur.name,14)}${esc2(shortProc(cur.name))}${cur.qtyDone?` · ${cur.qtyDone}/${r.qty||'?'}`:''}</span>`
+      : `<span class="qb-step" style="color:var(--text3)">No operations set</span>`;
+  const hold = cur ? holdChipHtml(holdActive(r, cur.name)) : '';
+  return `<div class="qb-card${allDone?' all-done':''}" data-qbid="${r.id}"${mgr?' draggable="true"':''} role="button" tabindex="0" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter')window._qbOpen('${r.id}')">
+    ${qbThumbHtml(r)}
+    <div class="qb-info">
+      <div class="qb-cust" title="${esc2(r.customer||'')}">${esc2(r.customer||'—')}</div>
+      <div class="qb-part">${r.part?`<b>${esc2(r.part)}</b>`:''}${r.part&&r.desc?' · ':''}${esc2(r.desc||'')}</div>
+      <div class="qb-meta">${r.job?`<span>Job ${esc2(r.job)}</span>`:''}<span>Qty ${r.qty||'—'}</span><span class="${over?'over':''}">Due ${r.due?fmtDate(r.due):'—'}</span></div>
+      <div>${step}${hold}</div>
+      ${pg.total?`<div class="qb-prog" title="${pg.done} of ${pg.total} operations done"><span style="width:${Math.round(pg.done/pg.total*100)}%"></span></div>`:''}
+    </div>
+    ${r.priority===0?'<span class="qb-hot">HOT</span>':''}
+  </div>`;
+}
+
+function renderQueueBoard(){
+  const wrap=document.getElementById('qb-wrap'); if(!wrap) return;
+  const mgr = userRole!=='operator';
+  const onBoard = orders.filter(qbOnBoard);
+  // filter chips by each card's current operation
+  const counts={}; let doneN=0;
+  onBoard.forEach(r=>{ const c=qbCurStep(r); if(c) counts[c.name]=(counts[c.name]||0)+1; else doneN++; });
+  if(_qbProc && _qbProc!=='__done__' && !counts[_qbProc]) _qbProc='';
+  if(_qbProc==='__done__' && !doneN) _qbProc='';
+  const chip = (key, label, n, dot) => `<button class="q-pchip${_qbProc===key?' on':''}" onclick="window._qbFilter('${key.replace(/'/g,"\\'")}')">${dot?`<span class="qt-dot" style="background:${dot}"></span>`:''}${label}<span class="q-pchip-n">${n}</span></button>`;
+  const filters = onBoard.length ? `<div class="qb-filter"><span class="q-pb-label">Show</span>`
+    + chip('', 'All jobs', onBoard.length)
+    + PROCESSES.filter(p=>counts[p]).map(p=>chip(p, esc2(shortProc(p)), counts[p], PROCESS_COLORS[p]||'#888')).join('')
+    + (doneN ? chip('__done__', 'All ops done', doneN, '#0f7a4f') : '')
+    + `</div>` : '';
+  const show = r => !_qbProc || (_qbProc==='__done__' ? !qbCurStep(r) : (qbCurStep(r)||{}).name===_qbProc);
+  const cols = QB_COLS.map(c=>{
+    const list = onBoard.filter(r=>r.qb.col===c.k).sort(qbSort);
+    const vis = list.filter(show);
+    const body = vis.length ? vis.map(r=>qbCardHtml(r, mgr)).join('')
+      : `<div class="qb-empty">${list.length ? 'No cards here match the filter above.' : (mgr ? 'Drag a card here, or use <b>Add jobs to board</b>.' : 'Nothing here yet.')}</div>`;
+    return `<div class="qb-col" data-col="${c.k}" style="--qbc:${c.color}">
+      <div class="qb-col-h"><b>${c.label}</b><span class="queue-count-pill">${list.length}</span><span class="qb-col-hint">${c.hint}</span></div>
+      <div class="qb-col-body">${body}</div>
+    </div>`;
+  }).join('');
+  const intro = onBoard.length ? '' : `<div class="empty-state" style="padding:18px 10px 6px"><i class="ti ti-layout-columns"></i><p>${mgr
+    ? 'The board is empty. Use <b>Add jobs to board</b> to put parts in Now, Next or Waiting.'
+    : 'No jobs on the board yet. Switch to <b>List</b> to see every queue.'}</p></div>`;
+  wrap.innerHTML = filters + intro + `<div class="qb-cols">${cols}</div>`;
+  if(mgr) qbWireDnD(wrap);
+  if(_qbOpenId) renderQbDialog();
+}
+window._qbFilter = (k) => { _qbProc = k; renderQueueBoard(); };
+
+// ── drag a card between / within columns (managers, mouse) ──
+function qbWireDnD(wrap){
+  wrap.querySelectorAll('.qb-card[draggable]').forEach(el=>{
+    el.addEventListener('dragstart', e=>{
+      _qbDragId=el.dataset.qbid; el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move'; try{ e.dataTransfer.setData('text/plain', _qbDragId); }catch(_){}
+    });
+    el.addEventListener('dragend', ()=>{
+      el.classList.remove('dragging'); _qbDragId=null;
+      wrap.querySelectorAll('.qb-col.drag-over').forEach(c=>c.classList.remove('drag-over'));
+      if(_qPendingRefresh){ _qPendingRefresh=false; queuesLiveRefresh(); }
+    });
+  });
+  wrap.querySelectorAll('.qb-col').forEach(col=>{
+    col.addEventListener('dragover', e=>{ if(!_qbDragId) return; e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', e=>{ if(!col.contains(e.relatedTarget)) col.classList.remove('drag-over'); });
+    col.addEventListener('drop', e=>{
+      if(!_qbDragId) return; e.preventDefault(); col.classList.remove('drag-over');
+      const id=_qbDragId;
+      const cards=[...col.querySelectorAll('.qb-card')].filter(c=>c.dataset.qbid!==id);
+      let before=null;
+      for(const c of cards){ const b=c.getBoundingClientRect(); if(e.clientY < b.top+b.height/2){ before=c.dataset.qbid; break; } }
+      qbPlace(id, col.dataset.col, before);
+    });
+  });
+}
+// Put a part in a column, before `beforeId` (or at the end), and renumber that column.
+function qbPlace(id, col, beforeId){
+  const r=orders.find(o=>o.id===id); if(!r || !QB_COL_KEYS.includes(col)) return;
+  const list=orders.filter(o=>qbOnBoard(o) && o.qb.col===col && o.id!==id).sort(qbSort);
+  let at = beforeId ? list.findIndex(o=>o.id===beforeId) : -1;
+  if(at<0) at=list.length;
+  list.splice(at, 0, r);
+  const now=new Date().toISOString(), who=qbWho();
+  const sameCol = qbOnBoard(r) && r.qb.col===col;
+  list.forEach((o,i)=>{
+    const seq=(i+1)*10;
+    if(o===r) o.qb = {col, seq, by:who, at:now, since: sameCol ? (r.qb.since||now) : now};
+    else if(o.qb.seq!==seq) o.qb = {...o.qb, seq};
+  });
+  saveDB(); renderQueues();
+}
+// Move a part one spot up/down inside its column.
+function qbNudge(id, dir){
+  const r=orders.find(o=>o.id===id); if(!qbOnBoard(r)) return;
+  const list=orders.filter(o=>qbOnBoard(o) && o.qb.col===r.qb.col).sort(qbSort);
+  const i=list.indexOf(r), j=i+dir;
+  if(i<0 || j<0 || j>=list.length) return;
+  [list[i], list[j]] = [list[j], list[i]];
+  list.forEach((o,k)=>{ const seq=(k+1)*10; if(o.qb.seq!==seq) o.qb={...o.qb, seq}; });
+  saveDB(); renderQueues();
+}
+window._qbMove = (id, col) => { if(userRole==='operator') return; qbPlace(id, col, null); };
+window._qbNudge = (id, dir) => { if(userRole==='operator') return; qbNudge(id, dir); };
+window._qbRemove = (id) => {
+  if(userRole==='operator') return;
+  const r=orders.find(o=>o.id===id); if(!r || !r.qb) return;
+  delete r.qb;
+  saveDB(); renderQueues();
+};
+
+// ── the card dialog ──
+window._qbOpen = (id) => {
+  if(!orders.find(o=>o.id===id)) return;
+  _qbOpenId=id; _qbDrawKey=null; _qbDlgDirty=false;
+  document.getElementById('qb-modal').style.display='flex';
+  renderQbDialog();
+};
+window._qbClose = () => {
+  _qbOpenId=null; _qbDrawKey=null;
+  const m=document.getElementById('qb-modal'); m.style.display='none';
+  document.getElementById('qbd-draw').innerHTML='';
+};
+function qbDlgTyping(){
+  const a=document.activeElement, m=document.getElementById('qb-modal');
+  return !!(a && m && m.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName));
+}
+function renderQbDialog(){
+  if(!_qbOpenId) return;
+  const r=orders.find(o=>o.id===_qbOpenId);
+  if(!r || r.archived){ window._qbClose(); return; }
+  if(qbDlgTyping()){ _qbDlgDirty=true; return; }   // don't wipe a number someone is typing
+  _qbDlgDirty=false;
+  const mgr = userRole!=='operator';
+  const pg=qbProgress(r);
+  const over=qbIsOver(r) && !(pg.total && pg.done===pg.total);
+  // header
+  document.getElementById('qbd-head').innerHTML = `
+    <div class="qbd-title">
+      <div class="qbd-cust" id="qbd-cust">${esc2(r.customer||'—')}</div>
+      <div class="qbd-sub">${r.part?`<b>${esc2(r.part)}</b>`:''}${r.part&&r.desc?' · ':''}${esc2(r.desc||'')}</div>
+      <div class="qbd-chips">
+        ${r.job?`<span class="qbd-chip">Job ${esc2(r.job)}</span>`:''}
+        ${r.po?`<span class="qbd-chip">PO ${esc2(r.po)}</span>`:''}
+        <span class="qbd-chip">Qty ${r.qty||'—'}</span>
+        <span class="qbd-chip${over?' over':''}">Due ${r.due?fmtDate(r.due):'—'}</span>
+        <span class="qbd-chip" style="color:${PRIORITY_COLOR[r.priority==null?2:r.priority]}">${PRIORITY_LABEL[r.priority==null?2:r.priority]} priority</span>
+        ${pg.total?`<span class="qbd-chip">${pg.done} of ${pg.total} operations done</span>`:''}
+      </div>
+    </div>
+    <span onclick="event.stopPropagation()">${chatBtnHtml(r.customer, r.po, '', r.id)}</span>
+    ${mgr?`<button class="btn sm" title="Open this order in Open Orders" onclick="window._qbClose();window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i> Order</button>`:''}
+    <button class="btn sm" title="Close" aria-label="Close" onclick="window._qbClose()"><i class="ti ti-x"></i></button>`;
+  // drawing (only rebuilt when it changes, so a PDF doesn't reload on every repaint)
+  const d=r.drawing||{};
+  const drawKey=r.id+'|'+(d.url||'');
+  if(drawKey!==_qbDrawKey){
+    _qbDrawKey=drawKey;
+    const pane=document.getElementById('qbd-draw');
+    if(!d.url) pane.innerHTML = `<div class="qbd-nodraw"><i class="ti ti-photo-off" style="font-size:40px;display:block;margin-bottom:8px"></i>No drawing attached to this part.</div>`;
+    else if(qbIsImg(d)) pane.innerHTML = `<button class="btn sm qbd-full" onclick="window._openDrawing('${r.id}',event)"><i class="ti ti-zoom-in"></i> Zoom</button><img src="${esc2(d.url)}" alt="Drawing" onclick="window._openDrawing('${r.id}',event)">`;
+    else pane.innerHTML = `<a class="btn sm qbd-full" href="${esc2(d.url)}" target="_blank" rel="noopener" style="text-decoration:none"><i class="ti ti-external-link"></i> Open full size</a><iframe src="${esc2(driveDirectView(d.url)||d.url)}" title="Drawing"></iframe>`;
+  }
+  // operations
+  const ord=enabledOrdered(ensureSchedule(r));
+  const need=r.qty||0;
+  const rows = ord.map(s=>{
+    const nameJs=s.name.replace(/'/g,"\\'");
+    const external=isExternal(s.name), purch=s.name.startsWith('Purchasing-');
+    const checkable=!external || purch;
+    const st=stepStatus(r, s.name);
+    const cls = s.done ? 'done' : (st==='pending' ? 'pending' : '');
+    const badge = s.done
+      ? `<span class="q-badge" style="background:#eaf5d8;color:#3B6D11">Done${s.doneAt?' '+fmtDate(String(s.doneAt).slice(0,10)):''}</span>`
+      : st==='ready' ? `<span class="q-badge" style="background:#e7f0fb;color:#185FA5">Ready</span>`
+      : `<span class="q-badge" style="background:#f1efe8;color:#5F5E5A">Waiting on an earlier step</span>`;
+    const extInfo = (external && !purch)
+      ? `<span>Outside process${s.vendor?' · '+esc2(s.vendor):''} · tracked on Incoming / Outgoing</span>` : '';
+    const sub = `<div class="qbd-op-sub">${badge}${s.assignee?personChip(s.assignee):''}${holdChipHtml(holdActive(r, s.name))}${extInfo}</div>`;
+    let qty='', check='';
+    if(checkable){
+      qty = s.done
+        ? `<span class="qbd-qty">${s.qtyDone??need} / ${need||'—'}</span>`
+        : `<label class="qbd-qty">Done <input type="number" inputmode="numeric" min="0" placeholder="0" class="q-qty" value="${s.qtyDone??''}" aria-label="Parts completed for ${esc2(s.name)}" onchange="window._stepQty('${r.id}','${nameJs}',this.value)"> / ${need||'—'}</label>`;
+      check = `<button class="q-check" title="${s.done?'Mark not done':'Mark complete'}" aria-label="${s.done?'Mark not done':'Mark complete'}: ${esc2(s.name)}" onclick="window._toggleStepDone('${r.id}','${nameJs}',event)"><i class="ti ti-${s.done?'circle-check-filled':'circle'}" style="font-size:30px;color:${s.done?'var(--green)':'var(--border2)'}"></i></button>`;
+    } else {
+      check = s.done ? `<i class="ti ti-circle-check-filled" style="font-size:26px;color:var(--green)" title="Done"></i>` : '';
+    }
+    return `<div class="qbd-op ${cls}">
+      <div><div class="qbd-op-name" style="color:${s.done?'var(--text)':(PROCESS_COLORS[s.name]||'var(--text)')}">${procIcon(s.name,18)}<span style="color:var(--text)">${esc2(s.name)}</span>${chatBtnStep(r, s.name)}</div>${sub}</div>
+      ${qty || '<span></span>'}
+      ${check || '<span></span>'}
+    </div>`;
+  }).join('');
+  const none = `<div class="empty-state" style="padding:20px 6px"><i class="ti ti-list-details"></i><p>No operations are set on this part yet.${mgr?' Add steps on the order in Open Orders.':''}</p></div>`;
+  // board placement (managers)
+  let place='';
+  if(mgr){
+    const on=qbOnBoard(r);
+    place = `<div class="qbd-place"><span class="q-pb-label">${on?'On the board':'Add to board'}</span>
+      ${QB_COLS.map(c=>`<button class="btn sm${on&&r.qb.col===c.k?' on':''}" onclick="window._qbMove('${r.id}','${c.k}')">${c.label}</button>`).join('')}
+      ${on?`<button class="btn sm" title="Move up in this column" aria-label="Move up" onclick="window._qbNudge('${r.id}',-1)"><i class="ti ti-arrow-up"></i></button>
+      <button class="btn sm" title="Move down in this column" aria-label="Move down" onclick="window._qbNudge('${r.id}',1)"><i class="ti ti-arrow-down"></i></button>
+      <button class="btn sm" style="margin-left:auto" onclick="window._qbRemove('${r.id}');window._qbClose()"><i class="ti ti-x"></i> Take off board</button>`:''}
+    </div>`;
+  }
+  document.getElementById('qbd-ops').innerHTML = `<div class="qbd-ops-h">Operations for this part</div>${ord.length?rows:none}${place}`;
+}
+// a repaint skipped while typing in the dialog runs once focus leaves the input
+document.getElementById('qb-modal')?.addEventListener('focusout', ()=>{
+  setTimeout(()=>{ if(_qbDlgDirty && !qbDlgTyping()) renderQbDialog(); }, 0);
+});
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Escape' || !_qbOpenId) return;
+  const top=['confirm-done-modal','draw-modal'].some(id=>document.getElementById(id)?.style.display==='flex');
+  if(!top) window._qbClose();
+});
+
+// ── "Add jobs to board" picker (managers) ──
+window._qbAddOpen = () => {
+  if(userRole==='operator') return;
+  _qbAddQ=''; const s=document.getElementById('qba-search'); if(s) s.value='';
+  document.getElementById('qba-msg').textContent='';
+  document.getElementById('qb-add-modal').style.display='flex';
+  renderQbAdd();
+  setTimeout(()=>s&&s.focus(), 60);
+};
+window._qbAddSearch = (v) => { _qbAddQ=v||''; renderQbAdd(); };
+function renderQbAdd(){
+  const box=document.getElementById('qba-list'); if(!box) return;
+  const q=_qbAddQ.trim().toLowerCase();
+  let list=orders.filter(r=>!r.archived && !qbOnBoard(r) && !QB_HIDE_STATUSES.includes(r.status));
+  if(q) list=list.filter(r=>[r.customer,r.part,r.desc,r.job,r.po].some(v=>String(v||'').toLowerCase().includes(q)));
+  list.sort((a,b)=>{ const da=a.due?new Date(a.due+'T00:00:00').getTime():8.64e15, db_=b.due?new Date(b.due+'T00:00:00').getTime():8.64e15; return da-db_; });
+  const total=list.length; list=list.slice(0,150);
+  if(!total){ box.innerHTML=`<div class="empty-state" style="padding:24px 8px"><i class="ti ti-search"></i><p>${q?'No open parts match that search.':'Every open part is already on the board.'}</p></div>`; return; }
+  box.innerHTML = list.map(r=>{
+    const cur=qbCurStep(r);
+    return `<div class="qba-row">
+      ${qbThumbHtml(r)}
+      <div style="min-width:0">
+        <div class="qb-cust" style="padding-right:0">${esc2(r.customer||'—')}</div>
+        <div class="qb-part">${r.part?`<b>${esc2(r.part)}</b>`:''}${r.part&&r.desc?' · ':''}${esc2(r.desc||'')}</div>
+        <div class="qb-meta">${r.job?`<span>Job ${esc2(r.job)}</span>`:''}${r.po?`<span>PO ${esc2(r.po)}</span>`:''}<span>Qty ${r.qty||'—'}</span><span class="${qbIsOver(r)?'over':''}">Due ${r.due?fmtDate(r.due):'—'}</span>${cur?`<span style="color:${PROCESS_COLORS[cur.name]||'inherit'};font-weight:700">Next op: ${esc2(shortProc(cur.name))}</span>`:''}</div>
+      </div>
+      <div class="qba-btns">${QB_COLS.map(c=>`<button class="btn sm" onclick="window._qbAddTo('${r.id}','${c.k}')">${c.label}</button>`).join('')}</div>
+    </div>`;
+  }).join('') + (total>list.length ? `<div style="font-size:12px;color:var(--text3);padding:10px 4px">Showing the first ${list.length} of ${total}. Search to narrow it down.</div>` : '');
+}
+window._qbAddTo = (id, col) => {
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  qbPlace(id, col, null);
+  const lbl=(QB_COLS.find(c=>c.k===col)||{}).label||col;
+  document.getElementById('qba-msg').textContent = `Added ${r.customer||''}${r.part?' · '+r.part:''} to ${lbl}.`;
+  renderQbAdd();
+};
+
+// Live refresh of Work Queues when another device changes an order (operator checks
+// a step off on a tablet → the office board updates). Skipped while someone is typing
+// or dragging; it runs once they finish.
+function queuesLiveRefresh(){
+  const pg=document.getElementById('queues-page');
+  if(!pg || pg.style.display==='none'){ _qPendingRefresh=false; return; }
+  const a=document.activeElement;
+  const typing = a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && (pg.contains(a) || document.getElementById('qb-modal').contains(a));
+  if(_qbDragId || typing){ _qPendingRefresh=true; return; }
+  _qPendingRefresh=false;
+  renderQueues();
+  if(document.getElementById('qb-add-modal')?.style.display==='flex') renderQbAdd();
+}
+document.addEventListener('focusout', ()=>{
+  if(!_qPendingRefresh) return;
+  setTimeout(()=>{ if(_qPendingRefresh) queuesLiveRefresh(); }, 0);
+});
 
 // ══════════════ TASKS ON HOLD ══════════════
 // A task (a job's current step, or one of the office Get PO / Invoice tasks) can be
@@ -9396,7 +9889,18 @@ function queueForOrder(r){
 window._openInQueue = (id, e) => {
   if(e) e.stopPropagation();
   const r = orders.find(o=>o.id===id); if(!r) return;
+  // On the Work Queues board → show the board and flash its card
+  if(qbOnBoard(r)){
+    _queueView='board'; _qbProc='';
+    showPage('queues');
+    setTimeout(()=>{
+      const el=document.querySelector(`.qb-card[data-qbid='${id}']`);
+      if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('row-flash'); setTimeout(()=>el.classList.remove('row-flash'),1600); }
+    }, 130);
+    return;
+  }
   const q = queueForOrder(r);
+  _queueView='list';
   showPage('queues');
   if(q) selectQueue(q);   // sets the active tab and re-renders the queue
   setTimeout(()=>{

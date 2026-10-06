@@ -82,6 +82,39 @@ page** (added to the operator page allowlist alongside `queues`/`dispatch`).
   console) or saves fail — same gotcha as every new path in this suite. (Rule was
   added and verified 2026-07-06.)
 
+## Work Queues board (added 2026-10-05)
+
+The Work Queues page has a **Board / List** toggle (`setQueueView`, remembered in
+localStorage `bsmp_queue_view`; Board is the default). List = the old per-process
+tabs + table, unchanged.
+
+- **Board:** three columns Now / Next / Waiting (`QB_COLS`). One card per part (order
+  row): drawing thumbnail, customer, part/desc, job, qty, due, the part's current
+  operation (`qbCurStep` = first enabled, not-done step in run order) and an ops
+  progress bar. Filter chips above the columns by current operation.
+- **Data:** placement lives on the order itself as `r.qb = {col, seq, by, at, since}`,
+  saved through `saveDB()` like any other order edit, so **no new RTDB path or rule**.
+  `qbPlace` renumbers `seq` (10, 20, …) in the target column; `_qbRemove` deletes `r.qb`.
+  Archived orders drop off automatically (`qbOnBoard`).
+- **Who does what:** managers add parts (`_qbAddOpen` picker, hides Invoiced /
+  Completed / Ready for Invoice), drag cards between/within columns (HTML5 DnD, mouse
+  only), or use the Now/Next/Waiting, up/down and "Take off board" buttons in the card
+  dialog. Operators only open cards and enter qty / check steps off.
+- **Card dialog** (`_qbOpen` → `renderQbDialog`, `#qb-modal`, z-index 60 so the
+  confirm-done modal (70) and full drawing viewer (90) sit above it): big drawing on
+  the left (image, or PDF/Drive in an iframe; rebuilt only when the drawing changes,
+  `_qbDrawKey`), the part's enabled steps on the right using the List view's own
+  handlers (`_stepQty`, `_toggleStepDone`). Outsource steps are read-only there;
+  Purchasing- steps are checkable like in the Purchasing queue.
+- **Thumbnails:** images as-is; PDFs get page 1 rendered by pdf.js 3.11.174 (loaded in
+  `<head>`), cached in memory + localStorage (`bsmp_qbt_*`, newest 60). Needs Storage
+  CORS for the page's origin (github.io), so on localhost PDFs show an icon.
+- **Live refresh:** the orders listener calls `queuesLiveRefresh()`, so Work Queues
+  (board or list) now follows other devices' changes; it waits while someone is
+  typing in a queue input or dragging a card.
+- `_openInQueue` (from Today) opens the board and flashes the card when the part is on
+  the board, otherwise the List view tab as before.
+
 ## Core areas (where to work)
 
 - **Scheduling engine (the heart of the app):** `computeGlobalSchedule`, `computeStepDates`, `computeMustStart`, `ensureSchedule` / `getSched` / `invalidateSched`. Working-time math: `addWorkingDays`, `addWorkingHours`, `addBusinessDays`, `bizDaysBetween`, `nextBusinessDayStart`, `atWorkStart`, `workEnd`, `isWeekend`, `usHolidays`-style checks. Steps can be internal or external/outsourced (`isExternal`, `gatherExternalSteps`, `firstExtStep`).
