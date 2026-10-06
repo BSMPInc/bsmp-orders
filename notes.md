@@ -1,33 +1,52 @@
 # notes.md — Notes (`notes.html`)
 
 > Read this together with the root `CLAUDE.md`. Deep-dive for the Notes app only.
-> App accent: **indigo** `--accent:#43397a`. ~500 lines — the newest and smallest app.
+> App accent: **warm yellow** `--accent:#f7d774` (2026-10-06, was indigo) — yellow is a FILL with dark text
+> (`--on-accent`); text/borders on white use `--accent-ink:#8a5d00`. ~750 lines.
 
 ## What it does
 
-Private per-user notes, usable on PC and iPhone (via Safari → Share → **Add to Home
-Screen**, which installs it full-screen like an app — the iOS metas and icons are in
-the `<head>`). A note has a title, a rich-text body, a checklist, tags, photos
-(collapsible section), an optional link to an order, and a pin flag. The list view
-is a card grid with search and tag filtering; pinned notes sort first.
+Private per-user notes, kept **as simple as iOS Notes** (owner, 2026-10-06: the old
+tags / job links / Daily Log / separate checklist + photo cards were "too much clicking").
+Usable on PC and iPhone (Safari → Share → **Add to Home Screen**; the iOS metas and
+icons are in the `<head>`).
+
+- **Two panes:** note list on the left (search, grouped Pinned / Today / Yesterday /
+  Previous 7 Days / Previous 30 Days / month), one full-page editor on the right.
+  Under 760 px it is one pane at a time (`body.nt-editing`), with a "‹ Notes" back button.
+  On desktop the newest note opens on load.
+- **Everything is in the text:** a note is ONE rich-text page. Its first line is the
+  title (a new note starts on a Title line).
+- **Toolbar:** Aa (format strip) · checklist · photo · save status · pin · delete.
+- **Aa strip** (inline under the toolbar, does not cover the text): Title (h1), Heading
+  (h2), Subheading (h3), Body (div), Monospaced (pre); B I U S; bulleted / dashed /
+  numbered lists; move left/right. Tab / Shift-Tab indent list lines; Ctrl/Cmd+Shift+L
+  = checklist.
+- **Checklists** are `<ul class="checklist"><li class="done?">` inside the text; the round
+  box is the li's `::before` — a click left of the li's box toggles `done`.
+- **Photos** upload (shrunk to ≤2000 px JPEG) to Storage and are inserted as `<img>` at the
+  caret; pasting an image does the same. Pasted text comes in as plain text.
+- Saves as you type (800 ms debounce, flush on note switch / tab hide).
 
 **Privacy model:** every user sees ONLY their own notes. This app deliberately has
-**no operator/manager split** (no `mgr-only`, no role logic) — privacy comes from the
-per-uid data path plus the matching security rules, not from roles.
+**no operator/manager split** — privacy comes from the per-uid data path plus the
+matching security rules, not from roles.
 
 ## Data & storage
 
-- **Owns RTDB:** `notes/<auth-uid>/<noteId>` — note the extra **per-user** level
-  compared to the other apps. `NT_UID` (the signed-in user's Firebase uid) is baked
-  into every read/write path.
-- **Reads:** `orders` (for the "Link to a job / order" dropdown) and `customers`
-  (title type-ahead). **Writes `customers/<id>`** when "Add … as a new customer"
-  is used — single-child set, same record shape as the Orders app
-  (`{id,name,phone,email,notes,addedAt}`), so it shows up there too.
+- **Owns RTDB:** `notes/<auth-uid>/<noteId>` (extra **per-user** level). Record (v2):
+  `{id, v:2, title, body(html), pinned, createdAt, updatedAt, by}` — `title` = first
+  text line of body, kept for the list/search.
+- **Older notes (no `v`)** have `title`, `body`, `checklist[]`, `photos[]`, `tags[]`,
+  `orderId`, `customer`. They open folded into one page (`legacyHtml()`: title as h1,
+  body, checklist as a checklist, photos as images) and are **only rewritten when
+  edited**: the save sets `v:2` and nulls `checklist`/`photos` (now inside body).
+- Saves use **`update()`, never `set()`**: `pinned`, `tags`, `orderId`, `customer` stay.
+- **Daily Log entries** (`kind:'log'`) still live under the same path; the page was
+  removed 2026-10-06 and the list filters them out. Data untouched (git history has the UI:
+  commits d71dfb7…3bd2e90).
 - **Storage:** photo uploads go under `notes/<uid>/photos/...` (`ntUpload`).
-- **No localStorage keys of its own** (sidebar pin is per-session; it does not use AI,
-  so it never touches `bsmp_proxy_url`/`bsmp_apikey`).
-- **No CDN deps beyond the shared ones** (fonts + Tabler icons). No pdf.js, no i18n.
+- No reads of `orders` / `customers` any more. No localStorage keys, no AI.
 
 > ⚠️ **Security rules (server-side, Firebase console) are what make notes private.**
 > Both must exist or saves fail silently / privacy breaks:
@@ -48,125 +67,22 @@ per-uid data path plus the matching security rules, not from roles.
 > }
 > ```
 
-## Structure
+## Structure / gotchas
 
-- **English-only.** No `t()`/`I18N` map (unlike `qc.html`). If Spanish is ever needed,
-  port the qc.html pattern.
-- **State:** `NOTES` mirrors `notes/<uid>`; `ORDERS` mirrors `orders`. `page` is
-  `'list'` or `'edit'`; `editId` is the open note (null = new). Editor scratch state
-  lives in `_editChecklist`, `_editTags`, `_editPhotos`, `_pendingPhotos`,
-  `_editPinned`, `_photosCollapsed` — initialized by `viewEdit()` from the record.
-- **Firebase bridge:** module script exposes `ntSet` / `ntUpdate` / `ntRemove` /
-  `ntUpload`; the classic script wraps them as `dbSet` / `dbRemove` / `upload` (with
-  the standard sanitize + toast-on-error). The notes listener attaches per-uid on
-  auth (`onValue(ref(db,'notes/'+user.uid))`).
-- **Toast:** `ntToast(msg, 'ok'|'err')`.
-
-## Pages / rendering
-
-`render()` switches on `page`:
-
-- **`list`** → `viewList()`: toolbar (New note + search box), tag-filter chips, and
-  `gridHtml()` — the card grid. Search re-renders only the grid (`ntRenderGrid`), not
-  the whole page, so the search box keeps focus. Filtering: `filterTag` (chip toggle),
-  `pinnedOnly` (Pinned nav/dock). Sort: pinned first, then `updatedAt` desc.
-- **`edit`** → `viewEdit()`: the editor doubles as the viewer (no read-only mode).
-  `render()` early-returns if `#nt-editor` already exists so background Firebase
-  refreshes don't wipe unsaved typing — **don't remove that guard.**
-
-## Autosave (no Save button)
-
-Every change (title, body, checklist, tags, job link, photos, pin) calls
-`ntQueueSave()`, which debounces ~0.9s into `ntAutoSave()`. A `savestat` chip in
-the toolbar shows Saving… / Saved / Not saved. Key invariants:
-
-- `ntCapture()` snapshots ALL state **synchronously** — navigating away can't lose
-  what was already typed. An empty NEW note is never created; the first real
-  content assigns `editId` so later saves update the same record.
-- Saves run one at a time on `_asChain` (a promise chain) so pending-photo uploads
-  can't run twice; a failed photo upload stays in `_pendingPhotos` and retries on
-  the next save.
-- `ntFlushSave()` runs on Back, sidebar/dock nav (`showNtPage`), `visibilitychange`
-  → hidden, and `pagehide` — the "locked the phone mid-note" path.
-- `ntDelete` sets `_asDeleted` so an in-flight or queued save can't resurrect the
-  note (`_ntDoSave` re-deletes if a save landed after the delete).
-
-## Editor pieces
-
-- **Rich text:** a `contenteditable` div (`#nt-body`) with an `execCommand` toolbar —
-  Title (H2), Heading (H3), Body (P), bold, italic, bullet list. Toolbar buttons use
-  `onmousedown` + `preventDefault` so the text selection isn't lost. `execCommand` is
-  deprecated-but-everywhere; it's fine for this scale.
-- **Sanitizing:** on save the body HTML goes through `stripDangerous()` (drops
-  `<script>`/`<style>`, `on*=` handlers, `javascript:` URLs). Saved body is injected
-  back with `innerHTML` when reopening — keep the sanitizer if you touch the save path.
-  Plain-text derivatives use `stripHtml()` (snippets, search).
-- **Checklist:** structured array (`{id,text,done,doneAt}`), NOT part of the
-  rich-text body. Rendered by `ntRenderChecklist()`; empty-text items are dropped
-  on save. Ticking an item stamps `doneAt` (ms) and `ntSortChecklist()` sinks done
-  items to the bottom in tick order (the ARRAY is sorted, not just the display, so
-  the inline `ntToggleCheck(i)` indices stay valid); unticking clears `doneAt` and
-  floats it back up. Done rows show strikethrough + a `fmtWhen` timestamp.
-- **Tags:** a FIXED set, defined in the `TAGS` constant (`Site Visit`, `Open Orders`,
-  `RFQ`, `Purchasing`, `Fab Note`, `Scheduling`) — tap-to-toggle chips in the editor
-  (`ntToggleTag`) and the same six as filter chips on the list. Chips are
-  **icon-only** (owner prefers minimal text): `TAG_ICONS` maps tag → Tabler icon
-  (`tagIcon()` falls back to `tag` for retired tags); the name lives in `title=`.
-  The editor toolbar Back/Pin/Delete buttons are icon-only too (`.btn.icon`). No free-text tags;
-  to change the vocabulary, edit `TAGS` (old notes keep any retired tag silently on
-  the record). Tag names must stay free of quotes/backslashes — they're echoed into
-  inline `onclick` attributes.
-- **Title + customer:** the title input doubles as a customer type-ahead
-  (`ntTitleSearch` → `#nt-title-results` → `ntPickCustomer`). Picking a match
-  ATTACHES the customer to the note (`_editCustomer` / record field `customer`),
-  clears the search text from the input, and shows a removable chip under the
-  title (`ntRenderCustSel` / `ntClearCustomer`). If nothing matches exactly, the
-  last option is `ntAddCustomer()` — creates the customer AND attaches it. List
-  cards render the customer in parentheses after the title ("Title (Customer)");
-  search matches it. Options use `onmousedown` + `preventDefault` so the input's
-  blur doesn't eat the tap.
-- **Job / order link:** a type-to-search picker (`ntOrderSearch` → `.rv-results`
-  list → `ntPickOrder`; chosen job shows as a chip with an X, `ntClearOrder`), not a
-  dropdown. Search matches `orderLabel()` = customer · part · Job # · PO. The main
-  list search also matches the linked job via `orderSearchText()`, so a part number
-  or PO finds the notes tied to it.
-- **Photos:** collapsible card ("Photos (n)" header toggles `_photosCollapsed`;
-  auto-expands when adding, auto-collapses when opening a note that has photos —
-  that's the owner-requested "photos under the note but hideable" behavior).
-  Saved photos (`_editPhotos`, have `.url`) and pending files (`_pendingPhotos`,
-  not yet uploaded) render side by side; X buttons remove either. Uploads happen
-  during autosave, sequentially; a failed upload stays pending and retries on the
-  next save.
-- **Pin:** toolbar button in the editor (`ntTogglePinEdit`), pin icon on each card
-  in the list (`ntTogglePin` writes immediately).
-
-## Record shape
-
-```
-notes/<uid>/<noteId> = {
-  id, title, body (sanitized HTML), checklist:[{id,text,done}],
-  tags:[string], orderId, customer (name string), photos:[{name,url,type}],
-  pinned:bool, createdAt, updatedAt, by (email)
-}
-```
-
-## Gotchas
-
-- **Silent saves = missing `notes/` security rule.** Same #1 rule as the rest of the
-  suite, but remember the rule is per-uid (`notes/$uid`), not a flat namespace.
-- The editor's early-return guard in `render()` (see above) is what protects unsaved
-  typing from the realtime listener; if you add new pages, keep that pattern in mind.
-- `noteCard()`, the tag chips, and the job-picker results embed ids/tags in inline
-  `onclick` strings — ids are app-generated and tags come from the fixed `TAGS` list,
-  so both are safe. If you ever put a user-entered value into an inline handler,
-  strip quotes/backslashes from it first.
-- Deleting a note removes the RTDB record but **not** its uploaded photos from
-  Storage (same behavior as the other apps — orphaned files are accepted).
-- The body is HTML: never feed it through `esc()` when reopening (it would show tags
-  as text), and never inject it anywhere without `stripDangerous` having run at save.
-
-## Cross-app nav
-
-The Notes dock chip (indigo, `ti-notes`) exists in `quote.html`, `apar.html`,
-`qc.html`, and notes links back to all four. `orders.html` has no app-switcher at
-all (pre-existing gap).
+- **English-only.** No `t()`/`I18N` map.
+- **State:** `NOTES` mirrors `notes/<uid>`; `curId` = open note (null while a new note
+  has no text — the first real text claims an id in `ntCapture()`, so empty notes are
+  never written); `editing` = the editor pane holds a note.
+- **Firebase listener updates only re-render the list** (`renderList()`); the editor is
+  rebuilt only on open/new (`buildEditor()`), so live updates never clobber typing.
+- **Paragraph separator is `div`** (`defaultParagraphSeparator`). With `p`, Chrome nested
+  lists inside `<p>` and Enter stopped leaving lists (found 2026-10-06).
+- **Toolbar buttons never take focus** (`keep` = preventDefault on pointerdown/mousedown).
+  `restoreSel()` trusts the LIVE caret while the editor is focused; `_lastRange` is only
+  for after focus was lost (photo picker). selectionchange fires late, so using
+  `_lastRange` first put a fast Enter + tap back on the previous line.
+- A Title/Heading tap on a list line takes the line out of the list first; a list tap on
+  a heading turns it into Body first (headings can't hold lists).
+- Body HTML is lightly sanitized on save (`stripDangerous`); never `esc()` the body.
+- Deleting a note removes the record but not its photos in Storage (accepted, same as
+  the other apps).

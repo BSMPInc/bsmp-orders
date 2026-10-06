@@ -14,7 +14,7 @@ The suite is five self-contained apps plus supporting files:
 | `orders.html` | Order Tracker | On-time delivery, scheduling, dispatch board, team load |
 | `apar.html` | AP / AR Tracker | Accounts payable/receivable, bills, pay runs, aging |
 | `qc.html` | Inspection / QC | Self-checks, First Articles, NCRs, material certs |
-| `notes.html` | Notes | Private per-user notes: rich text, checklists, photos, tags, job links |
+| `notes.html` | Notes | Private per-user notes, iOS-Notes style: one rich-text page per note (titles, headings, lists, checklists, photos) |
 
 All five are deployed as static files on **GitHub Pages** from this repo. There is no build step and no server — see "Architecture" below.
 
@@ -47,7 +47,7 @@ one that matches the file you're about to edit. If a task spans two apps, read b
 - `orders.html` ~5,900 lines
 - `apar.html` ~4,400 lines
 - `qc.html` ~2,300 lines
-- `notes.html` ~500 lines (the newest and smallest)
+- `notes.html` ~750 lines
 
 ## Architecture (shared across all apps)
 
@@ -70,7 +70,7 @@ Each app owns a top-level namespace, and some apps read across namespaces:
 - **orders.html** → owns `orders/`, plus `team`, `customers`, `durations`, `jobCounter`, `trash/`, `backups/`, `backupIndex`; also reads `quotes`
 - **apar.html** → owns `apar/*` (`apar/entries`, `apar/accounts`, `apar/vendorAccounts`, `apar/vendorAliases`, `apar/recurring`, `apar/audit`, `apar/depositLog`, `apar/apSplit`, etc.); also reads `orders`
 - **qc.html** → owns `qc/*` (`qc/inspections`, `qc/ncr`, `qc/certs`, `qc/audit` — append-only change history); also reads `orders` and `quotes`
-- **notes.html** → owns `notes/*`, but namespaced **per user**: `notes/<auth-uid>/<noteId>`. Notes are private — the security rules only let a signed-in user read/write their own `notes/<uid>` branch. Also reads `orders` (job-link dropdown).
+- **notes.html** → owns `notes/*`, but namespaced **per user**: `notes/<auth-uid>/<noteId>`. Notes are private — the security rules only let a signed-in user read/write their own `notes/<uid>` branch. Reads nothing else (job links / customers were dropped 2026-10-06).
 
 **When adding a new data path, keep it under the app's own namespace** (e.g. new QC data goes under `qc/…`, new AP/AR data under `apar/…`). Cross-app reads are fine; cross-app writes should be rare and intentional.
 
@@ -107,7 +107,7 @@ Actual upload prefixes in use (verified against the code 2026-07-05, updated 202
   - `orders.html` → **maroon** `--accent:#6a1f2e`
   - `apar.html` → **green** `--accent:#1f4d38` (AR green `#2f8f6b`, AP red `#a8443a`)
   - `qc.html` → **graphite** `--accent:#3a4049`
-  - `notes.html` → **indigo** `--accent:#43397a`
+  - `notes.html` → **warm yellow** `--accent:#f7d774` (dark text on it: `--on-accent:#2e2610`; text/borders on white: `--accent-ink:#8a5d00`)
 - **Shell pattern:** fixed left sidebar with a "logo flag," a collapsible/pinnable rail (`bsmp_sidebar_pinned` in localStorage), a sticky topbar with the spark underline, and a bottom **dock** that also holds the cross-app switcher.
 
 ### Cross-app navigation
@@ -149,5 +149,5 @@ There is no automated test suite. Before considering a change done:
 - **Scheduling, dispatch board, team load, order cards** → `orders.html`
 - **Bills, vendors, pay runs, AR/AP aging, invoices** → `apar.html`
 - **Self-checks, First Articles, balloons, NCRs, certs** → `qc.html`
-- **Personal notes, checklists, tagged jottings** → `notes.html`
+- **Personal notes and checklists** → `notes.html`
 - **A save silently does nothing** → check the Firebase security rules for that path first, then the write helper, then the console.
