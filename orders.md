@@ -110,15 +110,60 @@ tabs + table, unchanged.
   `<head>`), cached in memory + localStorage (`bsmp_qbt_*`, newest 60). Needs Storage
   CORS for the page's origin (github.io), so on localhost PDFs show an icon.
 - **Live refresh:** the orders listener calls `queuesLiveRefresh()`, so Work Queues
-  (board or list) now follows other devices' changes; it waits while someone is
-  typing in a queue input or dragging a card.
-- `_openInQueue` (from Today) opens the board and flashes the card when the part is on
-  the board, otherwise the List view tab as before.
+  (board or list) and Today follow other devices' changes; it waits while someone is
+  typing in an input or dragging a card.
+
+### Today feeds the board (added 2026-10-05)
+
+Today is the planning screen, the board is what the shop works from:
+- **Board chip** on every production row (managers only, `dispQbChip`): shows the
+  part's column, or "+ Board". Tapping opens a small fixed menu (`_dispQbMenu`,
+  `#dqb-menu`, created on first use) to place / move / take off; `_dispQbPick` →
+  `qbPlace` (joins the end of the column) or `_qbRemove`. Picking the column it's
+  already in does nothing.
+- **One order:** Today's own drag-to-reorder is gone. `dispDayCmp` sorts each
+  person's list: held last; then Now (board seq) → Next (board seq) → off-board work
+  (weekly Board "Publish to Today" `daySeq`, then urgency `dispCmp`) → Waiting.
+- **Rows open the card dialog** (`_qbOpen`) in place, for operators too; `renderDispatch`
+  repaints it while open. `_openInQueue` was removed.
+- **Cards, not rows:** each person's tasks are a grid of cards (`.disp-cards`,
+  auto-fill min 340px) styled like the board cards: `dispCardTop` (thumbnail,
+  customer, part, job/qty/due/start-by, step chip + health + notes + hold chip), seq
+  badge top-left, HOT top-right, and an actions bar: check + "Done [qty] / N"
+  (operators see only this), then managers' board chip / assignee / hold / open in
+  `.dc-mgr` (stops the click so it doesn't open the dialog). Office Get PO / Invoice
+  tasks are cards too (`dc-office`). The old fixed-column row grid and its
+  phone/narrow-panel fallbacks were removed.
+- `qbPlace` / `qbNudge` / `_qbRemove` now call `refreshActivePage()`, so they repaint
+  whichever of Today / Work Queues is showing.
+
+### Today declutter (added 2026-10-05)
+
+Each person's group body is built by `dispGroupBody(k, arr)` (inside `.disp-gbody`,
+which is what collapses):
+- **Office strip** (`k+':office'`): the office Get PO / Invoice tasks as slim lines
+  (`dispMiniRow`), summary "N invoices · N POs to get". No past-due count (an invoice
+  past the part's due date means nothing).
+- **Outside work strip** (`k+':out'`): every task whose current step is external
+  (send-out and Purchasing- buy steps), summary by process ("Paint 2 · Material 1"),
+  each line shows the vendor. Strip open/closed is per device (`bsmp_disp_strips`).
+- **Shop cards:** every card in the Now column, plus the next `DISP_SHOW_EXTRA` (3);
+  the rest sit behind a "Show N more" tile (`_dispMore`, per session; "Show fewer").
+- **Find a job** (`#dispatch-search`, static markup so re-renders never wipe what's
+  typed): `dsMatches` searches every non-archived, non-invoiced order by customer /
+  part / desc / job / PO (all words must match), jobs with work left first, then due;
+  shows the current step + who has it + board column. Arrow keys + Enter, or tap,
+  open the card dialog. Esc clears.
+- **Operators:** `dispMyKey()` matches the signed-in email's name (ops.oziel@ →
+  "Oziel", via `chatAuthorName`) to the ONE team member with that first name (team
+  records have no email; no unique match = normal behaviour). Their group sorts first
+  and stays open; other groups start collapsed (`_dispOpened` / `bsmp_disp_opened`
+  remembers the ones they open). Managers keep `_dispCollapsed` as before.
 
 ## Core areas (where to work)
 
 - **Scheduling engine (the heart of the app):** `computeGlobalSchedule`, `computeStepDates`, `computeMustStart`, `ensureSchedule` / `getSched` / `invalidateSched`. Working-time math: `addWorkingDays`, `addWorkingHours`, `addBusinessDays`, `bizDaysBetween`, `nextBusinessDayStart`, `atWorkStart`, `workEnd`, `isWeekend`, `usHolidays`-style checks. Steps can be internal or external/outsourced (`isExternal`, `gatherExternalSteps`, `firstExtStep`).
-- **Dispatch board:** `renderDispatch`, `dispatchRow`, `dispatchItems` / `dispatchAllItems`, grouping/sorting (`dispGroupKey`, `dispGroupsSorted`, `dispCmp`, `dispDayCmp`, `dispSeqBadge`, `dispMoveCtl`).
+- **Dispatch board:** `renderDispatch`, `dispatchRow`, `dispatchItems` / `dispatchAllItems`, grouping/sorting (`dispGroupKey`, `dispGroupsSorted`, `dispCmp`, `dispDayCmp` (follows the Work Queues board, see above), `dispSeqBadge`), board chip `dispQbChip`.
 - **Tasks on hold (added 2026-09-02):** a task can be parked with a reason and an optional "hold until" date, which takes it off the Today board without touching the schedule. Records live on the order at `holds[<slot>]` (`holdSlot` swaps out characters Firebase won't take in a key, so `Shear/Sawing` → `Shear_Sawing`; office tasks use `__po__` / `__invoice__`). `holdActive` is the only read that matters — it returns null once the until date arrives, so holds release themselves. `dispVisibleItems` filters the board, `_dispShowHeld` (localStorage `bsmp_disp_showheld`) flips the "N on hold" chip, and held work is excluded from the Today nav badge, `teamLoad` and `buildDispatchSnapshot`. Marking the step done clears its hold. Chips also show in Work Queues and on the schedule step row; the hold button is manager-only. Harnesses: `dev/build_hold_test.py`, `dev/build_hold_layout.py`, `dev/build_hold_steprow.py`.
 - **Order cards & detail:** `renderCards`, `condensedCard`, `cardDaysLabel`, `openEdit`, `detailInner` / `detailRow`, `lineRow`, `rowTotal`, `partChipHtml`. Condensed card shows part number as the main label with description in a tooltip; MM/DD/YY date fields; alternating tile colors.
 - **Health/status:** `jobHealth`, `groupHealth`, `healthBadge`, `healthTip`, `autoAdvanceStatus`, `stepStatus`, `procState`.

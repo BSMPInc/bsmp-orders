@@ -861,25 +861,83 @@ select.ss-vin{width:170px;flex-shrink:0}
 .disp-phead{display:flex;align-items:center;gap:11px;padding:12px 16px;background:#fafbfd;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
 .disp-chev{font-size:17px;color:var(--text3);transition:transform .18s;flex-shrink:0}
 .disp-group.collapsed .disp-chev{transform:rotate(-90deg)}
-.disp-group.collapsed .disp-rows{display:none}
+.disp-group.collapsed .disp-gbody{display:none}
 .disp-group.collapsed .disp-phead{border-bottom:none}
 .disp-group.none .disp-phead{background:#fdf8ee}
 .disp-pname{font-size:15px;font-weight:800;color:var(--text)}
 .disp-psub{font-size:11.5px;color:var(--text2);margin-top:1px}
-.disp-rows{display:flex;flex-direction:column}
-/* Fixed column grid so badges, dates and buttons line up across every row:
-   seq | check | process | job | health | dates | drawing | qty | assignee | open | move */
-.disp-row{display:grid;grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 56px 36px 36px 40px;align-items:center;gap:9px;padding:9px 16px;border-bottom:1px solid #f1f3f7;cursor:pointer}
-body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr) 124px 106px 56px 64px 40px}
-.disp-seq{font-size:11px;font-weight:800;color:var(--text3);min-width:17px;text-align:center;flex-shrink:0;font-variant-numeric:tabular-nums}
-.disp-grip{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;color:var(--text3);cursor:grab;border-radius:7px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
-.disp-grip:hover{background:#eef1f6;color:var(--text2)}
-.disp-grip:active{cursor:grabbing}
-.disp-grip i{font-size:19px}
-.disp-row.disp-dragging{background:#fff6d6;box-shadow:0 4px 14px rgba(0,0,0,.16);position:relative;z-index:5}
-@media(pointer:coarse){ .disp-grip{width:44px;height:44px} .disp-grip i{font-size:23px} .disp-seq{font-size:12.5px;min-width:20px} }
-.disp-row:last-child{border-bottom:none}
-.disp-row:hover{background:#f9fbfd}
+/* Cards: one per task, same look as the Work Queues board cards (thumbnail left,
+   customer / part / step on the right, actions along the bottom). */
+.disp-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;padding:12px}
+.disp-card{position:relative;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid var(--border2);padding:9px;cursor:pointer;min-width:0;transition:border-color .12s,box-shadow .12s}
+.disp-card:hover{border-color:var(--navy3);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.disp-card.row-flash{animation:rowflash 1.6s ease-out}
+.dc-top{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px}
+.dc-info{min-width:0;display:flex;flex-direction:column;gap:3px}
+.dc-chips{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.dc-chips .hold-chip{margin-left:0}
+.dc-chips .note-btn{margin-left:0}
+.disp-seq{position:absolute;top:4px;left:4px;z-index:1;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--navy3);color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.dc-meta .late{color:var(--red);font-weight:700}
+.dc-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:8px}
+.dc-done{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.dc-mgr{display:inline-flex;align-items:center;gap:6px;margin-left:auto;flex-wrap:wrap}
+.dc-office .dc-actions{min-height:38px}
+.disp-card.held{background:#fafbfc}
+/* "+ N more" tile at the end of a person's cards */
+.dc-more{font:inherit;font-size:13px;font-weight:700;color:var(--text2);background:transparent;border:1px dashed var(--border2);min-height:64px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.dc-more:hover{border-color:var(--navy3);color:var(--text)}
+/* Slim strips for office paperwork and outside work (send out / buy) */
+.dstrip{margin:12px 12px 0;border:1px solid var(--border2);background:#fafbfd}
+.dstrip + .disp-cards{padding-top:12px}
+.disp-cards + .dstrip{margin-top:0}
+.dstrip:last-child{margin-bottom:12px}
+.dstrip-h{font:inherit;width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px;background:transparent;border:0;cursor:pointer;text-align:left;color:var(--text)}
+.dstrip-h > .ti:first-child{font-size:18px;color:var(--text2)}
+.dstrip-h b{font-size:13.5px}
+.dstrip-sum{font-size:12.5px;color:var(--text2);flex:1;min-width:0}
+.dstrip-late{font-size:11.5px;font-weight:700;color:var(--red);white-space:nowrap}
+.dstrip-h .disp-chev{transform:rotate(-90deg)}
+.dstrip.open .dstrip-h .disp-chev{transform:none}
+.dstrip-list{display:none;border-top:1px solid var(--border)}
+.dstrip.open .dstrip-list{display:block}
+.dmini{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:7px 12px;border-bottom:1px solid #eef0f4;background:#fff;cursor:pointer}
+.dmini:last-child{border-bottom:0}
+.dmini:hover{background:#f6f8fb}
+.dmini.held{opacity:.65}
+.qb-thumb.xs{width:46px;height:36px}
+.qb-thumb.xs .ti{font-size:17px}
+.dmini-txt{flex:1 1 190px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dmini-top{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dmini-sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.5px;color:var(--text2)}
+.dmini-sub .qb-step{font-size:11px;padding:1px 7px}
+.dmini-sub .hold-chip{margin-left:0}
+.dmini-sub .late{color:var(--red);font-weight:700}
+.dmini .dc-mgr{margin-left:auto;flex:none}
+/* Find-a-job search */
+.dsearch{position:relative;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:0 14px;margin-bottom:14px;box-shadow:var(--shadow)}
+.dsearch > .ti{font-size:18px;color:var(--text3)}
+.dsearch input{flex:1;min-width:0;font:inherit;font-size:14px;border:0;outline:0;background:transparent;padding:12px 0;color:var(--text)}
+.ds-results{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:var(--card);border:1px solid var(--border2);box-shadow:0 10px 28px rgba(16,24,40,.18);max-height:min(70vh,520px);overflow-y:auto}
+.ds-results[hidden]{display:none}
+.ds-results .dmini.sel{background:#eef3fb}
+.ds-empty{padding:16px;font-size:13px;color:var(--text3)}
+.ds-who{font-weight:700;color:var(--text)}
+.disp-card.held .dc-top{opacity:.62}
+.disp-card.held:hover .dc-top{opacity:1}
+/* Work Queues board chip on a Today row (managers): shows the column, tap to place */
+.disp-qb{font:inherit;font-size:11.5px;font-weight:700;height:30px;padding:0 8px;border:1px solid var(--border2);border-radius:15px;background:var(--card);color:var(--text3);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;max-width:100%}
+.disp-qb:hover{border-color:var(--navy3);color:var(--text)}
+.disp-qb .dqb-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.disp-qb.on{color:var(--qbc);border-color:var(--qbc);background:#fff}
+.dqb-menu{position:fixed;z-index:56;background:var(--card);border:1px solid var(--border2);box-shadow:0 8px 24px rgba(16,24,40,.18);padding:6px;display:flex;flex-direction:column;gap:2px;min-width:170px}
+.dqb-menu[hidden]{display:none}
+.dqb-menu .dqb-h{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);padding:4px 8px 6px}
+.dqb-menu button{font:inherit;font-size:13px;text-align:left;border:0;background:transparent;padding:9px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text)}
+.dqb-menu button:hover{background:#eef1f6}
+.dqb-menu button.on{font-weight:800}
+.dqb-menu button .ti-check{margin-left:auto;color:var(--green)}
+.dqb-menu .dqb-sep{border-top:1px solid var(--border);margin:4px 0}
 .disp-proc{display:inline-flex;align-items:center;gap:6px;font-size:13px;min-width:0;overflow:hidden}
 .disp-out{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#a8553a;background:#a8553a14;border-radius:5px;padding:1px 6px;margin-left:2px}
 /* On-hold tasks: parked work, hidden from the Today board until released or the date arrives */
@@ -887,9 +945,6 @@ body.role-operator .disp-row{grid-template-columns:20px 34px 150px minmax(0,1fr)
 .disp-stat.hold b{color:#5a6170}
 .disp-stat.hold:hover{background:#e2e7ef}
 .disp-stat.hold.on{background:#e4eaf5;border-color:#c2cee2;color:#3a4a63}.disp-stat.hold.on b{color:#3a4a63}
-.disp-row.held{background:#fafbfc}
-.disp-row.held .disp-proc,.disp-row.held .dj-txt,.disp-row.held .disp-dates{opacity:.62}
-.disp-row.held:hover .disp-proc,.disp-row.held:hover .dj-txt,.disp-row.held:hover .disp-dates{opacity:1}
 .hold-chip{display:inline-flex;align-items:center;gap:4px;flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;font-weight:700;color:#4e5766;background:#e7eaf0;border:1px solid #d5dae3;border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle;max-width:100%}
 .hold-chip i{font-size:11px}
 .disp-hold-btn{width:36px;height:36px;border:1px solid var(--border2);border-radius:6px;background:var(--card);cursor:pointer;color:var(--text3);font-size:17px;display:inline-flex;align-items:center;justify-content:center}
@@ -987,20 +1042,9 @@ tr.inv-low td{background:#fdf6ee}
 .undo-toast .ut-x{background:none;border:none;color:#9aa5b4;cursor:pointer;padding:4px;display:inline-flex;flex-shrink:0}
 .undo-toast .ut-x:hover{color:#fff}
 @media (pointer: coarse){
-  .disp-row{padding:12px 16px;gap:10px;grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 56px 42px 42px 46px}
-  body.role-operator .disp-row{grid-template-columns:20px 44px 150px minmax(0,1fr) 124px 106px 58px 78px 46px}
+  .disp-qb{height:38px;padding:0 10px;font-size:12.5px}
   .disp-proc{font-size:14px}
   .disp-job{font-size:14px}
-}
-@media(max-width:760px), (pointer:coarse) and (max-width:1000px){
-  /* phones — and a touch device in portrait, where the coarse-pointer grid above is
-     too wide to fit: the fixed columns eat everything and the job cell (and the note
-     button in it) collapses to zero. Fall back to a wrapping row. */
-  .disp-row,body.role-operator .disp-row{display:flex;flex-wrap:wrap;gap:9px 11px}
-  .disp-dates{display:inline-flex;flex-direction:row;flex-wrap:wrap;gap:2px 8px}
-  .disp-dates,.disp-job{white-space:normal}
-  .disp-job{flex:1;min-width:200px;flex-wrap:wrap;gap:4px}
-  .dj-txt,.hold-chip{white-space:normal;overflow:visible}
 }
 .pm-mid{display:flex;align-items:center;gap:7px;margin-top:6px}
 .pm-part{font-size:10.5px;font-weight:700;color:#33405a;background:#eef2f8;border:1px solid #d7dde6;border-radius:5px;padding:1px 7px;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
@@ -1662,6 +1706,11 @@ body.sb-hidden .topbar{padding-left:24px}
   <div id="dispatch-page" style="display:none">
     <div id="dispatch-shopnote"></div>
     <div id="dispatch-summary"></div>
+    <div class="dsearch" id="dispatch-search">
+      <i class="ti ti-search"></i>
+      <input id="ds-input" type="search" autocomplete="off" placeholder="Find a job: customer, part, job # or PO" aria-label="Find a job" oninput="window._dsSearch(this.value)" onkeydown="window._dsKey(event)" onfocus="window._dsSearch(this.value)">
+      <div class="ds-results" id="ds-results" hidden></div>
+    </div>
     <div id="dispatch-brief"></div>
     <div id="dispatch-load"></div>
     <div id="dispatch-body"></div>
@@ -6790,14 +6839,14 @@ async function qbThumbPump(){
   }
   _qbThumbBusy=false;
 }
-function qbThumbHtml(r){
-  const d=r.drawing||{};
-  if(!d.url) return `<div class="qb-thumb" title="No drawing attached"><i class="ti ti-photo-off"></i></div>`;
-  if(qbIsImg(d)) return `<div class="qb-thumb"><img src="${esc2(d.url)}" loading="lazy" alt="Drawing"></div>`;
+function qbThumbHtml(r, size){
+  const d=r.drawing||{}, c='qb-thumb'+(size?' '+size:'');
+  if(!d.url) return `<div class="${c}" title="No drawing attached"><i class="ti ti-photo-off"></i></div>`;
+  if(qbIsImg(d)) return `<div class="${c}"><img src="${esc2(d.url)}" loading="lazy" alt="Drawing"></div>`;
   const t=qbThumbCached(d.url);
-  if(t && t!=='fail' && t!=='loading') return `<div class="qb-thumb"><img src="${t}" alt="Drawing"></div>`;
+  if(t && t!=='fail' && t!=='loading') return `<div class="${c}"><img src="${t}" alt="Drawing"></div>`;
   if(!t && qbIsPdf(d)){ _qbThumbs[d.url]='loading'; _qbThumbQueue.push(d.url); qbThumbPump(); }
-  return `<div class="qb-thumb" title="Drawing (tap the card to view)"><i class="ti ti-file-type-pdf"></i></div>`;
+  return `<div class="${c}" title="Drawing (tap to view)"><i class="ti ti-file-type-pdf"></i></div>`;
 }
 
 function qbCardHtml(r, mgr){
@@ -6898,7 +6947,7 @@ function qbPlace(id, col, beforeId){
     if(o===r) o.qb = {col, seq, by:who, at:now, since: sameCol ? (r.qb.since||now) : now};
     else if(o.qb.seq!==seq) o.qb = {...o.qb, seq};
   });
-  saveDB(); renderQueues();
+  saveDB(); refreshActivePage();   // Work Queues or Today, whichever is showing
 }
 // Move a part one spot up/down inside its column.
 function qbNudge(id, dir){
@@ -6908,7 +6957,7 @@ function qbNudge(id, dir){
   if(i<0 || j<0 || j>=list.length) return;
   [list[i], list[j]] = [list[j], list[i]];
   list.forEach((o,k)=>{ const seq=(k+1)*10; if(o.qb.seq!==seq) o.qb={...o.qb, seq}; });
-  saveDB(); renderQueues();
+  saveDB(); refreshActivePage();
 }
 window._qbMove = (id, col) => { if(userRole==='operator') return; qbPlace(id, col, null); };
 window._qbNudge = (id, dir) => { if(userRole==='operator') return; qbNudge(id, dir); };
@@ -6916,7 +6965,7 @@ window._qbRemove = (id) => {
   if(userRole==='operator') return;
   const r=orders.find(o=>o.id===id); if(!r || !r.qb) return;
   delete r.qb;
-  saveDB(); renderQueues();
+  saveDB(); refreshActivePage();
 };
 
 // ── the card dialog ──
@@ -7065,10 +7114,18 @@ window._qbAddTo = (id, col) => {
   renderQbAdd();
 };
 
-// Live refresh of Work Queues when another device changes an order (operator checks
-// a step off on a tablet → the office board updates). Skipped while someone is typing
-// or dragging; it runs once they finish.
+// Live refresh of Work Queues and Today when another device changes an order (operator
+// checks a step off on a tablet → the office board updates). Skipped while someone is
+// typing or dragging; it runs once they finish.
 function queuesLiveRefresh(){
+  const dp=document.getElementById('dispatch-page');
+  if(dp && dp.style.display!=='none'){
+    const a=document.activeElement;
+    if(a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)){ _qPendingRefresh=true; return; }
+    _qPendingRefresh=false;
+    invalidateSched(); renderDispatch();
+    return;
+  }
   const pg=document.getElementById('queues-page');
   if(!pg || pg.style.display==='none'){ _qPendingRefresh=false; return; }
   const a=document.activeElement;
@@ -7215,12 +7272,20 @@ const _dispPrio=r=>(r.priority==null?2:r.priority);
 const _dispDue=r=>r.due?new Date(r.due+'T00:00:00').getTime():8.64e15;
 const _dispMs=it=>it.health.mustStart?it.health.mustStart.getTime():8.64e15;
 function dispCmp(a,b){ return (HEALTH_RANK[a.health.state]-HEALTH_RANK[b.health.state])||(_dispMs(a)-_dispMs(b))||(_dispPrio(a.r)-_dispPrio(b.r))||(_dispDue(a.r)-_dispDue(b.r)); }
-// Manual "today only" order. daySeq is honored only when stamped with today's date,
-// so each day starts in urgency order until someone arranges it.
+// Today's order follows the Work Queues board, so the two screens can't disagree:
+//   held tasks sink to the bottom; then Now (board order) → Next (board order) →
+//   everything not on the board → Waiting (board order).
+// Off-board work keeps the weekly Board's "Publish to Today" order (daySeq, honored
+// only when stamped with today's date), then falls back to urgency.
 function _todayStr(){ return new Date().toISOString().slice(0,10); }
 function daySeqOf(r){ return (r.daySeqDate===_todayStr() && typeof r.daySeq==='number') ? r.daySeq : null; }
+const DISP_QB_BAND={now:0, next:1, wait:3};          // off-board work is band 2
+function dispBand(r){ return qbOnBoard(r) ? DISP_QB_BAND[r.qb.col] : 2; }
 function dispDayCmp(a,b){
   if(!!a.hold !== !!b.hold) return a.hold?1:-1;      // held tasks sink below live work
+  const ba=dispBand(a.r), bb=dispBand(b.r);
+  if(ba!==bb) return ba-bb;
+  if(ba!==2) return qbSort(a.r, b.r);                // same board column → board order
   const da=daySeqOf(a.r), db=daySeqOf(b.r);
   if(da!=null && db!=null) return da-db;
   if(da!=null) return -1;
@@ -7233,58 +7298,53 @@ function dispGroupsSorted(){
   groups.forEach(arr=>arr.sort(dispDayCmp));
   return groups;
 }
-// Drag-to-reorder within a person's list (mouse + touch), locking in today's manual order.
-// Pointer events so it works the same with a finger on the shop iPads.
-let _dd=null;   // {row, list, scroller, moved}
-window._dispDragStart = (e, el) => {
-  if(e.pointerType==='mouse' && e.button!==0) return;
-  e.preventDefault(); e.stopPropagation();
-  const row=el.closest('.disp-row'); if(!row) return;
-  const list=row.parentElement;
-  let sc=list; while(sc && sc!==document.documentElement){ const o=getComputedStyle(sc).overflowY; if(o==='auto'||o==='scroll') break; sc=sc.parentElement; }
-  _dd={row, list, scroller:sc||document.scrollingElement, moved:false};
-  try{ el.setPointerCapture(e.pointerId); }catch{}
-  row.classList.add('disp-dragging');
-  document.addEventListener('pointermove', _ddMove);
-  document.addEventListener('pointerup', _ddEnd);
-  document.addEventListener('pointercancel', _ddEnd);
+// ── Work Queues board chip on each Today row (managers) ──
+// Shows which column the part is in; tapping opens a small menu to place / move / take
+// it off the board. Placement is the same r.qb the board writes (qbPlace).
+function dispQbChip(r){
+  if(userRole==='operator') return '';
+  const on=qbOnBoard(r), c=on?QB_COLS.find(x=>x.k===r.qb.col):null;
+  return on
+    ? `<button type="button" class="disp-qb on" style="--qbc:${c.color}" title="On the Work Queues board: ${c.label}. Tap to move it." onclick="window._dispQbMenu('${r.id}',this,event)"><span class="dqb-dot" style="background:${c.color}"></span>${c.label}</button>`
+    : `<button type="button" class="disp-qb" title="Put this part on the Work Queues board" onclick="window._dispQbMenu('${r.id}',this,event)"><i class="ti ti-plus"></i>Board</button>`;
+}
+function _dispQbMenuEl(){
+  let m=document.getElementById('dqb-menu');
+  if(!m){ m=document.createElement('div'); m.id='dqb-menu'; m.className='dqb-menu'; m.hidden=true; m.setAttribute('role','menu'); document.body.appendChild(m); }
+  return m;
+}
+window._dispQbClose = () => { const m=document.getElementById('dqb-menu'); if(m){ m.hidden=true; m.dataset.oid=''; } };
+window._dispQbMenu = (id, btn, e) => {
+  if(e) e.stopPropagation();
+  if(userRole==='operator') return;
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  const m=_dispQbMenuEl();
+  if(!m.hidden && m.dataset.oid===String(id)){ window._dispQbClose(); return; }   // tap again = close
+  const on=qbOnBoard(r);
+  m.dataset.oid=String(id);
+  m.innerHTML=`<div class="dqb-h">${on?'Move on the board':'Put on the board'}</div>`
+    + QB_COLS.map(c=>{ const cur=on&&r.qb.col===c.k;
+        return `<button type="button" role="menuitem" class="${cur?'on':''}" onclick="window._dispQbPick('${id}','${c.k}',event)"><span class="dqb-dot" style="width:9px;height:9px;border-radius:50%;background:${c.color}"></span>${c.label}<span style="color:var(--text3);font-size:11.5px;font-weight:400">${esc2(c.hint)}</span>${cur?'<i class="ti ti-check"></i>':''}</button>`; }).join('')
+    + (on?`<div class="dqb-sep"></div><button type="button" role="menuitem" onclick="window._dispQbPick('${id}','',event)"><i class="ti ti-x" style="color:var(--text3)"></i>Take off board</button>`:'');
+  m.hidden=false;
+  const b=btn.getBoundingClientRect(), mw=m.offsetWidth, mh=m.offsetHeight;
+  const left=Math.max(8, Math.min(b.right-mw, innerWidth-mw-8));
+  const top=(b.bottom+4+mh > innerHeight-8) ? Math.max(8, b.top-4-mh) : b.bottom+4;
+  m.style.left=left+'px'; m.style.top=top+'px';
 };
-function _ddMove(e){
-  if(!_dd) return;
-  e.preventDefault();
-  const {row, list}=_dd;
-  const y=e.clientY;
-  // keep the list scrolling when dragging near the top/bottom of the screen
-  if(y<80) _dd.scroller.scrollTop-=9; else if(y>innerHeight-80) _dd.scroller.scrollTop+=9;
-  const sibs=[...list.children].filter(c=>c!==row);
-  let target=null;
-  for(const s of sibs){ const rc=s.getBoundingClientRect(); if(y < rc.top + rc.height/2){ target=s; break; } }
-  if(target){ if(row.nextElementSibling!==target){ list.insertBefore(row, target); _dd.moved=true; } }
-  else if(list.lastElementChild!==row){ list.appendChild(row); _dd.moved=true; }
-}
-function _ddEnd(){
-  if(!_dd) return;
-  const {row, list, moved, rerenderPending}=_dd;
-  row.classList.remove('disp-dragging');
-  document.removeEventListener('pointermove', _ddMove);
-  document.removeEventListener('pointerup', _ddEnd);
-  document.removeEventListener('pointercancel', _ddEnd);
-  _dd=null;
-  if(moved) _dispDropSave(list);                 // re-renders after saving
-  else if(rerenderPending) renderDispatch();     // a data update arrived mid-drag
-}
-// Stamp the dropped DOM order onto the group's items as today's manual order, then save.
-function _dispDropSave(list){
-  const gkey=list.closest('.disp-group')?.dataset.gkey;
-  const arr=dispGroupsSorted().get(gkey); if(!arr) return;
-  const pool=new Map();
-  arr.forEach(it=>{ const k=String(it.r.id); if(!pool.has(k)) pool.set(k,[]); pool.get(k).push(it); });
-  const ordered=[];
-  [...list.querySelectorAll('.disp-row')].forEach(el=>{ const q=pool.get(String(el.dataset.oid)); if(q && q.length) ordered.push(q.shift()); });
-  const ds=_todayStr();
-  ordered.forEach((it,i)=>{ it.r.daySeq=i+1; it.r.daySeqDate=ds; });
-  saveDB(); renderDispatch();
-}
+window._dispQbPick = (id, col, e) => {
+  if(e) e.stopPropagation();
+  window._dispQbClose();
+  if(userRole==='operator') return;
+  const r=orders.find(o=>o.id===id); if(!r) return;
+  if(!col){ window._qbRemove(id); return; }
+  if(qbOnBoard(r) && r.qb.col===col) return;          // already there: keep its spot
+  qbPlace(id, col, null);                              // joins the end of that column
+};
+document.addEventListener('click', e=>{ const m=document.getElementById('dqb-menu'); if(m && !m.hidden && !m.contains(e.target)) window._dispQbClose(); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') window._dispQbClose(); });
+window.addEventListener('scroll', ()=>window._dispQbClose(), true);
+window.addEventListener('resize', ()=>window._dispQbClose());
 // The whole-shop board: office → shop messages that aren't about one job.
 // Rides on the same orderChat node under a reserved key, so there's no new rule.
 function renderShopNote(){
@@ -7303,8 +7363,8 @@ function renderShopNote(){
   </div>`;
 }
 function renderDispatch(){
-  if(_dd){ _dd.rerenderPending=true; return; }   // never rebuild the board under someone's finger
   renderShopNote();
+  if(_qbOpenId) renderQbDialog();               // a card opened from Today stays current
   const sumEl=document.getElementById('dispatch-summary');
   const body=document.getElementById('dispatch-body');
   if(!body) return;
@@ -7336,7 +7396,9 @@ function renderDispatch(){
   shownItems.forEach(it=>{ const k=dispGroupKey(it); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(it); });
   groups.forEach(arr=>arr.sort(dispDayCmp));
   const worst=k=>Math.min(9, ...groups.get(k).filter(i=>!i.hold).map(i=>HEALTH_RANK[i.health.state]));
+  const me=dispMyKey();
   let keys=[...groups.keys()].sort((a,b)=>{
+    if(me){ if(a===me) return -1; if(b===me) return 1; }   // an operator's own list comes first
     if(a==='__none__') return 1; if(b==='__none__') return -1;
     return (worst(a)-worst(b)) || ((personById(a)?.name||'').localeCompare(personById(b)?.name||''));
   });
@@ -7346,83 +7408,237 @@ function renderDispatch(){
     const behindCount=arr.filter(i=>!i.hold && i.health.state==='behind').length;
     const liveN=arr.filter(i=>!i.hold).length, heldN=arr.length-liveN;
     const heldSub=heldN?` · <span style="color:var(--text3)">${heldN} on hold</span>`:'';
-    const collapsed=_dispCollapsed.has(k);
+    const collapsed=dispIsCollapsed(k);
     const chev=`<i class="ti ti-chevron-down disp-chev"></i>`;
     const head = none
       ? `<div class="disp-phead none" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:#BA7517"><i class="ti ti-help" style="font-size:15px"></i></span><div style="flex:1"><div class="disp-pname">Unassigned</div><div class="disp-psub">${liveN} ready step${liveN!==1?'s':''} with no owner — assign someone${heldSub}</div></div>${chev}</div>`
       : `<div class="disp-phead" title="Collapse / expand" onclick="window._dispToggleGroup('${k}')"><span class="pc-dot lg" style="background:${sigColor(person)}">${personInitials(person?.name||'?')}</span><div style="flex:1"><div class="disp-pname">${esc2(person?.name||'—')}</div><div class="disp-psub">${liveN} task${liveN!==1?'s':''}${behindCount?` · <span style="color:var(--red);font-weight:700">${behindCount} behind</span>`:''}${heldSub}</div></div>${chev}</div>`;
-    return `<div class="disp-group${none?' none':''}${collapsed?' collapsed':''}" data-gkey="${k}">${head}<div class="disp-rows">${arr.map((it,i)=>dispatchRow(it,i,arr.length)).join('')}</div></div>`;
+    return `<div class="disp-group${none?' none':''}${collapsed?' collapsed':''}" data-gkey="${k}">${head}<div class="disp-gbody">${dispGroupBody(k, arr)}</div></div>`;
   }).join('');
   renderDailyBrief(); renderTeamLoad();
 }
 // Collapsed people on the Today board — remembered per device across re-renders.
-let _dispCollapsed=new Set();
+// Operators: their own list first and open; everyone else's starts collapsed
+// (_dispOpened remembers the ones they chose to open).
+let _dispCollapsed=new Set(), _dispOpened=new Set();
 try{ _dispCollapsed=new Set(JSON.parse(localStorage.getItem('bsmp_disp_collapsed')||'[]')); }catch{}
+try{ _dispOpened=new Set(JSON.parse(localStorage.getItem('bsmp_disp_opened')||'[]')); }catch{}
+// The signed-in operator's team entry: ops.oziel@ → "Oziel" → the one team member
+// whose first name is Oziel. Team records have no email, so no unique match = no "mine".
+function dispMyKey(){
+  if(userRole!=='operator' || !auth.currentUser) return null;
+  const first=chatAuthorName({by:auth.currentUser.email||''}).split(' ')[0].toLowerCase();
+  if(!first || first==='unknown') return null;
+  const hits=team.filter(p=>(p.name||'').trim().split(/\s+/)[0].toLowerCase()===first);
+  return hits.length===1 ? hits[0].id : null;
+}
+function dispOthersFolded(k){ const me=dispMyKey(); return !!(me && k!==me); }
+function dispIsCollapsed(k){ return dispOthersFolded(k) ? !_dispOpened.has(k) : _dispCollapsed.has(k); }
 window._dispToggleGroup=(k)=>{
-  if(_dispCollapsed.has(k)) _dispCollapsed.delete(k); else _dispCollapsed.add(k);
-  try{ localStorage.setItem('bsmp_disp_collapsed', JSON.stringify([..._dispCollapsed])); }catch{}
+  if(dispOthersFolded(k)){
+    if(_dispOpened.has(k)) _dispOpened.delete(k); else _dispOpened.add(k);
+    try{ localStorage.setItem('bsmp_disp_opened', JSON.stringify([..._dispOpened])); }catch{}
+  } else {
+    if(_dispCollapsed.has(k)) _dispCollapsed.delete(k); else _dispCollapsed.add(k);
+    try{ localStorage.setItem('bsmp_disp_collapsed', JSON.stringify([..._dispCollapsed])); }catch{}
+  }
   // toggle in place — no full re-render, so the page doesn't jump
   const g=document.querySelector(`.disp-group[data-gkey='${k}']`);
-  if(g) g.classList.toggle('collapsed', _dispCollapsed.has(k));
+  if(g) g.classList.toggle('collapsed', dispIsCollapsed(k));
 };
+
+// ── Decluttered group body ──
+// Office paperwork (Get PO / Invoice) and outside work (send-out / buy steps) become
+// slim strips; shop-floor tasks stay as cards, showing the Now cards plus the next
+// DISP_SHOW_EXTRA, with the rest behind a "+ N more" tile. Nothing is hidden for good.
+const DISP_SHOW_EXTRA=3;
+const _dispMore=new Set();                        // groups showing every card (this session)
+let _dispStripOpen=new Set();
+try{ _dispStripOpen=new Set(JSON.parse(localStorage.getItem('bsmp_disp_strips')||'[]')); }catch{}
+function dispGroupBody(k, arr){
+  const office=arr.filter(it=>it.office);
+  const outside=arr.filter(it=>!it.office && it.ext);
+  const shop=arr.filter(it=>!it.office && !it.ext);
+  let extra=0, hidden=0;
+  const showAll=_dispMore.has(k);
+  const shown=shop.filter(it=>{
+    if(showAll) return true;
+    if(!it.hold && dispBand(it.r)===0) return true;   // everything in Now stays visible
+    if(extra<DISP_SHOW_EXTRA){ extra++; return true; }
+    hidden++; return false;
+  });
+  const kJs=String(k).replace(/'/g,"\\'");
+  const more = hidden
+    ? `<button type="button" class="dc-more" onclick="window._dispMoreToggle('${kJs}')"><i class="ti ti-chevron-down"></i>Show ${hidden} more</button>`
+    : (showAll && shop.length>DISP_SHOW_EXTRA ? `<button type="button" class="dc-more" onclick="window._dispMoreToggle('${kJs}')"><i class="ti ti-chevron-up"></i>Show fewer</button>` : '');
+  const cards = shop.length ? `<div class="disp-cards">${shown.map((it,i)=>dispatchRow(it,i,shown.length)).join('')}${more}</div>` : '';
+  // strips
+  const officeSum = () => {
+    const inv=office.filter(it=>it.action!=='po').length, po=office.length-inv;
+    return [inv?`${inv} invoice${inv!==1?'s':''}`:'', po?`${po} PO${po!==1?'s':''} to get`:''].filter(Boolean).join(' · ');
+  };
+  const outSum = () => {
+    const c={}; outside.forEach(it=>{ const n=shortProc(it.step.name); c[n]=(c[n]||0)+1; });
+    return Object.entries(c).map(([n,v])=>`${esc2(n)} ${v}`).join(' · ');
+  };
+  const strip=(key, icon, title, sum, items)=>{
+    if(!items.length) return '';
+    const open=_dispStripOpen.has(key);
+    const late=key.endsWith(':office') ? 0 : items.filter(it=>!it.hold && it.r.due && new Date(it.r.due+'T00:00:00')<new Date(new Date().toDateString())).length;
+    return `<div class="dstrip${open?' open':''}" data-strip="${esc2(key)}">
+      <button type="button" class="dstrip-h" aria-expanded="${open}" onclick="window._dispStrip('${key.replace(/'/g,"\\'")}')"><i class="ti ${icon}"></i><b>${title}</b><span class="dstrip-sum">${sum}</span>${late?`<span class="dstrip-late">${late} past due</span>`:''}<i class="ti ti-chevron-down disp-chev"></i></button>
+      <div class="dstrip-list">${items.map(dispMiniRow).join('')}</div>
+    </div>`;
+  };
+  return strip(k+':office','ti-file-invoice','Office', officeSum(), office)
+       + cards
+       + strip(k+':out','ti-truck-delivery','Outside work', outSum(), outside);
+}
+window._dispMoreToggle=(k)=>{ if(_dispMore.has(k)) _dispMore.delete(k); else _dispMore.add(k); renderDispatch(); };
+window._dispStrip=(key)=>{
+  if(_dispStripOpen.has(key)) _dispStripOpen.delete(key); else _dispStripOpen.add(key);
+  try{ localStorage.setItem('bsmp_disp_strips', JSON.stringify([..._dispStripOpen])); }catch{}
+  const el=[...document.querySelectorAll('.dstrip')].find(x=>x.dataset.strip===key);
+  if(el){ el.classList.toggle('open', _dispStripOpen.has(key)); el.querySelector('.dstrip-h').setAttribute('aria-expanded', _dispStripOpen.has(key)); }
+};
+// One slim line: small thumbnail, customer · part, the task, due, notes / hold; tap = card dialog.
+function dispMiniRow(it){
+  const {r, hold}=it;
+  const op=userRole==='operator';
+  const over=r.due && new Date(r.due+'T00:00:00')<new Date(new Date().toDateString());
+  let task, notes, holdKey;
+  if(it.office){
+    const isPO=it.action==='po';
+    task=`<span class="qb-step" style="color:${isPO?(PROCESS_COLORS['Purchasing']||'#6b7a3a'):'#2d6010'}">${isPO?'Get PO':'Invoice'}</span>`;
+    notes=chatBtnHtml(r.customer,r.po,'',r.id); holdKey=holdKeyForItem(it);
+  } else {
+    task=`<span class="qb-step" style="color:${PROCESS_COLORS[it.step.name]||'#5b6675'}">${procIcon(it.step.name,12)}${esc2(shortProc(it.step.name))}${it.step.vendor?' · '+esc2(it.step.vendor):''}</span>`;
+    notes=chatBtnStep(r, it.step.name); holdKey=it.step.name;
+  }
+  const mgr = op ? '' : `<span class="dc-mgr" onclick="event.stopPropagation()">${it.office?'':dispQbChip(r)}${dispHoldBtn(r.id, holdKey, hold)}<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button></span>`;
+  return `<div class="dmini${hold?' held':''}" data-oid="${r.id}" role="button" tabindex="0" title="Open the part card" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)window._qbOpen('${r.id}')">
+    ${qbThumbHtml(r,'xs')}
+    <div class="dmini-txt">
+      <div class="dmini-top"><b>${esc2(r.customer||'—')}</b>${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</div>
+      <div class="dmini-sub">${task}${r.job?`<span>Job ${esc2(r.job)}</span>`:''}${r.po?`<span>PO ${esc2(r.po)}</span>`:''}<span class="${over?'late':''}">Due ${r.due?fmtDate(r.due):'—'}</span><span onclick="event.stopPropagation()">${notes}</span>${holdChipHtml(hold)}</div>
+    </div>
+    ${mgr}
+  </div>`;
+}
+
+// ── Find a job ── searches every open order (not only what's on Today), so you can
+// jump to any part; Enter / tap opens its card dialog.
+let _dsHits=[], _dsSel=0;
+function dsMatches(q){
+  q=q.trim().toLowerCase(); if(!q) return [];
+  const words=q.split(/\s+/);
+  return orders.filter(r=>!r.archived && r.status!=='Invoiced')
+    .filter(r=>{ const hay=[r.customer,r.part,r.desc,r.job,r.po].map(v=>String(v||'').toLowerCase()).join(' '); return words.every(w=>hay.includes(w)); })
+    .map(r=>({r, live:!!qbCurStep(r)}))
+    .sort((a,b)=>{ if(a.live!==b.live) return a.live?-1:1;          // jobs with work left first
+      const da=a.r.due||'9999', db=b.r.due||'9999'; return da<db?-1:da>db?1:0; })
+    .slice(0,10).map(x=>x.r);
+}
+window._dsSearch=(v)=>{
+  const box=document.getElementById('ds-results'); if(!box) return;
+  _dsHits=dsMatches(v||''); _dsSel=0;
+  if(!(v||'').trim()){ box.hidden=true; box.innerHTML=''; return; }
+  box.hidden=false;
+  if(!_dsHits.length){ box.innerHTML=`<div class="ds-empty">No open job matches “${esc2(v.trim())}”.</div>`; return; }
+  box.innerHTML=_dsHits.map((r,i)=>{
+    const cur=qbCurStep(r);
+    const who=cur&&cur.assignee&&personById(cur.assignee) ? personById(cur.assignee).name : '';
+    const over=r.due && new Date(r.due+'T00:00:00')<new Date(new Date().toDateString());
+    const task = cur
+      ? `<span class="qb-step" style="color:${PROCESS_COLORS[cur.name]||'#5b6675'}">${procIcon(cur.name,12)}${esc2(shortProc(cur.name))}</span>${who?`<span class="ds-who">${esc2(who)}</span>`:'<span>Unassigned</span>'}`
+      : `<span>${esc2(r.status||'')}</span>`;
+    return `<div class="dmini${i===_dsSel?' sel':''}" role="option" onmousedown="event.preventDefault()" onclick="window._dsOpen(${i})">
+      ${qbThumbHtml(r,'xs')}
+      <div class="dmini-txt">
+        <div class="dmini-top"><b>${esc2(r.customer||'—')}</b>${r.part?' · '+esc2(r.part):''}${r.desc?' · '+esc2(r.desc):''}</div>
+        <div class="dmini-sub">${task}${r.job?`<span>Job ${esc2(r.job)}</span>`:''}${r.po?`<span>PO ${esc2(r.po)}</span>`:''}<span class="${over?'late':''}">Due ${r.due?fmtDate(r.due):'—'}</span>${qbOnBoard(r)?`<span>On the board: ${(QB_COLS.find(c=>c.k===r.qb.col)||{}).label}</span>`:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+};
+window._dsOpen=(i)=>{
+  const r=_dsHits[i]; if(!r) return;
+  const inp=document.getElementById('ds-input'); if(inp){ inp.value=''; inp.blur(); }
+  window._dsSearch('');
+  window._qbOpen(r.id);
+};
+window._dsKey=(e)=>{
+  if(e.key==='Escape'){ e.target.value=''; window._dsSearch(''); return; }
+  if(!_dsHits.length) return;
+  if(e.key==='ArrowDown' || e.key==='ArrowUp'){
+    e.preventDefault();
+    _dsSel=(_dsSel+(e.key==='ArrowDown'?1:-1)+_dsHits.length)%_dsHits.length;
+    document.querySelectorAll('#ds-results .dmini').forEach((el,i)=>el.classList.toggle('sel', i===_dsSel));
+    document.querySelectorAll('#ds-results .dmini')[_dsSel]?.scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){ e.preventDefault(); window._dsOpen(_dsSel); }
+};
+document.addEventListener('click', e=>{ const w=document.getElementById('dispatch-search'); if(w && !w.contains(e.target)){ const b=document.getElementById('ds-results'); if(b) b.hidden=true; } });
 function dispSeqBadge(idx){ return `<span class="disp-seq">${idx+1}</span>`; }
-function dispMoveCtl(){
-  return `<span class="disp-grip" title="Drag to reorder" onclick="event.stopPropagation()" onpointerdown="window._dispDragStart(event,this)"><i class="ti ti-grip-vertical"></i></span>`;
+// One card per task, styled like the Work Queues board cards. Tapping the card opens
+// the part card dialog; the controls along the bottom stop the click from bubbling.
+function dispCardTop(r, stepChip, extraChips){
+  const over=r.due && new Date(r.due+'T00:00:00')<new Date(new Date().toDateString());
+  return `<div class="dc-top">
+      ${qbThumbHtml(r)}
+      <div class="dc-info">
+        <div class="qb-cust" title="${esc2(r.customer||'')}">${esc2(r.customer||'—')}</div>
+        <div class="qb-part">${r.part?`<b>${esc2(r.part)}</b>`:''}${r.part&&r.desc?' · ':''}${esc2(r.desc||'')}</div>
+        <div class="qb-meta dc-meta">${r.job?`<span>Job ${esc2(r.job)}</span>`:''}<span>Qty ${r.qty||'—'}</span><span class="${over?'late':''}">Due ${r.due?fmtDate(r.due):'—'}</span>${extraChips.meta||''}</div>
+        <div class="dc-chips">${stepChip}${extraChips.chips||''}</div>
+      </div>
+    </div>`;
 }
 function dispatchRow(it, idx, total){
   if(it.office) return officeDispatchRow(it, idx, total);
   const {r, step, health, ext, hold}=it;
   const col=PROCESS_COLORS[step.name]||'#888';
-  const due=r.due?fmtDate(r.due):'—';
-  const dueOver=r.due && new Date(r.due+'T00:00:00')<new Date(new Date().toDateString());
+  const nJs=step.name.replace(/'/g,"\\'");
   const ms=health.mustStart?fmtDate(toISO(health.mustStart)):'';
   const msLate=health.state==='behind';
-  const esc=s=>esc2(s);
-  const qtyCtl = ext ? '<span></span>' : `<input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" title="Parts completed" onclick="event.stopPropagation()" onchange="window._stepQty('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">`;
   const op = userRole==='operator';
-  const assignCtl = op ? '' : (team.length ? `<select class="ss-assignee" title="Assign to" onclick="event.stopPropagation()" onchange="window._stepAssignee('${r.id}','${step.name.replace(/'/g,"\\'")}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : '<span></span>');
-  const holdBtn = op ? '' : dispHoldBtn(r.id, step.name, hold);
-  const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
-  return `<div class="disp-row${hold?' held':''}" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
+  const stepChip=`<span class="qb-step" style="color:${col}">${procIcon(step.name,14)}${esc2(shortProc(step.name))}${ext?'<span class="disp-out">send out</span>':''}</span>`;
+  const chips=`${healthBadge(health)}${chatBtnStep(r, step.name)}${holdChipHtml(hold)}`;
+  const meta=ms?`<span class="${msLate?'late':''}">Start by ${ms}</span>`:'';
+  const done = ext
+    ? `<span class="dc-done"><i class="ti ti-truck-delivery"></i> Outside process</span>`
+    : `<button class="q-check" title="Mark this step complete" aria-label="Mark ${esc2(step.name)} complete" onclick="window._toggleStepDone('${r.id}','${nJs}',event)"><i class="ti ti-circle" style="font-size:24px;color:var(--border2)"></i></button>
+       <label class="dc-done" onclick="event.stopPropagation()">Done <input type="number" inputmode="numeric" min="0" placeholder="0" value="${step.qtyDone??''}" class="q-qty" aria-label="Parts completed" onchange="window._stepQty('${r.id}','${nJs}',this.value)"> / ${r.qty||'—'}</label>`;
+  const mgr = op ? '' : `<span class="dc-mgr" onclick="event.stopPropagation()">
+       ${dispQbChip(r)}
+       ${team.length ? `<select class="ss-assignee" title="Assign to" onchange="window._stepAssignee('${r.id}','${nJs}',this.value)">${assigneeOptions(step.name, step.assignee||'')}</select>` : ''}
+       ${dispHoldBtn(r.id, step.name, hold)}
+       <button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>
+     </span>`;
+  return `<div class="disp-card${hold?' held':''}" data-oid="${r.id}" role="button" tabindex="0" title="Open the part card (drawing + operations)" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)window._qbOpen('${r.id}')">
     ${dispSeqBadge(idx)}
-    <button class="q-check" title="Mark this step complete" onclick="window._toggleStepDone('${r.id}','${step.name.replace(/'/g,"\\'")}',event)"><i class="ti ti-circle" style="font-size:22px;color:var(--border2)"></i></button>
-    <span class="disp-proc" style="color:${col}">${procIcon(step.name,18)} <b>${shortProc(step.name)}</b>${ext?'<span class="disp-out">send out</span>':''}</span>
-    <div class="disp-job"><span class="dj-txt"><b>${esc(r.customer||'—')}</b>${r.job?' · '+esc(r.job):''}${r.part?' · '+esc(r.part):(r.desc?' · '+esc(r.desc):'')}</span>${chatBtnStep(r, step.name)}${holdChipHtml(hold)}</div>
-    <span class="disp-health">${healthBadge(health)}</span>
-    <span class="disp-dates">${ms?`<span style="color:${msLate?'var(--red)':'var(--text3)'};font-weight:${msLate?700:400}">start by ${ms}</span>`:''}<span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
-    <span class="disp-draw">${drawCellHtml(r)}</span>
-    ${qtyCtl}
-    ${assignCtl}
-    ${holdBtn}
-    ${openBtn}
-    ${dispMoveCtl(r, idx, total)}
+    ${r.priority===0?'<span class="qb-hot">HOT</span>':''}
+    ${dispCardTop(r, stepChip, {chips, meta})}
+    <div class="dc-actions">${done}${mgr}</div>
   </div>`;
 }
 function officeDispatchRow(it, idx, total){
   const {r, action, hold}=it;
   const isPO = action==='po';
   const col = isPO ? (PROCESS_COLORS['Purchasing']||'#6b7a3a') : '#2d6010';
-  const icon = isPO ? procIcon('Purchasing',18) : '<i class="ti ti-file-invoice" style="font-size:18px"></i>';
+  const icon = isPO ? procIcon('Purchasing',14) : '<i class="ti ti-file-invoice" style="font-size:14px"></i>';
   const label = isPO ? 'Get PO' : 'Invoice';
-  const due = r.due?fmtDate(r.due):'—';
-  const dueOver = r.due && new Date(r.due+'T00:00:00') < new Date(new Date().toDateString());
   const op = userRole==='operator';
-  const holdBtn = op ? '' : dispHoldBtn(r.id, holdKeyForItem(it), hold);
-  const openBtn = op ? '' : `<button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>`;
-  const statusChip = `<span class="status-badge ${STATUS_CLASS[r.status]||''}" style="font-size:10px">${esc2(r.status)}</span>`;
-  return `<div class="disp-row${hold?' held':''}" data-oid="${r.id}" title="Open in Work Queues" onclick="window._openInQueue('${r.id}',event)">
+  const stepChip=`<span class="qb-step" style="color:${col}">${icon}${label}</span>`;
+  const chips=`<span class="status-badge ${STATUS_CLASS[r.status]||''}" style="font-size:10px">${esc2(r.status)}</span>${chatBtnHtml(r.customer,r.po,'',r.id)}${holdChipHtml(hold)}`;
+  const mgr = op ? '' : `<span class="dc-mgr" onclick="event.stopPropagation()">
+       ${dispHoldBtn(r.id, holdKeyForItem(it), hold)}
+       <button class="q-open-btn" title="Open in Open Orders" onclick="window._openInOrders('${r.id}',event)"><i class="ti ti-external-link"></i></button>
+     </span>`;
+  return `<div class="disp-card dc-office${hold?' held':''}" data-oid="${r.id}" role="button" tabindex="0" title="Open the part card (drawing + operations)" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter'&&event.target===this)window._qbOpen('${r.id}')">
     ${dispSeqBadge(idx)}
-    <span class="q-check" style="visibility:hidden"><i class="ti ti-circle" style="font-size:22px"></i></span>
-    <span class="disp-proc" style="color:${col}">${icon} <b>${label}</b></span>
-    <div class="disp-job"><span class="dj-txt"><b>${esc2(r.customer||'—')}</b>${r.job?' · '+esc2(r.job):''}${r.part?' · '+esc2(r.part):(r.desc?' · '+esc2(r.desc):'')}</span>${chatBtnHtml(r.customer,r.po,'',r.id)}${holdChipHtml(hold)}</div>
-    <span class="disp-health">${statusChip}</span>
-    <span class="disp-dates"><span style="${dueOver?'color:var(--red);font-weight:600':'color:var(--text3)'}">due ${due}</span></span>
-    <span class="disp-draw">${drawCellHtml(r)}</span>
-    <span></span>
-    ${op?'':'<span></span>'}
-    ${holdBtn}
-    ${openBtn}
-    ${dispMoveCtl(r, idx, total)}
+    ${r.priority===0?'<span class="qb-hot">HOT</span>':''}
+    ${dispCardTop(r, stepChip, {chips, meta:r.po?`<span>PO ${esc2(r.po)}</span>`:''})}
+    <div class="dc-actions"><span class="dc-done">${isPO?'Office: get the customer PO':'Office: send the invoice'}</span>${mgr}</div>
   </div>`;
 }
 
@@ -8612,11 +8828,10 @@ function bToast(msg){
   _undoTimer=setTimeout(()=>el.classList.remove('show'), 3500);
 }
 
-// Publish: the board's top-to-bottom arrangement becomes today's manual order
-// (daySeq) on every job it holds — the same field the Today page's drag-reorder
-// writes, so each person's list follows the board. Jobs not on the board keep
-// their urgency order below the published ones. Resets tomorrow, like any
-// manual Today order.
+// Publish: the board's top-to-bottom arrangement becomes today's order (daySeq) on
+// every job it holds, so each person's Today list follows it. Parts placed on the
+// Work Queues board keep that board's order instead (see dispDayCmp); jobs not
+// published keep urgency order below. Resets tomorrow.
 window.bPublish=()=>{
   if(!canEditBoard()) return;
   const cards=Object.values(BOARD).filter(i=>i&&(i.type==='order'||i.type==='part')&&!i.done)
@@ -8635,7 +8850,7 @@ window.bPublish=()=>{
   const seen=new Set();
   const uniq=ids.filter(id=>{ const k=String(id); if(seen.has(k)) return false; seen.add(k); return true; });
   if(!uniq.length){ alert('Nothing to publish — put order or part cards on the board first.'); return; }
-  if(!confirm(`Publish this board to Today?\n\nThe ${uniq.length} job${uniq.length!==1?'s':''} on the board (top to bottom) become today's task order under each team member. Jobs not on the board fall in below them in urgency order. This lasts for today — tomorrow starts fresh.`)) return;
+  if(!confirm(`Publish this board to Today?\n\nThe ${uniq.length} job${uniq.length!==1?'s':''} on the board (top to bottom) become today's task order under each team member. Parts on the Work Queues board keep that board's order, and jobs not published fall in below in urgency order. This lasts for today — tomorrow starts fresh.`)) return;
   const ds=_todayStr();
   uniq.forEach((id,i)=>{ const r=orders.find(o=>String(o.id)===String(id)); if(r){ r.daySeq=i+1; r.daySeqDate=ds; } });
   saveDB();
@@ -9885,29 +10100,6 @@ function queueForOrder(r){
   if(!q){ for(const s of ord){ if(!s.done){ const m=mapQ(s.name); if(m){ q=m; break; } } } }  // fall back to next queue-backed step
   return q;
 }
-// Jump from the Today board to this job's row in Work Queues, and flash it.
-window._openInQueue = (id, e) => {
-  if(e) e.stopPropagation();
-  const r = orders.find(o=>o.id===id); if(!r) return;
-  // On the Work Queues board → show the board and flash its card
-  if(qbOnBoard(r)){
-    _queueView='board'; _qbProc='';
-    showPage('queues');
-    setTimeout(()=>{
-      const el=document.querySelector(`.qb-card[data-qbid='${id}']`);
-      if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('row-flash'); setTimeout(()=>el.classList.remove('row-flash'),1600); }
-    }, 130);
-    return;
-  }
-  const q = queueForOrder(r);
-  _queueView='list';
-  showPage('queues');
-  if(q) selectQueue(q);   // sets the active tab and re-renders the queue
-  setTimeout(()=>{
-    const el = document.querySelector(`.q-row[data-qjob='${id}']`);
-    if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.classList.add('row-flash'); setTimeout(()=>el.classList.remove('row-flash'),1600); }
-  }, 130);
-};
 let _drawZoom = 1;
 window._openDrawing = (id, e) => {
   if(e) e.stopPropagation();
