@@ -259,6 +259,12 @@ select:focus{border-color:var(--green)}
 .qb-meta{font-size:11.5px;color:var(--text2);display:flex;gap:4px 10px;flex-wrap:wrap}
 .qb-meta .over{color:var(--red);font-weight:700}
 .qb-step{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;align-self:flex-start;padding:2px 9px;border:1px solid currentColor;border-radius:12px;background:#fff;max-width:100%}
+.qb-who{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--text);min-width:0}
+.qb-who .person-chip{min-width:0}
+.qb-who .pc-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qb-who > .ti{font-size:15px;color:var(--text3)}
+.qb-who.none{color:#BA7517;font-weight:600}
+.qb-who.none > .ti{color:#BA7517}
 .qb-prog{height:5px;background:var(--border);margin-top:3px}
 .qb-prog span{display:block;height:100%;background:var(--green)}
 .qb-hot{position:absolute;top:7px;right:7px;font-size:10px;font-weight:800;color:#fff;background:#A32D2D;padding:1px 6px;border-radius:8px}
@@ -6860,6 +6866,11 @@ function qbCardHtml(r, mgr){
       ? `<span class="qb-step" style="color:${PROCESS_COLORS[cur.name]||'#5b6675'}">${procIcon(cur.name,14)}${esc2(shortProc(cur.name))}${cur.qtyDone?` · ${cur.qtyDone}/${r.qty||'?'}`:''}</span>`
       : `<span class="qb-step" style="color:var(--text3)">No operations set</span>`;
   const hold = cur ? holdChipHtml(holdActive(r, cur.name)) : '';
+  // who has the part right now: the current step's assignee (outside steps: the vendor)
+  const who = !cur ? ''
+    : (cur.assignee && personById(cur.assignee)) ? `<div class="qb-who">${personChip(cur.assignee)}</div>`
+    : (isExternal(cur.name) && !cur.name.startsWith('Purchasing-') && cur.vendor) ? `<div class="qb-who"><i class="ti ti-truck-delivery"></i><span class="pc-name">${esc2(cur.vendor)}</span></div>`
+    : `<div class="qb-who none"><i class="ti ti-user-question"></i>Unassigned</div>`;
   return `<div class="qb-card${allDone?' all-done':''}" data-qbid="${r.id}"${mgr?' draggable="true"':''} role="button" tabindex="0" onclick="window._qbOpen('${r.id}')" onkeydown="if(event.key==='Enter')window._qbOpen('${r.id}')">
     ${qbThumbHtml(r)}
     <div class="qb-info">
@@ -6867,6 +6878,7 @@ function qbCardHtml(r, mgr){
       <div class="qb-part">${r.part?`<b>${esc2(r.part)}</b>`:''}${r.part&&r.desc?' · ':''}${esc2(r.desc||'')}</div>
       <div class="qb-meta">${r.job?`<span>Job ${esc2(r.job)}</span>`:''}<span>Qty ${r.qty||'—'}</span><span class="${over?'over':''}">Due ${r.due?fmtDate(r.due):'—'}</span></div>
       <div>${step}${hold}</div>
+      ${who}
       ${pg.total?`<div class="qb-prog" title="${pg.done} of ${pg.total} operations done"><span style="width:${Math.round(pg.done/pg.total*100)}%"></span></div>`:''}
     </div>
     ${r.priority===0?'<span class="qb-hot">HOT</span>':''}
