@@ -2007,16 +2007,24 @@ async function avShow(i){
   $('av-name').textContent=d.name||'attachment';
   const body=$('av-body');
   const ck='av|'+d.msg+'|'+d.att;
+  // Some mailers send PDFs / pictures as application/octet-stream (Doringer's 112-STMT.PDF,
+  // 2026-10-06): go by the file name too, or the viewer says "No preview for this file type".
+  const fn=(d.name||'').toLowerCase();
+  let mime=(d.mime||'').toLowerCase();
+  if(!mime.includes('pdf') && fn.endsWith('.pdf')) mime='application/pdf';
+  else if(!mime.startsWith('image/')){ const im=fn.match(/\.(png|jpe?g|gif|webp|bmp)$/); if(im) mime='image/'+(im[1]==='jpg'?'jpeg':im[1]); }
   try{
     if(!_cidCache[ck]){
       body.innerHTML='<div class="av-empty"><i class="ti ti-loader-2 nt-spin" style="font-size:28px"></i><div style="margin-top:8px">Loading…</div></div>';
-      const blob=await fetchAttBlob({box:d.box, msg:d.msg, att:d.att, mime:d.mime, name:d.name});
+      let blob=await fetchAttBlob({box:d.box, msg:d.msg, att:d.att, mime:d.mime, name:d.name});
       if(my!==_avSeq) return;   // user already moved on to another attachment
+      // the worker answers with the mail's own mime; an octet-stream blob in the iframe
+      // downloads instead of showing, so re-label it with the type we worked out above
+      if(mime && blob.type!==mime && (mime.includes('pdf')||mime.startsWith('image/'))) blob=new Blob([blob],{type:mime});
       _cidCache[ck]=URL.createObjectURL(blob);
     }
     if(my!==_avSeq) return;
     _avUrl=_cidCache[ck]; _avName=d.name||'attachment';
-    const mime=(d.mime||'').toLowerCase(), fn=(d.name||'').toLowerCase();
     // CAD files ship with junk mimes (octet-stream) — go by the file name
     if(fn.endsWith('.dxf')) await avShowDxf(body,my);
     else if(fn.endsWith('.dwg')) await avShowDwg(body,my);
