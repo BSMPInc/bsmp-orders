@@ -205,6 +205,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .aa-hl .sw{width:28px;height:28px;border-radius:50%;border:1px solid rgba(0,0,0,.12);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:var(--text2);background:#fff}
 .aa-hl .sw i{font-size:16px}
 .aa-hl .sw.on{box-shadow:0 0 0 2px #fff,0 0 0 4px var(--accent-ink)}
+.aa-hl .sw.fc{font-size:15px;font-weight:800;font-family:inherit}
 
 @media(max-width:760px){
   .nt-list{width:100%;border-right:none}
@@ -507,6 +508,10 @@ function buildEditor(){
         ${HL_COLORS.map(c=>`<button class="sw" data-hl="${c.v}" title="${c.n} highlight" style="background:${c.v}" ${keep}onclick="ntHl('${c.v}')"></button>`).join('')}
         <button class="sw" data-hl="" title="No highlight" ${keep}onclick="ntHl('')"><i class="ti ti-highlight-off"></i></button>
       </div>
+      <div class="aa-hl" title="Text colour">
+        <button class="sw fc" data-fc="" title="Normal text colour" style="color:var(--text)" ${keep}onclick="ntColor('')">A</button>
+        ${FC_COLORS.map(c=>`<button class="sw fc" data-fc="${c.v}" title="${c.n} text" style="color:${c.v}" ${keep}onclick="ntColor('${c.v}')">A</button>`).join('')}
+      </div>
     </div>
     <div class="ed-scroll">
       <div class="ed-date">${esc(fmtLong(n?whenOf(n):Date.now()))}</div>
@@ -558,6 +563,7 @@ function refreshAa(){
   const blk=closestIn('h1,h2,h3,pre'); const tag=blk?blk.tagName.toLowerCase():'div';
   p.querySelectorAll('[data-blk]').forEach(x=>x.classList.toggle('on',x.dataset.blk===tag));
   p.querySelectorAll('[data-hl]').forEach(x=>x.classList.toggle('on',x.dataset.hl?sameColor(x.dataset.hl,hc):!hc));
+  const fc=fcAt(); p.querySelectorAll('[data-fc]').forEach(x=>x.classList.toggle('on',x.dataset.fc?sameColor(x.dataset.fc,fc):!fc));
   p.querySelectorAll('[data-cmd]').forEach(x=>{ let on=false; try{ on=document.queryCommandState(x.dataset.cmd); }catch(e){} x.classList.toggle('on',on); });
   const li=closestIn('li'), list=li&&li.parentElement; const kind=!list?'':list.tagName==='OL'?'ol':list.classList.contains('dashed')?'dash':list.classList.contains('checklist')?'check':'ul';
   p.querySelectorAll('[data-list]').forEach(x=>x.classList.toggle('on',x.dataset.list===kind));
@@ -582,13 +588,32 @@ function sameColor(a,b){ if(!a||!b) return false; const t=document.createElement
 function hlEl(){ const b=$('nt-body'); let e=selEl(); while(e && e!==b && b.contains(e)){ if(!isClear(e.style&&e.style.backgroundColor)) return e; e=e.parentElement; } return null; }
 function hlAt(){ const e=hlEl(); return e?e.style.backgroundColor:''; }
 function hlTidy(){
-  // taking a highlight off leaves "background-color: transparent" spans behind: strip them
+  // taking a highlight / colour off leaves "background-color: transparent" or FC_CLEAR spans behind: strip them
   $('nt-body').querySelectorAll('[style]').forEach(el=>{
     if(el.style.backgroundColor && isClear(el.style.backgroundColor)) el.style.backgroundColor='';
+    if(el.style.color && sameColor(el.style.color,FC_CLEAR)) el.style.color='';
     if(!el.getAttribute('style').trim()) el.removeAttribute('style');
     if(el.tagName==='SPAN' && !el.attributes.length){ while(el.firstChild) el.parentNode.insertBefore(el.firstChild,el); el.remove(); }
   });
 }
+// ---- text colour: inline color spans; "normal" paints a marker colour that hlTidy then strips,
+// so the text goes back to inheriting instead of being stamped black
+const FC_COLORS=[{n:'Red',v:'#d92d20'},{n:'Orange',v:'#c2410c'},{n:'Green',v:'#15803d'},{n:'Blue',v:'#1d4ed8'},{n:'Purple',v:'#7e22ce'},{n:'Gray',v:'#6b7280'}];
+const FC_CLEAR='#010203';
+function fcEl(){ const b=$('nt-body'); let e=selEl(); while(e && e!==b && b.contains(e)){ if(e.style&&e.style.color) return e; e=e.parentElement; } return null; }
+function fcAt(){ const e=fcEl(); return e?e.style.color:''; }
+window.ntColor=(color)=>{
+  if(!restoreSel()) return;
+  const s=getSelection(), on=fcEl();
+  if(!color && s.isCollapsed && !on) return;   // nothing coloured here: don't arm the marker colour for typing
+  // a bare caret inside coloured text: recolour the whole coloured run
+  if(s.isCollapsed && on){ const r=document.createRange(); r.selectNodeContents(on); s.removeAllRanges(); s.addRange(r); }
+  document.execCommand('styleWithCSS',false,true);
+  document.execCommand('foreColor',false,color||FC_CLEAR);
+  document.execCommand('styleWithCSS',false,false);
+  hlTidy();
+  ntQueueSave(); refreshAa();
+};
 // ntHl() = bar button: toggle with the last colour; ntHl(colour) = swatch; ntHl('') = remove
 window.ntHl=(color)=>{
   if(!restoreSel()) return;
