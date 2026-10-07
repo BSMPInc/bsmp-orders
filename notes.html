@@ -457,6 +457,7 @@ function buildEditor(){
       <button class="eb back" onclick="ntBack()"><i class="ti ti-chevron-left"></i>Notes</button>
       <button class="eb aa" id="eb-aa" title="Text format" ${keep}onclick="ntAa()">Aa</button>
       <button class="eb" title="Checklist" ${keep}onclick="ntFmt('check')"><i class="ti ti-list-check"></i></button>
+      <button class="eb" id="eb-strike" title="Strikethrough (Ctrl+Shift+X)" ${keep}onclick="ntFmt('strikeThrough')"><i class="ti ti-strikethrough"></i></button>
       <label class="eb" title="Add a photo" ${keep}><i class="ti ti-photo"></i><input type="file" accept="image/*" multiple hidden onchange="ntPhotos(this)"></label>
       <span class="sp"></span>
       <span class="savestat" id="nt-savestat"></span>
@@ -530,6 +531,7 @@ document.addEventListener('pointerdown',e=>{
   if(!p.contains(e.target) && e.target.id!=='eb-aa' && !$('nt-body').contains(e.target)) ntAa(false);
 });
 function refreshAa(){
+  const sb=$('eb-strike'); if(sb){ let on=false; try{ on=document.queryCommandState('strikeThrough'); }catch(e){} sb.classList.toggle('on',on); }
   const p=$('aa-pop'); if(!p||p.hidden) return;
   const blk=closestIn('h1,h2,h3,pre'); const tag=blk?blk.tagName.toLowerCase():'div';
   p.querySelectorAll('[data-blk]').forEach(x=>x.classList.toggle('on',x.dataset.blk===tag));
@@ -576,6 +578,7 @@ function ntKeydown(e){
   if(e.key==='Tab' && closestIn('li')){ e.preventDefault(); document.execCommand(e.shiftKey?'outdent':'indent'); ntQueueSave(); }
   const mod=e.ctrlKey||e.metaKey;
   if(mod && e.shiftKey && (e.key==='L'||e.key==='l')){ e.preventDefault(); ntFmt('check'); }
+  if(mod && e.shiftKey && (e.key==='X'||e.key==='x')){ e.preventDefault(); ntFmt('strikeThrough'); }
 }
 function ntPaste(e){
   const cd=e.clipboardData; if(!cd) return;
