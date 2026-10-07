@@ -200,6 +200,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 .aa-grp button i{font-size:19px}
 .aa-grp button.on{background:var(--accent-soft);color:var(--accent-ink)}
 .eb.hlbtn{position:relative}
+.eb:disabled{opacity:.3;cursor:default;background:none}
 .eb.hlbtn .hl-bar{position:absolute;left:11px;right:11px;bottom:5px;height:3px;border-radius:2px}
 .aa-hl{display:flex;align-items:center;gap:6px}
 .aa-hl .sw{width:28px;height:28px;border-radius:50%;border:1px solid rgba(0,0,0,.12);cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;color:var(--text2);background:#fff}
@@ -224,6 +225,13 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
   .eb.hlbtn .hl-bar{left:8px;right:8px}
   .savestat{padding:7px 6px;flex:none}
   .savestat .st-txt{display:none}
+}
+/* narrow phones: no room for every button. Strikethrough stays in Aa; Redo shows once there's something to redo */
+@media(max-width:420px){
+  #eb-strike,#eb-redo:disabled{display:none}
+  #eb-redo:not(:disabled) ~ .savestat{display:none}   /* a failed save still pops a toast */
+  .ed-bar{padding:8px 2px}
+  .eb{min-width:31px;padding:0 4px}
 }
 
 .nt-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:var(--on-accent);padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
@@ -478,6 +486,8 @@ function buildEditor(){
       <button class="eb hlbtn" id="eb-hl" title="Highlight (Ctrl+Shift+H)" ${keep}onclick="ntHl()"><i class="ti ti-highlight"></i><span class="hl-bar" style="background:${hlColor()}"></span></button>
       <label class="eb" title="Add a photo" ${keep}><i class="ti ti-photo"></i><input type="file" accept="image/*" multiple hidden onchange="ntPhotos(this)"></label>
       <span class="sp"></span>
+      <button class="eb" id="eb-undo" title="Undo (Ctrl+Z)" disabled ${keep}onclick="ntUndo()"><i class="ti ti-arrow-back-up"></i></button>
+      <button class="eb" id="eb-redo" title="Redo (Ctrl+Y)" disabled ${keep}onclick="ntRedo()"><i class="ti ti-arrow-forward-up"></i></button>
       <span class="savestat" id="nt-savestat"></span>
       <button class="eb${n&&n.pinned?' on':''}" id="eb-pin" title="Pin to the top" onclick="ntPin()"><i class="ti ti-pin${n&&n.pinned?'ned':''}"></i></button>
       <button class="eb del" title="Delete note" onclick="ntDelete()"><i class="ti ti-trash"></i></button>
@@ -519,7 +529,9 @@ function buildEditor(){
     </div>`;
   const b=$('nt-body');
   try{ document.execCommand('defaultParagraphSeparator',false,'div'); }catch(e){}
-  b.addEventListener('input',()=>{ ntQueueSave(); });
+  b.addEventListener('input',()=>{ ntQueueSave(); clearTimeout(_unT); _unT=setTimeout(undoMark,600); const u=$('eb-undo'), r=$('eb-redo'); if(u) u.disabled=false; if(r) r.disabled=true; });
+  b.addEventListener('beforeinput',e=>{ if(e.inputType==='historyUndo'||e.inputType==='historyRedo'){ e.preventDefault(); e.inputType==='historyUndo'?ntUndo():ntRedo(); } });
+  _undo=[]; _redo=[]; clearTimeout(_unT); _unCur=undoSnap(); undoBtns();
   b.addEventListener('click',ntBodyClick);
   b.addEventListener('keydown',ntKeydown);
   b.addEventListener('paste',ntPaste);
@@ -571,6 +583,7 @@ function refreshAa(){
 
 window.ntFmt=(kind,arg)=>{
   if(!restoreSel()) return;
+  undoMark();
   if(kind==='blk'){
     // a style tap on a list line takes the line out of the list first (like iOS)
     if(arg!=='div' && closestIn('li')) listCmd(closestIn('ol')?'ol':'ul',true);
@@ -578,7 +591,7 @@ window.ntFmt=(kind,arg)=>{
   }
   else if(['ul','dash','ol','check'].includes(kind)) listCmd(kind);
   else document.execCommand(kind,false,null);
-  ntQueueSave(); refreshAa();
+  undoMark(); ntQueueSave(); refreshAa();
 };
 // ---- highlight: inline background-color spans; the bar button reuses the last colour picked
 const HL_COLORS=[{n:'Yellow',v:'#fde68a'},{n:'Green',v:'#bbf7d0'},{n:'Blue',v:'#bfdbfe'},{n:'Pink',v:'#fbcfe8'},{n:'Orange',v:'#fed7aa'}];
@@ -604,6 +617,7 @@ function fcEl(){ const b=$('nt-body'); let e=selEl(); while(e && e!==b && b.cont
 function fcAt(){ const e=fcEl(); return e?e.style.color:''; }
 window.ntColor=(color)=>{
   if(!restoreSel()) return;
+  undoMark();
   const s=getSelection(), on=fcEl();
   if(!color && s.isCollapsed && !on) return;   // nothing coloured here: don't arm the marker colour for typing
   // a bare caret inside coloured text: recolour the whole coloured run
@@ -612,11 +626,12 @@ window.ntColor=(color)=>{
   document.execCommand('foreColor',false,color||FC_CLEAR);
   document.execCommand('styleWithCSS',false,false);
   hlTidy();
-  ntQueueSave(); refreshAa();
+  undoMark(); ntQueueSave(); refreshAa();
 };
 // ntHl() = bar button: toggle with the last colour; ntHl(colour) = swatch; ntHl('') = remove
 window.ntHl=(color)=>{
   if(!restoreSel()) return;
+  undoMark();
   const s=getSelection(), on=hlEl();
   if(color===undefined) color=on?'':hlColor();
   if(color){ try{ localStorage.setItem('nt-hl',color); }catch(e){} const bar=document.querySelector('#eb-hl .hl-bar'); if(bar) bar.style.background=color; }
@@ -626,8 +641,42 @@ window.ntHl=(color)=>{
   document.execCommand('hiliteColor',false,color||'transparent');
   document.execCommand('styleWithCSS',false,false);
   if(!color) hlTidy();
-  ntQueueSave(); refreshAa();
+  undoMark(); ntQueueSave(); refreshAa();
 };
+// ---- undo / redo: our own snapshots of the note (the browser's undo can't see class toggles or
+// span tidying, and loses its place). Typing is grouped: a step is cut after 600 ms of quiet and
+// around every toolbar action. Per open note only; opening a note starts a fresh history.
+let _undo=[], _redo=[], _unCur=null, _unT=null;
+// caret saved as a child-index path from the body: undo restores the exact same HTML, so the path is exact
+function nodePath(b,n){ const p=[]; while(n && n!==b){ const par=n.parentNode; if(!par) return null; p.unshift([].indexOf.call(par.childNodes,n)); n=par; } return n===b?p:null; }
+function pathNode(b,p){ let n=b; for(const i of p||[]){ if(!n.childNodes[i]) return null; n=n.childNodes[i]; } return n; }
+function undoSnap(){
+  const b=$('nt-body'); if(!b) return null;
+  const s=getSelection(); let sel=_unCur?_unCur.sel:null;
+  if(s.rangeCount && b.contains(s.getRangeAt(0).commonAncestorContainer)){
+    const r=s.getRangeAt(0), sp=nodePath(b,r.startContainer), ep=nodePath(b,r.endContainer);
+    if(sp&&ep) sel={sp,so:r.startOffset,ep,eo:r.endOffset};
+  }
+  return {html:b.innerHTML,sel};
+}
+function undoMark(){
+  clearTimeout(_unT); const now=undoSnap(); if(!now||!_unCur) return;
+  if(now.html===_unCur.html){ _unCur=now; return; }
+  _undo.push(_unCur); if(_undo.length>200) _undo.shift();
+  _redo=[]; _unCur=now; undoBtns();
+}
+function undoApply(st){
+  const b=$('nt-body'); b.innerHTML=st.html; _unCur=st;
+  b.focus({preventScroll:true});
+  const r=document.createRange(), x=st.sel, sn=x&&pathNode(b,x.sp), en=x&&pathNode(b,x.ep);
+  try{ if(!sn||!en) throw 0; r.setStart(sn,x.so); r.setEnd(en,x.eo); }catch(e){ r.selectNodeContents(b); r.collapse(false); }
+  const s=getSelection(); s.removeAllRanges(); s.addRange(r);
+  _lastRange=r.cloneRange();
+  undoBtns(); ntQueueSave(); refreshAa();
+}
+window.ntUndo=()=>{ undoMark(); if(!_undo.length) return; _redo.push(_unCur); undoApply(_undo.pop()); };
+window.ntRedo=()=>{ undoMark(); if(!_redo.length) return; _undo.push(_unCur); undoApply(_redo.pop()); };
+function undoBtns(){ const u=$('eb-undo'), r=$('eb-redo'); if(u) u.disabled=!_undo.length; if(r) r.disabled=!_redo.length; }
 function listCmd(kind,off){
   const ordered=kind==='ol', cls=kind==='dash'?'dashed':kind==='check'?'checklist':'';
   const cmd=ordered?'insertOrderedList':'insertUnorderedList';
@@ -645,15 +694,17 @@ function listCmd(kind,off){
 function ntBodyClick(e){
   const li=e.target.closest&&e.target.closest('ul.checklist > li'); if(!li) return;
   const r=li.getBoundingClientRect();
-  if(e.clientX < r.left+2){ li.classList.toggle('done'); e.preventDefault(); ntQueueSave(); }
+  if(e.clientX < r.left+2){ undoMark(); li.classList.toggle('done'); undoMark(); e.preventDefault(); ntQueueSave(); }
 }
 function ntKeydown(e){
   if(e.key==='Enter' && !e.shiftKey){
     // a new checklist line starts unticked (the browser copies the class of the line it split)
     setTimeout(()=>{ const li=closestIn('ul.checklist > li'); if(li && li.classList.contains('done') && !li.textContent.trim()) li.classList.remove('done'); },0);
   }
-  if(e.key==='Tab' && closestIn('li')){ e.preventDefault(); document.execCommand(e.shiftKey?'outdent':'indent'); ntQueueSave(); }
+  if(e.key==='Tab' && closestIn('li')){ e.preventDefault(); undoMark(); document.execCommand(e.shiftKey?'outdent':'indent'); ntQueueSave(); }
   const mod=e.ctrlKey||e.metaKey;
+  if(mod && !e.altKey && (e.key==='z'||e.key==='Z')){ e.preventDefault(); e.shiftKey?ntRedo():ntUndo(); return; }
+  if(mod && !e.altKey && !e.shiftKey && (e.key==='y'||e.key==='Y')){ e.preventDefault(); ntRedo(); return; }
   if(mod && e.shiftKey && (e.key==='L'||e.key==='l')){ e.preventDefault(); ntFmt('check'); }
   if(mod && e.shiftKey && (e.key==='X'||e.key==='x')){ e.preventDefault(); ntFmt('strikeThrough'); }
   if(mod && e.shiftKey && (e.key==='H'||e.key==='h')){ e.preventDefault(); ntHl(); }
