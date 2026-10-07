@@ -6161,7 +6161,8 @@ function reloadQuote(id){
   document.getElementById('revision').value=q.revision==='—'?'':q.revision;
   document.getElementById('customer').value=q.customer==='—'?'':q.customer;
   document.getElementById('qty').value=q.qty;
-  document.getElementById('markup').value=(q.markup*100).toFixed(0);
+  // keep decimals: a markup set to hit a target price (e.g. 24.703%) rounded to 25% on reload and moved the price (Ace corner guards, 2026-10-06)
+  document.getElementById('markup').value=String(+(q.markup*100).toFixed(3));
   // Restore job tier selection (visual only — markup value above is authoritative)
   currentTier = q.tier || '';
   markupManual = false;
