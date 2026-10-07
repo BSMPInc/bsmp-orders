@@ -6386,6 +6386,9 @@ function reloadQuote(id){
   for(let i=1;i<=8;i++){ const el=document.getElementById('qb-'+i); if(el) el.value = savedQbs[i-1]!==undefined ? savedQbs[i-1] : ''; }
 
   // ---- Recalculate everything ----
+  // bar stock: the sv() calls above don't fire onchange, so the bar material cost/part would stay
+  // whatever the LAST quote computed (or $0 on a fresh page) - every bar quote reopened at a wrong price
+  if(q.matMode === 'bar') calcBarStock();
   calculate();
   calcProgramming();
   calcSheetLoading();
