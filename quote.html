@@ -1517,6 +1517,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <!-- Notes -->
   <div class="card">
     <div class="card-title">Notes</div>
+    <div class="field" style="max-width:260px;margin-bottom:10px"><label>Lead time</label>
+      <input id="q-leadtime" type="text" placeholder="3-4 Weeks" title="Saved with this quote and filled into the printed customer quote. Blank = 3-4 Weeks."></div>
     <textarea id="notes" placeholder="Internal notes, drawing callouts, special instructions…"></textarea>
   </div>
 
@@ -5314,6 +5316,7 @@ function saveQuote(){
     qtyBreaks: window._qtyBreaksResults || [],
     laborLines, hwLines, outLines,
     notes: document.getElementById('notes').value,
+    leadTime: quoteLeadTime(true),
     // Claude's decision record: attached when Claude builds the quote, kept when the quote is re-saved
     claudeReview: window._pendingClaudeReview || (existing && existing.claudeReview) || null,
     img: currentPartImg||null,
@@ -5474,6 +5477,7 @@ function resetForm(){
   document.getElementById('pierces').value='1';
   { const rc=document.getElementById('recool'); if(rc) rc.checked=false; }
   document.getElementById('notes').value='';
+  { const lt=document.getElementById('q-leadtime'); if(lt) lt.value=''; }
   { const et=document.getElementById('exp-type'); if(et) et.value='none';
     const ea=document.getElementById('exp-amount'); if(ea) ea.value='0';
     const mo=document.getElementById('min-order-apply'); if(mo) mo.value='yes'; }   // new quotes carry the shop minimum
@@ -6179,6 +6183,7 @@ function reloadQuote(id){
   // reload them that way so their numbers don't shift
   { const rsel=document.getElementById('rounding'); if(rsel) rsel.value=q.rounding||'nickel'; }
   document.getElementById('notes').value=q.notes||'';
+  { const lt=document.getElementById('q-leadtime'); if(lt) lt.value=q.leadTime||''; }   // always set: an old quote must not keep the last quote's lead time
 
   // ---- Material mode (sheet vs bar) ----
   if(q.matMode === 'bar'){
@@ -9788,10 +9793,10 @@ function buildCombinedQuote(){
   });
 
   // The minimum is per ORDER: on unless every picked quote was set to waive it.
-  openCombineForm(items, firstCust, picked.some(q => q.minOrderApply !== 'no'));
+  openCombineForm(items, firstCust, picked.some(q => q.minOrderApply !== 'no'), longestLeadTime(picked.map(q => q.leadTime)));
 }
 
-function openCombineForm(items, firstCust, applyMin){
+function openCombineForm(items, firstCust, applyMin, leadTime){
   const fmt = v => v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const today = new Date().toLocaleDateString("en-US",{month:"2-digit",day:"2-digit",year:"numeric"});
 
@@ -9839,7 +9844,7 @@ function openCombineForm(items, firstCust, applyMin){
         </div>
         <div style="grid-column:1/3">
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Lead Time</label>
-          <input id="cc-leadtime" type="text" value="3-4 Weeks" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
+          <input id="cc-leadtime" type="text" value="${qEsc(leadTime||'3-4 Weeks')}" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
         </div>
       </div>
       <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Line items</div>
@@ -9901,6 +9906,22 @@ function printQuoteFromHistory(id){
   setTimeout(()=>{ printCustomerQuote(id); }, 250);
 }
 
+// Lead time saved on the quote (Notes card). raw=true -> exactly what was typed (blank stays blank, for saving);
+// otherwise the value to print, falling back to the shop's usual 3-4 Weeks.
+function quoteLeadTime(raw){
+  const v=((document.getElementById('q-leadtime')||{}).value||'').trim();
+  return raw ? v : (v || '3-4 Weeks');
+}
+// Combine-print: several quotes on one sheet get the LONGEST lead time among them (by the largest number in
+// each text, e.g. "6-8 Weeks" beats "3-4 Weeks"); quotes with no lead time saved are ignored.
+function longestLeadTime(list){
+  const vals=(list||[]).map(v=>String(v||'').trim()).filter(Boolean);
+  if(!vals.length) return '';
+  const unit=v=>/day/i.test(v)?1/7:/month/i.test(v)?4.33:1;   // compare in weeks: "10 days" < "2 weeks"
+  const top=v=>{ const n=(v.match(/\d+(\.\d+)?/g)||[]).map(Number); return n.length?Math.max(...n)*unit(v):-1; };
+  return vals.reduce((a,b)=>top(b)>top(a)?b:a);
+}
+
 function printCustomerQuote(sourceId){
   const d = window._calc;
   if(!d){ alert("Calculate a quote first."); return; }
@@ -9938,7 +9959,7 @@ function printCustomerQuote(sourceId){
       }
     });
   }
-  openCustomerQuoteModal({ customer, descLines: descLines.map(titleCaseLine), qty, pricePerPart, expediteFee: d.expediteFee||0, minOrderApply: minOrderOn(), lockedQuoteNo, srcQuote, showTwoLines:true });
+  openCustomerQuoteModal({ customer, descLines: descLines.map(titleCaseLine), qty, pricePerPart, expediteFee: d.expediteFee||0, minOrderApply: minOrderOn(), lockedQuoteNo, srcQuote, showTwoLines:true, leadtime: quoteLeadTime() });
 }
 
 function openCustomerQuoteModal(prefill){
@@ -10165,7 +10186,7 @@ function printQtyBreaks(){
         </div>
         <div style="grid-column:1/3">
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Lead Time</label>
-          <input id="qbf-leadtime" type="text" value="3-4 Weeks" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
+          <input id="qbf-leadtime" type="text" value="${qEsc(quoteLeadTime())}" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
         </div>
         <div style="grid-column:1/3">
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Part description</label>
