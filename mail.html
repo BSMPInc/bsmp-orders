@@ -728,8 +728,12 @@ body.sb-pinned .dock{left:var(--sb)}
     <h3>New email</h3>
     <label>From</label>
     <select id="cp-from" onchange="renderSigHints();window._draftTick('compose')"></select>
-    <label>To</label>
-    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — add as many as you like, separated by commas" autocomplete="off" oninput="acInput();window._draftTick('compose')" onchange="renderQuickRow()" onkeydown="acKey(event)"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
+    <label style="display:flex;align-items:baseline">To<a href="#" id="cp-cc-toggle" onclick="showCc(true);return false" style="margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0">+ Cc</a></label>
+    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — add as many as you like, separated by commas" autocomplete="off" oninput="acInput('to');window._draftTick('compose')" onchange="renderQuickRow()" onkeydown="acKey(event,'to')" onblur="acHide('to')"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
+    <div id="cp-cc-row" style="display:none">
+      <label>Cc</label>
+      <div class="ac-wrap"><input id="cp-cc" type="text" placeholder="Copy others — names or emails, separated by commas" autocomplete="off" oninput="acInput('cc');window._draftTick('compose')" onkeydown="acKey(event,'cc')" onblur="acHide('cc')"><div id="cp-cc-ac" class="ac-list" style="display:none"></div></div>
+    </div>
     <label>Subject</label>
     <input id="cp-subject" type="text" placeholder="Subject" oninput="window._draftTick('compose')">
     <label>Message</label>
@@ -939,7 +943,7 @@ document.addEventListener('keydown',(ev)=>{
   if((ev.ctrlKey||ev.metaKey)&&ev.key==='Enter'){
     const id=document.activeElement&&document.activeElement.id;
     if(id==='reply-body'){ ev.preventDefault(); window.sendReply(); }
-    else if(composeOpen&&['cp-body','cp-subject','cp-to'].includes(id)){ ev.preventDefault(); window.sendCompose(); }
+    else if(composeOpen&&['cp-body','cp-subject','cp-to','cp-cc'].includes(id)){ ev.preventDefault(); window.sendCompose(); }
     return;
   }
   // Esc backs out of popups
@@ -1698,16 +1702,24 @@ window.saveSenderContact=()=>{
   if(CONTACTS[k]){ go('contacts'); _ctEdit=Object.assign({},CONTACTS[k]); renderContacts(); return; }
   saveContact({email:CURRENT.fromEmail, name:CURRENT.fromName||''});
 };
-// ── compose "To" autocomplete from contacts ──────────────────────────────────
-// The To box holds any number of addresses separated by commas (the worker splits
+// ── compose To / Cc autocomplete from contacts ───────────────────────────────
+// Both boxes hold any number of addresses separated by commas (the worker splits
 // on commas). Autocomplete only looks at the address being typed — the bit after
 // the last comma — and picking a contact appends it instead of replacing the list.
-let _acItems=[], _acIdx=-1;
-function toSplit(){
-  const v=$('cp-to').value||'';
+const AC_FIELDS={to:['cp-to','cp-ac'], cc:['cp-cc','cp-cc-ac']};
+let _acItems=[], _acIdx=-1, _acField='to';
+function toSplit(f){
+  const v=$(AC_FIELDS[f||'to'][0]).value||'';
   const i=Math.max(v.lastIndexOf(','),v.lastIndexOf(';'));
   return {done:v.slice(0,i+1).split(/[,;]/).map(s=>s.trim()).filter(Boolean), q:v.slice(i+1).toLowerCase().trim()};
 }
+const addrOf=a=>{ const m=String(a).match(/<([^>]+)>\s*$/); return (m?m[1]:String(a)).trim().toLowerCase(); };
+window.showCc=(on)=>{
+  $('cp-cc-row').style.display=on?'':'none';
+  $('cp-cc-toggle').style.display=on?'none':'';
+  if(on) setTimeout(()=>$('cp-cc').focus(),20);
+};
+window.acHide=(f)=>{ setTimeout(()=>{ $(AC_FIELDS[f][1]).style.display='none'; },120); };
 // "Jane <jane@acme.com>, bob@x.com; ann@y.com" → ['Jane <jane@acme.com>','bob@x.com','ann@y.com'], duplicates dropped
 function toList(v){
   const seen=new Set(), out=[];
@@ -1719,11 +1731,15 @@ function toList(v){
   return out;
 }
 function toAddrOk(a){ const m=a.match(/<([^>]+)>\s*$/); return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test((m?m[1]:a).trim()); }
-window.acInput=()=>{
-  const {done,q}=toSplit();
-  const box=$('cp-ac');
+window.acInput=(f)=>{
+  f=f||'to'; _acField=f;
+  const {q}=toSplit(f);
+  const other=AC_FIELDS[f==='to'?'cc':'to'][1];
+  $(other).style.display='none';
+  const box=$(AC_FIELDS[f][1]);
   if(!q){ box.style.display='none'; _acItems=[]; return; }
-  const have=new Set(done.map(a=>{ const m=a.match(/<([^>]+)>\s*$/); return (m?m[1]:a).trim().toLowerCase(); }));
+  // skip anyone already on the To or Cc line
+  const have=new Set(toList($('cp-to').value).concat(toList($('cp-cc').value)).map(addrOf));
   _acItems=contactList().filter(c=>!have.has(String(c.email||'').toLowerCase()) && [c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0,8);
   _acIdx=-1;
   if(!_acItems.length){ box.style.display='none'; return; }
@@ -1732,13 +1748,14 @@ window.acInput=()=>{
 };
 window.acPick=(i)=>{
   const c=_acItems[i]; if(!c) return;
-  const {done}=toSplit();
-  const el=$('cp-to'); el.value=done.concat(c.email).join(', ')+', ';   // trailing comma: ready for the next one
-  $('cp-ac').style.display='none'; _acItems=[]; renderQuickRow(); window._draftTick('compose');
-  el.focus(); el.setSelectionRange(el.value.length,el.value.length);
+  const f=_acField, {done}=toSplit(f);
+  const el=$(AC_FIELDS[f][0]); el.value=done.concat(c.email).join(', ')+', ';   // trailing comma: ready for the next one
+  $(AC_FIELDS[f][1]).style.display='none'; _acItems=[]; renderQuickRow(); window._draftTick('compose');
+  setTimeout(()=>{ el.focus(); el.setSelectionRange(el.value.length,el.value.length); },0);
 };
-window.acKey=(e)=>{
-  const box=$('cp-ac'); if(box.style.display==='none'||!_acItems.length) return;
+window.acKey=(e,f)=>{
+  f=f||'to';
+  const box=$(AC_FIELDS[f][1]); if(box.style.display==='none'||!_acItems.length||_acField!==f) return;
   if(e.key==='ArrowDown'){ e.preventDefault(); _acIdx=Math.min(_acIdx+1,_acItems.length-1); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); _acIdx=Math.max(_acIdx-1,0); }
   else if(e.key==='Enter'){ if(_acIdx>=0){ e.preventDefault(); acPick(_acIdx); } return; }
@@ -3623,9 +3640,9 @@ function _draftSave(ctx){
     if(body.trim()||tbls.length) _draftPut(t.key,{body, all:!!window._replyAll, tables:tbls});
     else _draftClear('reply',t.key);
   }else{
-    const to=$('cp-to').value, subject=$('cp-subject').value, body=$('cp-body').value, tbls=window._outTables.compose;
-    if(to.trim()||subject.trim()||body.trim()||tbls.length){
-      DRAFTS.compose={from:$('cp-from').value, to, subject, body, tables:tbls, at:Date.now()};
+    const to=$('cp-to').value, cc=$('cp-cc').value, subject=$('cp-subject').value, body=$('cp-body').value, tbls=window._outTables.compose;
+    if(to.trim()||cc.trim()||subject.trim()||body.trim()||tbls.length){
+      DRAFTS.compose={from:$('cp-from').value, to, cc, subject, body, tables:tbls, at:Date.now()};
       set(ref(db,_draftBase+'/compose'), DRAFTS.compose).catch(()=>{});
     } else _draftClear('compose');
   }
@@ -4333,16 +4350,17 @@ window.aiDraftReply=async ()=>{
 // ── compose ───────────────────────────────────────────────────────────────────
 window.openCompose=()=>{
   $('cp-from').innerHTML=SETTINGS.mailboxes.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join('');
-  $('cp-to').value=''; $('cp-subject').value=''; $('cp-body').value='';
-  $('cp-ac').style.display='none'; _acItems=[];
+  $('cp-to').value=''; $('cp-cc').value=''; $('cp-subject').value=''; $('cp-body').value='';
+  $('cp-ac').style.display='none'; $('cp-cc-ac').style.display='none'; _acItems=[];
   window._outAtt.compose=[]; window._outTables.compose=[]; window._outInline.compose=[]; renderOutAtts('compose');
   const dc=DRAFTS.compose;
   if(dc){   // an unfinished email comes back until it's sent or emptied out
     if(dc.from&&SETTINGS.mailboxes.includes(dc.from)) $('cp-from').value=dc.from;
-    $('cp-to').value=dc.to||''; $('cp-subject').value=dc.subject||''; $('cp-body').value=dc.body||'';
+    $('cp-to').value=dc.to||''; $('cp-cc').value=dc.cc||''; $('cp-subject').value=dc.subject||''; $('cp-body').value=dc.body||'';
     window._outTables.compose=normTables(dc.tables);
     renderOutAtts('compose');
   }
+  showCc(!!$('cp-cc').value.trim());   // Cc line stays tucked away unless the draft has one
   renderSigHints(); renderQuickRow();
   $('compose-modal').style.display='flex';
   setTimeout(()=>$('cp-to').focus(),30);
@@ -4356,15 +4374,20 @@ window.sendCompose=()=>{
   if(!to||(!body&&!atts.length&&!tbls.length&&!imgs.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
   const badTo=toAll.filter(a=>!toAddrOk(a));
   if(badTo.length){ toast('Check the To line — not an email address: '+badTo.join(', '),true); $('cp-to').focus(); return; }
+  const onTo=new Set(toAll.map(addrOf));
+  const ccAll=toList($('cp-cc').value).filter(a=>!onTo.has(addrOf(a)));   // already on To → no need to Cc
+  const badCc=ccAll.filter(a=>!toAddrOk(a));
+  if(badCc.length){ showCc(true); toast('Check the Cc line — not an email address: '+badCc.join(', '),true); return; }
   if(!subject && !confirm('Send without a subject? It will show as "(no subject)".')) { $('cp-subject').focus(); return; }
-  const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value), tables:tbls.slice(),
+  const payload={replyAs:$('cp-from').value, to, cc:ccAll, subject, body:withSig(body,$('cp-from').value), tables:tbls.slice(),
     sigLogo:sigLogoOf($('cp-from').value),
     inline:imgs.map(im=>({marker:'[image '+im.n+']', name:im.name, mime:im.mime, data:im.data})),
     attachments:atts.map(a=>({name:a.name, mime:a.mime, data:a.data}))};
-  const draft={from:$('cp-from').value, to:$('cp-to').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice(), tbls:tbls.slice(), imgs:imgs.slice()};
+  const draft={from:$('cp-from').value, to:$('cp-to').value, cc:$('cp-cc').value, subject:$('cp-subject').value, body:$('cp-body').value, atts:atts.slice(), tbls:tbls.slice(), imgs:imgs.slice()};
   const restore=()=>{
     openCompose();
-    $('cp-from').value=draft.from; $('cp-to').value=draft.to; $('cp-subject').value=draft.subject; $('cp-body').value=draft.body;
+    $('cp-from').value=draft.from; $('cp-to').value=draft.to; $('cp-cc').value=draft.cc; $('cp-subject').value=draft.subject; $('cp-body').value=draft.body;
+    showCc(!!String(draft.cc||'').trim());
     window._outAtt.compose=draft.atts; window._outTables.compose=draft.tbls; window._outInline.compose=draft.imgs; renderOutAtts('compose'); renderSigHints();
   };
   window._outAtt.compose=[]; window._outTables.compose=[]; window._outInline.compose=[]; renderOutAtts('compose'); closeCompose();
