@@ -729,7 +729,7 @@ body.sb-pinned .dock{left:var(--sb)}
     <label>From</label>
     <select id="cp-from" onchange="renderSigHints();window._draftTick('compose')"></select>
     <label>To</label>
-    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — pick from contacts" autocomplete="off" oninput="acInput();window._draftTick('compose')" onchange="renderQuickRow()" onkeydown="acKey(event)"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
+    <div class="ac-wrap"><input id="cp-to" type="text" placeholder="Name or email — add as many as you like, separated by commas" autocomplete="off" oninput="acInput();window._draftTick('compose')" onchange="renderQuickRow()" onkeydown="acKey(event)"><div id="cp-ac" class="ac-list" style="display:none"></div></div>
     <label>Subject</label>
     <input id="cp-subject" type="text" placeholder="Subject" oninput="window._draftTick('compose')">
     <label>Message</label>
@@ -1699,18 +1699,44 @@ window.saveSenderContact=()=>{
   saveContact({email:CURRENT.fromEmail, name:CURRENT.fromName||''});
 };
 // ── compose "To" autocomplete from contacts ──────────────────────────────────
+// The To box holds any number of addresses separated by commas (the worker splits
+// on commas). Autocomplete only looks at the address being typed — the bit after
+// the last comma — and picking a contact appends it instead of replacing the list.
 let _acItems=[], _acIdx=-1;
+function toSplit(){
+  const v=$('cp-to').value||'';
+  const i=Math.max(v.lastIndexOf(','),v.lastIndexOf(';'));
+  return {done:v.slice(0,i+1).split(/[,;]/).map(s=>s.trim()).filter(Boolean), q:v.slice(i+1).toLowerCase().trim()};
+}
+// "Jane <jane@acme.com>, bob@x.com; ann@y.com" → ['Jane <jane@acme.com>','bob@x.com','ann@y.com'], duplicates dropped
+function toList(v){
+  const seen=new Set(), out=[];
+  for(const raw of String(v||'').split(/[,;]/)){
+    const a=raw.trim(); if(!a) continue;
+    const m=a.match(/<([^>]+)>\s*$/), l=(m?m[1]:a).trim().toLowerCase();
+    if(seen.has(l)) continue; seen.add(l); out.push(a);
+  }
+  return out;
+}
+function toAddrOk(a){ const m=a.match(/<([^>]+)>\s*$/); return /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test((m?m[1]:a).trim()); }
 window.acInput=()=>{
-  const q=($('cp-to').value||'').toLowerCase().trim();
+  const {done,q}=toSplit();
   const box=$('cp-ac');
   if(!q){ box.style.display='none'; _acItems=[]; return; }
-  _acItems=contactList().filter(c=>[c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0,8);
+  const have=new Set(done.map(a=>{ const m=a.match(/<([^>]+)>\s*$/); return (m?m[1]:a).trim().toLowerCase(); }));
+  _acItems=contactList().filter(c=>!have.has(String(c.email||'').toLowerCase()) && [c.name,c.email,c.company].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0,8);
   _acIdx=-1;
   if(!_acItems.length){ box.style.display='none'; return; }
   box.innerHTML=_acItems.map((c,i)=>`<div class="ac-opt" data-i="${i}" onmousedown="acPick(${i})"><span class="ao-nm">${esc(c.name||c.email)}</span><span class="ao-em">${esc(c.email)}${c.company?' · '+esc(c.company):''}</span></div>`).join('');
   box.style.display='';
 };
-window.acPick=(i)=>{ const c=_acItems[i]; if(!c) return; $('cp-to').value=c.email; $('cp-ac').style.display='none'; _acItems=[]; renderQuickRow(); $('cp-subject').focus(); };
+window.acPick=(i)=>{
+  const c=_acItems[i]; if(!c) return;
+  const {done}=toSplit();
+  const el=$('cp-to'); el.value=done.concat(c.email).join(', ')+', ';   // trailing comma: ready for the next one
+  $('cp-ac').style.display='none'; _acItems=[]; renderQuickRow(); window._draftTick('compose');
+  el.focus(); el.setSelectionRange(el.value.length,el.value.length);
+};
 window.acKey=(e)=>{
   const box=$('cp-ac'); if(box.style.display==='none'||!_acItems.length) return;
   if(e.key==='ArrowDown'){ e.preventDefault(); _acIdx=Math.min(_acIdx+1,_acItems.length-1); }
@@ -4324,10 +4350,12 @@ window.openCompose=()=>{
 window.closeCompose=()=>{ _draftFlush('compose'); $('compose-modal').style.display='none'; };
 window.sendCompose=()=>{
   const imgs=window._outInline.compose;
-  const to=($('cp-to').value||'').trim(), subject=($('cp-subject').value||'').trim();
+  const toAll=toList($('cp-to').value), to=toAll.join(', '), subject=($('cp-subject').value||'').trim();
   const body=stripLostMarkers(($('cp-body').value||''),imgs).trim();
   const atts=window._outAtt.compose, tbls=window._outTables.compose;
   if(!to||(!body&&!atts.length&&!tbls.length&&!imgs.length)){ toast('Fill in To and a message (or attach a file).',true); return; }
+  const badTo=toAll.filter(a=>!toAddrOk(a));
+  if(badTo.length){ toast('Check the To line — not an email address: '+badTo.join(', '),true); $('cp-to').focus(); return; }
   if(!subject && !confirm('Send without a subject? It will show as "(no subject)".')) { $('cp-subject').focus(); return; }
   const payload={replyAs:$('cp-from').value, to, subject, body:withSig(body,$('cp-from').value), tables:tbls.slice(),
     sigLogo:sigLogoOf($('cp-from').value),
