@@ -635,6 +635,13 @@ const I18N = {
     'TEMP creeping up: cooler fins, intake filter, oil level, room temperature, in that order.':'Si TEMP sube: aletas del enfriador, filtro de admisión, nivel de aceite, temperatura del cuarto, en ese orden.',
     'Pressure reading looks wrong or the safety valve pops: pressure-sensor condensate procedure (guide, page 5).':'Si la presión se ve mal o salta la válvula de seguridad: procedimiento de condensado del sensor de presión (guía, página 5).',
     'Overload fault, or pressure sagging during cuts: troubleshooting on page 6 of the guide — fault log, supply voltage, cooler, leaks, then tank volume before a second compressor.':'Falla de sobrecarga, o la presión cae durante los cortes: solución de problemas en la página 6 de la guía — registro de fallas, voltaje de alimentación, enfriador, fugas, y luego volumen de tanque antes de un segundo compresor.',
+    'Laser fume extraction fan':'Extractor de humos del láser','Electrician':'Electricista','Daily':'Diario','Monthly':'Mensual','Every 6 months':'Cada 6 meses','Yearly':'Anual',
+    'Listen at start-up: steady hum, no rattle or scraping. Hose on, not crushed or kinked.':'Escucha al arrancar: zumbido parejo, sin traqueteo ni roce. Manguera puesta, sin aplastar ni doblar.',
+    'Power off, blow dust off the motor fins and the fan cover grille. Check the hose clamps and the tape on the outlet joint.':'Con la energía apagada, sopla el polvo de las aletas del motor y de la rejilla de la tapa del ventilador. Revisa las abrazaderas de la manguera y la cinta de la unión de salida.',
+    'Look for dust leaking at the outlet flange and the housing seams; reseal with foil HVAC tape.':'Busca fugas de polvo en la brida de salida y en las uniones de la carcasa; vuelve a sellar con cinta de aluminio para ductos.',
+    'Lock out, look at the impeller through the inlet, scrape off buildup evenly, spin by hand: free and quiet.':'Bloquea la energía, revisa el impulsor por la entrada, raspa la acumulación de forma pareja y gíralo a mano: libre y silencioso.',
+    'Amps per leg at full load (even, under the motor FLA), terminal box tight and dry, insulation to ground.':'Amperes por fase a plena carga (parejos, debajo del FLA del motor), caja de conexiones apretada y seca, aislamiento a tierra.',
+    'Weak suction or smoke over the table: filter first, then hose and joints, then check the fan is not running backwards (guide, page 2).':'Succión débil o humo sobre la mesa: primero el filtro, luego la manguera y las uniones, y luego verifica que el ventilador no gire al revés (guía, página 2).',
     'To add or update a document: ask Claude to drop the new file into the repo\'s docs folder and update the RESOURCES list in qc.html. This list was last updated':'Para agregar o actualizar un documento: pide a Claude que ponga el archivo nuevo en la carpeta docs del repositorio y actualice la lista RESOURCES en qc.html. Esta lista se actualizó por última vez el',
     'Setup':'Configuración','Settings':'Ajustes','dock:settings':'Ajustes','AI connection for this device':'Conexión de IA para este equipo',
     'One connection powers every AI feature here — drawing ballooning, cert reading and photo checks.':'Una sola conexión alimenta todas las funciones de IA — globos en planos, lectura de certificados y revisión de fotos.',
@@ -963,7 +970,7 @@ function viewSettings(){
    serves them next to this file, so a relative link is all a row needs. To add or revise a
    document: drop the file into docs/<area>/, then edit RESOURCES below (title, id/rev, date, file).
    Keep RES_UPDATED current — it prints at the bottom of the page. */
-const RES_UPDATED='2026-09-25';
+const RES_UPDATED='2026-10-10';
 const RESOURCES=[
   { key:'equipment', title:'Equipment manuals & maintenance', icon:'ti-tool', items:[
     { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'B', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts overload troubleshooting voltage second compressor',
@@ -975,6 +982,9 @@ const RESOURCES=[
     { title:'Laser Water Chiller — Compressor Troubleshooting Checklist', id:'BSMP-MG-002', rev:'B', date:'2026-09-25', tags:'laser chiller water cooling compressor tongfei tflw refrigerant r134a electrician refrigeration tech gauges troubleshooting checklist',
       desc:'Tongfei TFLW-3000WDR: fan runs but no cooling. One page: shop checks (alarm, setpoint, front-panel water-pressure gauges, water, airflow), electrician checks (transformer, phase protector, overload, contactor, pressure switches, compressor windings) and refrigeration-tech checks (refrigerant pressure at the service ports), with a readings grid to fill in.',
       file:'docs/equipment/laser-chiller/BSMP Laser Chiller - Compressor Troubleshooting Checklist.pdf' },
+    { title:'Laser Fume Extraction Fan — Spec & Maintenance', id:'BSMP-MG-003', rev:'A', date:'2026-10-10', tags:'laser fume fan blower extraction dust smoke centrifugal huayuan 6-46 3a motor 3kw suction hose impeller',
+      desc:'Dongguan Huayuan 6-46-3A centrifugal blower, 3 kW 380 V direct drive, about 1,700 CFM at 5.8 in. w.c. Nameplate decoded, what the model number means, maintenance schedule, troubleshooting (weak suction, running backwards, vibration, trips), spare motor/bearings and replacement specs.',
+      file:'docs/equipment/laser-fume-fan/BSMP Laser Fume Extraction Fan - Spec and Maintenance.pdf' },
   ]},
   { key:'quality', title:'Quality documents', icon:'ti-shield-check', items:[
     { title:'Material Compliance Guide — RoHS / REACH / DFARS', id:'BSMP-QG-001', rev:'A', date:'2026-09-18', tags:'rohs reach dfars compliance material cert declaration',
@@ -1007,6 +1017,14 @@ const MAINTENANCE=[
     { every:'When needed', tone:'flag', who:'Anyone', task:'TEMP creeping up: cooler fins, intake filter, oil level, room temperature, in that order.' },
     { every:'When needed', tone:'flag', who:'Manager', task:'Pressure reading looks wrong or the safety valve pops: pressure-sensor condensate procedure (guide, page 5).' },
     { every:'When needed', tone:'flag', who:'Manager', task:'Overload fault, or pressure sagging during cuts: troubleshooting on page 6 of the guide — fault log, supply voltage, cooler, leaks, then tank volume before a second compressor.' },
+  ]},
+  { equipment:'Laser fume extraction fan', guide:'BSMP-MG-003', tasks:[
+    { every:'Daily', tone:'neutral', who:'Laser operator', task:'Listen at start-up: steady hum, no rattle or scraping. Hose on, not crushed or kinked.' },
+    { every:'Weekly', tone:'neutral', who:'Laser operator', task:'Power off, blow dust off the motor fins and the fan cover grille. Check the hose clamps and the tape on the outlet joint.' },
+    { every:'Monthly', tone:'neutral', who:'Laser operator', task:'Look for dust leaking at the outlet flange and the housing seams; reseal with foil HVAC tape.' },
+    { every:'Every 6 months', tone:'warn', who:'Manager', task:'Lock out, look at the impeller through the inlet, scrape off buildup evenly, spin by hand: free and quiet.' },
+    { every:'Yearly', tone:'warn', who:'Electrician', task:'Amps per leg at full load (even, under the motor FLA), terminal box tight and dry, insulation to ground.' },
+    { every:'When needed', tone:'flag', who:'Anyone', task:'Weak suction or smoke over the table: filter first, then hose and joints, then check the fan is not running backwards (guide, page 2).' },
   ]},
 ];
 let RES_FILTER='';
