@@ -1109,7 +1109,8 @@ tr.inv-low td{background:#fdf6ee}
 .ci-row:last-child{margin-bottom:0}
 .ci-row.expanded-line{background:#eef2f8;outline:1px solid var(--border2)}
 /* Work Queues chip on an Open Orders part row (managers) — compact take on .disp-qb */
-.ci-row .disp-qb{align-self:flex-start;height:22px;font-size:11px;padding:0 7px;border-radius:11px;gap:4px;margin-top:2px}
+.ci-stat{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0}
+.ci-row .disp-qb{height:22px;font-size:11px;padding:0 7px;border-radius:11px;gap:4px}
 .ci-row .disp-qb:not(.on){opacity:.7}
 .ci-row:hover .disp-qb:not(.on){opacity:1}
 @media(pointer:coarse){ .ci-row .disp-qb{height:30px;padding:0 10px;font-size:12px;border-radius:15px} .ci-row .disp-qb:not(.on){opacity:1} }
@@ -3640,7 +3641,6 @@ function poItemsHtml(g){
         ${r.invoice?`<span class="inv-chip" title="Invoice number${r.invoiceDate?(' · invoiced '+fmtDate(r.invoiceDate)):''}">Inv ${r.invoice}${r.invoiceDate?` · ${fmtDate(r.invoiceDate)}`:''}</span>`:''}
         ${splitChip(r)}
         ${osLine}
-        ${ciQbChip(r)}
       </div>
       <span class="ci-qty">${r.qty||''}</span>
       ${(()=>{ const inv=['Ready for Invoice','Invoiced'].includes(r.status);
@@ -3648,7 +3648,8 @@ function poItemsHtml(g){
         return r.cost ? `<span class="ci-price${inv?' invoiceable':''}" title="${fmtMoney(r.cost)} per part × ${r.qty||0} = ${fmtMoney(rowTotal(r))}"><span class="ci-ea">${fmtMoney(r.cost)}<small>/ea</small></span><span class="ci-line">${fmtMoney(rowTotal(r))}</span></span>`
                        : `<span class="ci-price ci-noprice" title="No price set">—</span>`; })()}
       <span class="ci-due">${r.due?fmtDate(r.due):'—'}${r.due?' '+cardDaysLabel(days):''}</span>
-      <span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span>
+      ${(()=>{ const qb=ciQbChip(r), sb=`<span class="status-badge ${STATUS_CLASS[r.status]||'s-confirmed'}" onclick="window._sp('${r.id}',event)">${r.status||'Confirmed'}</span>`;
+        return qb ? `<span class="ci-stat">${sb}${qb}</span>` : sb; })()}
     </div>${det}`;
   }).join('')+`</div>`;
 }
