@@ -1108,6 +1108,13 @@ tr.inv-low td{background:#fdf6ee}
 .ci-row{display:grid;grid-template-columns:58px 1fr 40px 100px 92px 132px;gap:8px;align-items:center;padding:10px 10px;border-bottom:1px solid var(--border2);font-size:12px;cursor:pointer;background:#fff;border-radius:8px;margin-bottom:6px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
 .ci-row:last-child{margin-bottom:0}
 .ci-row.expanded-line{background:#eef2f8;outline:1px solid var(--border2)}
+/* Work Queues chip on an Open Orders part row (managers) — compact take on .disp-qb */
+.ci-row .disp-qb{align-self:flex-start;height:22px;font-size:11px;padding:0 7px;border-radius:11px;gap:4px;margin-top:2px}
+.ci-row .disp-qb:not(.on){opacity:.7}
+.ci-row:hover .disp-qb:not(.on){opacity:1}
+@media(pointer:coarse){ .ci-row .disp-qb{height:30px;padding:0 10px;font-size:12px;border-radius:15px} .ci-row .disp-qb:not(.on){opacity:1} }
+.po-qb-btn{font:inherit;font-size:11.5px;font-weight:700;height:28px;padding:0 10px;border:1px solid var(--border2);border-radius:14px;background:#fff;color:var(--text2);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.po-qb-btn:hover{border-color:var(--navy3);color:var(--text)}
 .ci-row:hover{background:#f5f8fc}
 .ci-job{font-weight:700;color:var(--text2);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ci-desc{min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -3633,6 +3640,7 @@ function poItemsHtml(g){
         ${r.invoice?`<span class="inv-chip" title="Invoice number${r.invoiceDate?(' · invoiced '+fmtDate(r.invoiceDate)):''}">Inv ${r.invoice}${r.invoiceDate?` · ${fmtDate(r.invoiceDate)}`:''}</span>`:''}
         ${splitChip(r)}
         ${osLine}
+        ${ciQbChip(r)}
       </div>
       <span class="ci-qty">${r.qty||''}</span>
       ${(()=>{ const inv=['Ready for Invoice','Invoiced'].includes(r.status);
@@ -3754,7 +3762,7 @@ function poDetailHtml(g){
         <div class="card-stat"><span class="cs-label">PO Value</span><span class="cs-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
         <div class="card-stat"><span class="cs-label">Earliest Due</span><span class="cs-val" style="${dueValStyle}">${dueVal}</span></div>
       </div>
-      <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto">${chatBtnJob(g)}</span></div>
+      <div class="card-foot">${statusBadges}<span class="pay-pill ${PAY_CLASS[g.payRoll]||'pay-unpaid'}">${PAY_LABEL[g.payRoll]||g.payRoll}</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px">${poQbBtn(g)}${chatBtnJob(g)}</span></div>
       ${outsourceStripHtml(g)}
     </div>
     ${vendorPOsHtml(g)}
@@ -7357,6 +7365,48 @@ window._dispQbPick = (id, col, e) => {
   if(!col){ window._qbRemove(id); return; }
   if(qbOnBoard(r) && r.qb.col===col) return;          // already there: keep its spot
   qbPlace(id, col, null);                              // joins the end of that column
+};
+// ── the same chip on Open Orders part rows, plus a whole-PO button ──
+// Finished parts (invoiced / ready for invoice / completed) get no chip unless they're
+// still sitting on the board, so they can be taken off from here too.
+function qbCanBoard(r){ return !!(r && !r.archived && !QB_HIDE_STATUSES.includes(r.status)); }
+function ciQbChip(r){ return (qbCanBoard(r) || qbOnBoard(r)) ? dispQbChip(r) : ''; }
+function poQbBtn(g){
+  if(userRole==='operator') return '';
+  const can=g.items.filter(qbCanBoard); if(!can.length) return '';
+  const on=can.filter(qbOnBoard).length;
+  const gkE=g.gk.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  return `<button type="button" class="po-qb-btn" title="Put every part on this PO on the Work Queues board" onclick="window._poQbMenu('${gkE}',this,event)"><i class="ti ti-layout-columns"></i>Board${on?` <span style="font-weight:400;color:var(--text3)">${on}/${can.length}</span>`:''}</button>`;
+}
+function poQbItems(gk){ const g=poGroups().find(x=>x.gk===gk); return g?g.items.filter(qbCanBoard):[]; }
+window._poQbMenu = (gk, btn, e) => {
+  if(e) e.stopPropagation();
+  if(userRole==='operator') return;
+  const items=poQbItems(gk); if(!items.length) return;
+  const m=_dispQbMenuEl();
+  if(!m.hidden && m.dataset.oid==='po:'+gk){ window._dispQbClose(); return; }
+  m.dataset.oid='po:'+gk;
+  const off=items.filter(r=>!qbOnBoard(r)).length, n=items.length;
+  _poQbGk=gk;
+  m.innerHTML=`<div class="dqb-h">${off===n?`Put all ${n} part${n!==1?'s':''} on the board`:`Put all ${n} parts in one column`}</div>`
+    + QB_COLS.map(c=>`<button type="button" role="menuitem" onclick="window._poQbPick('${c.k}',event)"><span class="dqb-dot" style="width:9px;height:9px;border-radius:50%;background:${c.color}"></span>${c.label}<span style="color:var(--text3);font-size:11.5px;font-weight:400">${esc2(c.hint)}</span></button>`).join('')
+    + (off<n?`<div class="dqb-sep"></div><button type="button" role="menuitem" onclick="window._poQbPick('',event)"><i class="ti ti-x" style="color:var(--text3)"></i>Take all off board</button>`:'')
+    + `<div style="font-size:11px;color:var(--text3);padding:6px 8px 2px;max-width:240px">Or use the Board chip on each part to place them one at a time.</div>`;
+  m.hidden=false;
+  const b=btn.getBoundingClientRect(), mw=m.offsetWidth, mh=m.offsetHeight;
+  m.style.left=Math.max(8, Math.min(b.right-mw, innerWidth-mw-8))+'px';
+  m.style.top=((b.bottom+4+mh > innerHeight-8) ? Math.max(8, b.top-4-mh) : b.bottom+4)+'px';
+};
+let _poQbGk=null;
+window._poQbPick = (col, e) => {
+  if(e) e.stopPropagation();
+  window._dispQbClose();
+  if(userRole==='operator' || _poQbGk==null) return;
+  const items=poQbItems(_poQbGk); _poQbGk=null;
+  if(!col){ let n=0; items.forEach(r=>{ if(r.qb){ delete r.qb; n++; } }); if(n){ saveDB(); refreshActivePage(); } return; }
+  // job order on the PO, so the column reads the same way the PO does; parts already
+  // in that column keep their spot
+  items.filter(r=>!(qbOnBoard(r)&&r.qb.col===col)).forEach(r=>qbPlace(r.id, col, null));
 };
 document.addEventListener('click', e=>{ const m=document.getElementById('dqb-menu'); if(m && !m.hidden && !m.contains(e.target)) window._dispQbClose(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') window._dispQbClose(); });
