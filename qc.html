@@ -591,6 +591,10 @@ const I18N = {
     'Include the invoice behind each cert (when one is attached)':'Incluir la factura detrás de cada certificado (si tiene una adjunta)',
     'Search material, heat / lot, cert #, supplier, PO, job…':'Buscar material, colada / lote, cert. #, proveedor, OC, trabajo…',
     'selected':'seleccionados','No certs match.':'Ningún certificado coincide.',
+    'Parts on this cover sheet':'Partes en esta portada','part':'parte','parts':'partes','No PO':'Sin OC','Job':'Trabajo',
+    'These certs cover more than one PO — tick the PO (or the parts) going out.':'Estos certificados cubren más de una OC — marca la OC (o las partes) que se envían.',
+    'From the orders linked to the picked certs. Tick a PO to take every part on it.':'De las órdenes vinculadas a los certificados elegidos. Marca una OC para tomar todas sus partes.',
+    'None of the picked certs are linked to this customer’s orders, so these are their recent orders.':'Ninguno de los certificados elegidos está vinculado a órdenes de este cliente, así que estas son sus órdenes recientes.',
     'Preparing cert pages…':'Preparando las páginas de certificados…','No file attached for':'Sin archivo adjunto para',
     'Order details':'Detalles de la orden','Orders using this material':'Órdenes que usan este material','Printed':'Impreso','No linked orders on this cert.':'Este certificado no tiene órdenes vinculadas.','Please allow pop-ups to open the printable order sheet.':'Permite ventanas emergentes para abrir la hoja imprimible.','View / print full order details':'Ver / imprimir detalles de la orden','Unit price':'Precio unitario','Order date':'Fecha de orden','Due date':'Fecha de entrega','Part #':'N.º de parte','Job #':'N.º de trabajo','Order':'Orden',
     'Material Certificate':'Certificado de material','Traceability sheet':'Hoja de trazabilidad','Certificate':'Certificado','Certificate document':'Documento del certificado','Loading cert document…':'Cargando documento del certificado…','No cert file attached.':'Sin archivo de certificado adjunto.','No cert details.':'Sin detalles del certificado.','Restricted':'Restringido','Could not embed this cert for printing. Open it from the cert viewer to print separately.':'No se pudo incrustar el certificado para imprimir. Ábrelo en el visor para imprimirlo por separado.',
@@ -4646,6 +4650,11 @@ window.qcCoverSheetOpen=()=>{
       <div class="field"><label class="fl">${t('Date')}</label><input class="in" id="cs-date" type="date" value="${todayISO()}"></div>
       <div class="field"><label class="fl">${t('Notes (prints under the table)')}</label><input class="in" id="cs-notes"></div>
     </div>
+    <div id="cs-parts-wrap" style="display:none;margin-top:6px">
+      <label class="fl">${t('Parts on this cover sheet')}</label>
+      <div id="cs-parts" style="border:1px solid var(--border);border-radius:8px;max-height:210px;overflow:auto"></div>
+      <div class="muted" id="cs-parts-hint" style="font-size:11.5px;margin-top:4px"></div>
+    </div>
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer;font-size:13px">
       <input type="checkbox" id="cs-attach" checked style="width:auto;min-height:0;flex:none">
       ${t('Attach the cert documents behind the cover sheet')}
@@ -4685,7 +4694,97 @@ window.qcCoverSheetOpen=()=>{
       .map(o=>[o.job,o.part].filter(Boolean).join(' — ')).filter(Boolean))];
     const jobEl=ov.querySelector('#cs-job');
     if(jobEl && !jobEl.value && jobs.length===1) jobEl.value=jobs[0];
+    renderParts();
   };
+  // ---- parts on this sheet: once a customer is chosen, list that customer's orders
+  // (the ones linked to the picked certs; their recent orders if none are linked),
+  // grouped by PO. Checked parts fill PO # + Job / part and print as a parts table,
+  // so one sheet can cover several parts on the same PO and cert.
+  // partKey = what the defaults were last worked out for; partTouched = the sender ticked
+  // something by hand, so later cert picks must not wipe it (a new customer still does)
+  let partSel=new Set(), partCust=null, partKey=null, partTouched=false;
+  const custNow=()=>(ov.querySelector('#cs-cust').value.trim()||ov.querySelector('#cs-cust-sel').value||'').trim();
+  const sameCust=(o,c)=>(o.customer||'').trim().toLowerCase()===c.toLowerCase();
+  const normPo=p=>String(p||'').trim().toLowerCase();
+  const partCands=()=>{
+    const cust=custNow(); if(!cust) return {list:[],linked:false};
+    const picked=[...ov.querySelectorAll('.cs-pick:checked')].map(x=>CERTS[x.value]).filter(Boolean);
+    const seen=new Set(), linked=[];
+    picked.forEach(c=>(c.linkedOrders||[]).forEach(oid=>{
+      const o=ORDERS[oid]; if(o&&!seen.has(oid)&&sameCust(o,cust)){ seen.add(oid); linked.push([oid,o]); }
+    }));
+    if(linked.length) return {list:linked,linked:true};
+    const dt=o=>String(o.ordered||o.orderDate||o.created||'');
+    const recent=Object.entries(ORDERS).filter(([,o])=>o&&!o.archived&&sameCust(o,cust))
+      .sort((a,b)=>dt(b[1]).localeCompare(dt(a[1]))).slice(0,60);
+    return {list:recent,linked:false};
+  };
+  const fillFromParts=()=>{
+    const sel=[...partSel].map(id=>ORDERS[id]).filter(Boolean); if(!sel.length) return;
+    const pos=[...new Set(sel.map(o=>String(o.po||'').trim()).filter(Boolean))];
+    if(pos.length) ov.querySelector('#cs-po').value=pos.join(', ');
+    const jobs=[...new Set(sel.map(o=>o.job).filter(Boolean))];
+    ov.querySelector('#cs-job').value=sel.length===1
+      ? [sel[0].job,pkgPart(sel[0])].filter(Boolean).join(' — ')
+      : jobs.join(', ')+(jobs.length?' — ':'')+sel.length+' '+t('parts');
+  };
+  function renderParts(){
+    const wrap=ov.querySelector('#cs-parts-wrap'), box=ov.querySelector('#cs-parts'); if(!wrap) return;
+    const cust=custNow(); const {list,linked}=partCands();
+    if(!cust||!list.length){ wrap.style.display='none'; partSel=new Set(); partCust=partKey=null; partTouched=false; return; }
+    wrap.style.display='block';
+    const ids=new Set(list.map(([id])=>id));
+    if(normPo(cust)!==partCust){ partCust=normPo(cust); partTouched=false; }
+    const key=partCust+'|'+(linked?1:0)+'|'+[...ids].sort().join(',');
+    const fresh=key!==partKey&&!partTouched;
+    partKey=key;
+    let refill=false;
+    if(fresh){
+      // new customer / new cert picks: if every candidate is on one PO, take them all;
+      // otherwise use the PO typed in the box, else leave it to the sender
+      partSel=new Set();
+      const pos=[...new Set(list.map(([,o])=>normPo(o.po)))];
+      const typed=normPo(ov.querySelector('#cs-po').value);
+      if(linked&&pos.length===1) list.forEach(([id])=>partSel.add(id));
+      else if(typed) list.forEach(([id,o])=>{ if(normPo(o.po)===typed) partSel.add(id); });
+    } else {
+      const before=partSel.size;
+      partSel=new Set([...partSel].filter(id=>ids.has(id)));
+      if(partSel.size!==before) refill=true;   // a dropped cert took parts with it
+    }
+    const groups=new Map();
+    list.forEach(([id,o])=>{ const k=String(o.po||'').trim(); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push([id,o]); });
+    const chk='style="width:auto;min-height:0;flex:none"';
+    box.innerHTML=[...groups].map(([po,rows])=>{
+      const all=rows.every(([id])=>partSel.has(id));
+      return `<label style="display:flex;gap:9px;align-items:center;padding:6px 10px;background:var(--bg2,#f4f5f7);border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;font-weight:700"><input type="checkbox" class="cs-po-all" data-po="${esc(po)}" ${all?'checked':''} ${chk}> ${po?esc(t('PO #')+' '+po):esc(t('No PO'))} <span class="muted" style="font-weight:400">· ${rows.length} ${t(rows.length===1?'part':'parts')}</span></label>`+
+        rows.map(([id,o])=>`<label style="display:flex;gap:9px;align-items:center;padding:6px 10px 6px 28px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" class="cs-part" value="${esc(id)}" ${partSel.has(id)?'checked':''} ${chk}> <span style="font-size:13px;flex:1;min-width:0"><b>${esc(pkgPart(o)||'—')}</b>${cocGuessRev(o)?' · Rev '+esc(cocGuessRev(o)):''} · ${t('Job')} ${esc(o.job||'—')}${o.qty?' · '+esc(String(o.qty))+' pcs':''}${o.desc?` <span class="muted">${esc(String(o.desc).slice(0,60))}</span>`:''}</span></label>`).join('');
+    }).join('');
+    ov.querySelector('#cs-parts-hint').textContent=(linked&&groups.size>1&&!partSel.size)
+      ? t('These certs cover more than one PO — tick the PO (or the parts) going out.')
+      : linked
+      ? t('From the orders linked to the picked certs. Tick a PO to take every part on it.')
+      : t('None of the picked certs are linked to this customer’s orders, so these are their recent orders.');
+    if(fresh||refill) fillFromParts();
+  }
+  ov.querySelector('#cs-cust-sel').addEventListener('change',renderParts);
+  ov.querySelector('#cs-cust').addEventListener('input',renderParts);
+  ov.querySelector('#cs-po').addEventListener('change',()=>{
+    // typing a PO picks every listed part on that PO
+    const typed=normPo(ov.querySelector('#cs-po').value); if(!typed) return;
+    const hits=partCands().list.filter(([,o])=>normPo(o.po)===typed).map(([id])=>id);
+    if(!hits.length) return;
+    partSel=new Set(hits); partTouched=true; renderParts(); fillFromParts();
+  });
+  ov.addEventListener('change',e=>{
+    const el=e.target; if(!el||!el.classList) return;
+    if(el.classList.contains('cs-part')||el.classList.contains('cs-po-all')) partTouched=true;
+    if(el.classList.contains('cs-part')){ el.checked?partSel.add(el.value):partSel.delete(el.value); renderParts(); fillFromParts(); }
+    else if(el.classList.contains('cs-po-all')){
+      partCands().list.filter(([,o])=>String(o.po||'').trim()===el.dataset.po).forEach(([id])=>el.checked?partSel.add(id):partSel.delete(id));
+      renderParts(); fillFromParts();
+    }
+  });
   // type-to-search: every word must match; picked certs stay visible so the
   // selection never disappears while searching for the next one
   const applySearch=()=>{
@@ -4708,7 +4807,7 @@ window.qcCoverSheetOpen=()=>{
   rebuildCust();
   const pre=[...ov.querySelectorAll('.cs-pick:checked')].map(x=>CERTS[x.value]).filter(Boolean);
   const pos=[...new Set(pre.map(c=>c.po).filter(Boolean))];
-  if(pos.length===1) ov.querySelector('#cs-po').value=pos[0];
+  if(pos.length===1&&!ov.querySelector('#cs-po').value) ov.querySelector('#cs-po').value=pos[0];
 };
 window.qcCoverSheetPrint=()=>{
   const ids=[...document.querySelectorAll('.cs-pick:checked')].map(x=>x.value);
@@ -4716,6 +4815,8 @@ window.qcCoverSheetPrint=()=>{
   const certs=ids.map(id=>CERTS[id]).filter(Boolean);
   const customer=gv('cs-cust')||gv('cs-cust-sel');
   const po=gv('cs-po'), job=gv('cs-job'), notes=gv('cs-notes');
+  const partIds=[...document.querySelectorAll('.cs-part:checked')].map(x=>x.value).filter(id=>ORDERS[id]);
+  const partSet=new Set(partIds), parts=partIds.map(id=>ORDERS[id]);
   const dateStr=fmtDate(gv('cs-date')||todayISO());
   const attachCerts=!!(document.getElementById('cs-attach')&&document.getElementById('cs-attach').checked);
   const attachInv=!!(document.getElementById('cs-attach-inv')&&document.getElementById('cs-attach-inv').checked)
@@ -4731,7 +4832,9 @@ window.qcCoverSheetPrint=()=>{
   // job # / part # per cert, from its linked orders — only the chosen customer's orders
   // (a cert can serve several customers' jobs; this copy goes to one of them)
   const jobCell=(c)=>{
-    const os=(c.linkedOrders||[]).map(oid=>ORDERS[oid]).filter(Boolean);
+    // the parts ticked in the dialog win; otherwise every linked order for this customer
+    const chosen=(c.linkedOrders||[]).filter(oid=>partSet.has(oid)).map(oid=>ORDERS[oid]);
+    const os=chosen.length?chosen:(c.linkedOrders||[]).map(oid=>ORDERS[oid]).filter(Boolean);
     const rel=customer?os.filter(o=>(o.customer||'').trim().toLowerCase()===customer.trim().toLowerCase()):os;
     const use=rel.length?rel:os;
     if(!use.length) return '—';
@@ -4750,6 +4853,20 @@ window.qcCoverSheetPrint=()=>{
     ${td(jobCell(c))}
     ${td(`${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(c.mill)}</div>`:''}`,';padding-right:0')}
   </tr>`).join('');
+  const partsTable=parts.length?`<div style="font-size:11px;font-weight:700;color:#222;letter-spacing:.3px;margin-bottom:6px">PARTS COVERED</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:26px">
+      <thead><tr style="border-bottom:1px solid #000">
+        ${th('PART #',';padding-left:0')}${th('REV')}${th('DESCRIPTION')}${th('JOB #')}${th('PO #')}${th('QTY',';padding-right:0;text-align:right')}
+      </tr></thead>
+      <tbody>${parts.map(o=>`<tr>
+        ${td(`<b style="color:#000">${esc(pkgPart(o)||'—')}</b>`,';padding-left:0')}
+        ${td(esc(cocGuessRev(o)||'—'))}
+        ${td(esc(o.desc||o.description||'—'))}
+        ${td(esc(o.job||'—'))}
+        ${td(esc(o.po||'—'))}
+        ${td(esc(String(o.qty||'—')),';padding-right:0;text-align:right')}
+      </tr>`).join('')}</tbody>
+    </table>`:'';
   const infoCol=(label,val)=>`<div style="flex:1;min-width:90px"><div style="font-size:10px;font-weight:700;color:#222;letter-spacing:.3px">${label}</div><div style="font-size:12px;color:#333;margin-top:2px">${val||'—'}</div></div>`;
   const w=window.open('','_blank','width=850,height=1100');
   if(!w){ alert(t('Please allow pop-ups to open the printable order sheet.')); return; }
@@ -4782,6 +4899,8 @@ window.qcCoverSheetPrint=()=>{
       ${infoCol('JOB / PART', esc(job))}
       ${infoCol('DATE', esc(dateStr))}
     </div>
+
+    ${partsTable}
 
     <div style="font-size:12px;color:#333;margin-bottom:18px">Enclosed are the material certifications covering this shipment. Each certificate is attached behind this sheet in the order listed below${attachInv?', followed by its supplier invoice where one is on file':''}.</div>
 
