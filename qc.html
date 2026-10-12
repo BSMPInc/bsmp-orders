@@ -588,6 +588,9 @@ const I18N = {
     'Notes (prints under the table)':'Notas (se imprimen bajo la tabla)','Generate & Print':'Generar e imprimir','Pick at least one cert.':'Elige al menos un certificado.',
     '— pick customer —':'— elige cliente —','Or type customer':'O escribe el cliente',
     'Attach the cert documents behind the cover sheet':'Adjuntar los certificados detrás de la portada',
+    'Include the invoice behind each cert (when one is attached)':'Incluir la factura detrás de cada certificado (si tiene una adjunta)',
+    'Search material, heat / lot, cert #, supplier, PO, job…':'Buscar material, colada / lote, cert. #, proveedor, OC, trabajo…',
+    'selected':'seleccionados','No certs match.':'Ningún certificado coincide.',
     'Preparing cert pages…':'Preparando las páginas de certificados…','No file attached for':'Sin archivo adjunto para',
     'Order details':'Detalles de la orden','Orders using this material':'Órdenes que usan este material','Printed':'Impreso','No linked orders on this cert.':'Este certificado no tiene órdenes vinculadas.','Please allow pop-ups to open the printable order sheet.':'Permite ventanas emergentes para abrir la hoja imprimible.','View / print full order details':'Ver / imprimir detalles de la orden','Unit price':'Precio unitario','Order date':'Fecha de orden','Due date':'Fecha de entrega','Part #':'N.º de parte','Job #':'N.º de trabajo','Order':'Orden',
     'Material Certificate':'Certificado de material','Traceability sheet':'Hoja de trazabilidad','Certificate':'Certificado','Certificate document':'Documento del certificado','Loading cert document…':'Cargando documento del certificado…','No cert file attached.':'Sin archivo de certificado adjunto.','No cert details.':'Sin detalles del certificado.','Restricted':'Restringido','Could not embed this cert for printing. Open it from the cert viewer to print separately.':'No se pudo incrustar el certificado para imprimir. Ábrelo en el visor para imprimirlo por separado.',
@@ -4617,7 +4620,12 @@ window.qcCoverSheetOpen=()=>{
   const rows=list.map(c=>{
     const label=[c.material,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):'',c.supplier].filter(Boolean).join(' · ');
     const match=!s||[c.material,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po].filter(Boolean).join(' ').toLowerCase().indexOf(s)>=0;
-    return `<label style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" class="cs-pick" value="${esc(c.id)}" ${(s&&match)?'checked':''} style="width:auto;min-height:0;flex:none"> <span style="font-size:13px">${esc(label||c.id)}</span></label>`;
+    // search text: the cert fields plus its linked orders (job / part / customer) and invoice #
+    const os=(c.linkedOrders||[]).map(oid=>ORDERS[oid]).filter(Boolean);
+    const inv=c.invoice||{};
+    const hay=[c.material,c.size,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor,...os.flatMap(o=>[o.job,o.part,o.customer,o.po])].filter(Boolean).join(' ').toLowerCase();
+    const hasInv=!!(inv.file&&inv.file.url);
+    return `<label class="cs-row" data-hay="${esc(hay)}" style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" class="cs-pick" value="${esc(c.id)}" ${(s&&match)?'checked':''} style="width:auto;min-height:0;flex:none"> <span style="font-size:13px;flex:1;min-width:0">${esc(label||c.id)}</span>${hasInv?`<span class="muted" title="${esc(t('Invoice'))}" style="font-size:11.5px;flex:none;white-space:nowrap"><i class="ti ti-file-dollar"></i> ${esc(t('Invoice'))}</span>`:''}</label>`;
   }).join('');
   const ov=document.createElement('div');
   ov.id='cs-overlay';
@@ -4625,7 +4633,11 @@ window.qcCoverSheetOpen=()=>{
   ov.innerHTML=`<div style="background:#fff;border-radius:12px;max-width:640px;width:100%;max-height:92vh;overflow:auto;padding:20px" onclick="event.stopPropagation()">
     <h3 style="margin:0 0 4px">${t('Cert cover sheet')}</h3>
     <p class="muted" style="margin:0 0 12px;font-size:12.5px">${t('Pick the certs going out, fill in the shipment info, then print — it goes on top of the cert package.')}</p>
-    <div style="border:1px solid var(--border);border-radius:8px;max-height:230px;overflow:auto;margin-bottom:12px">${rows}</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+      <input class="in" id="cs-search" type="search" autocomplete="off" placeholder="${esc(t('Search material, heat / lot, cert #, supplier, PO, job…'))}" style="flex:1;min-width:0">
+      <span class="muted" id="cs-count" style="font-size:12px;white-space:nowrap;flex:none"></span>
+    </div>
+    <div id="cs-list" style="border:1px solid var(--border);border-radius:8px;max-height:230px;overflow:auto;margin-bottom:12px">${rows}<div id="cs-none" class="muted" style="display:none;padding:12px;font-size:13px;text-align:center">${t('No certs match.')}</div></div>
     <div class="grid2">
       <div class="field"><label class="fl">${t('Customer')}</label><select class="in" id="cs-cust-sel"></select></div>
       <div class="field"><label class="fl">${t('Or type customer')}</label><input class="in" id="cs-cust"></div>
@@ -4637,6 +4649,10 @@ window.qcCoverSheetOpen=()=>{
     <label style="display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer;font-size:13px">
       <input type="checkbox" id="cs-attach" checked style="width:auto;min-height:0;flex:none">
       ${t('Attach the cert documents behind the cover sheet')}
+    </label>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" id="cs-attach-inv" checked style="width:auto;min-height:0;flex:none">
+      ${t('Include the invoice behind each cert (when one is attached)')}
     </label>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="document.getElementById('cs-overlay').remove()">${t('Cancel')}</button>
@@ -4670,7 +4686,25 @@ window.qcCoverSheetOpen=()=>{
     const jobEl=ov.querySelector('#cs-job');
     if(jobEl && !jobEl.value && jobs.length===1) jobEl.value=jobs[0];
   };
-  ov.addEventListener('change',e=>{ if(e.target&&e.target.classList&&e.target.classList.contains('cs-pick')) rebuildCust(); });
+  // type-to-search: every word must match; picked certs stay visible so the
+  // selection never disappears while searching for the next one
+  const applySearch=()=>{
+    const words=(ov.querySelector('#cs-search').value||'').toLowerCase().split(/\s+/).filter(Boolean);
+    let shown=0;
+    ov.querySelectorAll('.cs-row').forEach(r=>{
+      const on=r.querySelector('.cs-pick').checked||words.every(w=>r.dataset.hay.indexOf(w)>=0);
+      r.style.display=on?'flex':'none'; if(on) shown++;
+    });
+    ov.querySelector('#cs-none').style.display=shown?'none':'block';
+    const n=ov.querySelectorAll('.cs-pick:checked').length;
+    ov.querySelector('#cs-count').textContent=n?(n+' '+t('selected')):'';
+  };
+  const search=ov.querySelector('#cs-search');
+  search.addEventListener('input',applySearch);
+  search.addEventListener('keydown',e=>{ if(e.key==='Enter') e.preventDefault(); });
+  ov.addEventListener('change',e=>{ if(e.target&&e.target.classList&&e.target.classList.contains('cs-pick')){ rebuildCust(); applySearch(); } });
+  applySearch();
+  setTimeout(()=>{ try{ search.focus(); }catch(e){} },30);
   rebuildCust();
   const pre=[...ov.querySelectorAll('.cs-pick:checked')].map(x=>CERTS[x.value]).filter(Boolean);
   const pos=[...new Set(pre.map(c=>c.po).filter(Boolean))];
@@ -4684,6 +4718,9 @@ window.qcCoverSheetPrint=()=>{
   const po=gv('cs-po'), job=gv('cs-job'), notes=gv('cs-notes');
   const dateStr=fmtDate(gv('cs-date')||todayISO());
   const attachCerts=!!(document.getElementById('cs-attach')&&document.getElementById('cs-attach').checked);
+  const attachInv=!!(document.getElementById('cs-attach-inv')&&document.getElementById('cs-attach-inv').checked)
+    && certs.some(c=>c.invoice&&c.invoice.file&&c.invoice.file.url);
+  const attachAny=attachCerts||attachInv;
   const ovEl=document.getElementById('cs-overlay'); if(ovEl) ovEl.remove();
   const logo=(typeof BSMP_PRINT_LOGO!=='undefined'&&BSMP_PRINT_LOGO)||'';   // paper logo — the app-header logo is white-on-dark and invisible on print
   const anyItar=certs.some(c=>c.itar);
@@ -4746,7 +4783,7 @@ window.qcCoverSheetPrint=()=>{
       ${infoCol('DATE', esc(dateStr))}
     </div>
 
-    <div style="font-size:12px;color:#333;margin-bottom:18px">Enclosed are the material certifications covering this shipment. Each certificate is attached behind this sheet in the order listed below.</div>
+    <div style="font-size:12px;color:#333;margin-bottom:18px">Enclosed are the material certifications covering this shipment. Each certificate is attached behind this sheet in the order listed below${attachInv?', followed by its supplier invoice where one is on file':''}.</div>
 
     <table style="width:100%;border-collapse:collapse">
       <thead><tr style="border-bottom:1px solid #000">
@@ -4769,14 +4806,14 @@ window.qcCoverSheetPrint=()=>{
       <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Prepared By</div>
       <div style="flex:1;border-top:1px solid #000;padding-top:6px;font-size:11px;color:#444">Date</div>
     </div>
-  </div>${attachCerts?`<div id="cert-pages"><div class="pagenote" style="color:#8a919b">${esc(t('Preparing cert pages…'))}</div></div>
+  </div>${attachAny?`<div id="cert-pages"><div class="pagenote" style="color:#8a919b">${esc(t('Preparing cert pages…'))}</div></div>
   <div class="actions"><button onclick="window.print()">${esc(t('Print'))}</button></div>`:''}
-  ${attachCerts?'':'<script>setTimeout(function(){window.focus();window.print();},350)<\/script>'}</body></html>`);
+  ${attachAny?'':'<script>setTimeout(function(){window.focus();window.print();},350)<\/script>'}</body></html>`);
   w.document.close();
   // With certs attached, print only after every page is rendered and decoded —
   // an early print would ship blank pages behind the cover.
-  if(attachCerts){
-    qcCoverCertPages(certs, w)
+  if(attachAny){
+    qcCoverCertPages(certs, w, {certs:attachCerts, invoices:attachInv})
       .catch(e=>console.warn('cover cert render failed', e))
       .then(()=>{ try{ w.focus(); w.print(); }catch(e){} });
   }
@@ -4784,33 +4821,41 @@ window.qcCoverSheetPrint=()=>{
 // Rasterize every picked cert's files (PDF pages + photos) into the cover-sheet
 // print window, in the same order as the cover table. Resolves when all pages
 // are actually loaded, so the caller can safely print.
-async function qcCoverCertPages(certs, w){
+// opts.certs / opts.invoices pick what goes in; each cert's invoice (if any) follows
+// right behind that cert's own pages.
+async function qcCoverCertPages(certs, w, opts){
   const container=w.document.getElementById('cert-pages'); if(!container) return;
+  opts=opts||{certs:true};
   let html='';
   const certLabel=c=>[c.material,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):''].filter(Boolean).join(' · ')||c.id;
-  for(const c of certs){
-    const files=c.files?vals(c.files):(c.file?[c.file]:[]);
-    const withUrl=files.filter(f=>f&&f.url);
-    if(!withUrl.length){ html+='<div class="pagenote">'+esc(t('No file attached for')+' '+certLabel(c))+' — '+esc(t('No cert file attached.'))+'</div>'; continue; }
-    for(const f of withUrl){
-      const isPdf=/pdf/i.test((f.type||'')+' '+(f.name||'')+' '+f.url);
-      if(!isPdf){ html+='<img class="certpage" src="'+f.url+'">'; continue; }
-      try{
-        if(typeof pdfjsLib==='undefined') throw new Error('no pdfjs');
-        const pdf=await pdfjsLib.getDocument({url:f.url}).promise;
-        for(let p=1;p<=pdf.numPages;p++){
-          const page=await pdf.getPage(p);
-          const vp=page.getViewport({scale:2});
-          const canvas=document.createElement('canvas');
-          canvas.width=vp.width; canvas.height=vp.height;
-          await page.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise;
-          html+='<img class="certpage" src="'+canvas.toDataURL('image/jpeg',0.86)+'">';
-        }
-      }catch(e){
-        console.warn('cover cert render failed', c.id, e);
-        html+='<div class="pagenote">'+esc(certLabel(c))+' — '+esc(t('Could not embed this cert for printing. Open it from the cert viewer to print separately.'))+'</div>';
+  const addFile=async (f,c,what)=>{
+    const isPdf=/pdf/i.test((f.type||'')+' '+(f.name||'')+' '+f.url);
+    if(!isPdf){ html+='<img class="certpage" src="'+f.url+'">'; return; }
+    try{
+      if(typeof pdfjsLib==='undefined') throw new Error('no pdfjs');
+      const pdf=await pdfjsLib.getDocument({url:f.url}).promise;
+      for(let p=1;p<=pdf.numPages;p++){
+        const page=await pdf.getPage(p);
+        const vp=page.getViewport({scale:2});
+        const canvas=document.createElement('canvas');
+        canvas.width=vp.width; canvas.height=vp.height;
+        await page.render({canvasContext:canvas.getContext('2d'), viewport:vp}).promise;
+        html+='<img class="certpage" src="'+canvas.toDataURL('image/jpeg',0.86)+'">';
       }
+    }catch(e){
+      console.warn('cover '+what+' render failed', c.id, e);
+      html+='<div class="pagenote">'+esc(certLabel(c)+(what==='invoice'?' ('+t('Invoice')+')':''))+' — '+esc(t('Could not embed this cert for printing. Open it from the cert viewer to print separately.'))+'</div>';
     }
+  };
+  for(const c of certs){
+    if(opts.certs){
+      const files=c.files?vals(c.files):(c.file?[c.file]:[]);
+      const withUrl=files.filter(f=>f&&f.url);
+      if(!withUrl.length) html+='<div class="pagenote">'+esc(t('No file attached for')+' '+certLabel(c))+' — '+esc(t('No cert file attached.'))+'</div>';
+      for(const f of withUrl) await addFile(f,c,'cert');
+    }
+    const inv=c.invoice&&c.invoice.file;
+    if(opts.invoices && inv && inv.url) await addFile(inv,c,'invoice');
   }
   container.innerHTML=html||('<div class="pagenote">'+esc(t('No cert file attached.'))+'</div>');
   // wait for the non-PDF photo pages to finish loading before the print fires
