@@ -118,7 +118,7 @@ tabs + table, unchanged.
 ### Open Orders feeds the board (added 2026-10-12)
 
 Managers can place parts on the Work Queues board straight from Open Orders:
-- Each part row in the PO detail pane has the same **Board** chip as Today (`ciQbChip` -> `dispQbChip`): tap for Now / Next / Waiting / Take off board. Finished parts (Invoiced, Ready for Invoice, Completed) get no chip unless they are still on the board, so they can be taken off from here.
+- Each part row in the PO detail pane has the same **Board** chip as Today, under the status badge (the description column can shrink to ~34px on a narrow panel) (`ciQbChip` -> `dispQbChip`): tap for Now / Next / Waiting / Take off board. Finished parts (Invoiced, Ready for Invoice, Completed) get no chip unless they are still on the board, so they can be taken off from here.
 - The PO header has a **Board** button (`poQbBtn`, shows `on/total` once some are placed) that puts every unfinished part on the PO into one column in PO order (`_poQbMenu` / `_poQbPick`, one `qbPlace` per part), or takes them all off. It acts on the parts the current search/filter shows.
 - Operators see neither control (placement stays manager-only). Same `r.qb` field, so no new rule.
 
