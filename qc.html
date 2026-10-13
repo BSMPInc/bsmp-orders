@@ -4841,7 +4841,7 @@ window.qcCoverSheetPrint=()=>{
     const seen=new Set();
     return use.map(o=>{
       const key=(o.job||'')+'|'+(o.part||''); if(seen.has(key)||key==='|') return ''; seen.add(key);
-      return `<div style="font-weight:700;color:#000">${esc(o.job||'—')}</div>${o.part?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(o.part)}</div>`:''}`;
+      return `<div style="margin-bottom:6px"><div style="font-weight:700;color:#000">${esc(o.job||'—')}</div>${o.part?`<div style="color:#555;font-size:11px;margin-top:1px">${esc(o.part)}</div>`:''}</div>`;
     }).join('')||'—';
   };
   const trows=certs.map((c,i)=>`<tr>
@@ -4849,7 +4849,7 @@ window.qcCoverSheetPrint=()=>{
     ${td(`<div style="font-weight:700;color:#000">${esc(c.material||'—')}</div>${c.size?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(c.size)}</div>`:''}`)}
     ${td(esc(c.spec||'—'))}
     ${td(esc(c.heatLot||'—'))}
-    ${td(esc(c.certNo||'—'))}
+    ${td(esc(c.certNo||'—').replace(/\//g,'/<wbr>'))}
     ${td(jobCell(c))}
     ${td(`${esc(c.supplier||'—')}${c.mill&&c.mill!==c.supplier?`<div style="color:#888;font-size:10px;margin-top:1px">${esc(c.mill)}</div>`:''}`,';padding-right:0')}
   </tr>`).join('');
@@ -4876,6 +4876,7 @@ window.qcCoverSheetPrint=()=>{
     html,body{background:#e5e7eb}
     .sheet{width:8.5in;min-height:11in;background:#fff;padding:42px 46px;color:#222;font-family:Arial,Helvetica,sans-serif}
     @page{size:letter portrait;margin:0}
+    .certtbl td{overflow-wrap:anywhere}
     .certpage{display:block;width:8.5in;height:auto;background:#fff;page-break-before:always}
     .pagenote{width:8.5in;background:#fff;padding:24px 46px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#b3261e;page-break-before:always}
     .actions{position:sticky;bottom:12px;text-align:center;padding:8px 0}
@@ -4904,9 +4905,10 @@ window.qcCoverSheetPrint=()=>{
 
     <div style="font-size:12px;color:#333;margin-bottom:18px">Enclosed are the material certifications covering this shipment. Each certificate is attached behind this sheet in the order listed below${attachInv?', followed by its supplier invoice where one is on file':''}.</div>
 
-    <table style="width:100%;border-collapse:collapse">
+    <table class="certtbl" style="width:100%;border-collapse:collapse;table-layout:fixed">
+      <colgroup><col style="width:26px"><col style="width:84px"><col><col style="width:122px"><col style="width:106px"><col style="width:124px"><col style="width:108px"></colgroup>
       <thead><tr style="border-bottom:1px solid #000">
-        ${th('#',';padding-left:0;width:26px')}
+        ${th('#',';padding-left:0')}
         ${th('MATERIAL')}
         ${th('SPECIFICATION')}
         ${th('HEAT / LOT')}
