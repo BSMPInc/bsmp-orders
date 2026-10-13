@@ -667,7 +667,7 @@ const I18N = {
     'Enter a key first — or use Clear key to remove the saved one.':'Primero escribe una clave — o usa Borrar clave para quitar la guardada.',
     'API key saved in this browser.':'Clave API guardada en este navegador.','API key cleared.':'Clave API borrada.',
     // Cert linked-order editing
-    'Link orders':'Vincular órdenes','Edit cert details':'Editar datos del certificado','Files, linked orders and the invoice stay as they are. Clear a box to remove it.':'Los archivos, órdenes vinculadas y la factura no cambian. Borre un campo para quitarlo.','Edit linked orders':'Editar órdenes vinculadas','Save links':'Guardar vínculos','Links saved.':'Vínculos guardados.',
+    'Link orders':'Vincular órdenes','Edit cert details':'Editar datos del certificado','The cert file and linked orders stay as they are. Clear a box to remove it.':'El archivo del certificado y las órdenes vinculadas no cambian. Borre un campo para quitarlo.','Add invoice':'Agregar factura','A new file replaces this one.':'Un archivo nuevo reemplaza este.','Invoice file did not upload.':'El archivo de la factura no se subió.','Edit linked orders':'Editar órdenes vinculadas','Save links':'Guardar vínculos','Links saved.':'Vínculos guardados.',
     'Cert not found — it may have been deleted.':'Certificado no encontrado — puede haber sido eliminado.',
     // hand-write FAI sheet
     'Print blank FAI sheet':'Imprimir hoja FAI en blanco',
@@ -4541,7 +4541,7 @@ function viewCerts(){
     const inv=c.invoice||{};
     const invCell=(inv.no||inv.amount||(inv.file&&inv.file.url))
       ? `${inv.no?('<b>'+esc(inv.no)+'</b>'):''}${inv.amount?('<div class="muted" style="font-size:12px">$'+esc(inv.amount)+'</div>'):''}${inv.file&&inv.file.url?` <button class="icon-btn" onclick="qcViewCert('${c.id}',${nFiles})" title="${t('View invoice')}"><i class="ti ti-file-dollar"></i></button>`:''}`
-      : '<span class="muted">—</span>';
+      : `<span class="muted">—</span> <button class="icon-btn mgr-only" onclick="window.qcEditCert('${c.id}',true)" title="${t('Add invoice')}"><i class="ti ti-file-plus"></i></button>`;
     const sstr=[c.material,c.spec,c.size,c.heatLot,c.supplier,c.mill,c.certNo,c.otherCertNos,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
     const hasFile=nFiles>0||!!(inv.file&&inv.file.url);
     const matCell=hasFile?`<b class="cert-open" onclick="qcViewCert('${c.id}')" title="${t('View cert')}">${esc(c.material||'—')}</b>`:`<b>${esc(c.material||'—')}</b>`;
@@ -4598,35 +4598,71 @@ window.qcAttachCertFile=(id)=>{
 // Edit the typed details of a saved cert (files, links and invoice are untouched)
 const CERT_EDIT_FIELDS=[['material','Material / grade'],['spec','Specification'],['heatLot','Heat / lot #'],['supplier','Supplier'],['mill','Mill'],
   ['certNo','Cert #'],['otherCertNos','Other cert / lot #s'],['certDate','Cert date','date'],['size','Size / thickness'],['qty','Qty'],['po','PO #'],['country','Country of origin']];
-window.qcEditCert=(id)=>{
+let _ceDropInvFile=false;   // edit form: the saved invoice file was x'd off
+window.qcEditCert=(id,focusInv)=>{
   if(!isMgr()) return;
   if(!CERTS[id]) return;
+  _pendingFiles['invoice']=[]; _ceDropInvFile=false;
   editId='__cert_edit__'+id; render();
+  if(focusInv){ const el=$('ce-invoice'); if(el) el.scrollIntoView({block:'start'}); }
 };
+window.qcCancelCertEdit=()=>{ _pendingFiles['invoice']=[]; _ceDropInvFile=false; editId=null; render(); };
+window.qcCeDropInvFile=()=>{ _ceDropInvFile=true; const el=$('ce-inv-saved'); if(el) el.remove(); };
 function certDetailsForm(id){
   const c=CERTS[id];
-  const back=`<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>`;
+  const back=`<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="window.qcCancelCertEdit()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>`;
   if(!c) return back+`<div class="card"><div class="empty">${t('Cert not found — it may have been deleted.')}</div></div>`;
-  return back+`<div class="page-head"><h2>${t('Edit cert details')}</h2><p>${t('Files, linked orders and the invoice stay as they are. Clear a box to remove it.')}</p></div>
+  const inv=c.invoice||{};
+  const savedInv=(!_ceDropInvFile&&inv.file&&inv.file.url)
+    ?`<div id="ce-inv-saved" style="margin-top:6px"><span class="badge neutral"><i class="ti ti-file-dollar"></i> <a href="${esc(inv.file.url)}" target="_blank" rel="noopener">${esc(inv.file.name||t('Invoice'))}</a> <i class="ti ti-x" style="cursor:pointer" title="${t('Remove')}" onclick="window.qcCeDropInvFile()"></i></span> <span class="muted" style="font-size:12px">${t('A new file replaces this one.')}</span></div>`:'';
+  return back+`<div class="page-head"><h2>${t('Edit cert details')}</h2><p>${t('The cert file and linked orders stay as they are. Clear a box to remove it.')}</p></div>
   <div class="card" style="max-width:680px">
     <div class="grid2">${CERT_EDIT_FIELDS.map(([k,label,type])=>`<div class="field"><label class="fl">${t(label)}</label><input class="in" id="ce-${k}"${type?(' type="'+type+'"'):''} value="${esc(c[k]||'')}"></div>`).join('')}</div>
     <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ce-itar" style="width:auto;min-height:0"${c.itar?' checked':''}> ${t('Restricted / ITAR')}</label></div>
+    <div class="field" id="ce-invoice"><label class="fl">${t('Vendor invoice')}</label>
+      <div class="dz" ondragover="qcDragOver(event)" ondragleave="qcDragLeave(event)" ondrop="qcInvDrop(event)" onclick="this.querySelector('input').click()">
+        <i class="ti ti-file-dollar"></i>
+        <div>${t('Drop invoice here or click to add — AI reads invoice #, date and amount.')}</div>
+        <input type="file" accept=".pdf,image/*" style="display:none" onchange="qcInvPick(this)">
+      </div>
+      ${savedInv}
+      <div class="thumbs" id="files-invoice"></div>
+      <div class="aiwip" id="inv-ai" style="display:none"></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="field"><label class="fl">${t('Invoice #')}</label><input class="in" id="inv-no" value="${esc(inv.no||'')}"></div>
+        <div class="field"><label class="fl">${t('Invoice date')}</label><input class="in" id="inv-date" type="date" value="${esc(inv.date||'')}"></div>
+        <div class="field"><label class="fl">${t('Amount')}</label><input class="in" id="inv-amount" value="${esc(inv.amount||'')}"></div>
+        <div class="field"><label class="fl">${t('Vendor')}</label><input class="in" id="inv-vendor" value="${esc(inv.vendor||'')}"></div>
+      </div>
+    </div>
     <div class="toolbar" style="margin-top:6px">
-      <button class="btn primary" onclick="window.qcSaveCertEdit('${esc(id)}')"><i class="ti ti-device-floppy"></i> ${t('Save cert')}</button>
-      <button class="btn" onclick="editId=null;render()">${t('Cancel')}</button>
+      <button class="btn primary" id="ce-save" onclick="window.qcSaveCertEdit('${esc(id)}')"><i class="ti ti-device-floppy"></i> ${t('Save cert')}</button>
+      <button class="btn" onclick="window.qcCancelCertEdit()">${t('Cancel')}</button>
     </div>
   </div>`;
 }
 window.qcSaveCertEdit=async (id)=>{
   if(!isMgr() || !CERTS[id]) return;
+  const btn=$('ce-save'); if(btn){ btn.disabled=true; btn.style.opacity='.6'; }
   const upd={ itar:gc('ce-itar') };
   CERT_EDIT_FIELDS.forEach(([k])=>{ upd[k]=gv('ce-'+k); });
   try{
+    const old=CERTS[id].invoice||{};
+    const hadNew=(_pendingFiles['invoice']||[]).length>0;
+    const invFiles=await uploadPending('invoice','invoices');
+    if(hadNew && !invFiles.length) throw new Error(t('Invoice file did not upload.'));
+    const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'),
+      file:invFiles[0]||(_ceDropInvFile?null:(old.file||null)) };
+    upd.invoice=(invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file)?invoice:null;
     await dbUpdate('qc/certs/'+id, upd);
     Object.assign(CERTS[id], upd);
-    editId=null; render();
+    _ceDropInvFile=false; editId=null; render();
     qcToast(t('Cert saved.'),'ok');
-  }catch(e){ console.error('cert edit failed', e); }
+  }catch(e){
+    console.error('cert edit failed', e);
+    if(btn){ btn.disabled=false; btn.style.opacity=''; }
+    if(e&&e.message) qcToast(t('Save failed:')+' '+e.message,'err');
+  }
 };
 window.qcEditCertLinks=(id)=>{
   if(!isMgr()) return;
