@@ -234,6 +234,24 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
   .eb{min-width:31px;padding:0 4px}
 }
 
+/* Files page: photos + PDFs kept to share / download (reuses the list + pane split) */
+.nl-fbar{padding:0 12px 8px}
+.nl-fbar[hidden]{display:none}
+.nl-fbar .btn{width:100%;justify-content:center}
+.nl-fbar .fb-st{font-size:12px;color:var(--text2);text-align:center;margin-top:6px}
+.nt-list.drag{outline:2px dashed var(--accent-ink);outline-offset:-6px;background:var(--accent-soft)}
+.nl-ficon{width:42px;height:42px;flex:none;border-radius:6px;border:1px solid #e7c9c9;display:flex;align-items:center;justify-content:center;background:var(--red-soft);color:var(--red);font-size:22px}
+.fv-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 22px 40px}
+.fv-name{font-size:19px;font-weight:800;word-break:break-word;line-height:1.25}
+.fv-meta{font-size:12.5px;color:var(--text3);margin:3px 0 14px}
+.fv-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.fv-actions .btn{height:42px}
+.fv-img{max-width:100%;max-height:70vh;display:block;border-radius:8px;border:1px solid var(--border)}
+.fv-pdf{width:100%;height:calc(100vh - 330px);height:calc(100dvh - 330px);min-height:420px;border:1px solid var(--border);border-radius:8px;display:block}
+.fv-pdfcard{display:flex;flex-direction:column;align-items:center;gap:6px;padding:36px 16px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text2);font-size:13px}
+.fv-pdfcard i{font-size:54px;color:var(--red)}
+@media(max-width:760px){ .fv-scroll{padding:14px 16px 40px} }
+
 .nt-toast{position:fixed;left:50%;bottom:calc(var(--dock-h) + 18px);transform:translateX(-50%) translateY(8px);background:var(--accent);color:var(--on-accent);padding:11px 18px;font-weight:700;font-size:13px;z-index:9600;box-shadow:0 10px 28px rgba(0,0,0,.28);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw}
 .nt-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .nt-toast.err{background:var(--spark);color:#fff}
@@ -263,6 +281,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
       <div class="nav-sec">Notes</div>
       <div class="nav-item active" id="nav-all" onclick="ntShowList()"><i class="ti ti-notes"></i><span class="nav-label">All Notes</span></div>
       <div class="nav-item" onclick="ntNew()"><i class="ti ti-edit"></i><span class="nav-label">New Note</span></div>
+      <div class="nav-item" id="nav-files" onclick="ntShowFiles()"><i class="ti ti-folder"></i><span class="nav-label">Files</span></div>
     </div>
     <div class="sb-foot"><span class="dot" id="nt-foot-dot"></span><span class="lbl" id="nt-foot-txt">Connecting…</span><button class="pin-btn" id="nt-pin" title="Keep menu open" onclick="window._ntPin(event)"><i class="ti ti-pin" id="nt-pin-ico"></i></button></div>
   </nav>
@@ -279,8 +298,13 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
     </header>
     <div class="content nt-content" id="content">
       <div class="nt-split">
-        <aside class="nt-list">
+        <aside class="nt-list" id="nt-listbox" ondragover="ntFileDragOver(event)" ondragleave="ntFileDragLeave(event)" ondrop="ntFileDrop(event)">
           <div class="nl-search"><i class="ti ti-search"></i><input id="nt-search" type="search" placeholder="Search" autocomplete="off" oninput="ntSearch(this.value)"></div>
+          <div class="nl-fbar" id="nt-fbar" hidden>
+            <button class="btn primary" onclick="$('nt-fpick').click()"><i class="ti ti-upload"></i> Upload photos or PDFs</button>
+            <input type="file" id="nt-fpick" accept="image/*,application/pdf,.pdf" multiple style="display:none" onchange="ntFilePick(this)">
+            <div class="fb-st" id="nt-fstat"></div>
+          </div>
           <div class="nl-scroll" id="nt-rows"></div>
         </aside>
         <section class="nt-pane" id="nt-pane"></section>
@@ -293,6 +317,7 @@ label.fl{display:block;font-size:11px;font-weight:700;letter-spacing:.02em;text-
 <div class="dock" id="nt-dock" style="display:none">
   <button class="dock-tab active" id="dock-all" onclick="ntShowList()"><i class="ti ti-notes"></i><span>Notes</span></button>
   <button class="dock-tab" onclick="ntNew()"><i class="ti ti-edit"></i><span>New</span></button>
+  <button class="dock-tab" id="dock-files" onclick="ntShowFiles()"><i class="ti ti-folder"></i><span>Files</span></button>
   <div class="dock-switch">
     <span class="lbl">Switch app</span>
     <div class="dock-chips">
@@ -321,6 +346,8 @@ let curId=null;          // note in the editor (null while a new note has no tex
 let editing=false;       // the editor pane holds a note (new or existing)
 let query='';
 let _lastRange=null;     // caret inside the note, so toolbar taps / photo picks land in the right place
+let page='notes';        // 'notes' | 'files'
+let fileSel=null;        // file open in the pane on the Files page
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -355,18 +382,20 @@ window.ntOnData=(name,val)=>{
   if(name!=='notes') return;
   NOTES=val||{}; _loaded=true;
   renderList();
+  if(page==='files'){ if(fileSel && !NOTES[fileSel]){ fileSel=null; renderFilePane(); } return; }
   if(!editing && !isPhone()) openLatest();
 };
 window.ntOnAuth=(user)=>{
   NT_USER=user; NT_UID=user?user.uid:null;
   if(!user){ $('nt-app').style.display='none'; $('nt-dock').style.display='none'; return; }
   $('nt-app').style.display='block'; $('nt-dock').style.display='flex';
-  renderList(); if(!editing) renderEmptyPane();
+  renderList(); if(page==='files') renderFilePane(); else if(!editing) renderEmptyPane();
 };
 window._ntPin=(e)=>{ e&&e.stopPropagation(); const p=document.body.classList.toggle('sb-pinned'); const ic=$('nt-pin-ico'); if(ic) ic.className='ti '+(p?'ti-pinned':'ti-pin'); };
 
 /* ---------- reading a note ---------- */
-function noteList(){ return vals(NOTES).filter(n=>n.kind!=='log' && n.id); }
+// plain notes only: Daily Log entries (kind:'log') and Files (kind:'file') share the path
+function noteList(){ return vals(NOTES).filter(n=>!n.kind && n.id); }
 // text lines of an html body (block ends and <br> become line breaks)
 function textLines(html){
   const t=stripHtml(String(html||'').replace(/<(\/?(p|div|h[1-6]|li|pre|ul|ol)\b[^>]*|br\s*\/?)>/gi,'\n$&'));
@@ -412,6 +441,7 @@ function rowDate(t){
 }
 window.ntSearch=(q)=>{ query=String(q||''); renderList(); };
 function renderList(){
+  if(page==='files') return renderFileList();
   const box=$('nt-rows'); if(!box) return;
   const q=query.toLowerCase().trim();
   let L=sortedNotes().map(n=>({n, t:titleOf(n), p:previewOf(n)}));
@@ -440,6 +470,7 @@ function renderEmptyPane(){
 function openLatest(){ const n=sortedNotes()[0]; if(n) openNote(n.id); else renderEmptyPane(); }
 async function openNote(id){
   await ntFlushSave();
+  if(page!=='notes') setPage('notes');
   curId=id; editing=true;
   buildEditor();
   document.body.classList.add('nt-editing');
@@ -448,6 +479,7 @@ async function openNote(id){
 window.ntOpen=(id)=>{ if(editing && id===curId){ document.body.classList.add('nt-editing'); return; } openNote(id); };
 window.ntNew=async ()=>{
   await ntFlushSave();
+  if(page!=='notes') setPage('notes');
   curId=null; editing=true;
   buildEditor();
   document.body.classList.add('nt-editing');
@@ -456,6 +488,7 @@ window.ntNew=async ()=>{
 // phone: back to the list.  desktop: the list is always showing, so just focus search
 window.ntShowList=async ()=>{
   await ntFlushSave();
+  if(page!=='notes'){ setPage('notes'); fileSel=null; document.body.classList.remove('nt-editing'); renderList(); if(isPhone()) renderEmptyPane(); else openLatest(); return; }
   if(isPhone()){ editing=false; curId=null; document.body.classList.remove('nt-editing'); renderEmptyPane(); renderList(); }
   else { const s=$('nt-search'); if(s) s.focus(); }
 };
@@ -766,6 +799,148 @@ window.ntDelete=async ()=>{
   ntToast('Note deleted.','ok');
 };
 
+/* ---------- Files page ----------
+   Photos and PDFs kept to text / download. Each file is a record under the same private
+   notes/<uid> path: {id, kind:'file', name, url, path, type, size, createdAt, by}; the file
+   itself is in Storage under notes/<uid>/files/ (needs its own Storage rule for PDFs). */
+const FILE_MAX=25*1024*1024;
+const _blobs={};         // id -> Blob, fetched when a file opens so Share can fire inside the tap
+function fileList(){ return vals(NOTES).filter(n=>n.kind==='file' && n.id).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)); }
+const isPdf=f=>/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||'');
+function fmtSize(b){ b=+b||0; return b>=1048576?(b/1048576).toFixed(1)+' MB':b>=1024?Math.round(b/1024)+' KB':b+' B'; }
+function setPage(p){
+  page=p; query=''; const s=$('nt-search'); if(s){ s.value=''; s.placeholder=p==='files'?'Search files':'Search'; }
+  const fb=$('nt-fbar'); if(fb) fb.hidden=p!=='files';
+  [['nav-all','dock-all','notes'],['nav-files','dock-files','files']].forEach(([a,b,k])=>{ const x=$(a), y=$(b); if(x) x.classList.toggle('active',p===k); if(y) y.classList.toggle('active',p===k); });
+  const tt=$('tb-title'); if(tt) tt.textContent=p==='files'?'Files':'Notes';
+}
+window.ntShowFiles=async ()=>{
+  await ntFlushSave();
+  editing=false; curId=null; fileSel=null;
+  document.body.classList.remove('nt-editing');
+  setPage('files'); renderList(); renderFilePane();
+};
+function renderFileList(){
+  const box=$('nt-rows'); if(!box) return;
+  const q=query.toLowerCase().trim();
+  const all=fileList(); let L=all;
+  if(q) L=L.filter(f=>(f.name||'').toLowerCase().includes(q));
+  const sub=$('tb-sub'); if(sub) sub.textContent=all.length+' file'+(all.length===1?'':'s');
+  if(!L.length){ box.innerHTML=`<div class="nl-empty">${!_loaded?'Loading…':q?'No files match “'+esc(query)+'”.':'No files yet. Upload photos or PDFs to keep them here.'}</div>`; return; }
+  let html='', last='';
+  L.forEach(f=>{
+    const g=q?'':groupOf({createdAt:f.createdAt});
+    if(g!==last){ html+=`<div class="nl-group">${esc(g)}</div>`; last=g; }
+    html+=`<div class="nl-row${f.id===fileSel?' sel':''}" onclick="ntFileOpen('${esc(f.id)}')">
+      ${isPdf(f)?'<span class="nl-ficon"><i class="ti ti-file-type-pdf"></i></span>':`<img class="nl-img" src="${esc(f.url)}" alt="" loading="lazy">`}
+      <div class="nl-txt"><div class="nl-t">${esc(f.name||'File')}</div>
+      <div class="nl-p"><span class="nl-d">${esc(rowDate(f.createdAt))}</span>${esc(fmtSize(f.size))}</div></div>
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+function renderFilePane(){
+  const pane=$('nt-pane'); if(!pane) return;
+  const f=fileSel&&NOTES[fileSel];
+  if(!f){ pane.innerHTML=`<div class="ed-empty"><i class="ti ti-folder"></i><div>${fileList().length?'Pick a file to share or download it.':'No files yet.'}</div><button class="btn primary" onclick="$('nt-fpick').click()"><i class="ti ti-upload"></i> Upload photos or PDFs</button></div>`; return; }
+  const when=new Date(f.createdAt||Date.now());
+  const preview=isPdf(f)
+    ?(isPhone()?`<div class="fv-pdfcard"><i class="ti ti-file-type-pdf"></i><div>PDF · ${esc(fmtSize(f.size))}</div><a class="btn" href="${esc(f.url)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> Open PDF</a></div>`
+               :`<iframe class="fv-pdf" src="${esc(f.url)}" title="${esc(f.name||'PDF')}"></iframe>`)
+    :`<img class="fv-img" src="${esc(f.url)}" alt="${esc(f.name||'')}">`;
+  pane.innerHTML=`<div class="ed-bar">
+      <button class="eb back" onclick="ntFileBack()"><i class="ti ti-chevron-left"></i> Files</button>
+      <span class="sp"></span>
+      <button class="eb" title="Rename" onclick="ntFileRename('${esc(f.id)}')"><i class="ti ti-pencil"></i></button>
+      <button class="eb del" title="Delete file" onclick="ntFileDelete('${esc(f.id)}')"><i class="ti ti-trash"></i></button>
+    </div>
+    <div class="fv-scroll">
+      <div class="fv-name">${esc(f.name||'File')}</div>
+      <div class="fv-meta">${esc(fmtLong(when))} · ${esc(fmtSize(f.size))}</div>
+      <div class="fv-actions">
+        <button class="btn primary" onclick="ntFileShare('${esc(f.id)}')"><i class="ti ti-share"></i> Share / Text</button>
+        <button class="btn" onclick="ntFileDownload('${esc(f.id)}')"><i class="ti ti-download"></i> Download</button>
+        <a class="btn" href="${esc(f.url)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> Open</a>
+      </div>
+      ${preview}
+    </div>`;
+}
+window.ntFileOpen=(id)=>{
+  fileSel=id; document.body.classList.add('nt-editing');
+  renderFileList(); renderFilePane();
+  getBlob(id).catch(()=>{});   // warm it up so Share works on the first tap
+};
+window.ntFileBack=()=>{ fileSel=null; document.body.classList.remove('nt-editing'); renderFileList(); renderFilePane(); };
+async function getBlob(id){
+  if(_blobs[id]) return _blobs[id];
+  const f=NOTES[id]; if(!f||!f.url) throw new Error('missing file');
+  const r=await fetch(f.url); if(!r.ok) throw new Error('HTTP '+r.status);
+  return (_blobs[id]=await r.blob());
+}
+// phone: opens the share sheet (Messages, Mail, AirDrop, Save to Files). No file sharing -> share/copy the link
+window.ntFileShare=async (id)=>{
+  const f=NOTES[id]; if(!f) return;
+  const b=_blobs[id];
+  if(!b){ ntToast('Getting the file ready…'); try{ await getBlob(id); ntToast('Ready — tap Share again.','ok'); }catch(e){ ntToast('Could not load the file: '+((e&&e.message)||e),'err'); } return; }
+  const file=new File([b], f.name||'file', {type:f.type||b.type||''});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file], title:f.name||''}); }
+    catch(e){ if(e&&e.name==='NotAllowedError') ntToast('Tap Share again.'); else if(!(e&&e.name==='AbortError')) ntToast('Share failed: '+((e&&e.message)||e),'err'); }
+    return;
+  }
+  if(navigator.share){ try{ await navigator.share({title:f.name||'', url:f.url}); }catch(e){} return; }
+  try{ await navigator.clipboard.writeText(f.url); ntToast('Link copied — paste it into a text or email.','ok'); }
+  catch(e){ window.open(f.url,'_blank','noopener'); }
+};
+window.ntFileDownload=async (id)=>{
+  const f=NOTES[id]; if(!f) return;
+  try{
+    const b=await getBlob(id);
+    const u=URL.createObjectURL(b), a=document.createElement('a');
+    a.href=u; a.download=f.name||'file'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u), 60000);
+  }catch(e){ window.open(f.url,'_blank','noopener'); }
+};
+window.ntFileRename=async (id)=>{
+  const f=NOTES[id]; if(!f) return;
+  const ext=((f.name||'').match(/\.[A-Za-z0-9]{1,5}$/)||[''])[0];
+  let nm=prompt('File name', f.name||''); if(nm==null) return;
+  nm=nm.trim(); if(!nm) return;
+  if(ext && !/\.[A-Za-z0-9]{1,5}$/.test(nm)) nm+=ext;     // keep .pdf / .jpg so it still opens after download
+  try{ await dbUpdate('notes/'+NT_UID+'/'+id,{name:nm}); NOTES[id].name=nm; renderFileList(); renderFilePane(); }catch(e){}
+};
+window.ntFileDelete=async (id)=>{
+  const f=NOTES[id]; if(!f) return;
+  if(!confirm('Delete "'+(f.name||'this file')+'"? This cannot be undone.')) return;
+  try{ await dbRemove('notes/'+NT_UID+'/'+id); }catch(e){ ntToast('Delete failed: '+((e&&e.message)||e),'err'); return; }
+  if(f.path && window.ntDeleteFile) window.ntDeleteFile(f.path).catch(e=>console.warn('storage delete failed',e));
+  delete NOTES[id]; delete _blobs[id]; fileSel=null;
+  document.body.classList.remove('nt-editing');
+  renderFileList(); renderFilePane(); ntToast('File deleted.','ok');
+};
+window.ntFilePick=(inp)=>{ const fs=[...inp.files]; inp.value=''; addFiles(fs); };
+window.ntFileDragOver=(e)=>{ if(page!=='files') return; e.preventDefault(); $('nt-listbox').classList.add('drag'); };
+window.ntFileDragLeave=()=>{ const l=$('nt-listbox'); if(l) l.classList.remove('drag'); };
+window.ntFileDrop=(e)=>{ if(page!=='files') return; e.preventDefault(); ntFileDragLeave(); addFiles([...(e.dataTransfer&&e.dataTransfer.files||[])]); };
+async function addFiles(files){
+  const ok=files.filter(f=>/^image\//.test(f.type||'')||/pdf/i.test(f.type||'')||/\.pdf$/i.test(f.name||''));
+  if(ok.length<files.length) ntToast('Only photos and PDFs can be added here.','err');
+  const st=$('nt-fstat'); let done=0, lastId=null;
+  for(const f of ok){
+    if(f.size>FILE_MAX){ ntToast(f.name+' is over 25 MB.','err'); continue; }
+    if(st) st.innerHTML=`<i class="ti ti-loader-2 nt-spin"></i> Uploading ${done+1} of ${ok.length}…`;
+    try{
+      const type=f.type||(/\.pdf$/i.test(f.name||'')?'application/pdf':'');
+      const up=await window.ntUploadFile(f, NT_UID, type);
+      const id=newId('file');
+      await dbUpdate('notes/'+NT_UID+'/'+id,{ id, kind:'file', name:f.name||'file', url:up.url, path:up.path, type, size:f.size||0, createdAt:Date.now(), by:(NT_USER&&NT_USER.email)||'' });
+      done++; lastId=id;
+    }catch(e){ ntToast(f.name+' did not upload: '+((e&&e.message)||e),'err'); }
+  }
+  if(st) st.innerHTML='';
+  if(done){ ntToast(done+' file'+(done===1?'':'s')+' added.','ok'); if(!isPhone() && lastId && NOTES[lastId]) ntFileOpen(lastId); }
+}
+
 /* ---------- autosave ---------- */
 let _asTimer=null, _asDirty=false, _asDeleted=false, _asChain=Promise.resolve();
 window.ntQueueSave=()=>{
@@ -822,7 +997,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') ntAa(false); });
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { getDatabase, ref, set, update, remove, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
-import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
+import { getStorage, ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 const firebaseConfig = {
   apiKey: "AIzaSyBA2_PQBpNIwdBAzg-EPG-OAyqTtJAFOeg",
@@ -850,6 +1025,16 @@ window.ntUpload = async (file, uid, sub)=>{
   await task;
   return await getDownloadURL(task.snapshot.ref);
 };
+
+// Files page: keeps the storage path so a delete can remove the file too
+window.ntUploadFile = async (file, uid, type)=>{
+  const safe=(file.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
+  const path='notes/'+uid+'/files/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
+  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:type||file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
+  await task;
+  return { url: await getDownloadURL(task.snapshot.ref), path };
+};
+window.ntDeleteFile = (path)=> deleteObject(sRef(storage,path));
 
 onAuthStateChanged(auth, (user)=>{
   const ov=document.getElementById('nt-login');

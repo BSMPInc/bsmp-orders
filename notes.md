@@ -45,7 +45,24 @@ matching security rules, not from roles.
 - **Daily Log entries** (`kind:'log'`) still live under the same path; the page was
   removed 2026-10-06 and the list filters them out. Data untouched (git history has the UI:
   commits d71dfb7…3bd2e90).
-- **Storage:** photo uploads go under `notes/<uid>/photos/...` (`ntUpload`).
+- **Files page** (2026-10-13): photos + PDFs kept to share/download. Each is a record
+  under the same path with `kind:'file'`: `{id, kind:'file', name, url, path, type, size,
+  createdAt, by}`; `noteList()` skips anything with a `kind`. Share = Web Share API with
+  the file (blob fetched when the file opens so the share fires inside the tap; needs the
+  Storage CORS that already allows github.io), falls back to sharing / copying the link.
+  Delete removes the record, then the Storage object (`ntDeleteFile`).
+- **Storage:** photo uploads go under `notes/<uid>/photos/...` (`ntUpload`); Files page
+  uploads go under `notes/<uid>/files/...` (`ntUploadFile`, returns `{url,path}`). The
+  `notes/{uid}/**` rule allows images only, so PDFs need the extra block:
+  ```
+  match /notes/{uid}/files/{allPaths=**} {
+    allow read: if request.auth != null && request.auth.uid == uid;
+    allow create, update: if request.auth != null && request.auth.uid == uid
+                          && request.resource.size < 25 * 1024 * 1024
+                          && request.resource.contentType.matches('image/.*|application/pdf');
+    allow delete: if request.auth != null && request.auth.uid == uid;
+  }
+  ```
 - No reads of `orders` / `customers` any more. No localStorage keys, no AI.
 
 > ⚠️ **Security rules (server-side, Firebase console) are what make notes private.**
