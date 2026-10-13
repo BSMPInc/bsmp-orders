@@ -4921,7 +4921,11 @@ window.qcCoverSheetPrint=()=>{
   const infoCol=(label,val)=>`<div style="flex:1;min-width:90px"><div style="font-size:10px;font-weight:700;color:#222;letter-spacing:.3px">${label}</div><div style="font-size:12px;color:#333;margin-top:2px">${val||'—'}</div></div>`;
   const w=window.open('','_blank','width=850,height=1100');
   if(!w){ alert(t('Please allow pop-ups to open the printable order sheet.')); return; }
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc((customer?customer+' - ':'')+(po?'PO '+po+' - ':'')+'Material Certifications')}</title>
+  // The title becomes the Save-as-PDF file name, so it carries the material too.
+  // Characters Windows won't take in a file name (304/304L) become dashes.
+  const mats=[...new Set(certs.map(c=>[c.material,c.size].filter(Boolean).join(' ').trim()).filter(Boolean))];
+  const matDesc=(mats.length>3?mats.slice(0,3).join(', ')+' +'+(mats.length-3)+' more':mats.join(', ')).replace(/[\\/:*?"<>|]+/g,'-');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc((customer?customer+' - ':'')+(po?'PO '+po+' - ':'')+(matDesc?matDesc+' - ':'')+'Material Certifications')}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{background:#e5e7eb}
