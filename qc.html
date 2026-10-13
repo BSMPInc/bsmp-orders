@@ -667,7 +667,7 @@ const I18N = {
     'Enter a key first — or use Clear key to remove the saved one.':'Primero escribe una clave — o usa Borrar clave para quitar la guardada.',
     'API key saved in this browser.':'Clave API guardada en este navegador.','API key cleared.':'Clave API borrada.',
     // Cert linked-order editing
-    'Link orders':'Vincular órdenes','Edit linked orders':'Editar órdenes vinculadas','Save links':'Guardar vínculos','Links saved.':'Vínculos guardados.',
+    'Link orders':'Vincular órdenes','Edit cert details':'Editar datos del certificado','Files, linked orders and the invoice stay as they are. Clear a box to remove it.':'Los archivos, órdenes vinculadas y la factura no cambian. Borre un campo para quitarlo.','Edit linked orders':'Editar órdenes vinculadas','Save links':'Guardar vínculos','Links saved.':'Vínculos guardados.',
     'Cert not found — it may have been deleted.':'Certificado no encontrado — puede haber sido eliminado.',
     // hand-write FAI sheet
     'Print blank FAI sheet':'Imprimir hoja FAI en blanco',
@@ -4528,6 +4528,7 @@ function viewCerts(){
   if(editId==='__new_cert__') return certForm();
   if(editId==='__cert_review__') return certReviewForm();
   if(editId && String(editId).indexOf('__cert_links__')===0) return certLinksForm(String(editId).slice('__cert_links__'.length));
+  if(editId && String(editId).indexOf('__cert_edit__')===0) return certDetailsForm(String(editId).slice('__cert_edit__'.length));
   const heatCount={};
   list.forEach(c=>{ const h=(c.heatLot||'').trim().toLowerCase(); if(h) heatCount[h]=(heatCount[h]||0)+1; });
   const rows=list.map(c=>{
@@ -4554,6 +4555,7 @@ function viewCerts(){
     <td>${invCell}</td>
     <td>${nFiles?`<button class="icon-btn" onclick="qcViewCert('${c.id}')" title="${t('View cert')}"><i class="ti ti-eye"></i></button>${nFiles>1?` <span class="badge neutral" title="${t('Files')}">${nFiles}</span>`:''}`:`<button class="icon-btn" onclick="qcAttachCertFile('${c.id}')" title="${t('Attach cert file')}"><i class="ti ti-paperclip"></i></button>`}
         ${c.mailKey?`<a class="icon-btn mgr-only" style="text-decoration:none" title="${t('Open the email this cert came from')}" href="mail.html?thread=${encodeURIComponent(c.mailKey)}"><i class="ti ti-mail"></i></a>`:''}
+        <span class="icon-btn mgr-only" title="${t('Edit cert details')}" onclick="window.qcEditCert('${c.id}')"><i class="ti ti-pencil"></i></span>
         <span class="icon-btn mgr-only" title="${t('Link orders')}" onclick="window.qcEditCertLinks('${c.id}')"><i class="ti ti-link"></i></span>
         <span class="icon-btn mgr-only" title="${t('Delete')}" onclick="window.qcDelCert('${c.id}')"><i class="ti ti-trash"></i></span></td>
   </tr>`;}).join('');
@@ -4593,6 +4595,39 @@ window.qcAttachCertFile=(id)=>{
 };
 /* edit the linked orders on an already-saved cert (manager only) — reuses the
    add-cert chip/search widgets, which read _certLinks and the cert-* element ids */
+// Edit the typed details of a saved cert (files, links and invoice are untouched)
+const CERT_EDIT_FIELDS=[['material','Material / grade'],['spec','Specification'],['heatLot','Heat / lot #'],['supplier','Supplier'],['mill','Mill'],
+  ['certNo','Cert #'],['otherCertNos','Other cert / lot #s'],['certDate','Cert date','date'],['size','Size / thickness'],['qty','Qty'],['po','PO #'],['country','Country of origin']];
+window.qcEditCert=(id)=>{
+  if(!isMgr()) return;
+  if(!CERTS[id]) return;
+  editId='__cert_edit__'+id; render();
+};
+function certDetailsForm(id){
+  const c=CERTS[id];
+  const back=`<div class="toolbar" style="margin-bottom:10px"><button class="btn" onclick="editId=null;render()"><i class="ti ti-arrow-left"></i> ${t('Saved certs')}</button></div>`;
+  if(!c) return back+`<div class="card"><div class="empty">${t('Cert not found — it may have been deleted.')}</div></div>`;
+  return back+`<div class="page-head"><h2>${t('Edit cert details')}</h2><p>${t('Files, linked orders and the invoice stay as they are. Clear a box to remove it.')}</p></div>
+  <div class="card" style="max-width:680px">
+    <div class="grid2">${CERT_EDIT_FIELDS.map(([k,label,type])=>`<div class="field"><label class="fl">${t(label)}</label><input class="in" id="ce-${k}"${type?(' type="'+type+'"'):''} value="${esc(c[k]||'')}"></div>`).join('')}</div>
+    <div class="field"><label class="fl" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="ce-itar" style="width:auto;min-height:0"${c.itar?' checked':''}> ${t('Restricted / ITAR')}</label></div>
+    <div class="toolbar" style="margin-top:6px">
+      <button class="btn primary" onclick="window.qcSaveCertEdit('${esc(id)}')"><i class="ti ti-device-floppy"></i> ${t('Save cert')}</button>
+      <button class="btn" onclick="editId=null;render()">${t('Cancel')}</button>
+    </div>
+  </div>`;
+}
+window.qcSaveCertEdit=async (id)=>{
+  if(!isMgr() || !CERTS[id]) return;
+  const upd={ itar:gc('ce-itar') };
+  CERT_EDIT_FIELDS.forEach(([k])=>{ upd[k]=gv('ce-'+k); });
+  try{
+    await dbUpdate('qc/certs/'+id, upd);
+    Object.assign(CERTS[id], upd);
+    editId=null; render();
+    qcToast(t('Cert saved.'),'ok');
+  }catch(e){ console.error('cert edit failed', e); }
+};
 window.qcEditCertLinks=(id)=>{
   if(!isMgr()) return;
   const c=CERTS[id]; if(!c) return;
