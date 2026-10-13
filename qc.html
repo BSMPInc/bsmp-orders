@@ -560,7 +560,7 @@ const I18N = {
     'Open':'Abierta','Dispositioned':'Con disposición','Closed':'Cerrada',
     // certs
     'Mill & material certifications, linkable to the orders that used them.':'Certificados de molino y material, vinculables a las órdenes que los usaron.',
-    'Add cert':'Agregar certificado','Heat / Lot':'Colada / lote','Supplier':'Proveedor','Cert #':'N.º de cert.','Linked orders':'Órdenes vinculadas',
+    'Add cert':'Agregar certificado','Heat / Lot':'Colada / lote','Supplier':'Proveedor','Cert #':'N.º de cert.','Other cert / lot #s':'Otros N.º de cert. / lote','Linked orders':'Órdenes vinculadas',
     'No certs yet. Press':'Aún no hay certificados. Pulsa','and attach a mill certificate.':'y adjunta un certificado de molino.',
     'Add material cert':'Agregar certificado de material','Capture the cert details and link it to the orders it covers.':'Captura los datos del certificado y vincúlalo a las órdenes que cubre.',
     'Material / grade':'Material / grado','Specification':'Especificación','Heat / lot #':'N.º de colada / lote','Cert date':'Fecha de cert.',
@@ -1408,7 +1408,7 @@ function qcIngestCert(files){
   qcRenderStrip('cert');
   analyzeCertPacket();
 }
-const CERT_PROMPT='You are reading a received material package for a sheet metal shop. It may contain ONE or SEVERAL distinct material certifications / mill test reports (different heats or lots). Respond with ONLY valid JSON, no markdown or extra text:\n{"certs":[{"material":null,"spec":null,"heat_lot":null,"supplier":null,"mill":null,"cert_no":null,"cert_date":null,"size_thickness":null,"qty":null,"po_number":null,"country_of_origin":null,"itar":false,"doc":1,"pages":null}]}\nCreate one array element per DISTINCT certificate (distinct heat/lot, or distinct material plus cert number). If the package is a single certificate, return exactly one element. doc=the 1-based Document number (as labeled below) this certificate appears in. pages=for a multi-page PDF document, the 1-based page numbers within that document that make up THIS certificate (e.g. [1,2]); use null when the document is a single page or a single image. Field rules: material=alloy/grade/temper e.g. "6061-T6","304/304L SS","A36". spec=governing specification(s) e.g. "AMS 4027","ASTM B209","ASTM A240". heat_lot=heat and/or lot exactly as printed. supplier=distributor/vendor who shipped it. mill=producing mill if different. cert_no=certificate/document number. cert_date=YYYY-MM-DD. size_thickness=size/gauge/thickness. qty=quantity or weight. po_number=purchase order referenced. country_of_origin=melt/manufacture country if stated. itar=true only if explicitly export-controlled.';
+const CERT_PROMPT='You are reading a received material package for a sheet metal shop. It may contain ONE or SEVERAL distinct material certifications / mill test reports (different heats or lots). Respond with ONLY valid JSON, no markdown or extra text:\n{"certs":[{"material":null,"spec":null,"heat_lot":null,"supplier":null,"mill":null,"cert_no":null,"other_cert_nos":null,"cert_date":null,"size_thickness":null,"qty":null,"po_number":null,"country_of_origin":null,"itar":false,"doc":1,"pages":null}]}\nCreate one array element per DISTINCT certificate (distinct heat/lot, or distinct material plus cert number). If the package is a single certificate, return exactly one element. doc=the 1-based Document number (as labeled below) this certificate appears in. pages=for a multi-page PDF document, the 1-based page numbers within that document that make up THIS certificate (e.g. [1,2]); use null when the document is a single page or a single image. Field rules: material=alloy/grade/temper e.g. "6061-T6","304/304L SS","A36". spec=governing specification(s) e.g. "AMS 4027","ASTM B209","ASTM A240". heat_lot=heat and/or lot exactly as printed. supplier=distributor/vendor who shipped it. mill=producing mill if different. cert_no=ONE main certificate/document number only (the one identifying this certificate, usually in the header as Cert No./Certificate No./Report No./MTR No.; if several are listed and none stands out, the first one) - never join several numbers. other_cert_nos=any additional cert/lot/coil/document numbers listed on this same certificate, comma-separated, or null. cert_date=YYYY-MM-DD. size_thickness=size/gauge/thickness. qty=quantity or weight. po_number=purchase order referenced. country_of_origin=melt/manufacture country if stated. itar=true only if explicitly export-controlled.';
 async function callAICerts(files){
   const content=[];
   for(let i=0;i<files.length;i++){
@@ -1440,19 +1440,34 @@ async function callAICerts(files){
 function fillCertForm(d){
   const setV=(id,v)=>{ const el=$(id); if(el && v!=null && v!=='') el.value=String(v); };
   setV('ct-material', d.material); setV('ct-spec', d.spec); setV('ct-heat', d.heat_lot);
-  setV('ct-supplier', d.supplier); setV('ct-mill', d.mill); setV('ct-certno', d.cert_no);
+  setV('ct-supplier', d.supplier); setV('ct-mill', d.mill); setV('ct-certno', d.cert_no); setV('ct-othercerts', d.other_cert_nos);
   setV('ct-size', d.size_thickness); setV('ct-qty', d.qty); setV('ct-po', d.po_number);
   setV('ct-country', d.country_of_origin);
   if(d.cert_date){ const el=$('ct-date'); if(el){ const m=String(d.cert_date).match(/\d{4}-\d{2}-\d{2}/); if(m) el.value=m[0]; } }
   const itarEl=$('ct-itar'); if(itarEl && d.itar===true) itarEl.checked=true;
   if(d.po_number) qcAutoLinkByPO(String(d.po_number));
 }
+// Cert # holds ONE main number; extra cert/lot numbers go to other_cert_nos.
+// Splits on , ; and on / only when every piece looks alike (LC4271/LC4279) so a
+// single number that contains a slash stays whole.
+function splitCertNos(main,other){
+  const raw=String(main||'').trim(), extra=String(other||'').trim();
+  let parts=raw.split(/\s*[,;]\s*/).filter(Boolean);
+  if(parts.length===1){
+    const sl=raw.split(/\s*\/\s*/).filter(Boolean);
+    const shape=x=>x.replace(/[0-9]/g,'9');
+    if(sl.length>1 && sl.every(x=>x.length>=4 && /\d/.test(x) && shape(x)===shape(sl[0]))) parts=sl;
+  }
+  const rest=parts.slice(1).concat(extra?[extra]:[]);
+  return { main:parts[0]||'', other:rest.join(', ') };
+}
 function normalizeDetected(c){
   const norm=s=>String(s||'').replace(/[^a-z0-9]/gi,'').toLowerCase();
   const linked=[];
   if(c.po_number){ const tp=norm(c.po_number); if(tp) vals(ORDERS).forEach(o=>{ if(norm(o.po)===tp) linked.push(o.id); }); }
+  const cn=splitCertNos(c.cert_no,c.other_cert_nos);
   return { material:c.material||'', spec:c.spec||'', heat_lot:c.heat_lot||'', supplier:c.supplier||'', mill:c.mill||'',
-    cert_no:c.cert_no||'', cert_date:(String(c.cert_date||'').match(/\d{4}-\d{2}-\d{2}/)||[''])[0], size_thickness:c.size_thickness||'',
+    cert_no:cn.main, other_cert_nos:cn.other, cert_date:(String(c.cert_date||'').match(/\d{4}-\d{2}-\d{2}/)||[''])[0], size_thickness:c.size_thickness||'',
     qty:c.qty!=null?String(c.qty):'', po_number:c.po_number||'', country_of_origin:c.country_of_origin||'', itar:c.itar===true,
     doc:Number(c.doc)||1, pages:Array.isArray(c.pages)?c.pages.map(n=>+n).filter(n=>Number.isFinite(n)&&n>0):null, _linked:linked };
 }
@@ -1465,6 +1480,7 @@ async function analyzeCertPacket(){
     const certs=await callAICerts(files);
     if(certs.length<=1){
       const d=certs[0]||{};
+      const cn=splitCertNos(d.cert_no,d.other_cert_nos); d.cert_no=cn.main; d.other_cert_nos=cn.other;
       fillCertForm(d);
       const filled=['material','spec','heat_lot','supplier','cert_no'].filter(k=>d[k]!=null&&d[k]!=='').length;
       setAIStatus('cert-ai','ok', filled?t('AI filled the fields below — check them before saving.'):t('AI could not read the cert. Fill the fields by hand.'));
@@ -4525,7 +4541,7 @@ function viewCerts(){
     const invCell=(inv.no||inv.amount||(inv.file&&inv.file.url))
       ? `${inv.no?('<b>'+esc(inv.no)+'</b>'):''}${inv.amount?('<div class="muted" style="font-size:12px">$'+esc(inv.amount)+'</div>'):''}${inv.file&&inv.file.url?` <button class="icon-btn" onclick="qcViewCert('${c.id}',${nFiles})" title="${t('View invoice')}"><i class="ti ti-file-dollar"></i></button>`:''}`
       : '<span class="muted">—</span>';
-    const sstr=[c.material,c.spec,c.size,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
+    const sstr=[c.material,c.spec,c.size,c.heatLot,c.supplier,c.mill,c.certNo,c.otherCertNos,c.po,inv.no,inv.vendor].concat(linked).filter(Boolean).join(' ').toLowerCase();
     const hasFile=nFiles>0||!!(inv.file&&inv.file.url);
     const matCell=hasFile?`<b class="cert-open" onclick="qcViewCert('${c.id}')" title="${t('View cert')}">${esc(c.material||'—')}</b>`:`<b>${esc(c.material||'—')}</b>`;
     return `<tr id="certrow-${esc(c.id)}" data-s="${esc(sstr)}">
@@ -4623,11 +4639,11 @@ window.qcCoverSheetOpen=()=>{
   const s=(CERT_FILTER||'').toLowerCase();
   const rows=list.map(c=>{
     const label=[c.material,c.heatLot?(t('Heat / Lot')+' '+c.heatLot):'',c.certNo?(t('Cert #')+' '+c.certNo):'',c.supplier].filter(Boolean).join(' · ');
-    const match=!s||[c.material,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po].filter(Boolean).join(' ').toLowerCase().indexOf(s)>=0;
+    const match=!s||[c.material,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.otherCertNos,c.po].filter(Boolean).join(' ').toLowerCase().indexOf(s)>=0;
     // search text: the cert fields plus its linked orders (job / part / customer) and invoice #
     const os=(c.linkedOrders||[]).map(oid=>ORDERS[oid]).filter(Boolean);
     const inv=c.invoice||{};
-    const hay=[c.material,c.size,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.po,inv.no,inv.vendor,...os.flatMap(o=>[o.job,o.part,o.customer,o.po])].filter(Boolean).join(' ').toLowerCase();
+    const hay=[c.material,c.size,c.spec,c.heatLot,c.supplier,c.mill,c.certNo,c.otherCertNos,c.po,inv.no,inv.vendor,...os.flatMap(o=>[o.job,o.part,o.customer,o.po])].filter(Boolean).join(' ').toLowerCase();
     const hasInv=!!(inv.file&&inv.file.url);
     return `<label class="cs-row" data-hay="${esc(hay)}" style="display:flex;gap:9px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer"><input type="checkbox" class="cs-pick" value="${esc(c.id)}" ${(s&&match)?'checked':''} style="width:auto;min-height:0;flex:none"> <span style="font-size:13px;flex:1;min-width:0">${esc(label||c.id)}</span>${hasInv?`<span class="muted" title="${esc(t('Invoice'))}" style="font-size:11.5px;flex:none;white-space:nowrap"><i class="ti ti-file-dollar"></i> ${esc(t('Invoice'))}</span>`:''}</label>`;
   }).join('');
@@ -5062,7 +5078,7 @@ window.qcOrderSheet=async (certId)=>{
     : `<p class="none">${t('No linked orders on this cert.')}</p>`;
   const cf=[
     [t('Material / grade'), c.material],[t('Specification'), c.spec],[t('Heat / Lot'), c.heatLot],
-    [t('Cert #'), c.certNo],[t('Supplier'), c.supplier],[t('Mill'), c.mill],
+    [t('Cert #'), c.certNo],[t('Other cert / lot #s'), c.otherCertNos],[t('Supplier'), c.supplier],[t('Mill'), c.mill],
     [t('Cert date'), fmtDate(c.certDate)],[t('Size / thickness'), c.size],[t('Country of origin'), c.country]
   ].filter(r=>r[1]!=null && String(r[1]).trim()!=='' && r[1]!=='—');
   const certInfo=cf.map(r=>`<div class="ci"><span class="cl">${esc(r[0])}</span><span class="cv">${esc(String(r[1]))}</span></div>`).join('')
@@ -5159,6 +5175,7 @@ function certForm(){
       <div class="field"><label class="fl">${t('Supplier')}</label><input class="in" id="ct-supplier"></div>
       <div class="field"><label class="fl">${t('Mill')}</label><input class="in" id="ct-mill"></div>
       <div class="field"><label class="fl">${t('Cert #')}</label><input class="in" id="ct-certno"></div>
+      <div class="field"><label class="fl">${t('Other cert / lot #s')}</label><input class="in" id="ct-othercerts"></div>
       <div class="field"><label class="fl">${t('Cert date')}</label><input class="in" id="ct-date" type="date"></div>
       <div class="field"><label class="fl">${t('Size / thickness')}</label><input class="in" id="ct-size" placeholder='18ga 48&quot;x120&quot;'></div>
       <div class="field"><label class="fl">${t('Qty')}</label><input class="in" id="ct-qty"></div>
@@ -5204,7 +5221,7 @@ window.qcSaveCert=async ()=>{
     const invoice={ no:gv('inv-no'), date:gv('inv-date'), amount:gv('inv-amount'), vendor:gv('inv-vendor'), file:invFiles[0]||null };
     const hasInv=invoice.no||invoice.date||invoice.amount||invoice.vendor||invoice.file;
     const rec={ id, createdAt:Date.now(), addedBy:(QC_USER&&QC_USER.email)||'',
-      material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), mill:gv('ct-mill'), certNo:gv('ct-certno'),
+      material, spec:gv('ct-spec'), heatLot:gv('ct-heat'), supplier:gv('ct-supplier'), mill:gv('ct-mill'), certNo:gv('ct-certno'), otherCertNos:gv('ct-othercerts'),
       certDate:gv('ct-date'), size:gv('ct-size'), qty:gv('ct-qty'), po:gv('ct-po'), country:gv('ct-country'), itar:gc('ct-itar'),
       files, file:files[0]||null, linkedOrders:linked, invoice: hasInv?invoice:null };
     await dbSet('qc/certs/'+id, rec);
@@ -5252,7 +5269,7 @@ function certReviewForm(){
       <div class="grid2">
         ${F(i,'material',t('Material / grade'))}${F(i,'spec',t('Specification'))}
         ${F(i,'heat_lot',t('Heat / lot #'))}${F(i,'supplier',t('Supplier'))}
-        ${F(i,'mill',t('Mill'))}${F(i,'cert_no',t('Cert #'))}
+        ${F(i,'mill',t('Mill'))}${F(i,'cert_no',t('Cert #'))}${F(i,'other_cert_nos',t('Other cert / lot #s'))}
         ${F(i,'cert_date',t('Cert date'),'date')}${F(i,'size_thickness',t('Size / thickness'))}
         ${F(i,'qty',t('Qty'))}${F(i,'po_number',t('PO #'))}
         ${F(i,'country_of_origin',t('Country of origin'))}
@@ -5306,7 +5323,7 @@ window.qcSaveReviewedCerts=async ()=>{
       }catch(ue){ console.warn('cert file upload failed',ue); upErrs.push((c.heat_lot||c.material||'cert')+((ue&&ue.message)?(' — '+ue.message):'')); }
       const id=newId('cert');
       await dbSet('qc/certs/'+id, { id, createdAt:Date.now()+n, addedBy:(QC_USER&&QC_USER.email)||'',
-        material:c.material||'', spec:c.spec||'', heatLot:c.heat_lot||'', supplier:c.supplier||'', mill:c.mill||'', certNo:c.cert_no||'',
+        material:c.material||'', spec:c.spec||'', heatLot:c.heat_lot||'', supplier:c.supplier||'', mill:c.mill||'', certNo:c.cert_no||'', otherCertNos:c.other_cert_nos||'',
         certDate:c.cert_date||'', size:c.size_thickness||'', qty:c.qty||'', po:c.po_number||'', country:c.country_of_origin||'', itar:!!c.itar,
         files:fileObj?[fileObj]:[], file:fileObj, linkedOrders:c._linked||[], invoice: hasInv?invoice:null });
       n++; setSt(t('Saved')+' '+n+'/'+P.detected.length);
