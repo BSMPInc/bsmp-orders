@@ -57,8 +57,10 @@ def _open(mod, sw, path):
     if d: return mod.IModelDoc2(d._oleobj_), False
     ext = os.path.splitext(path)[1].lower()
     if ext == '.sldprt':
-        e = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0); w = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
-        d = sw.OpenDoc6(path, 1, 1 | 2, '', e, w)          # part, silent + read-only
+        # Errors/Warnings are in/out ints: pywin32 wants plain 0s and hands back (doc, errors, warnings).
+        # (Passing VARIANT byrefs here throws "int() argument ... not 'VARIANT'" — first live run, 2026-10-14.)
+        r = sw.OpenDoc6(path, 1, 1 | 2, '', 0, 0)          # part, silent + read-only
+        d = r[0] if isinstance(r, tuple) else r
     else:                                                  # STEP / IGES / Parasolid / ...
         r = sw.LoadFile4(path, '', sw.GetImportFileData(path), 0)
         d = r[0] if isinstance(r, tuple) else r
