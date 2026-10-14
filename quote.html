@@ -9778,7 +9778,7 @@ function buildCombinedQuote(){
   const firstCust = picked[0].customer && picked[0].customer !== '—' ? picked[0].customer : '';
 
   // Build a default line item per selected quote
-  const items = picked.map(q => {
+  const items = picked.flatMap(q => {
     const descLines = [];
     const title = [q.partNum && q.partNum!=='—'?q.partNum:'', (q.revision && q.revision!=='—')?('Rev '+q.revision):''].filter(Boolean).join(', ');
     if(title) descLines.push(title);
@@ -9789,7 +9789,13 @@ function buildCombinedQuote(){
     }
     const rate = q.pricePerPart || 0;
     const qty = q.qty || 0;
-    return { srcId:q.id, desc: descLines.map(titleCaseLine).join('\n'), qty, rate, amt: qty*rate };
+    const line = { srcId:q.id, desc: descLines.map(titleCaseLine).join('\n'), qty, rate, amt: qty*rate };
+    // A quote's expedite fee is a job-level charge (not in price/part), so it prints as its own line
+    // right under its part, same as the single-quote print. Combine used to drop it (ResMed, 2026-10-14).
+    const fee = parseFloat(q.expediteFee) || 0;
+    if(!(fee > 0)) return [line];
+    const pn = q.partNum && q.partNum!=='—' ? q.partNum : 'Part';
+    return [line, { srcId:q.id, desc: 'Expedite Fee — Expedited Lead Time (' + pn + ')', qty: 1, rate: fee, amt: fee }];
   });
 
   // The minimum is per ORDER: on unless every picked quote was set to waive it.
