@@ -2499,8 +2499,8 @@ function mcResultHtml(res, where){
   const rot=(g.rotation||[]).map(r=>'['+r.join(' ')+']').join(' ');
   const sl=g.slivers||{}, lim=g.limits||{};
   return `${head}
-    <div class="mc-pics">${pic('iso')}${pic('top')}${pic('front')}</div>
-    <div class="hint" style="margin:2px 0 8px"><span style="color:var(--red)">■</span> ${t('only in your model')} · <span style="color:var(--blue)">■</span> ${t('only in the customer’s model')} · ${t('click a picture to enlarge')}</div>
+    <div class="mc-pics">${pic('iso')}${pic('top')}${pic('front')}${pic('diffs')}</div>
+    <div class="hint" style="margin:2px 0 8px"><span style="color:var(--red)">■</span> ${t('only in your model')} · <span style="color:var(--blue)">■</span> ${t('only in the customer’s model')} · ${t('the last picture shows the differences alone, so ones hidden inside the part show too')} · ${t('click a picture to enlarge')}</div>
     ${sugN?`<button class="btn sm" style="margin-bottom:8px" onclick="mcAcceptSuggested('${esc(where)}')"><i class="ti ti-checks"></i> ${t('Confirm the')} ${sugN} ${t(sugN===1?'suggested label':'suggested labels')}</button>`:''}
     ${rows.length?`<div class="dc-tblwrap"><table class="tbl dc-tbl"><thead><tr><th>${t('Difference')}</th><th>${t('Size (red = yours, blue = theirs)')}</th><th>${t('Sign-off')}</th></tr></thead><tbody>${tr}</tbody></table></div>`
       :`<div class="empty">${t('No differences bigger than the noise limit — the models match.')}</div>`}

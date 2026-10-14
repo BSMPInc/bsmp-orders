@@ -258,7 +258,9 @@ def _pictures(mod, sw, bo, keep):
     pm = mod.IModelDoc2(nd._oleobj_); title = pm.GetTitle(); pics = {}
     rgb = lambda r, g, b: r | (g << 8) | (b << 16)
     try:
-        mod.IBody2(bo.Copy()._oleobj_).Display3(pm, rgb(190, 190, 190), 1)
+        # keep the copy referenced until the pictures are saved: a temp body Python lets go of
+        # vanishes from the display (the 14651 nest pictures came out with only the red pieces)
+        base = mod.IBody2(bo.Copy()._oleobj_); base.Display3(pm, rgb(190, 190, 190), 1)
         for x in keep['ours']: x.Display3(pm, rgb(220, 30, 30), 1)
         for x in keep['theirs']: x.Display3(pm, rgb(20, 90, 230), 1)
         folder = os.path.join(tempfile.gettempdir(), 'bsmp-modelcheck'); os.makedirs(folder, exist_ok=True)
@@ -267,6 +269,14 @@ def _pictures(mod, sw, bo, keep):
             p = os.path.join(folder, 'pic_%s.jpg' % name)
             pm.Extension.SaveAs(p, 0, 1, None, 0, 0)
             with open(p, 'rb') as f: pics[name] = base64.b64encode(f.read()).decode()
+        # the differences on their own: one INSIDE the part (a hole they drilled that we didn't)
+        # is hidden by the grey body in the views above (14651 nest: 4 tapped holes)
+        if keep['ours'] or keep['theirs']:
+            base.Hide(pm)
+            pm.ShowNamedView2('', 7); pm.ViewZoomtofit2(); pm.GraphicsRedraw2()
+            p = os.path.join(folder, 'pic_diffs.jpg')
+            pm.Extension.SaveAs(p, 0, 1, None, 0, 0)
+            with open(p, 'rb') as f: pics['diffs'] = base64.b64encode(f.read()).decode()
     finally:
         sw.CloseDoc(title)
     return pics
