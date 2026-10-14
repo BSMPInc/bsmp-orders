@@ -10,6 +10,9 @@ SolidWorks PC and does the geometry there.
   `python compare.py <ours.sldprt> <theirs.step>` prints the findings as JSON).
 - `Start Model Check helper.bat` — starts the helper in the background (no window). Starting it twice is harmless.
 
+Starts with Windows on the office PC: shortcut `BSMP Model Check helper.lnk` in the user's Startup folder
+(`pythonw.exe helper.py`, no window). Delete that shortcut to stop it auto-starting.
+
 Needs: SolidWorks open, Python with `pywin32`. Log: `%LOCALAPPDATA%\BSMP\ModelCheck.log`.
 
 ## How the compare works
