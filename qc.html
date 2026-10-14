@@ -251,6 +251,16 @@ body.meas-open .fair-fs{padding-right:var(--measW,330px)}
 @media (max-width:900px){ .fair-top{grid-template-columns:1fr} .fdv{height:min(52vh,460px)} }
 
 .thumbs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+/* ---- model check: customer 3D model vs ours (SolidWorks helper) ---- */
+.mc-pics{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:8px 0 4px}
+.mc-pic{display:block;border:1px solid var(--border);background:#fff}
+.mc-pic img{display:block;width:100%;height:auto}
+.mc-sug{font-size:11.5px;color:var(--text2);background:var(--amber-soft);padding:4px 7px;margin-bottom:5px}
+.dc-whybtn.mc-sugbtn{border-color:var(--amber);color:var(--text);background:var(--amber-soft)}
+.mc-warn{display:flex;gap:9px;align-items:flex-start;background:var(--amber-soft);border:1px solid var(--amber);padding:9px 11px;font-size:12.5px;line-height:1.5}
+.mc-warn>i{font-size:18px;color:var(--amber)}
+.mc-work{margin:10px 0 6px;font-size:12px}
+.mc-work summary{cursor:pointer;font-weight:700;color:var(--text2)}
 /* ---- drawing check: customer drawing vs ours ---- */
 .dc-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 @media(max-width:760px){.dc-pair{grid-template-columns:1fr}}
@@ -406,6 +416,7 @@ body.role-operator .mgr-only{display:none!important}
       <div class="nav-item" id="nav-fairs" onclick="showPage('fairs')"><i class="ti ti-file-certificate"></i><span class="nav-label" data-t="First Articles">First Articles</span></div>
       <div class="nav-item" id="nav-ncr" onclick="showPage('ncr')"><i class="ti ti-alert-triangle"></i><span class="nav-label" data-t="Nonconformances">Nonconformances</span></div>
       <div class="nav-item mgr-only" id="nav-drawcheck" onclick="showPage('drawcheck')"><i class="ti ti-file-diff"></i><span class="nav-label" data-t="Drawing Check">Drawing Check</span></div>
+      <div class="nav-item mgr-only" id="nav-modelcheck" onclick="showPage('modelcheck')"><i class="ti ti-3d-cube-sphere"></i><span class="nav-label" data-t="Model Check">Model Check</span></div>
       <div class="nav-sec" data-t="Records">Records</div>
       <div class="nav-item" id="nav-drawings" onclick="showPage('drawings')"><i class="ti ti-files"></i><span class="nav-label" data-t="Drawing Library">Drawing Library</span></div>
       <div class="nav-item" id="nav-certs" onclick="showPage('certs')"><i class="ti ti-license"></i><span class="nav-label" data-t="nav:materialcerts">Material Certs</span></div>
@@ -879,12 +890,13 @@ const META={
   coc:['Certificates of Conformance','Signed statement that shipped parts meet the PO, drawing and specs'],
   packages:['Ship Packages','One PDF per shipment — invoice, packing slip, CoCs, first articles and certs'],
   drawcheck:['Drawing Check','Compare your model drawing to the customer’s before you cut'],
+  modelcheck:['Model Check','Compare the customer’s 3D model with yours in SolidWorks'],
   drawings:['Drawing Library','Part drawings & DXF files — operators pull these into checks'],
   settings:['Settings','AI connection for this device'],
   resources:['Resources','Guides, manuals and maintenance schedules']
 };
 window.showPage=(p)=>{
-  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck'||p==='coc'||p==='packages')) p='inspections';
+  if(QC_ROLE==='operator' && (p==='certs'||p==='drawcheck'||p==='modelcheck'||p==='coc'||p==='packages')) p='inspections';
   if(typeof qcBoxConfirmKill==='function') qcBoxConfirmKill();   // don't leave a confirm card floating over another page
   page=p; if(p!=='selfcheck'&&p!=='fair') editId=null;
   if(p==='selfcheck'||p==='start'){
@@ -900,7 +912,7 @@ window.showPage=(p)=>{
   render();
 };
 function setActive(){
-  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',packages:'nav-packages',drawcheck:'nav-drawcheck',drawings:'nav-drawings',settings:'nav-settings',resources:'nav-resources'};
+  const navMap={start:'nav-start',selfcheck:'nav-start',inspections:'nav-inspections',fairs:'nav-fairs',fair:'nav-fairs',ncr:'nav-ncr',certs:'nav-certs',coc:'nav-coc',packages:'nav-packages',drawcheck:'nav-drawcheck',modelcheck:'nav-modelcheck',drawings:'nav-drawings',settings:'nav-settings',resources:'nav-resources'};
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(navMap[page]&&$(navMap[page])) $(navMap[page]).classList.add('active');
   const dockMap={start:'dock-start',selfcheck:'dock-start',inspections:'dock-inspections',fairs:'dock-fairs',fair:'dock-fairs',ncr:'dock-ncr',certs:'dock-certs',drawcheck:'dock-drawcheck',settings:'dock-settings',resources:'dock-resources'};
@@ -926,6 +938,7 @@ function render(){
   else if(page==='coc') c.innerHTML=viewCoc();
   else if(page==='packages') c.innerHTML=viewPackages();
   else if(page==='drawcheck') c.innerHTML=viewDrawCheck();
+  else if(page==='modelcheck') c.innerHTML=viewModelCheck();
   else if(page==='drawings') c.innerHTML=viewDrawings();
   else if(page==='settings') c.innerHTML=viewSettings();
   else if(page==='resources') c.innerHTML=viewResources();
@@ -1160,6 +1173,7 @@ window.qcFillFromOrder=(prefix,oid)=>{
   const set=(suf,v)=>{const el=$(prefix+suf); if(el&&v!=null) el.value=v;};
   set('-customer',o.customer||''); set('-part',o.part||o.partNum||''); set('-po',o.po||''); set('-job',o.job||'');
   if(prefix==='coc' && typeof cocFillFromOrder==='function') cocFillFromOrder(o);
+  if(prefix==='mc') mcSyncFields();
 };
 
 /* ---------- file inputs ---------- */
@@ -2219,7 +2233,7 @@ function viewDrawCheck(){
       </div>`;
   }
   // ---- new check ----
-  const list=vals(DRAWCHECKS).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
+  const list=vals(DRAWCHECKS).filter(r=>r.kind!=='model').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
   const rows=list.map(r=>{
     // the list counts what's still OPEN — signed-off differences aren't outstanding work
     const bad=(r.rows||[]).filter(x=>dcIsDeviation(x)&&!dcSignedOff(x)).length;
@@ -2307,6 +2321,315 @@ window.qcSaveDrawCheck=async ()=>{
     setBtn('<i class="ti ti-device-floppy"></i> '+t('Save check'), false);   // result + fields are still here — try again
   }
 };
+
+/* =================== MODEL CHECK ===================
+   The 3D version of the drawing check: the customer's model (STEP / IGES / SLDPRT)
+   against the SolidWorks model we built to cut from. The browser can't drive
+   SolidWorks, so a small helper on the SolidWorks PC does the geometry
+   (bsmp-orders/tools/modelcheck: helper.py + compare.py, http://127.0.0.1:8767):
+   it lines the customer copy up with ours, subtracts each from the other, and
+   returns every leftover piece — material only in ours (red) or only in theirs
+   (blue) — with its volume, size and where it sits, plus pictures.
+   This page shows that work, pre-labels the obvious pieces (paint masking, turret
+   forms), and every difference is signed off with a reason, same rules as the
+   drawing check. Records live in qc/drawingChecks with kind:'model' (no new rule).
+   Owner-confirmed on Absolute 11207-001, 2026-10-14. =================== */
+const MC_HELPER='http://127.0.0.1:8767';
+let _mc={ f:{order:'',part:'',customer:'',job:'',rev:'',notes:''}, helper:null, pinging:false, parts:[],
+  oursPath:'', oursFile:null, theirsPath:'', theirsFile:null, running:false, started:0, result:null, view:null };
+// why a difference is fine. 'real' = a genuine geometric difference we own (shows in the roll-up)
+const MC_WHY=[
+  {k:'clearance',  l:'My clearance (flatten)', real:true,  hint:'Relief or clearance you added so the part flattens / forms'},
+  {k:'masking',    l:'Paint masking',          real:false, hint:'A masking area the customer modeled for paint — not a cut feature'},
+  {k:'turret',     l:'Turret form',            real:false, hint:'Half shear, extrusion or other form they model and we punch'},
+  {k:'negligible', l:'Negligible',             real:false, hint:'Too small to matter (radius, rounding, modeling noise)'},
+  {k:'confirmed',  l:'Customer confirmed',     real:true,  hint:'A real difference the customer approved'},
+  {k:'other',      l:'Other…',                 real:true,  hint:'Type your own reason'}
+];
+const mcWhyDef=(k)=>MC_WHY.find(w=>w.k===k)||null;
+const mcSigned=(r)=>!!(r&&r.accepted&&r.acceptWhy);
+function mcRecompute(res){
+  const rows=res.rows||[];
+  res.openCount=rows.filter(r=>!mcSigned(r)).length;
+  res.acceptedCount=rows.filter(mcSigned).length;
+  res.realDeviations=rows.filter(r=>mcSigned(r)&&(mcWhyDef(r.acceptWhy)||{}).real).length;
+  res.verdict=res.openCount?'review':(res.acceptedCount?'accepted':'clear');
+  return res;
+}
+// helper findings -> one row per difference; a paired ours/theirs finding at the same spot
+// is ONE row ("shape differs here"), since that is one feature built differently
+function mcRowsFrom(findings){
+  const rows=[], fs=findings||[];
+  fs.forEach((f,i)=>{
+    if(f.side==='theirs' && f.pairedWith!=null) return;           // shown with its partner
+    const p=(f.side==='ours' && f.pair!=null)?fs[f.pair]:null;
+    rows.push({ kind:p?'both':f.side, count:f.count, ours:f.side==='ours'?f:null, theirs:f.side==='theirs'?f:p,
+      suggest:(p?p.suggest:f.suggest)||'', why:(p?p.why:f.why)||'' });
+  });
+  return rows;
+}
+const mcIn=(v,d)=>(+v).toFixed(d==null?3:d);
+function mcPieceTxt(f){
+  if(!f) return '';
+  return f.count+'× '+mcIn(f.vol,4)+' in³ · '+(f.size||[]).map(s=>mcIn(s)).join(' × ')+' in · '+t('avg thickness')+' '+mcIn(f.avgThk,4)+'"';
+}
+function mcWhere(f){
+  const at=(f&&f.at)||[];
+  return at.slice(0,4).map(c=>'('+c.map(v=>mcIn(v,2)).join(', ')+')').join(' ')+(at.length>4?' +'+(at.length-4):'');
+}
+const MC_KIND={
+  both:  {c:'var(--amber)', ic:'ti-arrows-diff', l:'Shape differs here'},
+  ours:  {c:'var(--red)',   ic:'ti-square-plus', l:'Only in your model'},
+  theirs:{c:'var(--blue)',  ic:'ti-square-minus',l:'Only in the customer’s model'}
+};
+function mcResOf(where){ return where==='live' ? _mc.result : DRAWCHECKS[where]; }
+async function mcPersist(where,res,audit){
+  if(where==='live'){ render(); return; }
+  await dbSet('qc/drawingChecks/'+where, Object.assign({}, res, {updatedAt:Date.now()}));   // per-id write
+  if(audit){ try{ await qcLogAudit([Object.assign({drawCheckId:where, partNum:res.partNum||'', field:'modelcheck', verdict:res.verdict||''}, audit)]); }catch(e){ console.error('audit log failed', e); } }
+  render();
+}
+window.mcAccept=async (where,i,why)=>{
+  const res=mcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
+  const w=mcWhyDef(why); if(!w) return;
+  let note='';
+  if(why==='other'){ note=(prompt(t('Why is this difference acceptable?'))||'').trim(); if(!note) return; }
+  r.accepted=true; r.acceptWhy=why; r.acceptNote=note||r.acceptNote||''; r.acceptBy=(QC_USER&&QC_USER.email)||''; r.acceptAt=Date.now();
+  mcRecompute(res);
+  await mcPersist(where,res,{action:'deviation-accepted', note:t((MC_KIND[r.kind]||{}).l||'')+' — '+t(w.l)+(r.acceptNote?(': '+r.acceptNote):'')});
+};
+// one click for every row whose suggestion you agree with — still a reason per row, still your name on it
+window.mcAcceptSuggested=async (where)=>{
+  const res=mcResOf(where); if(!res) return;
+  const todo=(res.rows||[]).filter(r=>!mcSigned(r)&&r.suggest&&mcWhyDef(r.suggest));
+  if(!todo.length) return;
+  todo.forEach(r=>{ r.accepted=true; r.acceptWhy=r.suggest; r.acceptNote=r.acceptNote||''; r.acceptBy=(QC_USER&&QC_USER.email)||''; r.acceptAt=Date.now(); });
+  mcRecompute(res);
+  await mcPersist(where,res,{action:'deviation-accepted', note:todo.length+' '+t('suggested labels confirmed')});
+};
+window.mcReopen=async (where,i)=>{
+  const res=mcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
+  const was=r.acceptWhy;
+  delete r.accepted; delete r.acceptWhy; delete r.acceptNote; delete r.acceptBy; delete r.acceptAt;
+  mcRecompute(res);
+  await mcPersist(where,res,{action:'deviation-reopened', note:was?('was: '+t((mcWhyDef(was)||{}).l||was)):''});
+};
+window.mcAcceptNote=async (where,i,val)=>{
+  const res=mcResOf(where); const r=res&&res.rows&&res.rows[i]; if(!r) return;
+  r.acceptNote=String(val||'').trim();
+  if(where!=='live'){ await dbSet('qc/drawingChecks/'+where+'/rows/'+i+'/acceptNote', r.acceptNote); }
+};
+
+// ---- talking to the helper ----
+async function mcFetch(path,opts,ms){
+  const ctl=new AbortController(); const tm=setTimeout(()=>ctl.abort(), ms||4000);
+  try{ const r=await fetch(MC_HELPER+path, Object.assign({signal:ctl.signal}, opts||{})); return await r.json(); }
+  finally{ clearTimeout(tm); }
+}
+window.mcPing=async ()=>{
+  if(_mc.pinging) return; _mc.pinging=true;
+  try{
+    const s=await mcFetch('/status');
+    _mc.helper={ok:true, solidworks:!!s.solidworks, version:s.version};
+    if(s.solidworks){ const p=await mcFetch('/parts'); _mc.parts=(p&&p.parts)||[]; }
+  }catch(e){ _mc.helper={ok:false}; }
+  finally{ _mc.pinging=false; if(page==='modelcheck') render(); }
+};
+window.mcField=(k,v)=>{ _mc.f[k]=v; };
+window.mcPickOurs=(path)=>{ _mc.oursPath=path; if(path) _mc.oursFile=null; };
+window.mcPickTheirs=(path)=>{ _mc.theirsPath=path; if(path) _mc.theirsFile=null; render(); };
+window.mcFile=(side,input)=>{
+  const f=input.files&&input.files[0]; input.value=''; if(!f) return;
+  if(side==='ours'){ _mc.oursFile=f; _mc.oursPath=''; } else { _mc.theirsFile=f; _mc.theirsPath=''; }
+  render();
+};
+// the order picker fills mc-part/-customer/-job; copy them into the page state so a re-render keeps them
+function mcSyncFields(){ ['part','customer','job','rev','notes'].forEach(k=>{ const el=$('mc-'+k); if(el) _mc.f[k]=el.value; }); const o=$('mc-order'); if(o) _mc.f.order=o.value; }
+window.mcRun=async ()=>{
+  mcSyncFields();
+  if(!_mc.oursPath && !_mc.oursFile){ qcToast(t('Pick your model first.'),'err'); return; }
+  if(!_mc.theirsPath && !_mc.theirsFile){ qcToast(t('Add the customer’s model first.'),'err'); return; }
+  const side=async (path,file)=>path?{path}:{name:file.name, b64:await toBase64(file)};
+  _mc.running=true; _mc.started=Date.now(); _mc.result=null; render();
+  const tick=setInterval(()=>{ const el=$('mc-elapsed'); if(el) el.textContent=Math.round((Date.now()-_mc.started)/1000)+' s'; },1000);
+  try{
+    const body=JSON.stringify({ ours:await side(_mc.oursPath,_mc.oursFile), theirs:await side(_mc.theirsPath,_mc.theirsFile) });
+    const r=await mcFetch('/check',{method:'POST', headers:{'Content-Type':'application/json'}, body}, 15*60*1000);
+    if(!r||!r.ok) throw new Error((r&&r.error)||t('no answer from the helper'));
+    const pictures=r.pictures||{}; delete r.pictures; delete r.ok;
+    _mc.result=mcRecompute({ ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'', geo:r, rows:mcRowsFrom(r.findings), pics:pictures,
+      oursName:_mc.oursPath?_mc.oursPath.split(/[\\/]/).pop():_mc.oursFile.name, oursPath:_mc.oursPath||'',
+      theirsName:_mc.theirsPath?_mc.theirsPath.split(/[\\/]/).pop():_mc.theirsFile.name, theirsPath:_mc.theirsPath||'' });
+  }catch(e){
+    console.error('model check failed', e);
+    qcToast(t('Model check failed:')+' '+((e&&e.name==='AbortError')?t('it took longer than 15 minutes'):((e&&e.message)||e)),'err');
+  }finally{ clearInterval(tick); _mc.running=false; render(); }
+};
+
+function mcResultHtml(res, where){
+  const g=res.geo||{}, o=g.ours||{}, th=g.theirs||{};
+  const rows=res.rows||[];
+  const head=res.verdict==='clear'
+    ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-circle-check"></i> ${t('The models match')}</div>`
+    : res.verdict==='accepted'
+    ? `<div class="dc-verdict" style="color:var(--green)"><i class="ti ti-writing-sign"></i> ${t('Reviewed — every difference signed off')}${res.realDeviations?` <span class="muted" style="font-weight:600">· ${res.realDeviations} ${t(res.realDeviations===1?'real difference accepted':'real differences accepted')}</span>`:''}</div>`
+    : `<div class="dc-verdict" style="color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${t('Review before you cut')} <span class="muted" style="font-weight:600">· ${res.openCount} ${t('open')}</span></div>`;
+  const sugN=rows.filter(r=>!mcSigned(r)&&r.suggest).length;
+  const pic=(k)=>{ const src=where==='live'?(res.pics&&res.pics[k]?'data:image/jpeg;base64,'+res.pics[k]:''):((res.pictures||{})[k]||{}).url;
+    return src?`<a href="${esc(src)}" target="_blank" rel="noopener" class="mc-pic"><img src="${esc(src)}" alt="${esc(k)}"></a>`:''; };
+  const tr=rows.map((r,i)=>{
+    const k=MC_KIND[r.kind]||MC_KIND.both, done=mcSigned(r), w=done?mcWhyDef(r.acceptWhy):null;
+    const f=r.ours||r.theirs;
+    const ui=done
+      ? `<div class="dc-acc"><div class="dc-why"><i class="ti ti-writing-sign"></i> ${esc(t((w&&w.l)||r.acceptWhy))}</div>
+          <input class="dc-accnote" value="${esc(r.acceptNote||'')}" placeholder="${esc(t('Add detail (optional)'))}" onchange="mcAcceptNote('${esc(where)}',${i},this.value)">
+          <div class="dc-accby">${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+fmtWhen(r.acceptAt):''} · <a class="dc-undo" onclick="mcReopen('${esc(where)}',${i})">${t('Reopen')}</a></div></div>`
+      : `<div class="dc-acc">
+          ${r.suggest?`<div class="mc-sug"><i class="ti ti-bulb"></i> ${t('Looks like')} <b>${esc(t((mcWhyDef(r.suggest)||{}).l||r.suggest))}</b>${r.why?' — '+esc(r.why):''}</div>`:''}
+          <div class="dc-asks">${t('Acceptable? Say why:')}</div>
+          <div class="dc-whys">${MC_WHY.map(x=>`<button class="dc-whybtn${x.k===r.suggest?' mc-sugbtn':''}" title="${esc(t(x.hint))}" onclick="mcAccept('${esc(where)}',${i},'${x.k}')">${esc(t(x.l))}</button>`).join('')}</div>
+        </div>`;
+    return `<tr class="dc-row${done?' dc-accepted':''}">
+      <td><span class="dc-st" style="color:${k.c}"><i class="ti ${k.ic}"></i> ${t(k.l)}</span> <b>${r.count}×</b>
+        <div class="dc-math">${t('at')} ${esc(mcWhere(f))}</div></td>
+      <td class="dc-math">${r.ours?`<span style="color:var(--red)">■</span> ${esc(mcPieceTxt(r.ours))}`:''}${r.ours&&r.theirs?'<br>':''}${r.theirs?`<span style="color:var(--blue)">■</span> ${esc(mcPieceTxt(r.theirs))}`:''}</td>
+      <td>${ui}</td></tr>`;
+  }).join('');
+  const sz=(s)=>(s||[]).map(v=>mcIn(v)).join(' × ');
+  const rot=(g.rotation||[]).map(r=>'['+r.join(' ')+']').join(' ');
+  const sl=g.slivers||{}, lim=g.limits||{};
+  return `${head}
+    <div class="mc-pics">${pic('iso')}${pic('top')}${pic('front')}</div>
+    <div class="hint" style="margin:2px 0 8px"><span style="color:var(--red)">■</span> ${t('only in your model')} · <span style="color:var(--blue)">■</span> ${t('only in the customer’s model')} · ${t('click a picture to enlarge')}</div>
+    ${sugN?`<button class="btn sm" style="margin-bottom:8px" onclick="mcAcceptSuggested('${esc(where)}')"><i class="ti ti-checks"></i> ${t('Confirm the')} ${sugN} ${t(sugN===1?'suggested label':'suggested labels')}</button>`:''}
+    ${rows.length?`<div class="dc-tblwrap"><table class="tbl dc-tbl"><thead><tr><th>${t('Difference')}</th><th>${t('Size (red = yours, blue = theirs)')}</th><th>${t('Sign-off')}</th></tr></thead><tbody>${tr}</tbody></table></div>`
+      :`<div class="empty">${t('No differences bigger than the noise limit — the models match.')}</div>`}
+    <details class="mc-work"><summary>${t('Show the work')}</summary>
+      <table class="tbl" style="font-size:12px;margin-top:6px"><thead><tr><th></th><th>${t('Your model')}</th><th>${t('Customer model')}</th></tr></thead><tbody>
+        <tr><td>${t('File')}</td><td>${esc(res.oursName||o.title||'')}</td><td>${esc(res.theirsName||th.title||'')}</td></tr>
+        <tr><td>${t('Size (in)')}</td><td>${sz(o.size)}</td><td>${sz(th.size)}</td></tr>
+        <tr><td>${t('Volume (in³)')}</td><td>${mcIn(o.volume||0,4)}</td><td>${mcIn(th.volume||0,4)}</td></tr>
+        <tr><td>${t('Surface area (in²)')}</td><td>${mcIn(o.area||0,2)}</td><td>${mcIn(th.area||0,2)}</td></tr>
+        <tr><td>${t('Bodies · configuration')}</td><td>${esc((o.bodies||1)+' · '+(o.config||''))}</td><td>${esc((th.bodies||1)+' · '+(th.config||''))}</td></tr>
+        <tr><td>${t('Hole axes found')}</td><td>${g.holesOurs||0}</td><td>${g.holesTheirs||0}</td></tr>
+        <tr><td>${t('Material left after subtracting the other model (in³)')}</td><td>${mcIn((g.diffVol||{}).ours||0,5)}</td><td>${mcIn((g.diffVol||{}).theirs||0,5)}</td></tr>
+        <tr><td>${t('Hairline slivers ignored')}</td><td>${(sl.ours||{}).count||0} · ${mcIn((sl.ours||{}).vol||0,5)} in³</td><td>${(sl.theirs||{}).count||0} · ${mcIn((sl.theirs||{}).vol||0,5)} in³</td></tr>
+      </tbody></table>
+      <div class="dc-math" style="margin-top:6px">${t('Customer model turned by')} ${esc(rot)} ${t('and moved')} (${(g.shift||[]).map(v=>mcIn(v,4)).join(', ')}) in ${t('onto yours; the move is set from the big flat faces')} (${esc(JSON.stringify(g.planeDeltas||[]))}).</div>
+      <div class="dc-math">${t('Ignored as slivers: pieces under')} ${lim.minVol||''} in³ ${t('or thinner than')} ${lim.thinAvg||''}" ${t('on average (2 × volume ÷ area). Suggested masking = a customer-only pad')} ≤ ${lim.maskThk||''}" ${t('thick; suggested turret form = customer material inside one of your holes.')}</div>
+    </details>
+    <div class="hint">${t('Locations are in your model’s coordinates (inches). Signing a difference off never hides it — the numbers, your reason and your name stay on the record.')}</div>`;
+}
+
+window.mcOpen=(id)=>{ _mc.view=id; render(); };
+window.mcBack=()=>{ _mc.view=null; render(); };
+window.mcNew=()=>{ _mc.view=null; _mc.result=null; _mc.oursFile=null; _mc.theirsFile=null; _mc.oursPath=''; _mc.theirsPath=''; _mc.f={order:'',part:'',customer:'',job:'',rev:'',notes:''}; render(); };
+window.mcDel=async (id)=>{ if(!confirm(t('Delete this model check?'))) return; await dbRemove('qc/drawingChecks/'+id); if(_mc.view===id) _mc.view=null; render(); };
+function mcBadge(r){ return dcVerdictBadge(r); }
+function viewModelCheck(){
+  if(_mc.view && DRAWCHECKS[_mc.view]){
+    const r=DRAWCHECKS[_mc.view];
+    const file=(f,lbl)=>f&&f.url?`<a class="btn sm" href="${esc(f.url)}" target="_blank"><i class="ti ti-file"></i> ${esc(lbl)}</a>`:'';
+    return `<div class="page-head"><h2>${t('Model check')}</h2><p>${esc([r.partNum,r.rev?('Rev '+r.rev):'',r.customer].filter(Boolean).join(' · '))} · ${fmtWhen(r.ranAt||r.createdAt)}</p></div>
+      <div class="toolbar" style="margin-bottom:12px">
+        <button class="btn" onclick="mcBack()"><i class="ti ti-arrow-left"></i> ${t('Back')}</button>
+        ${file(r.custModel,t('Customer model'))}${file(r.myModel,t('Your model'))}
+        <button class="btn" style="margin-left:auto;color:var(--red)" onclick="mcDel('${esc(r.id)}')"><i class="ti ti-trash"></i> ${t('Delete')}</button>
+      </div>
+      <div class="card">${mcResultHtml(r,r.id)}
+        ${r.oursPath?`<div class="muted" style="font-size:11.5px;margin-top:6px">${t('Your model')}: ${esc(r.oursPath)}</div>`:''}
+        ${r.notes?`<div class="field" style="margin-top:10px"><label class="fl">${t('Notes')}</label><div>${esc(r.notes)}</div></div>`:''}
+        <div class="muted" style="font-size:11.5px;margin-top:8px">${t('Checked by')} ${esc((r.createdBy||'').split('@')[0])} · ${fmtWhen(r.createdAt)}</div>
+      </div>`;
+  }
+  if(_mc.helper===null && !_mc.pinging) setTimeout(mcPing,0);
+  const h=_mc.helper;
+  const status=!h ? `<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('Looking for SolidWorks on this PC…')}</div>`
+    : !h.ok ? `<div class="mc-warn"><i class="ti ti-plug-x"></i> <div><b>${t('The Model Check helper is not running on this PC.')}</b><br>
+        ${t('It only works on the PC with SolidWorks. Double-click')} <b>Start Model Check helper</b> ${t('in')} <code>C:\\Users\\info\\bsmp-orders\\tools\\modelcheck</code>, ${t('then')} <a class="dc-undo" onclick="_mc.helper=null;mcPing()">${t('try again')}</a>.
+        <br><span class="muted">${t('Brave: if it asks to let this site reach apps on this device (localhost), allow it.')}</span></div></div>`
+    : !h.solidworks ? `<div class="mc-warn"><i class="ti ti-alert-triangle"></i> <div><b>${t('SolidWorks is not open.')}</b> ${t('Open SolidWorks, then')} <a class="dc-undo" onclick="_mc.helper=null;mcPing()">${t('try again')}</a>.</div></div>`
+    : `<div class="hint" style="color:var(--green)"><i class="ti ti-plug-connected"></i> ${t('Connected to SolidWorks on this PC')} · <a class="dc-undo" onclick="_mc.helper=null;mcPing()">${t('refresh the open parts')}</a></div>`;
+  const opts=(sel)=>`<option value="">${t('— pick a part open in SolidWorks —')}</option>`+_mc.parts.map(p=>`<option value="${esc(p.path)}" ${p.path===sel?'selected':''}>${esc(p.title)}</option>`).join('');
+  const fileChip=(f)=>f?`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`:'';
+  const list=vals(DRAWCHECKS).filter(r=>r.kind==='model').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
+  const f=_mc.f;
+  return `<div class="page-head"><h2>${t('Model check')}</h2><p>${t('Compare the customer’s 3D model with the SolidWorks model you built — SolidWorks lines them up and subtracts one from the other, so every difference shows up, with its size and where it is.')}</p></div>
+  <div class="card">
+    ${status}
+    <div class="field" style="margin-top:10px"><label class="fl">${t('Link to an order')}</label>${orderSearchHtml('mc',f.order)}</div>
+    <div class="grid2">
+      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="mc-part" value="${esc(f.part)}" oninput="mcField('part',this.value)"></div>
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="mc-customer" value="${esc(f.customer)}" oninput="mcField('customer',this.value)"></div>
+      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="mc-job" value="${esc(f.job)}" oninput="mcField('job',this.value)"></div>
+      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="mc-rev" value="${esc(f.rev)}" oninput="mcField('rev',this.value)"></div>
+    </div>
+    <div class="dc-pair">
+      <div class="field">
+        <label class="fl"><i class="ti ti-box" style="color:var(--green)"></i> ${t('Your model')}</label>
+        <select class="in" onchange="mcPickOurs(this.value)" ${h&&h.ok&&h.solidworks?'':'disabled'}>${opts(_mc.oursPath)}</select>
+        <div style="margin-top:6px"><label class="btn sm"><i class="ti ti-file-upload"></i> ${t('or upload a .SLDPRT')}<input type="file" accept=".sldprt,.SLDPRT" style="display:none" onchange="mcFile('ours',this)"></label> ${fileChip(_mc.oursFile)}</div>
+        <div class="hint">${t('The model you will cut from — formed, not the flat pattern.')}</div>
+      </div>
+      <div class="field">
+        <label class="fl"><i class="ti ti-box" style="color:var(--blue)"></i> ${t('Customer model')}</label>
+        <label class="btn sm primary"><i class="ti ti-file-upload"></i> ${t('Upload STEP / IGES / SLDPRT')}<input type="file" accept=".step,.stp,.igs,.iges,.sldprt,.x_t,.x_b,.STEP,.STP,.IGS,.IGES,.SLDPRT,.X_T,.X_B" style="display:none" onchange="mcFile('theirs',this)"></label> ${fileChip(_mc.theirsFile)}
+        <select class="in" style="margin-top:6px" onchange="mcPickTheirs(this.value)" ${h&&h.ok&&h.solidworks?'':'disabled'}>${opts(_mc.theirsPath).replace(t('— pick a part open in SolidWorks —'),t('— or pick one open in SolidWorks —'))}</select>
+        <div class="hint">${t('Their model is the spec.')}</div>
+      </div>
+    </div>
+    <div class="field">
+      <button class="btn primary" onclick="mcRun()" ${_mc.running||!(h&&h.ok&&h.solidworks)?'disabled':''}><i class="ti ${_mc.running?'ti-loader-2 spin':'ti-3d-cube-sphere'}"></i> ${_mc.running?t('Comparing in SolidWorks…'):t('Compare models')}</button>
+      ${_mc.running?`<span class="muted" style="margin-left:8px">${t('A tray takes about 2 minutes — leave SolidWorks alone until it finishes.')} <b id="mc-elapsed">0 s</b></span>`:''}
+      ${_mc.result?`<div style="margin-top:12px">${mcResultHtml(_mc.result,'live')}</div>`:''}
+    </div>
+    <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="mc-notes" oninput="mcField('notes',this.value)">${esc(f.notes)}</textarea></div>
+    <div class="toolbar" style="margin:4px 0 0">
+      <button class="btn primary" id="mc-save" onclick="mcSave()" ${_mc.result?'':'disabled'}><i class="ti ti-device-floppy"></i> ${t('Save check')}</button>
+      <button class="btn" onclick="mcNew()">${t('Clear')}</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0;margin-top:14px">
+    ${list.length?`<table class="tbl"><thead><tr><th>${t('Part #')}</th><th>${t('Result')}</th><th>${t('Open')}</th><th>${t('Checked')}</th></tr></thead><tbody>${list.map(r=>`<tr class="click" onclick="mcOpen('${esc(r.id)}')">
+        <td><b>${esc(r.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc([r.customer,r.rev?('Rev '+r.rev):'',r.job].filter(Boolean).join(' · '))}</div></td>
+        <td>${mcBadge(r)}</td><td>${r.openCount?`<span style="color:var(--red);font-weight:700">${r.openCount}</span>`:'<span class="muted">0</span>'}</td>
+        <td class="muted" style="font-size:11.5px;white-space:nowrap">${esc((r.createdBy||'').split('@')[0])}<div>${fmtWhen(r.createdAt)}</div></td></tr>`).join('')}</tbody></table>`
+      :`<div class="empty">${t('No model checks yet.')}</div>`}
+  </div>`;
+}
+window.mcSave=async ()=>{
+  mcSyncFields();
+  const btn=$('mc-save'); if(btn&&btn.disabled&&!_mc.result) return;
+  if(!_mc.result){ qcToast(t('Run the comparison first, then save it.'),'err'); return; }
+  const f=_mc.f; if(!f.part&&!f.customer){ alert(t('Enter at least a part # or customer.')); return; }
+  const setBtn=(html,dis)=>{ const b=$('mc-save'); if(b){ b.disabled=dis; b.innerHTML=html; } };
+  try{
+    setBtn('<i class="ti ti-loader-2 spin"></i> '+t('Uploading…'), true);
+    const id=newId('mchk');
+    const up=async (file)=>file?(await uploadPending2Model(file)):null;
+    const custModel=await up(_mc.theirsFile), myModel=await up(_mc.oursFile);
+    const pictures={};
+    for(const [k,b64] of Object.entries(_mc.result.pics||{})){
+      const bin=atob(b64), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+      const pf=new File([u8], (f.part||'model').replace(/[^\w.-]+/g,'_')+'_modelcheck_'+k+'.jpg', {type:'image/jpeg'});
+      const url=await upload(pf,'modelChecks'); if(url) pictures[k]={name:pf.name,url};
+    }
+    const res=Object.assign({}, _mc.result); delete res.pics;
+    const rec=Object.assign(res, { id, kind:'model', createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'', orderId:f.order||'',
+      partNum:f.part, customer:f.customer, job:f.job, rev:f.rev, notes:f.notes, custModel, myModel, pictures });
+    setBtn('<i class="ti ti-loader-2 spin"></i> '+t('Saving…'), true);
+    await dbSet('qc/drawingChecks/'+id, rec);
+    try{ await qcLogAudit([{ drawCheckId:id, partNum:f.part, field:'modelcheck', action:'model-check', verdict:rec.verdict||'',
+      note:(rec.rows||[]).length+' difference(s), '+(rec.openCount||0)+' open' }]); }catch(e){ console.error('audit log failed', e); }
+    _mc.result=null; _mc.view=id; _mc.oursFile=null; _mc.theirsFile=null;
+    qcToast(t('Model check saved.'),'ok'); render();
+  }catch(e){
+    console.error('model check save failed', e);
+    qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err');
+    setBtn('<i class="ti ti-device-floppy"></i> '+t('Save check'), false);
+  }
+};
+async function uploadPending2Model(file){ const url=await upload(file,'modelChecks'); return url?{name:file.name,url,type:file.type||''}:null; }
 
 /* =================== DRAWING LIBRARY =================== */
 function drawMatches(d,q){
