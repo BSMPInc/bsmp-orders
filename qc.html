@@ -680,6 +680,7 @@ const I18N = {
     'Print the blank sheet, have the inspector fill it in by hand, then upload a scan or photo of every page here.':'Imprime la hoja en blanco, el inspector la llena a mano y luego sube aquí un escaneo o foto de cada página.',
     'Rows on the blank sheet':'Filas en la hoja en blanco','One numbered line per characteristic — set it before printing.':'Una línea numerada por característica — ajústalo antes de imprimir.',
     'Upload scan / photo':'Subir escaneo / foto','Take photo':'Tomar foto','No pages uploaded yet.':'Aún no hay páginas subidas.','Open page':'Abrir página',
+    'Ready — the pages upload when you press Save.':'Listo — las páginas se suben al presionar Guardar.','Uploading':'Subiendo','Page uploaded.':'Página subida.','on this report.':'en este reporte.',
     'Customer package':'Paquete para el cliente','One PDF for the customer: cover page, CoCs, the scanned first article, and the material / plating certs.':'Un PDF para el cliente: portada, CoCs, el primer artículo escaneado y los certificados de material / recubrimiento.',
     'Builds one PDF to email: cover page, invoice, packing slip, CoCs, the scanned first article, then the certs and any extra files, in that order.':'Arma un PDF para enviar por correo: portada, factura, lista de empaque, CoCs, el primer artículo escaneado y luego los certificados y archivos extra, en ese orden.',
     'Upload the scanned pages first — they are the report.':'Sube primero las páginas escaneadas — son el reporte.','The PDF tools did not load — check the connection and reload.':'Las herramientas PDF no cargaron — revisa la conexión y recarga.',
@@ -2547,6 +2548,49 @@ function fairSheetsHtml(sheets){
     return `<span class="sheet-tile">${inner}${canRm?`<span class="rm" title="${esc(t('Remove'))}" onclick="qcFairSheetDel(${i})"><i class="ti ti-x"></i></span>`:''}</span>`;
   }).join('');
 }
+// Picking the completed pages. On a SAVED report they upload right away and land on the record, so
+// the inspector sees the page tiles at once. They used to wait for Save, with only a small file-name
+// chip above "No pages uploaded yet." — the owner read that as "not recognized" (Dynamo DA1840568,
+// 2026-10-14). A brand-new report has no record to attach to yet, so those still go up on Save,
+// with a hint that says so.
+window.qcFairScanPicked=async (inputEl)=>{
+  const files=[...(inputEl.files||[])]; inputEl.value='';
+  if(!files.length) return;
+  const r=editId?INSPECTIONS[editId]:null;
+  if(!r){
+    _pendingFiles['frscan']=(_pendingFiles['frscan']||[]).concat(files); qcRenderStrip('frscan');
+    const host=$('fr-sheets');
+    if(host && !fairSheets(null).length) host.innerHTML=`<div class="muted" style="font-size:12px"><i class="ti ti-info-circle"></i> ${t('Ready — the pages upload when you press Save.')}</div>`;
+    return;
+  }
+  const id=editId, strip=$('files-frscan');
+  if(strip) strip.innerHTML=files.map(f=>`<span class="badge neutral"><i class="ti ti-loader-2 spin"></i> ${t('Uploading')} ${esc(f.name)}…</span>`).join(' ');
+  let urls=[];
+  try{ urls=await withTimeout(uploadPending2(files), 180000, t('Page upload timed out — check the connection.')); }
+  catch(e){ if(strip) strip.innerHTML=''; qcToast(t('NOT saved:')+' '+((e&&e.message)||e),'err'); return; }
+  if(strip) strip.innerHTML='';
+  if(!urls.length) return;   // uploadPending2 already toasted the failures
+  // re-read the record AFTER the upload so a page added meanwhile (another device) is kept
+  const cur=INSPECTIONS[id]||r;
+  const sheets=fairSheets(cur);
+  urls.forEach(f=>sheets.push({ name:f.name, url:f.url, type:f.type||'', at:Date.now(), by:(QC_USER&&QC_USER.email)||'' }));
+  try{
+    await dbSet('qc/inspections/'+id+'/manualSheets', sheets);
+    // a completed page on a draft = ready for the manager (same rule as Save)
+    const st=cur.fairStatus||'Draft';
+    if(st==='Draft'||st==='Measuring') await dbUpdate('qc/inspections/'+id, { fairStatus:'Submitted', updatedAt:Date.now() });
+    try{ await qcLogAudit(urls.map(f=>({ inspectionId:id, partNum:cur.partNum||'', field:'sheet', action:'sheet-uploaded', note:f.name||'' }))); }catch(e){ console.error('audit log failed', e); }
+    if(editId===id){ const host=$('fr-sheets'); if(host) host.innerHTML=fairSheetsHtml(sheets); }
+    qcToast(t('Page uploaded.')+' '+sheets.length+' '+t(sheets.length===1?'page':'pages')+' '+t('on this report.'),'ok');
+  }catch(e){ qcToast(t('NOT saved:')+' '+((e&&e.message)||e),'err'); }
+};
+// upload a list of File objects (not the shared pending queue), same error reporting as uploadPending
+async function uploadPending2(files){
+  const urls=[], errs=[];
+  for(const f of files){ try{ const u=await upload(f,'fair-manual'); if(u) urls.push({name:f.name,url:u,type:f.type}); else errs.push(f.name); }catch(e){ console.warn('upload failed',e); errs.push(f.name+((e&&e.message)?(' — '+e.message):'')); } }
+  if(errs.length) qcToast(t('File upload failed:')+' '+errs.join(' · '),'err');
+  return urls;
+}
 window.qcFairManualResult=(v)=>{ const h=$('fr-mresv'); if(h) h.value=(h.value===v?'':v); document.querySelectorAll('#fr-mres button').forEach(b=>b.classList.toggle('on', b.dataset.v===(h?h.value:''))); };
 // a page uploaded by mistake — managers can take it off the record (logged; the file itself stays in Storage)
 window.qcFairSheetDel=async (i)=>{
@@ -3160,8 +3204,8 @@ function viewFair(){
             <input class="in" id="fr-mrows" type="number" min="1" max="200" step="1" value="${esc(v('manualRows',MANUAL_ROWS_DEFAULT))}" ${ro}>
             <div class="muted" style="font-size:11.5px;margin-top:4px">${t('One numbered line per characteristic — set it before printing.')}</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <label class="btn sm primary"><i class="ti ti-scan"></i> ${t('Upload scan / photo')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="qcPickFiles('frscan',this)"></label>
-            <label class="btn sm"><i class="ti ti-camera"></i> ${t('Take photo')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="qcPickFiles('frscan',this)"></label>
+            <label class="btn sm primary"><i class="ti ti-scan"></i> ${t('Upload scan / photo')}<input type="file" accept=".pdf,image/*" multiple style="display:none" onchange="qcFairScanPicked(this)"></label>
+            <label class="btn sm"><i class="ti ti-camera"></i> ${t('Take photo')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="qcFairScanPicked(this)"></label>
           </div>
           <div class="thumbs" id="files-frscan">${qcPendingBadges('frscan')}</div>
           <div class="thumbs" id="fr-sheets">${fairSheetsHtml(fairSheets(r))}</div>
