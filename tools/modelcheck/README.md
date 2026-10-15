@@ -20,9 +20,11 @@ Needs: SolidWorks open, Python with `pywin32`. Log: `%LOCALAPPDATA%\BSMP\ModelCh
 2. The customer copy is turned (best of the 24 proper axis rotations, scored by matching hole centres;
    mirror images are never tried, a mirror is a real difference) and moved onto ours using the big flat faces.
 3. Each copy is subtracted from the other. Leftover pieces = real differences: red = only in our model,
-   blue = only in theirs. Pieces under 0.0002 in³ or thinner than 0.004" on average are hairline slivers
-   (e.g. a .001 bend-radius difference) and are only counted.
-4. Suggested labels: a customer-only pad ≤ .010" thick = **paint masking**; customer material inside one of
+   blue = only in theirs. Hairline pieces are only counted: average thickness (2 x volume / area) under 5% of
+   the part's wall, kept between .0015" and .003" (it was a fixed size once and hid every real difference on a
+   small .016" part). A model showing its flat pattern is refused with a clear message.
+4. Suggested labels: the same feature in both with its outline moved under .005" = **negligible**;
+   a customer-only pad ≤ .010" thick = **paint masking**; customer material inside one of
    our holes = **turret form** (half shear etc.). The user still signs every difference off with a reason.
 
 First proven on Absolute 11207-001 (2026-10-14): found the owner's flattening clearances, a .005" paint-masking

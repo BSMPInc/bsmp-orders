@@ -12,10 +12,15 @@
 #              (split faces) — on the first test that left a .003" skin = 1.36 in3 of
 #              false difference.
 #   findings   leftover pieces grouped by shape, so 4 identical tabs read as one row
-#              "4x". Hairline pieces (volume < MINVOL, or average thickness < THIN_AVG)
-#              are counted but not listed — a .001 bend-radius difference makes
-#              hundreds of them.
+#              "4x". Hairline pieces are counted but not listed — a .001 bend-radius
+#              difference makes hundreds of them. "Hairline" = average thickness (2V/A)
+#              under 5% of the part's own wall (2V/A of our part), kept between .0015
+#              and .003. It used to be a fixed .0002 in3 / .004": that was tuned on a
+#              24" tray and threw away EVERY real difference on a .84" part with .016
+#              wall (Beyond 52520850, owner's flat-pattern reliefs, 2026-10-14).
 #   labels     suggestions only, the user signs every row off:
+#              negligible = the same feature in both, outline moved < .005 (a slot
+#                         .003 wider) — shown, never hidden, one click to confirm
 #              masking  = a pad <= .010 thick that only the customer has (paint masking)
 #              turret   = customer material sitting inside one of OUR holes (a half
 #                         shear / form they model and we cut as a hole)
@@ -27,8 +32,9 @@ import pythoncom, win32com.client
 from win32com.client import gencache, VARIANT
 
 IN = 39.37007874          # metres -> inches
-MINVOL = 0.0002           # in3: smaller leftover pieces are slivers
-THIN_AVG = 0.004          # in: average thickness (2V/A) below this = a skin, not a feature
+MINVOL = 1e-7             # in3: numeric dust from the boolean
+THIN_FRAC, THIN_MIN, THIN_MAX = 0.05, 0.0015, 0.003   # hairline limit = 5% of wall, clamped (in)
+NEGLIGIBLE = 0.005        # in: a resized outline under this is pre-labelled negligible (BSMP .000 = ±.005)
 MASK_THK = 0.010          # in: thinner customer-only pads are paint masking
 
 _mod = None
@@ -76,7 +82,26 @@ def save_upload(name, b64, prefix):
     with open(p, 'wb') as f: f.write(base64.b64decode(b64))
     return p
 
+def _flattened(mod, m):
+    """True when a sheet-metal part is showing its flat pattern (Flat-Pattern feature unsuppressed):
+    the solid is then the flat blank, not the formed part."""
+    f = m.FirstFeature()
+    while f:
+        f = mod.IFeature(f._oleobj_)
+        if f.GetTypeName2() == 'FlatPattern':
+            try:
+                st = f.IsSuppressed2(1, None)          # this configuration
+                sup = st[0] if isinstance(st, (list, tuple)) else st
+                return not sup
+            except Exception:
+                return False
+        f = f.GetNextFeature()
+    return False
+
 def _solid(mod, m):
+    if _flattened(mod, m):
+        raise RuntimeError('%s is showing its FLAT PATTERN in SolidWorks - unflatten it (or close it so the saved '
+                           'file is used) and run the check again.' % m.GetTitle())
     bodies = mod.IPartDoc(m._oleobj_).GetBodies2(0, True) or []
     if not bodies: raise RuntimeError(m.GetTitle() + ' has no solid body.')
     if len(bodies) > 1:
@@ -181,7 +206,9 @@ def compare(ours_path, theirs_path, pictures=True):
         for k in range(3):
             ds = []
             for (kk, sg, area, pos) in sorted([p for p in po if p[0] == k], key=lambda p: -p[2])[:6]:
-                c = [q for q in pt if q[0] == k and q[1] == sg and abs(q[2]-area) < 0.02*area]
+                # 15% area slack: the user's own edits (reliefs, clearances) change face areas, and on a
+                # small part 2% matched nothing, so the fine shift never ran (Beyond 52520850)
+                c = [q for q in pt if q[0] == k and q[1] == sg and abs(q[2]-area) < 0.15*area]
                 if c:
                     q = min(c, key=lambda q: abs(q[3]-pos))
                     if abs(q[3]-pos) < 0.02: ds.append(pos - q[3])
@@ -190,6 +217,8 @@ def compare(ours_path, theirs_path, pictures=True):
         if any(abs(a) > 1e-7 for a in adj):
             moved.ApplyTransform(_xform(mod, sw, [[1, 0, 0], [0, 1, 0], [0, 0, 1]], adj))
             t = [t[i]+adj[i] for i in range(3)]
+        wall = 2*fo['volume']/fo['area'] if fo['area'] else 0.06
+        thin_lim = min(THIN_MAX, max(THIN_MIN, THIN_FRAC*wall))
         # ---- subtract both ways ----
         findings = []; slivers = {'ours': [0, 0.0], 'theirs': [0, 0.0]}; real_vol = {'ours': 0.0, 'theirs': 0.0}
         keep_bodies = {'ours': [], 'theirs': []}
@@ -199,7 +228,7 @@ def compare(ours_path, theirs_path, pictures=True):
                 mp = x.GetMassProperties(1.0); v = mp[3]*IN**3; a = mp[4]*IN**2
                 bb = x.GetBodyBox(); sz = [(bb[i+3]-bb[i])*IN for i in range(3)]
                 avg = 2*v/a if a > 0 else 0
-                if v < MINVOL or avg < THIN_AVG:
+                if v < MINVOL or avg < thin_lim:
                     slivers[side][0] += 1; slivers[side][1] += v; continue
                 real_vol[side] += v
                 pieces.append({'vol': v, 'c': [mp[i]*IN for i in range(3)], 'size': sz, 'avg': avg,
@@ -214,7 +243,7 @@ def compare(ours_path, theirs_path, pictures=True):
                      'avgThk': round(ps[0]['avg'], 4), 'at': [[round(c, 3) for c in p['c']] for p in ps],
                      'boxes': [[round(c, 3) for c in p['box']] for p in ps]}
                 thin = min(ps[0]['size'])
-                if side == 'theirs' and thin <= MASK_THK:
+                if side == 'theirs' and thin <= MASK_THK and sorted(ps[0]['size'])[1] >= 0.1:
                     f['suggest'] = 'masking'
                     f['why'] = 'only %.3f" thick, only on the customer model' % thin
                 elif side == 'theirs':
@@ -224,7 +253,11 @@ def compare(ours_path, theirs_path, pictures=True):
                             # distance from the piece centre to our hole axis
                             d = [p['c'][i]-c[i] for i in range(3)]; along = sum(d[i]*ax[i] for i in range(3))
                             radial = math.sqrt(max(sum(x*x for x in d) - along*along, 0))
-                            if radial < dia/2 and max(p['size']) <= dia + 0.03: inside += 1; break
+                            # centred in the hole and no wider than it (across the axis) = a form sitting in
+                            # our hole. Looser rules tagged a relief next to a small hole (Beyond 52520850).
+                            k = max(range(3), key=lambda i: ax[i])
+                            across = [p['size'][i] for i in range(3) if i != k]
+                            if radial < 0.25*dia and max(across) <= dia + 0.01: inside += 1; break
                     if inside == len(ps):
                         f['suggest'] = 'turret'
                         f['why'] = 'customer material inside %d of your holes' % inside
@@ -238,12 +271,19 @@ def compare(ours_path, theirs_path, pictures=True):
                 # same spot = their boxes overlap (grown by .05"); a changed cutout leaves a ring on
                 # each side whose centres can sit an inch apart, so centre distance alone misses it
                 if all(any(_overlap(p, q, 0.05) for q in b['boxes']) for p in a['boxes']):
-                    a['pair'] = j; used.add(j); b['pairedWith'] = i; break
+                    a['pair'] = j; used.add(j); b['pairedWith'] = i
+                    # same feature both sides, same size, surfaces under .005 apart = an outline resized slightly
+                    if (all(abs(x-y) < 0.01 for x, y in zip(sorted(a['size']), sorted(b['size'])))
+                            and max(a['avgThk'], b['avgThk']) < NEGLIGIBLE and not a.get('suggest')):
+                        g = max(a['avgThk'], b['avgThk'])
+                        a['suggest'] = b['suggest'] = 'negligible'
+                        a['why'] = b['why'] = 'same feature in both, outline about %.3f" different (under .005)' % g
+                    break
         out = {'ours': fo, 'theirs': ft, 'rotation': R, 'shift': [round(v, 5) for v in t], 'planeDeltas': plane_deltas,
                'holesOurs': len(ho), 'holesTheirs': len(ht), 'findings': findings,
                'slivers': {k: {'count': v[0], 'vol': round(v[1], 5)} for k, v in slivers.items()},
                'diffVol': {k: round(v, 5) for k, v in real_vol.items()},
-               'limits': {'minVol': MINVOL, 'thinAvg': THIN_AVG, 'maskThk': MASK_THK}}
+               'limits': {'minVol': MINVOL, 'thinAvg': round(thin_lim, 4), 'wall': round(wall, 4), 'maskThk': MASK_THK, 'negligible': NEGLIGIBLE}}
         if pictures: out['pictures'] = _pictures(mod, sw, bo, keep_bodies)
         return out
     finally:
