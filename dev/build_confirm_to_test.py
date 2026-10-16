@@ -29,6 +29,8 @@ block  = grab('const RE_EMAIL=', '\nwindow.emailConfirmation=')
 # the message composer — the preview and the send both render this one function,
 # so asserting on it is asserting on what actually leaves the building
 block += '\n' + grab('function _confirmCompose(sigText){', '\n// Mailbox + shared signature.')
+# the attached PDF's filename (shared with Print / Save PDF) — the preview shows it
+block += '\n' + grab('function _confirmFileTitle(){', '\n// The ticket on screen')
 # the guess+book merge, lifted out of emailConfirmation so it can be exercised
 # without Firebase (kept byte-identical to the source below it)
 merge = u'''
@@ -288,12 +290,10 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
   ok('body says it is not an invoice', m.body.indexOf('is not an invoice')>=0);
   ok('the signature is appended after the "-- " delimiter', m.body.indexOf('\\n\\n-- \\nEdgar')>=0);
   ok('no Notes block when there are none', m.body.indexOf('Notes:')<0);
-  ok('header row first', m.rows[0].join('|')==='Part / Description|Qty|Rate|Amount', m.rows[0].join('|'));
-  ok('one row per line item', m.rows.length===4, m.rows.length);
-  ok('a line shows part — desc', m.rows[1][0]==='BRK-1042 — bracket', m.rows[1][0]);
-  ok('a line with no desc shows just the part', m.rows[2][0]==='PLT-9', m.rows[2][0]);
-  ok('line amount is qty × cost', m.rows[1][3]==='$650.00', m.rows[1][3]);
-  ok('TOTAL row is last and adds up', m.rows[3].join('|')==='||TOTAL|$1220.00', m.rows[3].join('|'));
+  // the line items go out in the attached PDF (the printed ticket), not as a table
+  ok('body says the confirmation is attached as a PDF', m.body.indexOf('The order confirmation is attached as a PDF.')>=0);
+  ok('no line-item table rides along in the message', m.rows===undefined, m.rows&&m.rows.length);
+  ok('the PDF is named from customer + PO', _confirmFileTitle()==='Acme Aerospace - PO PO-4471 - Order Confirmation', _confirmFileTitle());
 
   _confirmItems[0].confirmNotes='Certs included.';
   m=_confirmCompose('Edgar');
@@ -314,8 +314,9 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
   ok('subject survives a missing customer and PO', m.subject==='Order Confirmation', m.subject);
   ok('no order-date line when there is no date', m.body.indexOf('Order date:')<0);
   ok('no due-date line when there is no date', m.body.indexOf('Completion / due date:')<0);
-  ok('a priceless line still renders', m.rows[1].join('|')==='X|1||', m.rows[1].join('|'));
-  ok('TOTAL is zero, not blank', m.rows[2][3]==='$0.00', m.rows[2][3]);
+  ok('the PDF name falls back when there is no customer or PO', _confirmFileTitle()==='Order Confirmation', _confirmFileTitle());
+  _confirmMeta={customer:'A/B: Co', po:'12*3'};
+  ok('the PDF name has no characters a filename can’t hold', _confirmFileTitle()==='A-B- Co - PO 12-3 - Order Confirmation', _confirmFileTitle());
 }
 
 // ══ 10 · the preview step renders that message ═══════════════════════════════
@@ -350,11 +351,11 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
   ok('preview shows the real body text', txt.indexOf('This confirms receipt of your order')>=0);
   ok('preview shows the note', txt.indexOf('Certs included.')>=0);
   ok('preview shows the signature', txt.indexOf('Edgar')>=0);
-  const rows=[...document.querySelectorAll('#panel .cmp-tbl tbody tr')];
-  ok('preview draws one table row per line item', rows.length===1, rows.length);
-  ok('preview draws the TOTAL in the table foot',
-     (document.querySelector('#panel .cmp-tbl tfoot')||{}).textContent.indexOf('$650.00')>=0,
-     (document.querySelector('#panel .cmp-tbl tfoot')||{}).textContent);
+  ok('preview draws no line-item table (it’s in the PDF now)', !document.querySelector('#panel .cmp-body table, #panel .cmp-tbl'));
+  const att=document.querySelector('#panel .cmp-att');
+  ok('preview shows the attached PDF by name',
+     !!att && att.textContent.indexOf('Acme Aerospace - PO PO-4471 - Order Confirmation.pdf')>=0, att&&att.textContent.trim());
+  ok('the attachment has a View button', !!document.getElementById('cmp-attview'));
   ok('preview has a Send button', !!document.getElementById('cto-go'));
   ok('Send counts To + Cc', document.getElementById('cto-go').textContent.indexOf('Send to 2')>=0,
      document.getElementById('cto-go').textContent.trim());
@@ -396,17 +397,11 @@ ok('a typed stranger gets no name', (ctoAdd('who@else.com'), _ctoTo[1].name===''
   _ctoStep='preview'; _ctoRender();
   const p=document.getElementById('panel');
   ok('preview does not scroll the modal sideways', p.scrollWidth<=p.clientWidth+1, p.scrollWidth+' vs '+p.clientWidth);
-  const w=document.querySelector('#panel .cmp-tblwrap');
-  ok('a wide table scrolls inside its own box', getComputedStyle(w).overflowX==='auto');
-  // the money columns must not be the ones pushed off — a preview you have to
-  // scroll to see the total is not much of a preview
-  ok('the table fits without scrolling at the modal width', w.scrollWidth<=w.clientWidth+1,
-     w.scrollWidth+' vs '+w.clientWidth);
-  const amtCells=[...document.querySelectorAll('#panel .cmp-tbl tr')].map(tr=>tr.lastElementChild.getBoundingClientRect());
-  const wr=w.getBoundingClientRect();
-  ok('the Amount column is on screen', amtCells.every(c=>c.right<=wr.right+1), amtCells.map(c=>Math.round(c.right)).join('|'));
+  // a long customer name must not push the View button out of the chip
+  const vb=document.getElementById('cmp-attview').getBoundingClientRect(), ar=document.querySelector('#panel .cmp-att').getBoundingClientRect();
+  ok('the View button stays inside the attachment chip', vb.right<=ar.right+1 && vb.left>=ar.left-1, Math.round(vb.right)+' vs '+Math.round(ar.right));
   const pr=p.getBoundingClientRect();
-  const over=[...document.querySelectorAll('#panel .cmp-hdr, #panel .cmp-body, #panel .cmp-tblwrap, #panel button, #panel textarea')]
+  const over=[...document.querySelectorAll('#panel .cmp-hdr, #panel .cmp-body, #panel .cmp-att, #panel button, #panel textarea')]
     .filter(el=>{const r=el.getBoundingClientRect(); return r.right>pr.right+1||r.left<pr.left-1;});
   ok('nothing overflows the preview', over.length===0, over.map(e=>e.className).join('|'));
 }
