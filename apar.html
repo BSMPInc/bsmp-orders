@@ -337,14 +337,17 @@ body{margin:0;font-family:'Hanken Grotesk',-apple-system,Segoe UI,Arial,sans-ser
 .cf-filter select{border:none;background:transparent;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;outline:none}
 .acct-bills-section h3 .tot{margin-left:auto;font-size:13px;color:var(--text2)}
 .acct-bills{font-size:12.5px}
-.acct-bill-head{display:grid;grid-template-columns:1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;padding:0 0 6px;border-bottom:1px solid var(--border)}
+.acct-bill-head{display:grid;grid-template-columns:16px 1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;padding:0 0 6px;border-bottom:1px solid var(--border)}
 .acct-bill-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text3);cursor:pointer;display:flex;align-items:center;gap:2px;user-select:none}
 .acct-bill-head span:hover{color:var(--text2)}
 .acct-bill-head i{font-size:12px}
-.acct-bill{display:grid;grid-template-columns:1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
+.acct-bill{display:grid;grid-template-columns:16px 1.4fr 0.9fr 1fr 0.95fr 1fr 0.75fr;gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2)}
 .acct-bill.is-wd{opacity:.62}
 .acct-bill.is-wd .ab-amt{text-decoration:line-through;text-decoration-color:var(--text3)}
 .acct-bill:last-child{border-bottom:none}
+.acct-bill.sel{background:#2c574010}
+.ab-chk{width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--navy)}
+.acct-bill-head span.ab-chk-h{cursor:default}
 .acct-bill .ab-party{cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acct-bill .ab-party:hover{text-decoration:underline}
 .acct-bill .ab-due{color:var(--text3);cursor:pointer}
@@ -2368,6 +2371,8 @@ let cashSort={}; // {sectionKey:{key:'due'|'party'|'account'|'method'|'status'|'
 let hidePaid={}; // {sectionKey:true} -> hide withdrawn (paid) bills in that section
 let cashCollapsed={}; // {accountId:true} -> account card collapsed
 let cashFilter={status:'all',due:'all'}; // focused filters across all cards
+const cashSel=new Set(); // ticked bills -> sticky "N selected · Total" bar (like Payables)
+let cashSelAmt={};      // id -> amount the row shows, refreshed every renderCash
 // Does a bill pass the current Cash Flow status/due filters?
 function cashBillMatchesFilter(e){
   const st=e.payStatus||'open';
@@ -2431,6 +2436,42 @@ window.toggleCashCollapseAll=()=>{
   cardIds.forEach(k=>{ cashCollapsed[k]=!allCollapsed; });
   render();
 };
+// Sum-together bar: the amount summed is what the row shows (unpaid balance, or the
+// full bill for a withdrawn one). Ticks live in memory only, like the Payables bar,
+// and still count while their card is collapsed.
+function updateCashSelBar(){
+  const bar=$('cash-selbar'), pad=$('cash-selbar-pad'); if(!bar) return;
+  let tot=0; cashSel.forEach(id=>{ tot+=cashSelAmt[id]||0; });
+  bar.innerHTML=cashSel.size?`<div class="selbar">
+    <span class="sb-count">${cashSel.size} selected</span>
+    <span class="sb-tot">Total ${fmtMoney(tot)}</span>
+    <button class="sb-clear" onclick="clearCashSel()">Clear</button>
+  </div>`:'';
+  if(pad) pad.style.height=cashSel.size?'64px':'0';
+}
+window.toggleCashSel=(id,on)=>{
+  if(on) cashSel.add(id); else cashSel.delete(id);
+  document.querySelectorAll('.acct-bill[data-id="'+id+'"]').forEach(r=>r.classList.toggle('sel',on));
+  // keep the card's header box in step
+  document.querySelectorAll('.acct-bills').forEach(box=>{
+    const h=box.querySelector('.ab-chk-h input'); if(!h) return;
+    const ids=[...box.querySelectorAll('.acct-bill[data-id]')].map(r=>r.dataset.id);
+    h.checked=ids.length>0&&ids.every(x=>cashSel.has(x));
+  });
+  updateCashSelBar();
+};
+window.toggleCashSelAll=(box)=>{
+  const wrap=box.closest('.acct-bills'); if(!wrap) return;
+  // only the rows the search box is currently showing
+  wrap.querySelectorAll('.acct-bill[data-id]').forEach(r=>{
+    if(r.style.display==='none') return;
+    if(box.checked) cashSel.add(r.dataset.id); else cashSel.delete(r.dataset.id);
+    r.classList.toggle('sel',box.checked);
+    const c=r.querySelector('.ab-chk'); if(c) c.checked=box.checked;
+  });
+  updateCashSelBar();
+};
+window.clearCashSel=()=>{ cashSel.clear(); render(); };
 window.setCashFilter=(key,val)=>{ cashFilter[key]=val; render(); };
 window.clearCashFilters=()=>{ cashFilter={status:'all',due:'all'}; render(); };
 function sortArrow(sectionKey,key){
@@ -2491,7 +2532,8 @@ function renderCash(entries){
       : sched
       ? `<span class="ab-due plan-date"><input type="date" value="${e.planDate||''}" onclick="event.stopPropagation()" onchange="setPlanDate('${e.id}',this.value)" title="Planned withdrawal date — when this payment comes out${e.due?' (bill due '+fmtDate(e.due)+(d!=null?', '+(d<0?Math.abs(d)+'d late':d+'d'):'')+')':''}"></span>`
       : `<span class="ab-due${d!=null&&d<0?' over':''}" onclick="openEntry('${e.id}')">${dueTxt}</span>`;
-    return `<div class="acct-bill${wd?' is-wd':''}" data-search="${esc([e.party,e.ref,e.planMethod].filter(Boolean).join(' ').toLowerCase())}">
+    return `<div class="acct-bill${wd?' is-wd':''}${cashSel.has(e.id)?' sel':''}" data-id="${e.id}" data-search="${esc([e.party,e.ref,e.planMethod].filter(Boolean).join(' ').toLowerCase())}">
+      <input type="checkbox" class="ab-chk" ${cashSel.has(e.id)?'checked':''} onclick="event.stopPropagation();toggleCashSel('${e.id}',this.checked)" title="Tick to add to the selected total">
       <span class="ab-party" onclick="openEntry('${e.id}')">${esc(e.party)}</span>
       ${dueCell}
       ${accountSelect(e)}
@@ -2500,7 +2542,10 @@ function renderCash(entries){
       <span class="ab-amt" onclick="openEntry('${e.id}')">${fmtMoney(wd?(e.amount||0):unpaid(e))}</span>
     </div>`;
   };
-  const billHead=(sectionKey)=>`<div class="acct-bill-head">
+  const billHead=(sectionKey,list)=>{
+    const allOn=list.length>0&&list.every(e=>cashSel.has(e.id));
+    return `<div class="acct-bill-head">
+    <span class="ab-chk-h"><input type="checkbox" class="ab-chk" ${allOn?'checked':''} onclick="event.stopPropagation();toggleCashSelAll(this)" title="Select every bill in this card"></span>
     <span onclick="sortCash('${sectionKey}','party')">Vendor ${sortArrow(sectionKey,'party')}</span>
     <span onclick="sortCash('${sectionKey}','due')">Due ${sortArrow(sectionKey,'due')}</span>
     <span onclick="sortCash('${sectionKey}','account')">Account ${sortArrow(sectionKey,'account')}</span>
@@ -2508,6 +2553,7 @@ function renderCash(entries){
     <span onclick="sortCash('${sectionKey}','status')">Status ${sortArrow(sectionKey,'status')}</span>
     <span onclick="sortCash('${sectionKey}','amount')">Amount ${sortArrow(sectionKey,'amount')}</span>
   </div>`;
+  };
 
   const acctTile=(id,a)=>{
     const bills=ap.filter(e=>e.account===id&&activeBill(e));
@@ -2549,7 +2595,7 @@ function renderCash(entries){
     const c=colorFor(id);
     const collapsed=!!cashCollapsed[id];
     const toggle=paidCount>0?`<button class="paid-toggle" onclick="event.stopPropagation();toggleHidePaid('${id}')"><i class="ti ti-eye${hidden?'':'-off'}"></i> ${hidden?`Show ${paidCount} paid`:'Hide paid'}</button>`:'';
-    const body=bills.length?billHead(id)+bills.map(billRow).join(''):'<div class="acct-empty">All paid bills hidden.</div>';
+    const body=bills.length?billHead(id,bills)+bills.map(billRow).join(''):'<div class="acct-empty">All paid bills hidden.</div>';
     const count=allBills.length;
     return `<div class="acct-bills-section${collapsed?' collapsed':''}" style="border-left:4px solid ${c.bar}">
       <h3 onclick="toggleCashCard('${id}')"><i class="ti ti-chevron-${collapsed?'right':'down'} acct-chev"></i><span class="acct-dot" style="background:${c.bar}"></span>${esc(a.name)}<span class="acct-cnt">${count}</span><span class="tot">${totTxt}</span>${collapsed?'':toggle}</h3>
@@ -2563,7 +2609,7 @@ function renderCash(entries){
   const uCollapsed=!!cashCollapsed['unassigned'];
   const unassignedSection=(cashFilterActive()&&!unassigned.length)?'':`<div class="acct-bills-section${uCollapsed?' collapsed':''}">
     <h3 onclick="toggleCashCard('unassigned')"><i class="ti ti-chevron-${uCollapsed?'right':'down'} acct-chev"></i>Unassigned<span class="acct-cnt">${unassigned.length}</span><span class="tot">${fmtMoney(unassignedTotal)}</span></h3>
-    ${uCollapsed?'':`<div class="acct-bills">${unassigned.length?billHead('unassigned')+unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>`}
+    ${uCollapsed?'':`<div class="acct-bills">${unassigned.length?billHead('unassigned',unassigned)+unassigned.map(billRow).join(''):'<div class="acct-empty">Every unpaid payable is assigned to an account. Nice.</div>'}</div>`}
   </div>`;
 
   // collapse-all state: are all account cards (incl. unassigned if present) collapsed?
@@ -2572,6 +2618,10 @@ function renderCash(entries){
   const allCashCollapsed=allCardIds.length>0&&allCardIds.every(k=>cashCollapsed[k]);
   // any bill matching the active filter (for the empty-state message)
   const anyCashMatch=ap.some(e=>activeBill(e)&&cashBillMatchesFilter(e));
+  // drop ticks for bills that left this tab (paid off, archived, deleted)
+  const liveIds=new Set(ap.filter(activeBill).map(e=>e.id));
+  cashSel.forEach(id=>{ if(!liveIds.has(id)) cashSel.delete(id); });
+  cashSelAmt={}; ap.filter(activeBill).forEach(e=>{ cashSelAmt[e.id]=wdAmt(e); });
 
   $('content').innerHTML=`
     <div class="stats">
@@ -2601,7 +2651,9 @@ function renderCash(entries){
     </div>`:''}
     ${ids.map(id=>acctBillSection(id,accounts[id])).join('')}
     ${unassignedSection}
-    ${cashFilterActive()&&!anyCashMatch?'<div class="empty">No bills match these filters. <a href="#" onclick="clearCashFilters();return false">Clear filters</a></div>':''}`;
+    ${cashFilterActive()&&!anyCashMatch?'<div class="empty">No bills match these filters. <a href="#" onclick="clearCashFilters();return false">Clear filters</a></div>':''}
+    <div id="cash-selbar-pad"></div><div id="cash-selbar"></div>`;
+  updateCashSelBar();
   if(cashQ){ cashSearch(cashQ); const q=$('cash-q'); if(q){ setTimeout(()=>{q.focus();q.setSelectionRange(q.value.length,q.value.length);},0); } }
 }
 window.addAccount=()=>{
