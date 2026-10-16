@@ -4889,7 +4889,8 @@ window._ctoKey=(inp,e,f)=>{
     if(!_ctoSug.length) return;
     e.preventDefault();
     _ctoHi=(e.key==='ArrowDown') ? Math.min(_ctoSug.length-1,_ctoHi+1) : Math.max(0,_ctoHi-1);
-    _ctoPaintSug();
+    _ctoMarkHi();
+    document.querySelectorAll('#cto-sug-'+f+' .cto-sug')[_ctoHi]?.scrollIntoView({block:'nearest'});
     return;
   }
   if(e.key==='Escape'&&v){ e.preventDefault(); inp.value=''; window._ctoInput(inp,f); }
@@ -4922,7 +4923,13 @@ function _ctoPaintSug(){
     ${c.suggested?`<span class="cto-tag">${esc2(c.suggested)}</span>`:''}
   </div>`).join('');
 }
-window._ctoHover=(i)=>{ _ctoHi=i; _ctoPaintSug(); };
+// Moving the highlight only flips the .on class. Rebuilding the list here (as it
+// used to) swapped out the row under the mouse on every hover, so the press
+// landed on the list box instead of the row and a click never picked anyone.
+function _ctoMarkHi(){
+  document.querySelectorAll('#cto-sug-'+_ctoField+' .cto-sug').forEach((el,i)=>el.classList.toggle('on',i===_ctoHi));
+}
+window._ctoHover=(i)=>{ if(_ctoHi===i) return; _ctoHi=i; _ctoMarkHi(); };
 function _ctoFieldHtml(f,label,hint){
   const list=ctoList(f);
   const chips=list.map((t,i)=>`<span class="cto-chip" title="${esc2(t.email)}">${esc2(t.name||t.email)}<i class="ti ti-x" onclick="window._ctoRemove('${f}',${i})"></i></span>`).join('');
