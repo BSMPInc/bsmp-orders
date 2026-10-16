@@ -300,6 +300,73 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .dc-qs .dc-accnote{max-width:340px}
 .dc-qs{margin-top:12px;padding:10px 12px;background:var(--amber-soft);border:1px solid #e3cf9b;font-size:12.5px;color:#5a400d}
 .dc-qs-h{font-weight:800;display:flex;align-items:center;gap:6px}
+/* drawing check — pin view (dcv*) */
+.c-red{--pc:#d32f2f}.c-amber{--pc:#d98a00}.c-blue{--pc:#1f6fd1}.c-green{--pc:#1f9d55}.c-q{--pc:#7b4fc4}.c-off{--pc:#8a93a0}
+.dcv-dot{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--pc);color:#fff;font:800 11px/1 Arial,sans-serif;font-style:normal;flex:none}
+.dcv{margin:4px 0 12px;background:var(--card);border:1px solid var(--border);padding:8px}
+.dcv.sticky{position:sticky;top:86px;z-index:20;box-shadow:0 6px 18px rgba(16,24,40,.12)}
+.dcv-bar{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-bottom:6px;font-size:12.5px}
+.dcv-bar>b{display:flex;align-items:center;gap:5px}
+.dcv-note{font-size:11.5px;color:var(--text2);display:inline-flex;align-items:center;gap:4px;flex:1 1 220px}
+.dcv-tools{display:flex;gap:10px;margin-left:auto}
+.dcv-tog{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap}
+.dcv-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dcv-pane{position:relative;min-width:0;border:1px solid var(--border2);background:#3a4049}
+.dcv-lbl{background:#fff;font-size:11.5px;font-weight:800;padding:5px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:5px}
+.dcv-canvas{position:relative;height:min(60vh,560px);overflow:hidden;cursor:grab;touch-action:none;user-select:none}
+.dcv.sticky .dcv-canvas,.dcv.sticky .dcv-msg{height:clamp(200px,38vh,400px)}
+.dcv-canvas.grabbing{cursor:grabbing}
+.dcv-canvas.placing{cursor:crosshair;box-shadow:inset 0 0 0 3px var(--spark)}
+.dcv-img{position:absolute;top:0;left:0;transform-origin:0 0;max-width:none;user-select:none;-webkit-user-drag:none;background:#fff;pointer-events:none}
+.dcv-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.dcv-msg{height:min(60vh,560px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#d7dbe0;font-size:12.5px;text-align:center;padding:16px}
+.dcv-msg i{font-size:28px;opacity:.7}
+/* a pin is a hollow ring ON the callout (the text stays readable through it) with its number tagged beside it */
+.dcv-pin{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border:2.5px solid var(--pc);border-radius:50%;background:color-mix(in srgb,var(--pc) 10%,transparent);box-shadow:0 0 0 1.5px #fff;pointer-events:auto;cursor:move;touch-action:none}
+.dcv-pin>b{position:absolute;left:14px;bottom:15px;background:var(--pc);color:#fff;font:800 11px/1 Arial,sans-serif;padding:3px 5px;border-radius:9px;border:1.5px solid #fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.dcv-pin::after{content:'';position:absolute;inset:-8px;border-radius:50%}
+.dcv-pin.sel{z-index:3;border-width:3px;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--pc)}
+.dcv-pin.dragging{z-index:4;opacity:.85}
+.dcv-pin.flash::before,.dcv-zone.flash::before{content:'';position:absolute;inset:-4px;border-radius:50%;border:3px solid var(--pc);animation:dcvPulse .6s ease-out 3}
+.dcv-zone.flash::before{border-radius:0}
+@keyframes dcvPulse{from{transform:scale(1);opacity:1}to{transform:scale(2.6);opacity:0}}
+.dcv-zone{position:absolute;border:2px dashed var(--pc);background:color-mix(in srgb,var(--pc) 15%,transparent);pointer-events:auto;cursor:pointer}
+.dcv-zone>span{position:absolute;top:-1px;left:0;transform:translateY(-100%);background:var(--pc);color:#fff;font:800 11px/1 Arial,sans-serif;padding:3px 5px;border-radius:9px 9px 9px 0;border:1.5px solid #fff;white-space:nowrap}
+.dcv-zone.sel{border-style:solid;border-width:3px;z-index:2}
+.dc-probonly .dcv-pin.c-green,.dc-probonly .dcv-zone.c-green,.dc-probonly .dc-row.dc-match{display:none!important}
+.dcv-ctrls{position:absolute;right:6px;bottom:6px;display:flex;gap:1px;align-items:center;background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:7px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:4}
+.dcv-ctrls button{border:none;background:none;cursor:pointer;padding:5px 7px;color:var(--text);font:inherit;font-weight:700;border-radius:5px;line-height:1;min-height:30px}
+.dcv-ctrls button:hover{background:var(--bg)}
+.dcv-more{position:absolute;left:6px;bottom:8px;font-size:10.5px;font-weight:700;color:#fff;background:rgba(58,64,73,.85);padding:3px 7px;pointer-events:none}
+.dcv-over{position:absolute;left:6px;right:6px;top:34px;z-index:4;pointer-events:none;display:flex;justify-content:center}
+.dcv-placebar{pointer-events:auto;display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px;background:rgba(255,255,255,.97);border:1px solid var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.18);padding:5px 8px;font-size:12px;max-width:100%}
+.dcv-pop{position:absolute;z-index:6;width:260px;max-width:calc(100% - 12px);background:#fff;border:1px solid var(--border2);box-shadow:0 8px 24px rgba(16,24,40,.25);padding:9px 11px;font-size:12px;line-height:1.4}
+.dcv-pop-x{position:absolute;right:4px;top:4px;border:none;background:none;cursor:pointer;color:var(--text3);font-size:15px;padding:2px}
+.dcv-pop-h{display:flex;align-items:center;gap:6px;padding-right:18px}
+.dcv-pop-st{font-weight:800;font-size:11.5px;margin:4px 0 5px;display:flex;align-items:center;gap:4px}
+.dcv-pop-kv{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:baseline;margin-top:2px}
+.dcv-pop-kv>span{font-size:10.5px;font-weight:700;color:var(--text3);white-space:nowrap}
+.dcv-pop-kv code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;word-break:break-word}
+.dcv-pop-math{margin-top:5px;padding:4px 6px;background:var(--bg);font-size:11px;color:var(--text2);font-variant-numeric:tabular-nums}
+.dcv-pop-off{margin-top:5px;font-size:11px;font-weight:700;color:var(--green)}
+.dcv-pop-loc{margin-top:6px;font-size:10.5px;color:var(--text3);display:flex;gap:4px}
+.dcv-pop-act{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.dcv-pop-act:empty{display:none}
+.dcv-legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:6px;font-size:11px;color:var(--text2)}
+.dcv-legend span{display:inline-flex;align-items:center;gap:4px}
+.dcv-legend .dcv-dot{min-width:16px;height:16px;font-size:9.5px}
+.dcv-zonekey{display:inline-block;width:16px;height:12px;border:1.5px dashed var(--text3);background:rgba(138,147,160,.18)}
+.dcv-fail{margin:4px 0 12px;padding:9px 11px;border:1px solid var(--border2);background:var(--bg);font-size:12.5px;color:var(--text2);display:flex;gap:7px;align-items:flex-start}
+.dc-row{cursor:pointer}
+.dc-no{width:34px;text-align:center}
+.dc-row.dc-sel td{box-shadow:inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+.dc-row.dc-sel td:first-child{box-shadow:inset 3px 0 0 var(--accent),inset 0 2px 0 var(--accent),inset 0 -2px 0 var(--accent)}
+.dc-row.flash td,.dc-qs li.flash{animation:dcRowFlash 1.8s ease-out}
+@keyframes dcRowFlash{0%,30%{background:#fff4c2}100%{}}
+.dc-qs li{cursor:pointer}
+.dc-qs li.dc-sel{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-height:860px){.dcv.sticky .dcv-legend{display:none}.dcv.sticky .dcv-canvas,.dcv.sticky .dcv-msg{height:clamp(190px,36vh,360px)}}
+@media(max-width:640px){.dcv-pair{grid-template-columns:1fr}.dcv.sticky{position:relative;top:auto}.dcv.sticky .dcv-canvas,.dcv.sticky .dcv-msg{height:min(52vh,420px)}}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
 .seg{display:inline-flex;border:1px solid var(--border2)}
 .seg button{height:36px;padding:0 14px;background:#fff;border:none;border-right:1px solid var(--border2);cursor:pointer;font-weight:700;color:var(--text2)}
@@ -757,7 +824,24 @@ const I18N = {
     'Work done in our shop, e.g. Laser cut, formed, deburred, PEM hardware installed, inspected per drawing':'Trabajo hecho en nuestro taller, p. ej. Corte láser, doblado, desbarbado, instalación de herrajes PEM, inspeccionado según plano',
     'Statement of conformance':'Declaración de conformidad','Signed by (printed name)':'Firmado por (nombre)','Title':'Puesto','Signed by':'Firmado por',
     'Delete certificate':'Eliminar certificado','Certificate saved.':'Certificado guardado.','certificate':'certificado','certificates':'certificados',
-    'No certificates issued yet.':'Aún no se han emitido certificados.','Managers only.':'Solo gerentes.'
+    'No certificates issued yet.':'Aún no se han emitido certificados.','Managers only.':'Solo gerentes.',
+    // drawing check — pin view
+    'On the drawings':'En los planos','Click to find it on both drawings':'Clic para ubicarlo en ambos planos',
+    'Pins are placed by AI and approximate — drag one onto its callout to correct it.':'La IA coloca los marcadores de forma aproximada — arrastra uno sobre su cota para corregirlo.',
+    'No pin locations on this check — click a row, then place its pin.':'Esta revisión no tiene ubicaciones — haz clic en una fila y coloca su marcador.',
+    'Problems only':'Solo problemas','Keep in view':'Mantener a la vista','Keep the drawings on screen while you scroll the table':'Mantener los planos en pantalla mientras recorres la tabla',
+    'The drawings could not be loaded here, so the pin view is off — every finding is still in the table below. Use the file buttons to open each drawing.':'No se pudieron cargar los planos aquí, así que la vista de marcadores está apagada — cada hallazgo sigue en la tabla de abajo. Usa los botones de archivo para abrir cada plano.',
+    'This drawing could not be loaded here — the table below still has every finding.':'Este plano no se pudo cargar aquí — la tabla de abajo tiene todos los hallazgos.',
+    'No drawing on file':'No hay plano guardado','Showing the first':'Se muestran las primeras','of':'de',
+    'Customer drawing':'Plano del cliente','Your drawing':'Tu plano','Does not match':'No coincide','Not on your drawing':'No está en tu plano',
+    'Customer never states it':'El cliente no lo indica','Matches':'Coincide','Question':'Pregunta','Signed off':'Aprobado',
+    'Grid zone only (no pin)':'Solo zona de cuadrícula (sin marcador)','Pin moved by hand':'Marcador movido a mano','Placed by AI — approximate':'Colocado por la IA — aproximado',
+    'Approximate — the grid zone the AI named, no exact spot':'Aproximado — la zona de cuadrícula que indicó la IA, sin punto exacto',
+    'Click the drawing where':'Haz clic en el plano donde está','sits':'',
+    'isn’t marked on this drawing':'no está marcado en este plano','isn’t on this drawing':'no está en este plano','Place it':'Colocarlo',
+    'Pin moved by':'Marcador movido por','hand':'mano','Placed by AI — approximate. Drag the pin onto the callout to correct it.':'Colocado por la IA — aproximado. Arrastra el marcador sobre la cota para corregirlo.',
+    'No exact spot — shaded zone':'Sin punto exacto — la zona sombreada','is approximate.':'es aproximada.',
+    'Place a pin here':'Colocar marcador aquí','Place on your drawing':'Colocar en tu plano','Place on customer drawing':'Colocar en el plano del cliente'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -1814,12 +1898,16 @@ const DC_PROMPT='You are a senior sheet-metal detailer at a fabrication shop, re
 +'Find every place OUR drawing disagrees with, omits, or adds to the CUSTOMER drawing — and every place the CUSTOMER drawing is unclear.\n\n'
 +'Return ONLY valid JSON, no markdown:\n'
 +'{"custTitleBlock":{"stated":true,"frac":null,"p2":null,"p3":null,"ang":null},'
-+'"rows":[{"feature":"short label","kind":"dim|angle|hole|thickness|material|finish|rev|part|qty|note","cust":"exact text on the customer drawing, or empty","mine":"exact text on our drawing, or empty","zone":"customer-drawing border-grid zone like B3, or empty","note":"short remark or empty"}],'
-+'"questions":[{"topic":"short label","detail":"what is unclear on the CUSTOMER drawing and what to ask them","zone":"customer-drawing border-grid zone like B3, or empty"}],'
++'"custGrid":{"cols":8,"rows":4,"numbers":"right-to-left","letters":"bottom-to-top"},"mineGrid":null,'
++'"rows":[{"feature":"short label","kind":"dim|angle|hole|thickness|material|finish|rev|part|qty|note","cust":"exact text on the customer drawing, or empty","mine":"exact text on our drawing, or empty","zone":"customer-drawing border-grid zone like B3, or empty","mineZone":"our-drawing border-grid zone, or empty","custAt":{"page":1,"x":0.42,"y":0.31},"mineAt":{"page":1,"x":0.40,"y":0.29},"note":"short remark or empty"}],'
++'"questions":[{"topic":"short label","detail":"what is unclear on the CUSTOMER drawing and what to ask them","zone":"customer-drawing border-grid zone like B3, or empty","custAt":{"page":1,"x":0.5,"y":0.5}}],'
 +'"summary":"one short sentence"}\n\n'
 +'Rules:\n'
 +'- "cust" and "mine" MUST be copied EXACTLY as written on that drawing — "2.500 ±.005", "Ø.250 THRU", "3/8", "16 GA CRS", "90°". Never rewrite, round, convert or invent a value. Use an empty string when that drawing does not state it; never guess.\n'
 +'- "zone": many drawings print a reference grid in the border (numbers along the top/bottom edge, letters down the sides). If the CUSTOMER drawing has one, set "zone" to the grid cell where that feature\'s callout sits on THEIR drawing — read the border markers nearest the callout and give letter+number, e.g. "B3" or "D7". Give each question a zone the same way when it points at a specific spot on their drawing. If their drawing has no border grid, or you cannot place the callout confidently, use an empty string — NEVER guess a zone.\n'
++'- "mineZone": the same, for where the callout sits on OUR drawing\'s border grid. Empty when our drawing has no grid or does not state it.\n'
++'- "custAt" / "mineAt": WHERE that callout\'s text is printed on that drawing, so a person can find it — page = the 1-based PDF page it is on (1 for a single image), x = fraction of the page width from the LEFT edge (0) to the RIGHT edge (1), y = fraction of the page height from the TOP edge (0) to the BOTTOM edge (1). Point at the callout text itself (the number or note), not at the feature or its extension lines. Use null when that drawing does not state it. For questions, custAt points at the unclear spot on the CUSTOMER drawing (null if it is not one spot). This is only a pointer for a person — it never changes what you report in "cust" or "mine".\n'
++'- "custGrid" / "mineGrid": describe each drawing\'s border reference grid if it has one: cols = how many number columns, rows = how many letter rows, numbers = "right-to-left" or "left-to-right" (the direction the numbers INCREASE), letters = "bottom-to-top" or "top-to-bottom" (the direction A, B, C… run). Use null when that drawing has no border grid.\n'
 +'- One row per feature. Pair features by what they measure, not by wording: "OVERALL LENGTH" and "LG 12.000" are the same row.\n'
 +'- ALWAYS include a row for each of these when either drawing states it: part number (kind "part"), revision ("rev"), material ("material"), thickness ("thickness"), finish ("finish"), quantity ("qty").\n'
 +'- custTitleBlock = the CUSTOMER\'s "unless otherwise specified" default tolerances in decimal inches: frac = fractional, p2 = two-place decimal, p3 = three-place decimal, ang = angular in degrees. Use stated:false and nulls when their block is missing or unreadable. Never put our shop\'s defaults in it.\n'
@@ -1858,6 +1946,28 @@ function dcJudge(row){
   const status = oot ? 'mismatch' : (band.str ? 'match' : (Math.abs(d)<1e-9?'match':'mismatch'));
   return {status, math, delta:+d.toFixed(4), band:band.str||'', bandSrc:band.src};
 }
+// Where a callout sits on a drawing — {page, x, y} as page fractions from top-left.
+// AI-placed and approximate; only ever a pointer for the pin view, never judged.
+// Anything that isn't a usable fraction is dropped rather than drawn in a wrong spot.
+function dcAt(v){
+  if(!v||typeof v!=='object') return null;
+  let x=parseFloat(v.x), y=parseFloat(v.y);
+  if(!isFinite(x)||!isFinite(y)) return null;
+  if((x>1||y>1)&&x<=100&&y<=100){ x/=100; y/=100; }      // a percent slipped through
+  if(x<0||x>1||y<0||y>1) return null;
+  const p=parseInt(v.page,10);
+  const out={page:p>=1?p:1, x:+x.toFixed(4), y:+y.toFixed(4)};
+  if(v.moved){ out.moved=true; out.by=v.by||''; out.at=v.at||0; }   // corrected by hand
+  return out;
+}
+// A drawing's border reference grid, so a zone like "B3" can be shaded when no pin exists.
+function dcGrid(g){
+  if(!g||typeof g!=='object') return null;
+  const cols=parseInt(g.cols,10), rows=parseInt(g.rows,10);
+  if(!(cols>=1&&cols<=40&&rows>=1&&rows<=26)) return null;
+  return {cols, rows, numbers:/^\s*right/i.test(String(g.numbers||''))?'right-to-left':'left-to-right',
+    letters:/^\s*bottom/i.test(String(g.letters||''))?'bottom-to-top':'top-to-bottom'};
+}
 // Judge every row against the CUSTOMER's title-block defaults when their block is
 // legible, otherwise BSMP's standard block. _fairTolDefaults is what defaultTolBand
 // reads, so it's swapped in around the run and put back — the FAIR page owns it.
@@ -1867,7 +1977,8 @@ function dcComputeRows(rows, tolDefaults){
   try{
     return (rows||[]).map(r=>{
       const j=dcJudge(r); if(!j) return null;
-      return Object.assign({feature:r.feature||'', kind:r.kind||'dim', cust:String(r.cust||'').trim(), mine:String(r.mine||'').trim(), zone:String(r.zone||'').trim().toUpperCase(), note:r.note||''}, j);
+      return Object.assign({feature:r.feature||'', kind:r.kind||'dim', cust:String(r.cust||'').trim(), mine:String(r.mine||'').trim(), zone:String(r.zone||'').trim().toUpperCase(),
+        mineZone:String(r.mineZone||'').trim().toUpperCase(), custAt:dcAt(r.custAt), mineAt:dcAt(r.mineAt), note:r.note||''}, j);
     }).filter(Boolean);
   } finally { _fairTolDefaults=saved; }
 }
@@ -2021,8 +2132,10 @@ async function qcDrawCompare(){
     const truncated=!!res.__truncated; delete res.__truncated;
     const tol=dcTolDefaults(res.custTitleBlock);
     const rows=dcComputeRows(res.rows, tol.defaults).sort((a,b)=>(DC_ORDER[a.status]-DC_ORDER[b.status]));
-    const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail));
+    const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail))
+      .map(q=>Object.assign({}, q, {custAt:dcAt(q.custAt)}));
     _dcResult=dcRecomputeVerdict({
+      custGrid:dcGrid(res.custGrid), mineGrid:dcGrid(res.mineGrid),
       ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'',
       summary:(res.summary||'')+(truncated?((res.summary?' ':'')+'⚠ The AI reply was cut off at its length limit — this list may be missing features. Re-run the check to be sure it is complete.'):''),
       rows, questions,
@@ -2065,7 +2178,9 @@ function dcResultHtml(res, where){
           <div class="dc-asks">${t('Acceptable? Say why:')}</div>
           <div class="dc-whys">${DC_WHY.map(x=>`<button class="dc-whybtn" title="${esc(t(x.hint))}" onclick="dcAcceptWhy('${esc(where)}',${i},'${x.k}')">${esc(t(x.l))}</button>`).join('')}</div>
         </div>`);
-    return `<tr class="dc-row dc-${esc(r.status)}${done?' dc-accepted':''}">
+    const key='r:'+i;
+    return `<tr class="dc-row dc-${esc(r.status)}${done?' dc-accepted':''}${_dcv.sel===key?' dc-sel':''}" data-dckey="${key}" onclick="dcRowClick(event,'${esc(where)}','${key}')" title="${esc(t('Click to find it on both drawings'))}">
+      <td class="dc-no"><span class="dcv-dot c-${dcvColor(r)}">${i+1}</span></td>
       <td><b>${esc(r.feature||'—')}</b>${r.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap" title="${esc(t('Where the callout sits on the customer drawing (border grid)'))}"><i class="ti ti-map-pin"></i> ${esc(r.zone)}</span>`:''}${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
       <td class="dc-val">${esc(r.cust)||`<span class="muted">${t('— not stated —')}</span>`}</td>
       <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}</td>
@@ -2079,8 +2194,9 @@ function dcResultHtml(res, where){
   }).join('');
   const qs=(res.questions||[]).map((q,i)=>{
     const qdone=dcQDone(q), qw=qdone?dcQWhyDef(q.qWhy):null;
-    return `<li class="${qdone?'dc-qdone':''}">
-      <b>${esc(q.topic||'')}</b>${q.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap" title="${esc(t('Where this sits on the customer drawing (border grid)'))}"><i class="ti ti-map-pin"></i> ${esc(String(q.zone).toUpperCase())}</span>`:''}${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
+    const key='q:'+i;
+    return `<li class="${qdone?'dc-qdone':''}${_dcv.sel===key?' dc-sel':''}" data-dckey="${key}" onclick="dcRowClick(event,'${esc(where)}','${key}')">
+      <span class="dcv-dot c-${qdone?'off':'q'}">Q${i+1}</span> <b>${esc(q.topic||'')}</b>${q.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap" title="${esc(t('Where this sits on the customer drawing (border grid)'))}"><i class="ti ti-map-pin"></i> ${esc(String(q.zone).toUpperCase())}</span>`:''}${(q.topic&&q.detail)?' — ':''}${esc(q.detail||'')}
       <div class="dc-acc">
         ${qdone
           ? `<div class="dc-why"><i class="ti ti-writing-sign"></i> ${esc(t((qw&&qw.l)||q.qWhy).replace('…',''))}</div>
@@ -2092,20 +2208,506 @@ function dcResultHtml(res, where){
   const tolNote=res.tolFromCustomer
     ? t('Differences are judged against the customer’s title-block tolerances, read off their drawing.')
     : t('The customer’s title block could not be read, so differences are judged against BSMP’s standard block (frac ±1/16, .00 ±.020, .000 ±.005, angular ±1°).');
-  return `${head}
+  return `<div class="dc-res${_dcv.probOnly?' dc-probonly':''}" id="dc-res">${head}
     ${res.summary?`<div style="margin:2px 0 8px">${esc(res.summary)}</div>`:''}
     <div class="dc-chips">${chip('mismatch')}${chip('missing_mine')}${chip('missing_cust')}${chip('match')}${accChip}</div>
+    ${dcViewerHtml(res, where)}
     ${rows?`<div class="dc-tblwrap"><table class="tbl dc-tbl">
-      <thead><tr><th>${t('Feature')}</th><th>${t('Customer drawing')}</th><th>${t('Your drawing')}</th><th>${t('Check')}</th></tr></thead>
+      <thead><tr><th style="width:34px">#</th><th>${t('Feature')}</th><th>${t('Customer drawing')}</th><th>${t('Your drawing')}</th><th>${t('Check')}</th></tr></thead>
       <tbody>${rows}</tbody></table></div>`:`<div class="empty">${t('AI did not read any comparable features — check that both files are the right drawings.')}</div>`}
     ${qs?`<div class="dc-qs"><div class="dc-qs-h"><i class="ti ti-message-question"></i> ${t('Ask the customer')}</div>
       <ul style="margin:6px 0 0;padding-left:18px">${qs}</ul></div>`:''}
     <div class="hint" style="margin-top:8px">${esc(tolNote)}</div>
     <div class="hint">${t('Advisory only — AI reads the drawings, the tolerance math is ours. You still own the final call.')}</div>
     <div class="hint">${t('Signing a difference off never hides it — the finding, its math, your reason and your name all stay on the record.')}</div>
-    ${where!=='live'?'':`<div class="hint" style="margin-top:2px">${t('Values above are copied from each drawing exactly as written; saving keeps them with both files.')}</div>`}`;
+    ${where!=='live'?'':`<div class="hint" style="margin-top:2px">${t('Values above are copied from each drawing exactly as written; saving keeps them with both files.')}</div>`}</div>`;
 }
 function qcDrawRenderResult(){ const p=$('dc-panel'); if(!p||!_dcResult) return; p.style.display='block'; p.innerHTML=dcResultHtml(_dcResult,'live'); }
+
+/* ---- pin view: both drawings side by side, a numbered pin on every callout ----
+   The AI says roughly where each callout sits (custAt / mineAt, page fractions);
+   the pins are pointers only — the table and its math stay the record. A pin's
+   number is its table row (Q1… for questions), its colour is the row's status,
+   grey once signed off. Click a row → both drawings zoom to it; click a pin → the
+   row scrolls into view. Pins are approximate, so a manager can drag one to the
+   right spot (saved per field: qc/drawingChecks/<id>/rows/<i>/custAt). A row with
+   no pin falls back to shading its border-grid zone.
+   Same pan/zoom idea as the First Article viewer (fdv*), but its own state —
+   two panes, pointer events, and a cache so a re-render (every RTDB tick) never
+   re-renders a PDF or loses the zoom. */
+const DCV_MAX_PAGES=6;          // a drawing PDF past 6 sheets: pins on the rest fall back to the table
+const DCV_PAGE_GAP=24;          // grey gap between stacked PDF pages, image px
+const DCV_SIDES=['cust','mine'];
+let _dcv={ where:null, sel:null, pop:null, place:null, probOnly:false, sticky:true, v:{cust:{}, mine:{}} };
+try{ _dcv.sticky=localStorage.getItem('bsmp_dcv_sticky')!=='0'; }catch(e){}
+const _dcvCache={};             // where → {cust:{src,status,img,err}, mine:{…}}
+
+const dcvKeyOf=(key)=>{ const m=/^([rq]):(\d+)$/.exec(String(key||'')); return m?{k:m[1], i:+m[2]}:null; };
+const dcvLabel=(key)=>{ const o=dcvKeyOf(key); return o?(o.k==='q'?'Q'+(o.i+1):String(o.i+1)):''; };
+function dcvColor(r){
+  if(dcIsDeviation(r)&&dcSignedOff(r)) return 'off';
+  return {mismatch:'red', missing_mine:'amber', missing_cust:'blue', match:'green'}[r&&r.status]||'green';
+}
+function dcvItem(res,key){
+  const o=dcvKeyOf(key); if(!o||!res) return null;
+  const it=o.k==='r'?(res.rows||[])[o.i]:(res.questions||[])[o.i];
+  return it?Object.assign({it, key}, o):null;
+}
+// the file behind each pane: a picked File on a live check, the stored {url,name,type} on a saved one
+function dcvSrc(where, side){
+  if(where==='live') return (_pendingFiles[side==='cust'?'dccust':'dcmine']||[])[0]||null;
+  const r=DRAWCHECKS[where]; const f=r&&(side==='cust'?r.custDrawing:r.myDrawing);
+  return (f&&f.url)?f:null;
+}
+const dcvSrcId=(src)=>src?(src instanceof Blob?src:src.url):null;
+// does this drawing state the feature at all? Only then is there a callout to pin.
+const dcvStates=(o,side)=>side==='cust'?(o.k==='q'||!!o.it.cust):(o.k==='r'&&!!o.it.mine);
+
+// Load one drawing into something an <img> can show. Images display straight from
+// their URL (no CORS needed just to look); PDFs are rendered with pdf.js, every
+// page stacked top to bottom so a pin on sheet 2 lands on sheet 2.
+async function dcvLoad(src){
+  const isFile=src instanceof Blob;
+  const isPdf=/pdf/i.test((src.type||'')+' '+(src.name||'')+' '+(isFile?'':String(src.url||'').split('?')[0]));
+  if(!isPdf){
+    const url=isFile?URL.createObjectURL(src):src.url;
+    const im=await loadImg(url,false);
+    const w=im.naturalWidth, h=im.naturalHeight;
+    return {url, blob:isFile, w, h, total:1, pages:[{x0:0,y0:0,w,h}]};
+  }
+  if(typeof pdfjsLib==='undefined') throw new Error('pdf.js not loaded');
+  const pdf=await pdfjsLib.getDocument(isFile?{data:await src.arrayBuffer()}:{url:src.url}).promise;
+  const n=Math.min(pdf.numPages, DCV_MAX_PAGES);
+  const pages=[]; let H=0, W=0;
+  for(let p=1;p<=n;p++){
+    const pg=await pdf.getPage(p); const vp1=pg.getViewport({scale:1});
+    const vp=pg.getViewport({scale:Math.min(3, 2000/Math.max(vp1.width,1))});   // ~2000 px wide — sharp enough to read a callout at zoom
+    if(pages.length && H+DCV_PAGE_GAP+vp.height>15000) break;                    // stay under canvas limits
+    pages.push({pg, vp, y0:pages.length?H+DCV_PAGE_GAP:0});
+    H=(pages.length>1?H+DCV_PAGE_GAP:0)+vp.height; W=Math.max(W,vp.width);
+  }
+  const cv=document.createElement('canvas'); cv.width=Math.ceil(W); cv.height=Math.ceil(H);
+  const ctx=cv.getContext('2d'); ctx.fillStyle='#8a8f96'; ctx.fillRect(0,0,cv.width,cv.height);
+  const out=[];
+  for(const p of pages){
+    const x0=Math.round((W-p.vp.width)/2);
+    const pc=document.createElement('canvas'); pc.width=Math.ceil(p.vp.width); pc.height=Math.ceil(p.vp.height);
+    const pctx=pc.getContext('2d'); pctx.fillStyle='#fff'; pctx.fillRect(0,0,pc.width,pc.height);
+    await p.pg.render({canvasContext:pctx, viewport:p.vp}).promise;
+    ctx.drawImage(pc, x0, Math.round(p.y0));
+    out.push({x0, y0:Math.round(p.y0), w:pc.width, h:pc.height});
+  }
+  const blob=await new Promise(res=>cv.toBlob(res,'image/png'));
+  if(!blob) throw new Error('could not draw the PDF');
+  return {url:URL.createObjectURL(blob), blob:true, w:cv.width, h:cv.height, total:pdf.numPages, pages:out};
+}
+function dcvEnsure(where){
+  const ent=_dcvCache[where]||(_dcvCache[where]={});
+  DCV_SIDES.forEach(side=>{
+    const src=dcvSrc(where,side), id=dcvSrcId(src);
+    const cur=ent[side];
+    if(cur && cur.src===id) return;
+    if(cur&&cur.img&&cur.img.blob){ try{ URL.revokeObjectURL(cur.img.url); }catch(e){} }
+    if(!src){ ent[side]={src:null, status:'none'}; return; }
+    const slot=ent[side]={src:id, status:'loading'};
+    dcvLoad(src).then(img=>{ slot.status='ok'; slot.img=img; })
+      .catch(e=>{ console.warn('pin view: drawing did not load', e); slot.status='err'; slot.err=(e&&e.message)||String(e); })
+      .then(()=>{ if(ent[side]===slot && _dcv.where===where) dcvRefreshPane(side); });
+  });
+  return ent;
+}
+
+// ---- where a pin / zone sits, in image pixels ----
+function dcvAtPx(img, at){
+  if(!img||!at) return null;
+  const p=img.pages[(at.page||1)-1]; if(!p) return null;              // past the rendered pages
+  return {X:p.x0+at.x*p.w, Y:p.y0+at.y*p.h};
+}
+function dcvPxToAt(img, X, Y){
+  let best=0, bd=Infinity;
+  img.pages.forEach((p,k)=>{ const d=Y<p.y0?p.y0-Y:(Y>p.y0+p.h?Y-(p.y0+p.h):0); if(d<bd){ bd=d; best=k; } });
+  const p=img.pages[best], cl=(v)=>Math.max(0,Math.min(1,v));
+  return {page:best+1, x:+cl((X-p.x0)/p.w).toFixed(4), y:+cl((Y-p.y0)/p.h).toFixed(4)};
+}
+// "B3" → that cell of the border grid on sheet 1. The frame sits just inside the
+// paper edge, so the cells are laid over the inner ~95% — approximate on purpose.
+function dcvZoneRect(img, zone, grid){
+  if(!img||!zone||!grid) return null;
+  const z=String(zone).toUpperCase().replace(/[\s-]/g,'');
+  const m=/^([A-Z])(\d{1,2})$/.exec(z)||/^(\d{1,2})([A-Z])$/.exec(z); if(!m) return null;
+  const L=/[A-Z]/.test(m[1])?m[1]:m[2], N=+(/\d/.test(m[1])?m[1]:m[2]);
+  const li=L.charCodeAt(0)-65, ni=N-1;
+  if(li<0||li>=grid.rows||ni<0||ni>=grid.cols) return null;
+  const col=grid.numbers==='right-to-left'?grid.cols-1-ni:ni;
+  const row=grid.letters==='bottom-to-top'?grid.rows-1-li:li;
+  const p=img.pages[0], ins=0.025, iw=p.w*(1-2*ins), ih=p.h*(1-2*ins);
+  return {X:p.x0+p.w*ins+col*iw/grid.cols, Y:p.y0+p.h*ins+row*ih/grid.rows, W:iw/grid.cols, H:ih/grid.rows};
+}
+// every mark on one pane: pins where a location is known, a shaded zone where only the grid cell is
+function dcvMarks(res, side, img){
+  const out=[]; if(!img) return out;
+  const grid=side==='cust'?res.custGrid:res.mineGrid;
+  const add=(key, it, c)=>{
+    const at=side==='cust'?it.custAt:(dcvKeyOf(key).k==='r'?it.mineAt:null);
+    const px=dcvAtPx(img, at);
+    if(px){ out.push({key, c, pin:true, X:px.X, Y:px.Y, moved:!!(at&&at.moved)}); return; }
+    const zone=side==='cust'?it.zone:(dcvKeyOf(key).k==='r'?it.mineZone:'');
+    const rc=dcvZoneRect(img, zone, grid);
+    if(rc) out.push(Object.assign({key, c, pin:false}, rc));
+  };
+  (res.rows||[]).forEach((r,i)=>{ if(r) add('r:'+i, r, dcvColor(r)); });
+  if(side==='cust') (res.questions||[]).forEach((q,i)=>{ if(q) add('q:'+i, q, dcQDone(q)?'off':'q'); });
+  // several rows in one zone: step their badges along so each number stays readable
+  const seen={};
+  out.filter(m=>!m.pin).forEach(m=>{ const k=Math.round(m.X)+','+Math.round(m.Y); m.slot=seen[k]=(seen[k]||0)+1; });
+  return out;
+}
+
+// ---- markup ----
+function dcViewerHtml(res, where){
+  if(!dcvSrc(where,'cust') && !dcvSrc(where,'mine')) return '';
+  if(_dcv.where!==where){ _dcv.where=where; _dcv.sel=null; _dcv.pop=null; _dcv.place=null; _dcv.v={cust:{}, mine:{}}; }
+  const ent=dcvEnsure(where);
+  const bad=DCV_SIDES.filter(s=>ent[s].status==='err').length, have=DCV_SIDES.filter(s=>ent[s].status!=='none').length;
+  if(have && bad===have){
+    return `<div class="dcv-fail"><i class="ti ti-photo-off"></i> ${t('The drawings could not be loaded here, so the pin view is off — every finding is still in the table below. Use the file buttons to open each drawing.')}</div>`;
+  }
+  const pos=(res.rows||[]).some(r=>r&&(r.custAt||r.mineAt)) || (res.questions||[]).some(q=>q&&q.custAt);
+  return `<div class="dcv${_dcv.sticky?' sticky':''}" id="dcv">
+    <div class="dcv-bar">
+      <b><i class="ti ti-map-pins"></i> ${t('On the drawings')}</b>
+      <span class="dcv-note"><i class="ti ti-info-circle"></i> ${pos?t('Pins are placed by AI and approximate — drag one onto its callout to correct it.'):t('No pin locations on this check — click a row, then place its pin.')}</span>
+      <span class="dcv-tools">
+        <label class="dcv-tog"><input type="checkbox" ${_dcv.probOnly?'checked':''} onchange="dcvProblems(this.checked)"> ${t('Problems only')}</label>
+        <label class="dcv-tog" title="${esc(t('Keep the drawings on screen while you scroll the table'))}"><input type="checkbox" ${_dcv.sticky?'checked':''} onchange="dcvSticky(this.checked)"> ${t('Keep in view')}</label>
+      </span>
+    </div>
+    <div class="dcv-pair">${DCV_SIDES.map(s=>`<div class="dcv-pane" id="dcv-p-${s}">${dcvPaneInner(s)}</div>`).join('')}</div>
+    <div class="dcv-legend">
+      <span><i class="dcv-dot c-red">1</i>${t('Does not match')}</span><span><i class="dcv-dot c-amber">1</i>${t('Not on your drawing')}</span>
+      <span><i class="dcv-dot c-blue">1</i>${t('Customer never states it')}</span><span><i class="dcv-dot c-green">1</i>${t('Matches')}</span>
+      <span><i class="dcv-dot c-q">Q</i>${t('Question')}</span><span><i class="dcv-dot c-off">1</i>${t('Signed off')}</span>
+      <span><i class="dcv-zonekey"></i>${t('Grid zone only (no pin)')}</span>
+    </div>
+  </div>`;
+}
+function dcvPaneInner(side){
+  const where=_dcv.where, ent=_dcvCache[where]||{}, slot=ent[side]||{status:'none'};
+  const lbl=side==='cust'
+    ? `<i class="ti ti-file-text" style="color:var(--blue)"></i> ${t('Customer drawing')}`
+    : `<i class="ti ti-file-vector" style="color:var(--green)"></i> ${t('Your drawing')}`;
+  let body;
+  if(slot.status==='ok'){
+    const img=slot.img;
+    const more=img.total>img.pages.length?`<div class="dcv-more">${t('Showing the first')} ${img.pages.length} ${t('of')} ${img.total} ${t('pages')}</div>`:'';
+    body=`<div class="dcv-canvas${_dcv.place&&_dcv.place.side===side?' placing':''}" id="dcv-c-${side}">
+        <img class="dcv-img" id="dcv-i-${side}" src="${esc(img.url)}" draggable="false" alt="" onload="dcvInit('${side}')">
+        <div class="dcv-layer" id="dcv-l-${side}"></div>
+      </div>${more}
+      <div class="dcv-ctrls">
+        <button onclick="dcvZoomBtn('${side}',-1)" title="${esc(t('Zoom out (−)'))}"><i class="ti ti-minus"></i></button>
+        <button onclick="dcvFit('${side}')" title="${esc(t('Fit'))}"><i class="ti ti-arrows-minimize"></i></button>
+        <span class="fdv-pct" id="dcv-pct-${side}">—</span>
+        <button onclick="dcvZoomBtn('${side}',1)" title="${esc(t('Zoom in'))}"><i class="ti ti-plus"></i></button>
+      </div>
+      <div class="dcv-over" id="dcv-o-${side}"></div>`;
+  } else if(slot.status==='err'){
+    body=`<div class="dcv-msg"><i class="ti ti-photo-off"></i><div>${t('This drawing could not be loaded here — the table below still has every finding.')}</div><div class="muted" style="font-size:11px">${esc(slot.err||'')}</div></div>`;
+  } else if(slot.status==='none'){
+    body=`<div class="dcv-msg"><i class="ti ti-file-off"></i><div>${t('No drawing on file')}</div></div>`;
+  } else {
+    body=`<div class="dcv-msg"><i class="ti ti-loader-2 spin"></i><div>${t('Loading drawing…')}</div></div>`;
+  }
+  return `<div class="dcv-lbl">${lbl}</div>${body}`;
+}
+function dcvRefreshPane(side){
+  const p=$('dcv-p-'+side); if(!p) return;
+  const ent=_dcvCache[_dcv.where]||{};
+  if(DCV_SIDES.every(s=>(ent[s]||{}).status==='err')){ dcvRerender(); return; }   // both failed → table-only note
+  p.innerHTML=dcvPaneInner(side);
+}
+function dcvRerender(){ if(_dcv.where==='live') qcDrawRenderResult(); else render(); }
+
+// ---- pan / zoom ----
+const dcvEls=(side)=>({c:$('dcv-c-'+side), i:$('dcv-i-'+side), l:$('dcv-l-'+side)});
+function dcvImg(side){ const s=(_dcvCache[_dcv.where]||{})[side]; return s&&s.status==='ok'?s.img:null; }
+function dcvApply(side){
+  const {i}=dcvEls(side), v=_dcv.v[side]; if(!i||!v.s) return;
+  i.style.transform='translate('+v.x+'px,'+v.y+'px) scale('+v.s+')';
+  const p=$('dcv-pct-'+side); if(p) p.textContent=Math.round(v.s/(v.fit||v.s)*100)+'%';
+  dcvPosition(side);
+}
+window.dcvFit=(side)=>{
+  const {c}=dcvEls(side), img=dcvImg(side); if(!c||!img||!c.clientWidth) return;
+  const v=_dcv.v[side], s=Math.min(c.clientWidth/img.w, c.clientHeight/img.h)||1;
+  v.s=s; v.fit=s; v.x=(c.clientWidth-img.w*s)/2; v.y=(c.clientHeight-img.h*s)/2; dcvApply(side);
+};
+function dcvZoomAt(side,f,cx,cy){
+  const {c}=dcvEls(side), v=_dcv.v[side]; if(!c||!v.s) return;
+  if(cx==null){ cx=c.clientWidth/2; cy=c.clientHeight/2; }
+  const ns=Math.max((v.fit||0.05)*0.6, Math.min(v.s*f, (v.fit||0.05)*40, 6));
+  v.x=cx-(cx-v.x)*(ns/v.s); v.y=cy-(cy-v.y)*(ns/v.s); v.s=ns; dcvApply(side);
+}
+window.dcvZoomBtn=(side,dir)=>dcvZoomAt(side, dir>0?1.35:1/1.35);
+// glide to a view instead of jumping, so the eye follows which way it moved
+function dcvAnimTo(side, ts, tx, ty){
+  const v=_dcv.v[side]; if(!v.s) return;
+  cancelAnimationFrame(v.raf);
+  const s0=v.s, x0=v.x, y0=v.y, t0=performance.now(), D=280;
+  const step=(now)=>{ let k=Math.min(1,(now-t0)/D); k=1-Math.pow(1-k,3);
+    v.s=s0+(ts-s0)*k; v.x=x0+(tx-x0)*k; v.y=y0+(ty-y0)*k; dcvApply(side);
+    if(k<1) v.raf=requestAnimationFrame(step); };
+  v.raf=requestAnimationFrame(step);
+}
+window.dcvInit=(side)=>{
+  const {c}=dcvEls(side), img=dcvImg(side); if(!c||!img) return;
+  const v=_dcv.v[side];
+  if(v.src===img.url && v.s){                    // same drawing after a re-render — keep the zoom
+    v.fit=Math.min(c.clientWidth/img.w, c.clientHeight/img.h)||v.fit; dcvRenderLayer(side); dcvApply(side);
+  } else { v.src=img.url; dcvFit(side); dcvRenderLayer(side); }
+  dcvBind(side); dcvRenderOver(side);
+  if(_dcv.pop&&_dcv.pop.side===side) dcvRenderPop();   // a re-render rebuilt the pane — bring the popup back
+};
+
+// ---- the marks layer ----
+function dcvRenderLayer(side){
+  const {l}=dcvEls(side), res=dcResOf(_dcv.where), img=dcvImg(side); if(!l||!res||!img) return;
+  l.innerHTML=dcvMarks(res, side, img).map(m=>m.pin
+    ? `<div class="dcv-pin c-${m.c}${m.moved?' moved':''}${_dcv.sel===m.key?' sel':''}" data-key="${m.key}" data-x="${m.X}" data-y="${m.Y}" title="${esc(m.moved?t('Pin moved by hand'):t('Placed by AI — approximate'))}"><b>${dcvLabel(m.key)}</b></div>`
+    : `<div class="dcv-zone c-${m.c}${_dcv.sel===m.key?' sel':''}" data-key="${m.key}" data-x="${m.X}" data-y="${m.Y}" data-w="${m.W}" data-h="${m.H}" data-slot="${m.slot||1}" title="${esc(t('Approximate — the grid zone the AI named, no exact spot'))}"><span>${dcvLabel(m.key)}</span></div>`
+  ).join('');
+  dcvPosition(side);
+}
+function dcvPosition(side){
+  const {c,l}=dcvEls(side), v=_dcv.v[side]; if(!c||!l||!v.s) return;
+  const cw=c.clientWidth, ch=c.clientHeight;
+  l.querySelectorAll('.dcv-pin,.dcv-zone').forEach(el=>{
+    if(el.classList.contains('dragging')) return;
+    const x=v.x+(+el.dataset.x)*v.s, y=v.y+(+el.dataset.y)*v.s;
+    el.style.left=x+'px'; el.style.top=y+'px';
+    if(el.classList.contains('dcv-zone')){
+      const w=(+el.dataset.w)*v.s, h=(+el.dataset.h)*v.s;
+      el.style.width=w+'px'; el.style.height=h+'px';
+      const sp=el.firstElementChild; if(sp) sp.style.left=((+el.dataset.slot-1)*20)+'px';
+      el.style.display=(x+w<0||y+h<0||x>cw||y>ch)?'none':'block';
+    } else el.style.display=(x<-16||y<-16||x>cw+16||y>ch+16)?'none':'block';
+  });
+  dcvPlacePop();
+}
+// the overlay strip on a pane: "click where it goes" while placing, or "not marked here" for the selected row
+function dcvRenderOver(side){
+  const o=$('dcv-o-'+side); if(!o) return;
+  const res=dcResOf(_dcv.where), img=dcvImg(side);
+  if(_dcv.place&&_dcv.place.side===side){
+    o.innerHTML=`<div class="dcv-placebar"><i class="ti ti-pointer"></i> ${t('Click the drawing where')} <b>${esc(dcvLabel(_dcv.place.key))}</b> ${t('sits')} <button class="btn sm" onclick="dcvPlaceCancel()">${t('Cancel')}</button></div>`;
+    return;
+  }
+  const sel=_dcv.sel&&dcvItem(res,_dcv.sel);
+  if(sel && img && !dcvMarks(res, side, img).some(m=>m.key===_dcv.sel)){
+    const dot=`<span class="dcv-dot c-${sel.k==='q'?(dcQDone(sel.it)?'off':'q'):dcvColor(sel.it)}">${esc(dcvLabel(_dcv.sel))}</span>`;
+    o.innerHTML=dcvStates(sel, side)
+      ? `<div class="dcv-placebar">${dot} ${t('isn’t marked on this drawing')} <button class="btn sm" onclick="dcvPlaceStart('${side}','${_dcv.sel}')"><i class="ti ti-map-pin-plus"></i> ${t('Place it')}</button></div>`
+      : `<div class="dcv-placebar">${dot} ${t('isn’t on this drawing')}</div>`;
+    return;
+  }
+  o.innerHTML='';
+}
+
+// ---- pointer handling: pan, pinch, drag a pin, tap a pin / zone ----
+function dcvBind(side){
+  const c=$('dcv-c-'+side); if(!c||c._dcvBound) return; c._dcvBound=true;
+  const ptrs=new Map(); let drag=null, pinch=null;
+  const local=(e)=>{ const r=c.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; };
+  c.onwheel=(e)=>{ e.preventDefault(); const p=local(e); dcvZoomAt(side, e.deltaY<0?1.2:1/1.2, p.x, p.y); };
+  c.onpointerdown=(e)=>{
+    if(e.button>0) return;
+    try{ c.setPointerCapture(e.pointerId); }catch(_){}
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y)||1, s:_dcv.v[side].s}; if(drag&&drag.pin){ drag.pin.classList.remove('dragging'); dcvPosition(side); } drag=null; return; }
+    const hit=e.target.closest('.dcv-pin,.dcv-zone');
+    drag={x0:e.clientX, y0:e.clientY, lx:e.clientX, ly:e.clientY, moved:false, hit, pin:(hit&&hit.classList.contains('dcv-pin'))?hit:null};
+    e.preventDefault();
+  };
+  c.onpointermove=(e)=>{
+    if(!ptrs.has(e.pointerId)) return;
+    ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const v=_dcv.v[side];
+    if(pinch&&ptrs.size===2){
+      const [a,b]=[...ptrs.values()], r=c.getBoundingClientRect();
+      const f=(Math.hypot(a.x-b.x,a.y-b.y)/pinch.d)*pinch.s/v.s;
+      dcvZoomAt(side, f, (a.x+b.x)/2-r.left, (a.y+b.y)/2-r.top); return;
+    }
+    if(!drag) return;
+    if(!drag.moved && Math.hypot(e.clientX-drag.x0, e.clientY-drag.y0)>4) drag.moved=true;
+    if(!drag.moved) return;
+    if(drag.pin){ const p=local(e); drag.pin.classList.add('dragging'); drag.pin.style.left=p.x+'px'; drag.pin.style.top=p.y+'px'; }
+    else { v.x+=e.clientX-drag.lx; v.y+=e.clientY-drag.ly; c.classList.add('grabbing'); dcvApply(side); }
+    drag.lx=e.clientX; drag.ly=e.clientY;
+  };
+  const end=(e)=>{
+    ptrs.delete(e.pointerId); if(ptrs.size<2) pinch=null;
+    const d=drag; drag=null; c.classList.remove('grabbing');
+    if(!d) return;
+    if(e.type==='pointercancel'){ if(d.pin){ d.pin.classList.remove('dragging'); dcvPosition(side); } return; }
+    const p=local(e), v=_dcv.v[side];
+    if(d.pin&&d.moved){ dcvDropPin(side, d.pin.dataset.key, (p.x-v.x)/v.s, (p.y-v.y)/v.s); return; }
+    if(d.moved) return;
+    if(_dcv.place&&_dcv.place.side===side){ const k=_dcv.place.key; _dcv.place=null; c.classList.remove('placing'); dcvDropPin(side, k, (p.x-v.x)/v.s, (p.y-v.y)/v.s); return; }
+    if(d.hit){ dcvPick(side, d.hit.dataset.key); return; }
+    if(_dcv.pop){ _dcv.pop=null; dcvRenderPop(); }
+  };
+  c.onpointerup=end; c.onpointercancel=end;
+}
+
+// ---- selecting ----
+function dcvMarkSel(){
+  document.querySelectorAll('.dcv-pin.sel,.dcv-zone.sel,.dc-sel').forEach(el=>el.classList.remove('sel','dc-sel'));
+  if(!_dcv.sel) return;
+  document.querySelectorAll('.dcv-pin[data-key="'+_dcv.sel+'"],.dcv-zone[data-key="'+_dcv.sel+'"]').forEach(el=>el.classList.add('sel'));
+  document.querySelectorAll('[data-dckey="'+_dcv.sel+'"]').forEach(el=>el.classList.add('dc-sel'));
+}
+function dcvFlash(sel){
+  document.querySelectorAll(sel).forEach(el=>{ el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); setTimeout(()=>el.classList.remove('flash'),1900); });
+}
+// a row (or question) was clicked → both drawings glide to it and its pins flash
+window.dcRowClick=(ev,where,key)=>{
+  if(ev&&ev.target&&ev.target.closest('button,input,a,textarea,select,label')) return;   // sign-off controls keep working
+  if(_dcv.where!==where) return;
+  _dcv.sel=key; _dcv.pop=null; _dcv.place=null;
+  dcvMarkSel(); dcvRenderPop();
+  const res=dcResOf(where);
+  DCV_SIDES.forEach(side=>{
+    dcvRenderOver(side);
+    const {c}=dcvEls(side), img=dcvImg(side), v=_dcv.v[side]; if(!c||!img||!v.s) return;
+    const m=dcvMarks(res, side, img).find(x=>x.key===key);
+    const cw=c.clientWidth, ch=c.clientHeight;
+    if(!m){ dcvAnimTo(side, v.fit, (cw-img.w*v.fit)/2, (ch-img.h*v.fit)/2); return; }
+    if(m.pin){
+      const ts=Math.max(v.fit*3.2, Math.min(v.s, v.fit*10));
+      dcvAnimTo(side, ts, cw/2-m.X*ts, ch/2-m.Y*ts);
+    } else {
+      const ts=Math.max(v.fit, Math.min(cw*0.8/m.W, ch*0.8/m.H));
+      dcvAnimTo(side, ts, cw/2-(m.X+m.W/2)*ts, ch/2-(m.Y+m.H/2)*ts);
+    }
+  });
+  setTimeout(()=>dcvFlash('.dcv-pin[data-key="'+key+'"],.dcv-zone[data-key="'+key+'"]'), 300);
+  const vEl=$('dcv'); if(vEl&&!_dcv.sticky){ const b=vEl.getBoundingClientRect(); if(b.bottom<100||b.top>innerHeight-80) vEl.scrollIntoView({block:'nearest',behavior:'smooth'}); }
+};
+// a pin was tapped → its popup opens, and the table row scrolls into view
+function dcvPick(side, key){
+  _dcv.sel=key; _dcv.pop={side, key}; _dcv.place=null;
+  dcvMarkSel(); dcvRenderPop(); DCV_SIDES.forEach(dcvRenderOver);
+  dcvFlash('.dcv-pin[data-key="'+key+'"],.dcv-zone[data-key="'+key+'"]');
+  const row=document.querySelector('[data-dckey="'+key+'"]'); if(!row) return;
+  // keep the row clear of the sticky topbar + the stuck drawings, and above the dock
+  const tb=document.querySelector('.topbar'), dock=$('qc-dock'), vEl=$('dcv');
+  let top=(tb?tb.getBoundingClientRect().bottom:0)+8;
+  if(vEl&&_dcv.sticky&&getComputedStyle(vEl).position==='sticky') top+=vEl.offsetHeight;
+  const bottom=(dock&&getComputedStyle(dock).display!=='none'?dock.getBoundingClientRect().top:innerHeight)-8;
+  const r=row.getBoundingClientRect();
+  if(r.top<top||r.bottom>bottom) window.scrollBy({top:r.top-top, behavior:'smooth'});
+  dcvFlash('[data-dckey="'+key+'"]');
+}
+
+// ---- the popup: the row's own text and math, right at the pin ----
+function dcvPopHtml(res, key, side){
+  const o=dcvItem(res,key); if(!o) return '';
+  const it=o.it, other=side==='cust'?'mine':'cust';
+  const at=side==='cust'?it.custAt:(o.k==='r'?it.mineAt:null);
+  const zone=side==='cust'?it.zone:(o.k==='r'?it.mineZone:'');
+  let body;
+  if(o.k==='r'){
+    const s=DC_STATUS[it.status]||DC_STATUS.match, done=dcSignedOff(it), w=done?dcWhyDef(it.acceptWhy):null;
+    body=`<div class="dcv-pop-h"><span class="dcv-dot c-${dcvColor(it)}">${o.i+1}</span> <b>${esc(it.feature||'—')}</b></div>
+      <div class="dcv-pop-st" style="color:${s.c}"><i class="ti ${s.ic}"></i> ${t(s.l)}</div>
+      <div class="dcv-pop-kv"><span>${t('Customer drawing')}</span><code>${esc(it.cust)||`<i class="muted">${t('— not stated —')}</i>`}</code></div>
+      <div class="dcv-pop-kv"><span>${t('Your drawing')}</span><code>${esc(it.mine)||`<i class="muted">${t('— not stated —')}</i>`}</code></div>
+      ${it.math?`<div class="dcv-pop-math">${esc(it.math)}</div>`:''}
+      ${done?`<div class="dcv-pop-off"><i class="ti ti-writing-sign"></i> ${esc(t((w&&w.l)||it.acceptWhy))}${it.acceptNote?': '+esc(it.acceptNote):''} · ${esc((it.acceptBy||'').split('@')[0])}</div>`:''}`;
+  } else {
+    const done=dcQDone(it), qw=done?dcQWhyDef(it.qWhy):null;
+    body=`<div class="dcv-pop-h"><span class="dcv-dot c-${done?'off':'q'}">Q${o.i+1}</span> <b>${esc(it.topic||'')}</b></div>
+      <div style="margin-top:4px">${esc(it.detail||'')}</div>
+      ${done?`<div class="dcv-pop-off"><i class="ti ti-writing-sign"></i> ${esc(t((qw&&qw.l)||it.qWhy).replace('…',''))}${it.answer?': '+esc(it.answer):''}</div>`:''}`;
+  }
+  const where_=at?(at.moved?`${t('Pin moved by')} ${esc((at.by||'').split('@')[0]||t('hand'))}${at.at?' · '+fmtWhen(at.at):''}`:t('Placed by AI — approximate. Drag the pin onto the callout to correct it.'))
+    :(zone?`${t('No exact spot — shaded zone')} ${esc(zone)} ${t('is approximate.')}`:'');
+  const otherHas=dcvStates(o,other)&&dcvImg(other)&&!dcvMarks(res, other, dcvImg(other)).some(m=>m.key===key && m.pin);
+  return `<button class="dcv-pop-x" onclick="dcvPopClose()" title="${esc(t('Close'))}"><i class="ti ti-x"></i></button>${body}
+    ${where_?`<div class="dcv-pop-loc"><i class="ti ti-map-pin"></i> ${where_}</div>`:''}
+    <div class="dcv-pop-act">
+      ${!at&&dcvStates(o,side)?`<button class="btn sm" onclick="dcvPlaceStart('${side}','${key}')"><i class="ti ti-map-pin-plus"></i> ${t('Place a pin here')}</button>`:''}
+      ${otherHas?`<button class="btn sm" onclick="dcvPlaceStart('${other}','${key}')"><i class="ti ti-map-pin-plus"></i> ${other==='mine'?t('Place on your drawing'):t('Place on customer drawing')}</button>`:''}
+    </div>`;
+}
+function dcvRenderPop(){
+  DCV_SIDES.forEach(side=>{ const old=$('dcv-pop-'+side); if(old) old.remove(); });
+  if(!_dcv.pop) return;
+  const pane=$('dcv-p-'+_dcv.pop.side), res=dcResOf(_dcv.where); if(!pane||!res) return;
+  const html=dcvPopHtml(res, _dcv.pop.key, _dcv.pop.side); if(!html) return;
+  const el=document.createElement('div'); el.className='dcv-pop'; el.id='dcv-pop-'+_dcv.pop.side; el.innerHTML=html;
+  el.onpointerdown=(e)=>e.stopPropagation();
+  pane.appendChild(el); dcvPlacePop();
+}
+// keep the popup beside its pin as the drawing pans/zooms, clamped inside the pane
+function dcvPlacePop(){
+  if(!_dcv.pop) return;
+  const el=$('dcv-pop-'+_dcv.pop.side), pane=$('dcv-p-'+_dcv.pop.side), c=$('dcv-c-'+_dcv.pop.side); if(!el||!pane||!c) return;
+  const mk=c.querySelector('[data-key="'+_dcv.pop.key+'"]');
+  const pr=pane.getBoundingClientRect(), cr=c.getBoundingClientRect();
+  let ax=cr.width/2, ay=cr.height/2;
+  if(mk&&mk.style.display!=='none'){ const r=mk.getBoundingClientRect(); ax=r.left+r.width/2-cr.left; ay=(mk.classList.contains('dcv-zone')?r.top:r.top+r.height/2)-cr.top; }
+  const ox=cr.left-pr.left, oy=cr.top-pr.top, w=el.offsetWidth, h=el.offsetHeight;
+  const px=ox+ax, py=oy+ay, pw=pr.width;
+  let x, y;
+  if(px+16+w<=pw-6 || px-16-w>=6){                       // beside the pin — right, else left
+    x=(px+16+w<=pw-6)?px+16:px-16-w;
+    y=Math.max(oy+4, Math.min(py-18, oy+cr.height-h-4));
+  } else {                                               // narrow pane: above the pin, else below it — never on top of it
+    x=Math.max(6, Math.min(px-w/2, pw-w-6));
+    y=(py-24-h>=oy+4)?py-24-h:py+24;
+  }
+  el.style.left=x+'px'; el.style.top=y+'px';
+}
+window.dcvPopClose=()=>{ _dcv.pop=null; dcvRenderPop(); };
+
+// ---- moving / placing a pin ----
+window.dcvPlaceStart=(side,key)=>{
+  _dcv.place={side,key}; _dcv.pop=null; dcvRenderPop();
+  DCV_SIDES.forEach(s=>{ const c=$('dcv-c-'+s); if(c) c.classList.toggle('placing', s===side); dcvRenderOver(s); });
+};
+window.dcvPlaceCancel=()=>{ _dcv.place=null; DCV_SIDES.forEach(s=>{ const c=$('dcv-c-'+s); if(c) c.classList.remove('placing'); dcvRenderOver(s); }); };
+async function dcvDropPin(side, key, X, Y){
+  const where=_dcv.where, res=dcResOf(where), img=dcvImg(side), o=dcvItem(res,key);
+  if(!res||!img||!o) return;
+  const field=side==='cust'?'custAt':'mineAt';
+  if(o.k==='q'&&field!=='custAt') return;
+  const at=Object.assign(dcvPxToAt(img, X, Y), {moved:true, by:(QC_USER&&QC_USER.email)||'', at:Date.now()});
+  o.it[field]=at;
+  _dcv.sel=key; _dcv.pop={side,key};
+  dcvRenderLayer(side); DCV_SIDES.forEach(dcvRenderOver); dcvMarkSel(); dcvRenderPop();
+  if(where==='live') return;                    // saved with the check when you press Save
+  try{ await dbSet('qc/drawingChecks/'+where+'/'+(o.k==='r'?'rows':'questions')+'/'+o.i+'/'+field, at); }   // one field — never the record or the collection
+  catch(e){ console.error('pin save failed', e); }
+}
+window.dcvProblems=(on)=>{
+  _dcv.probOnly=!!on;
+  const w=$('dc-res'); if(w) w.classList.toggle('dc-probonly', _dcv.probOnly);
+  if(_dcv.probOnly&&_dcv.pop){ const o=dcvItem(dcResOf(_dcv.where),_dcv.pop.key); if(o&&o.k==='r'&&dcvColor(o.it)==='green'){ _dcv.pop=null; dcvRenderPop(); } }
+};
+window.dcvSticky=(on)=>{
+  _dcv.sticky=!!on; try{ localStorage.setItem('bsmp_dcv_sticky', on?'1':'0'); }catch(e){}
+  const v=$('dcv'); if(v) v.classList.toggle('sticky', _dcv.sticky);
+  DCV_SIDES.forEach(s=>{ const c=$('dcv-c-'+s); if(c){ const img=dcvImg(s), vv=_dcv.v[s]; if(img&&vv.s) vv.fit=Math.min(c.clientWidth/img.w, c.clientHeight/img.h)||vv.fit; dcvFit(s); } });
+};
+// a live check just got saved: its rendered drawings and zoom carry over to the saved record
+function dcvAdopt(id, cf, mf){
+  const ent=_dcvCache['live']; if(!ent) return;
+  if(ent.cust&&cf&&cf.url) ent.cust.src=cf.url; else delete ent.cust;
+  if(ent.mine&&mf&&mf.url) ent.mine.src=mf.url; else delete ent.mine;
+  _dcvCache[id]=ent; delete _dcvCache['live'];
+  if(_dcv.where==='live') _dcv.where=id;
+}
 
 // ── printable drawing check — same paper style as the orders confirmation ─────
 // Everything on the record prints: each row's values, math, and sign-off reason,
@@ -2312,6 +2914,7 @@ window.qcSaveDrawCheck=async ()=>{
     try{ await qcLogAudit([{ drawCheckId:id, partNum:part, field:'drawcheck', action:'ai-drawing-check', verdict:rec.verdict||'',
       note:(rec.summary||'')+' · '+(rec.rows||[]).filter(r=>r.status==='mismatch').length+' mismatch, '+(rec.questions||[]).length+' question(s)' }]); }
     catch(e){ console.error('audit log failed', e); }
+    dcvAdopt(id, cf[0], mf[0]);                       // the pin view keeps its rendered drawings + zoom
     _dcResult=null; _dcView=id;
     qcToast(t('Drawing check saved.'),'ok');
     render();                                         // rebuilds the page, button comes back fresh
