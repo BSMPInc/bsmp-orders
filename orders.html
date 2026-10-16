@@ -13,6 +13,7 @@
 <!-- pdf.js: first-page thumbnails of PDF drawings on the Work Queues board (same version as quote/qc) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>try{if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){}</script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -500,20 +501,11 @@ tr:hover .del-btn{opacity:1}
 .cmp-h b{flex:1;min-width:0;font-weight:600;color:var(--text);word-break:break-word}
 .cmp-body{font-size:12.5px;line-height:1.55;color:var(--text);border:1px solid var(--border);border-radius:9px;
   padding:11px 13px;background:#fff;max-height:230px;overflow:auto}
-.cmp-tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:9px;margin-top:8px;background:#fff}
-/* the global `table{min-width:1020px;table-layout:fixed}` is for the orders grid
-   and would blow this one out to 1020px with the money columns pushed off — opt
-   out of both, the same way .att-table does */
-.cmp-tbl{width:100%!important;min-width:0!important;table-layout:auto!important;border-collapse:collapse;font-size:12px}
-.cmp-tbl th{background:var(--bg);font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;
-  color:var(--text2);padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
-.cmp-tbl td{padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text)}
-/* the description takes the slack and wraps; qty/rate/amount shrink to their
-   content, so the money columns stay on screen instead of being scrolled off */
-.cmp-tbl th:first-child,.cmp-tbl td:first-child{width:100%}
-.cmp-tbl th:not(:first-child),.cmp-tbl td:not(:first-child){white-space:nowrap}
-.cmp-tbl tbody tr:last-child td{border-bottom:0}
-.cmp-tbl tfoot td{font-weight:800;background:var(--bg);border-top:1px solid var(--border2);border-bottom:0}
+/* the attached PDF (the printed ticket) — one chip, like a mail attachment */
+.cmp-att{display:flex;align-items:center;gap:9px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:#fff}
+.cmp-att>.ti{font-size:22px;color:#c0392b;flex-shrink:0}
+.cmp-attname{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-att .btn{flex-shrink:0;padding:5px 10px;font-size:12px}
 .cmp-tblnote{font-size:10.5px;color:var(--text3);margin-top:5px;line-height:1.4}
 .cmp-notes{width:100%;box-sizing:border-box;margin-top:5px;font-family:inherit;font-size:12.5px;
   padding:8px 10px;border:1px solid var(--border);border-radius:8px;resize:vertical}
@@ -4700,13 +4692,69 @@ window._confirmNotesInput=()=>{
   saveDB();
 };
 function openModalById(mid){ const el=document.getElementById(mid); if(el) el.style.display='flex'; }
-window.printConfirmation=()=>{
-  const node=document.getElementById('confirm-ticket-inner'); if(!node) return;
+// "Customer - PO 123 - Order Confirmation" — the printed copy's default filename
+// and the emailed PDF's name, so the two always match
+function _confirmFileTitle(){
   const po=(_confirmMeta.po||'').trim();
   const cust=(_confirmMeta.customer||'').trim();
-  // Browsers use the document title as the default PDF filename — build it from PO + customer.
   const raw=(cust?cust+' - ':'') + (po?'PO '+po+' - ':'') + 'Order Confirmation';
-  const fileTitle=raw.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim() || 'Order Confirmation';
+  return raw.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim() || 'Order Confirmation';
+}
+// The ticket on screen as a Letter-size PDF — the same page Print / Save PDF
+// gives, so what the customer gets attached is what we'd have printed. Drawn in a
+// bare frame like the print window (this page's own CSS — e.g. the orders grid's
+// `table{min-width:1020px}` — would stretch the line-item table and cut off the
+// money columns), at a fixed 8.5" width, broken between line items when a long
+// PO runs past one page.
+async function _confirmPdf(){
+  const node=document.getElementById('confirm-ticket-inner');
+  if(!node) throw new Error('the confirmation ticket isn’t open');
+  if(!window.html2canvas||!window.PDFLib) throw new Error('the PDF tools didn’t load — reload the page and try again');
+  const PAGE_W=816, PAGE_H=1056, SCALE=2;               // CSS px at 96/in → 8.5 × 11 in
+  const stage=document.createElement('iframe');
+  stage.setAttribute('aria-hidden','true');
+  stage.style.cssText='position:fixed;left:-20000px;top:0;width:'+PAGE_W+'px;height:'+PAGE_H+'px;border:0;background:#fff';
+  document.body.appendChild(stage);
+  try{
+    const d=stage.contentDocument;
+    d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#fff">'+node.outerHTML+'</body></html>'); d.close();
+    const clone=d.getElementById('confirm-ticket-inner');
+    await Promise.all([...d.images].map(im=>im.complete?0:new Promise(r=>{ im.onload=im.onerror=r; })));
+    const top0=clone.getBoundingClientRect().top;
+    const totalH=Math.ceil(clone.getBoundingClientRect().height);
+    // places a page may end without cutting through a line item
+    const cuts=[...clone.querySelectorAll('tbody tr')].map(tr=>Math.round(tr.getBoundingClientRect().bottom-top0));
+    const canvas=await html2canvas(clone,{scale:SCALE,backgroundColor:'#ffffff',useCORS:true,logging:false,width:PAGE_W,windowWidth:PAGE_W});
+    const {PDFDocument}=PDFLib;
+    const pdf=await PDFDocument.create();
+    pdf.setTitle(_confirmFileTitle()); pdf.setAuthor('Bert\'s Sheet Metal Products Inc.');
+    const MARGIN=42;                                      // ticket's own padding, kept on page breaks
+    for(let y=0; y<totalH; ){
+      const top=y?MARGIN:0;                               // page 1 already has the ticket's top padding
+      let end;
+      if(totalH-y<=PAGE_H-top) end=totalH;               // the rest fits (it ends with its own padding)
+      else{
+        end=y+PAGE_H-top-MARGIN;
+        const fit=cuts.filter(c=>c>y+80&&c<=end); if(fit.length) end=fit[fit.length-1];
+      }
+      const slice=document.createElement('canvas');
+      slice.width=PAGE_W*SCALE; slice.height=(end-y)*SCALE;
+      const g=slice.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,slice.width,slice.height);
+      g.drawImage(canvas,0,y*SCALE,slice.width,slice.height,0,0,slice.width,slice.height);
+      const jpg=await pdf.embedJpg(slice.toDataURL('image/jpeg',0.92));
+      const page=pdf.addPage([612,792]);                  // Letter, in points (0.75 pt per CSS px)
+      page.drawImage(jpg,{x:0, y:792-(top+end-y)*0.75, width:612, height:(end-y)*0.75});
+      y=end;
+    }
+    const bytes=await pdf.save();
+    let bin=''; for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+    return {name:_confirmFileTitle()+'.pdf', mime:'application/pdf', data:btoa(bin), bytes};
+  }finally{ stage.remove(); }
+}
+window.printConfirmation=()=>{
+  const node=document.getElementById('confirm-ticket-inner'); if(!node) return;
+  // Browsers use the document title as the default PDF filename — build it from PO + customer.
+  const fileTitle=_confirmFileTitle();
   const w=window.open('','_blank','width=720,height=900');
   w.document.write(`<html><head><meta charset="utf-8"><title>${esc2(fileTitle)}</title></head><body style="margin:0">${node.outerHTML}</body></html>`);
   w.document.close();
@@ -4981,14 +5029,6 @@ function _ctoRenderPreview(){
     return;
   }
   const msg=_confirmCompose(_ctoCfg.sigText);
-  // the table the worker renders, drawn here the same way — header row + a TOTAL last
-  const head=msg.rows[0], body=msg.rows.slice(1,-1), tot=msg.rows[msg.rows.length-1];
-  const cellAlign=(j)=>j===0?'left':'right';
-  const tableHtml=`<table class="cmp-tbl">
-    <thead><tr>${head.map((c,j)=>`<th style="text-align:${cellAlign(j)}">${e(c)}</th>`).join('')}</tr></thead>
-    <tbody>${body.map(r=>`<tr>${r.map((c,j)=>`<td style="text-align:${cellAlign(j)}">${e(c)||'—'}</td>`).join('')}</tr>`).join('')}</tbody>
-    <tfoot><tr>${tot.map((c,j)=>`<td style="text-align:${cellAlign(j)}">${e(c)}</td>`).join('')}</tr></tfoot>
-  </table>`;
   host.innerHTML=`
     <h3 style="margin:0 0 4px;display:flex;align-items:center;gap:9px"><i class="ti ti-mail"></i> Message preview</h3>
     <div style="font-size:12px;color:var(--text3);margin-bottom:11px">This is exactly what goes out. Nothing has been sent yet.</div>
@@ -4999,8 +5039,12 @@ function _ctoRenderPreview(){
       <div class="cmp-h"><span>Subject</span><b>${e(msg.subject)}</b></div>
     </div>
     <div class="cmp-body">${e(msg.body).replace(/\n/g,'<br>')}</div>
-    <div class="cmp-tblwrap">${tableHtml}</div>
-    <div class="cmp-tblnote">The table is sent as a real table — the wording above and the sign-off sit either side of it.${_ctoCfg.sigLogo?' The signature logo is embedded too.':''}</div>
+    <div class="cmp-att">
+      <i class="ti ti-file-type-pdf"></i>
+      <span class="cmp-attname">${e(_confirmFileTitle())}.pdf</span>
+      <button type="button" class="btn" id="cmp-attview" onclick="window._ctoViewPdf()"><i class="ti ti-eye"></i> View</button>
+    </div>
+    <div class="cmp-tblnote">Attached: the confirmation ticket, the same page Print / Save PDF gives. It’s built when you press Send, so a notes edit below is in it.${_ctoCfg.sigLogo?' The signature logo is embedded too.':''}</div>
     <label class="cto-lbl" style="margin-top:12px">Notes on the confirmation<span class="cto-lblhint">edit here and the preview updates</span></label>
     <textarea id="cmp-notes" rows="2" class="cmp-notes" placeholder="e.g. Pricing valid 30 days. Material certs included."
       oninput="window._ctoNotes(this.value)">${e(msg.notes)}</textarea>
@@ -5012,6 +5056,24 @@ function _ctoRenderPreview(){
     </div>`;
 }
 window._ctoBack=()=>{ _ctoStep='who'; _ctoRender(); };   // chips are kept
+// open the PDF that would be attached, built the same way the send builds it.
+// The tab is opened before the await so the popup blocker counts it as the click.
+window._ctoViewPdf=async ()=>{
+  const btn=document.getElementById('cmp-attview');
+  const w=window.open('','_blank');
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2"></i> Building…'; }
+  try{
+    const pdf=await _confirmPdf();
+    const url=URL.createObjectURL(new Blob([pdf.bytes],{type:'application/pdf'}));
+    if(w) w.location.href=url; else window.open(url,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(err){
+    if(w) w.close();
+    _ctoNote('Couldn’t build the PDF: '+((err&&err.message)||err));
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML='<i class="ti ti-eye"></i> View'; }
+  }
+};
 // the same field the confirmation ticket edits — the printed copy and the email
 // read from one place, so a fix here shows up on both
 window._ctoNotes=(val)=>{
@@ -5100,14 +5162,13 @@ window.emailConfirmation=async ()=>{
 function _confirmCompose(sigText){
   const items=_confirmItems||[];
   const cust=(_confirmMeta.customer||'').trim();
-  // dates + totals, computed the same way the printed ticket does
+  // dates, computed the same way the printed ticket does
   const dueDates=items.map(i=>i.due).filter(Boolean).sort();
   const ordDates=items.map(i=>i.ordered).filter(Boolean).sort();
   const dueDate=dueDates[dueDates.length-1]||'', orderDate=ordDates[0]||'';
-  const grand=items.reduce((s2,i)=>s2+rowTotal(i),0);
   const notes=(items.find(i=>i.confirmNotes)||{}).confirmNotes||'';
   const po=(_confirmMeta.po||'').trim();
-  let body='Hello,\n\nThis confirms receipt of your order'+(po?(' — PO '+po):'')+'. The line items are below.\n'
+  let body='Hello,\n\nThis confirms receipt of your order'+(po?(' — PO '+po):'')+'. The order confirmation is attached as a PDF.\n'
     +(orderDate?('\nOrder date: '+fmtDate(orderDate)):'')
     +(dueDate?('\nCompletion / due date: '+fmtDate(dueDate)):'')
     +'\n\nThis confirms receipt of your order and is not an invoice.'
@@ -5115,13 +5176,8 @@ function _confirmCompose(sigText){
     +'\n\nThank you,';
   body+= sigText ? ('\n\n-- \n'+sigText)
     : '\nBert\'s Sheet Metal Products Inc.\n9521 Irondale Ave, Chatsworth, CA 91311\n+1 818 775 0104\ninfo@bertsmp.com';
-  const rows=[['Part / Description','Qty','Rate','Amount']];
-  items.forEach(i=>{
-    const lt=rowTotal(i);
-    rows.push([[i.part,i.desc].filter(Boolean).join(' — ')||'—', String(i.qty||''), i.cost?Number(i.cost).toFixed(2):'', lt?fmtMoney(lt):'']);
-  });
-  rows.push(['','','TOTAL',fmtMoney(grand)]);
-  return { subject:'Order Confirmation'+(cust?(' — '+cust):'')+(po?(' — PO '+po):''), body, rows, notes };
+  // the line items go in the attached PDF (the printed ticket), not as a table in the body
+  return { subject:'Order Confirmation'+(cust?(' — '+cust):'')+(po?(' — PO '+po):''), body, notes };
 }
 // Mailbox + shared signature. Read once when the preview opens and reused for
 // the send, so what was previewed is what goes out.
@@ -5159,8 +5215,12 @@ async function _sendConfirmationTo(list, ccList){
   try{
     const {proxy, replyAs, sigText, sigLogo} = _ctoCfg || await _confirmMailCfg();
     const msg=_confirmCompose(sigText);
-    const payload={replyAs, to, cc:ccs, subject:msg.subject,
-      body:msg.body, tables:[{title:'', header:true, rows:msg.rows}], sigLogo};
+    // built now, not at preview time, so a notes edit made in the preview is in it
+    let pdf;
+    try{ pdf=await _confirmPdf(); }
+    catch(err){ throw new Error('couldn’t build the confirmation PDF — '+((err&&err.message)||err)); }
+    const payload={replyAs, to, cc:ccs, subject:msg.subject, body:msg.body,
+      attachments:[{name:pdf.name, mime:pdf.mime, data:pdf.data}], sigLogo};
     const tok=await auth.currentUser.getIdToken();
     const r=await fetch(proxy+'/send',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify(payload)});
     if(!r.ok) throw new Error('mail proxy error '+r.status+': '+(await r.text()).slice(0,150));
