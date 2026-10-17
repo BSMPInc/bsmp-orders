@@ -300,6 +300,17 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .dc-qs .dc-accnote{max-width:340px}
 .dc-qs{margin-top:12px;padding:10px 12px;background:var(--amber-soft);border:1px solid #e3cf9b;font-size:12.5px;color:#5a400d}
 .dc-qs-h{font-weight:800;display:flex;align-items:center;gap:6px}
+/* drawing check — re-check after a fix */
+.dc-recheck{margin:2px 0 10px;padding:8px 10px;border:1px solid var(--border2);background:var(--bg)}
+.dc-rc-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.dc-rc-top .hint{flex:1 1 240px}
+.dc-rc-what{margin-top:7px;font-size:12.5px;display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.dc-rc-gone{margin-top:4px;font-size:12px;color:var(--amber);font-weight:600}
+.dc-rc-hist{margin-top:4px;font-size:11px;color:var(--text3)}
+.dc-was{font-size:10.5px;color:var(--text3);margin-top:2px;text-decoration:line-through}
+.dc-fixed{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:1px 6px;color:var(--green);background:var(--green-soft);white-space:nowrap}
+.dc-carried{font-size:10px;font-weight:700;color:var(--text3);margin-left:4px;white-space:nowrap}
+.dc-restored{margin-top:8px;font-size:12px;color:var(--text2);background:var(--accent-soft);padding:6px 9px;display:flex;gap:6px;align-items:center}
 /* drawing check — pin view (dcv*) */
 .c-red{--pc:#d32f2f}.c-amber{--pc:#d98a00}.c-blue{--pc:#1f6fd1}.c-green{--pc:#1f9d55}.c-q{--pc:#7b4fc4}.c-off{--pc:#8a93a0}
 .dcv-dot{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 5px;border-radius:10px;background:var(--pc);color:#fff;font:800 11px/1 Arial,sans-serif;font-style:normal;flex:none}
@@ -842,7 +853,35 @@ const I18N = {
     'isn’t marked on this drawing':'no está marcado en este plano','isn’t on this drawing':'no está en este plano','Place it':'Colocarlo',
     'Pin moved by':'Marcador movido por','hand':'mano','Placed by AI — approximate. Drag the pin onto the callout to correct it.':'Colocado por la IA — aproximado. Arrastra el marcador sobre la cota para corregirlo.',
     'No exact spot — shaded zone':'Sin punto exacto — la zona sombreada','is approximate.':'es aproximada.',
-    'Place a pin here':'Colocar marcador aquí','Place on your drawing':'Colocar en tu plano','Place on customer drawing':'Colocar en el plano del cliente'
+    'Place a pin here':'Colocar marcador aquí','Place on your drawing':'Colocar en tu plano','Place on customer drawing':'Colocar en el plano del cliente',
+    // drawing check — re-check after a fix
+    'Compare again':'Comparar de nuevo',
+    'Restored your unsaved check from':'Se recuperó tu revisión sin guardar de',
+    'it stays on this computer until you save it or press Clear.':'se queda en esta computadora hasta que la guardes o presiones Borrar.',
+    'Not saved yet — kept on this computer, so a reload won’t lose it.':'Aún sin guardar — se conserva en esta computadora, así que recargar no la borra.',
+    'Re-checking with your updated drawing — this takes a few seconds…':'Revisando de nuevo con tu plano corregido — tarda unos segundos…',
+    'was':'antes',
+    'Fixed since last run':'Corregido desde la última revisión',
+    'Our value didn’t change, so the earlier sign-off still applies':'Nuestro valor no cambió, así que la aprobación anterior sigue valiendo',
+    'carried over':'se conservó',
+    'Re-check with updated drawing':'Revisar de nuevo con plano corregido',
+    'Re-checking…':'Revisando…',
+    'fixed':'corregidos',
+    'still open':'siguen abiertos',
+    'new':'nuevos',
+    'sign-off carried over':'aprobación conservada',
+    'sign-offs carried over':'aprobaciones conservadas',
+    'Since the last run':'Desde la última revisión',
+    'Open last time but not reported now — look at these yourself:':'Abiertos la vez pasada pero no reportados ahora — revísalos tú mismo:',
+    'Run':'Revisión',
+    'earlier':'antes',
+    'open':'abiertos',
+    'Fixed something in SolidWorks? Export the drawing again and pick it here — the customer drawing and your sign-offs stay.':'¿Corregiste algo en SolidWorks? Exporta el plano de nuevo y elígelo aquí — el plano del cliente y tus aprobaciones se quedan.',
+    'This check has no customer drawing on file — start a new check instead.':'Esta revisión no tiene plano del cliente guardado — empieza una nueva.',
+    'could not fetch the saved customer drawing':'no se pudo descargar el plano del cliente guardado',
+    'upload of your drawing failed':'falló la subida de tu plano',
+    'Re-checked —':'Revisado de nuevo —',
+    'Re-check failed:':'Falló la nueva revisión:'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -916,6 +955,7 @@ window.qcOnAuth=(user,role)=>{
   $('qc-app').style.display='block'; $('qc-dock').style.display='flex';
   if(page==='inspections' && role==='operator') page='selfcheck';
   applyStatic(); render();
+  if(role!=='operator') dcDraftLoad();          // an unsaved drawing check survives a reload
 };
 async function dbSet(path,val){
   if(!window.qcSet) return;
@@ -1262,7 +1302,10 @@ window.qcFillFromOrder=(prefix,oid)=>{
 };
 
 /* ---------- file inputs ---------- */
+// slots that hold ONE drawing: picking again replaces it (appending kept comparing the old file)
+const QC_SINGLE_FILE={dccust:1, dcmine:1};
 window.qcPickFiles=(key,inputEl)=>{
+  if(QC_SINGLE_FILE[key]){ const f=inputEl.files&&inputEl.files[0]; inputEl.value=''; if(!f) return; _pendingFiles[key]=[f]; qcRenderStrip(key); return; }
   _pendingFiles[key]=_pendingFiles[key]||[];
   [...inputEl.files].forEach(f=>_pendingFiles[key].push(f));
   const strip=$('files-'+key);
@@ -1276,9 +1319,11 @@ async function uploadPending(key,prefix){
   if(errs.length) qcToast(t('File upload failed:')+' '+errs.join(' · '),'err');
   return urls;
 }
+function qcStripHtml(key){ return (_pendingFiles[key]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="qcDropFile('${key}',${i})"></i></span>`).join(' '); }
 function qcRenderStrip(key){
   const strip=$('files-'+key);
-  if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="qcDropFile('${key}',${i})"></i></span>`).join(' ');
+  if(strip) strip.innerHTML=qcStripHtml(key);
+  if(QC_SINGLE_FILE[key] && typeof dcDraftSoon==='function') dcDraftSoon();
 }
 window.qcDropFile=(key,i)=>{ (_pendingFiles[key]||[]).splice(i,1); qcRenderStrip(key); };
 // a hung upload (shop wifi) must become a loud error, not an endless quiet wait
@@ -1917,6 +1962,132 @@ const DC_PROMPT='You are a senior sheet-metal detailer at a fabrication shop, re
 
 let _dcResult=null;    // last comparison on this page (unsaved)
 let _dcView=null;      // id of a saved check being viewed
+let _dcRestoredAt=0;   // when an unsaved check was brought back after a reload (0 = not restored)
+let _dcBusy=null;      // id of a saved check being re-checked right now
+
+/* ---- the new-check form survives re-renders ----
+   render() rebuilds the page on every Firebase tick, so the fields are read back
+   into _dcForm just before each rebuild and written into the new markup. */
+let _dcForm={order:'', part:'', customer:'', job:'', rev:'', notes:''};
+const DC_FORM_IDS={order:'dc-order', part:'dc-part', customer:'dc-customer', job:'dc-job', rev:'dc-rev', notes:'dc-notes'};
+function dcFormSnap(){ Object.keys(DC_FORM_IDS).forEach(k=>{ const el=$(DC_FORM_IDS[k]); if(el) _dcForm[k]=el.value; }); }
+// write _dcForm into whatever fields are on screen, so the next snapshot doesn't read stale values back
+function dcFormPut(){ Object.keys(DC_FORM_IDS).forEach(k=>{ const el=$(DC_FORM_IDS[k]); if(el) el.value=_dcForm[k]||''; }); const os=$('dc-order-search'); if(os) os.value=(_dcForm.order&&ORDERS[_dcForm.order])?orderLabel(ORDERS[_dcForm.order]):''; }
+function dcFormReset(){ Object.keys(_dcForm).forEach(k=>{ _dcForm[k]=''; }); dcFormPut(); }
+
+/* ---- an unsaved check survives a reload ----
+   The live result, the form and BOTH drawing files are kept in this browser's
+   IndexedDB (files can't go in localStorage) until the check is saved or cleared.
+   A reload — by hand, or the app's own update reload — brings it all back.
+   Per user, per device; nothing leaves the computer. Best effort: if IndexedDB is
+   unavailable the page just works as before. */
+const DC_DRAFT_DB='bsmp_qc_drafts';
+function dcDraftKey(){ return 'drawcheck:'+(((QC_USER&&QC_USER.email)||'').toLowerCase()); }
+function dcIdb(){
+  return new Promise((res,rej)=>{
+    try{ const r=indexedDB.open(DC_DRAFT_DB,1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('d');
+      r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }
+    catch(e){ rej(e); }
+  });
+}
+async function dcIdbDo(mode, fn){
+  const db=await dcIdb();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('d',mode), rq=fn(tx.objectStore('d'));
+    tx.oncomplete=()=>{ db.close(); res(rq&&rq.result); };
+    tx.onerror=()=>{ db.close(); rej(tx.error); };
+  });
+}
+let _dcDraftT=null;
+function dcDraftSoon(){ clearTimeout(_dcDraftT); _dcDraftT=setTimeout(dcDraftSave, 400); }
+async function dcDraftSave(){
+  if(!QC_USER) return;
+  if(page==='drawcheck' && !_dcView) dcFormSnap();
+  const cust=(_pendingFiles['dccust']||[])[0]||null, mine=(_pendingFiles['dcmine']||[])[0]||null;
+  if(!_dcResult && !cust && !mine){ dcDraftClear(); return; }
+  let result=null;
+  if(_dcResult){ const c=_dcResult.custFile; delete _dcResult.custFile; try{ result=JSON.parse(JSON.stringify(_dcResult)); } finally{ if(c) _dcResult.custFile=c; } }
+  const d={v:1, at:Date.now(), result, form:Object.assign({}, _dcForm), cust, mine, sameCust:!!(_dcResult&&_dcResult.custFile&&_dcResult.custFile===cust)};
+  try{ await dcIdbDo('readwrite', st=>st.put(d, dcDraftKey())); }catch(e){ console.warn('drawing check draft not kept', e); }
+}
+function dcDraftClear(){ clearTimeout(_dcDraftT); dcIdbDo('readwrite', st=>st.delete(dcDraftKey())).catch(()=>{}); }
+async function dcDraftLoad(){
+  if(_dcResult || (_pendingFiles['dccust']||[]).length || (_pendingFiles['dcmine']||[]).length) return;   // something's already on the form
+  let d=null; try{ d=await dcIdbDo('readonly', st=>st.get(dcDraftKey())); }catch(e){ return; }
+  if(!d || (!d.result && !d.cust && !d.mine)) return;
+  if(_dcResult || (_pendingFiles['dccust']||[]).length || (_pendingFiles['dcmine']||[]).length) return;
+  if(d.cust) _pendingFiles['dccust']=[d.cust];
+  if(d.mine) _pendingFiles['dcmine']=[d.mine];
+  if(d.form){ Object.assign(_dcForm, d.form); dcFormPut(); }
+  if(d.result){ _dcResult=d.result; if(d.sameCust&&d.cust) _dcResult.custFile=d.cust; _dcRestoredAt=d.at||Date.now(); }
+  if(page==='drawcheck' && !_dcView) render();
+}
+// keep the draft current as the form is typed in / signed off
+['input','change'].forEach(ev=>document.addEventListener(ev,(e)=>{
+  if(page!=='drawcheck' || _dcView || !e.target || !e.target.closest) return;
+  if(e.target.closest('#content')) dcDraftSoon();
+}));
+
+/* ---- the re-check bar: run it again on an updated drawing, and what changed ---- */
+function dcRecheckHtml(res, where){
+  const rc=res.recheck, runs=vals(res.runs||[]);
+  const busy=where!=='live' && _dcBusy===where;
+  const pick=where==='live'
+    ? `<label class="btn sm primary"><i class="ti ti-refresh"></i> ${t('Re-check with updated drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcDrawRecheckPick(this)"></label>`
+    : (busy ? `<span class="btn sm" style="pointer-events:none"><i class="ti ti-loader-2 spin"></i> ${t('Re-checking…')}</span>`
+            : `<label class="btn sm primary"><i class="ti ti-refresh"></i> ${t('Re-check with updated drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcDrawRecheckSaved('${esc(where)}',this)"></label>`);
+  let what='';
+  if(rc){
+    const bits=[];
+    bits.push(`<b style="color:var(--green)">${rc.fixed} ${t('fixed')}</b>`);
+    bits.push(`<b style="color:${rc.still?'var(--red)':'var(--text3)'}">${rc.still} ${t('still open')}</b>`);
+    bits.push(`<b style="color:${rc.fresh?'var(--amber)':'var(--text3)'}">${rc.fresh} ${t('new')}</b>`);
+    if(rc.carried) bits.push(`${rc.carried} ${t(rc.carried===1?'sign-off carried over':'sign-offs carried over')}`);
+    const gone=vals(rc.gone||[]);
+    what=`<div class="dc-rc-what"><i class="ti ti-git-compare"></i> ${t('Since the last run')}${rc.prevAt?` (${esc(fmtWhen(rc.prevAt))})`:''}: ${bits.join(' · ')}</div>
+      ${gone.length?`<div class="dc-rc-gone"><i class="ti ti-eye-search"></i> ${t('Open last time but not reported now — look at these yourself:')} ${esc(gone.join(', '))}</div>`:''}`;
+  }
+  const hist=runs.length?`<div class="dc-rc-hist">${t('Run')} ${runs.length+1} · ${t('earlier')}: ${runs.slice(-3).reverse().map(r=>`${esc(fmtWhen(r.ranAt))}${r.mine?' ('+esc(r.mine)+')':''} — ${r.openCount||0} ${t('open')}`).join(' · ')}</div>`:'';
+  return `<div class="dc-recheck">
+      <div class="dc-rc-top">${pick}<span class="hint" style="margin:0">${t('Fixed something in SolidWorks? Export the drawing again and pick it here — the customer drawing and your sign-offs stay.')}</span></div>
+      ${what}${hist}
+    </div>`;
+}
+
+// Re-check a SAVED check: the customer drawing comes back from storage, the new
+// export of ours is uploaded, and the same record is updated (earlier runs kept in runs[]).
+window.qcDrawRecheckSaved=async (id, inputEl)=>{
+  const f=inputEl.files&&inputEl.files[0]; inputEl.value=''; if(!f) return;
+  const rec=DRAWCHECKS[id]; if(!rec || _dcBusy) return;
+  if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
+  if(!rec.custDrawing||!rec.custDrawing.url){ qcToast(t('This check has no customer drawing on file — start a new check instead.'),'err'); return; }
+  _dcBusy=id; render();
+  try{
+    let cust;
+    try{
+      const resp=await fetch(rec.custDrawing.url); if(!resp.ok) throw new Error('HTTP '+resp.status);
+      const blob=await resp.blob();
+      cust=new File([blob], rec.custDrawing.name||'customer-drawing', {type:rec.custDrawing.type||blob.type||''});
+    }catch(e){ throw new Error(t('could not fetch the saved customer drawing')+' ('+((e&&e.message)||e)+')'); }
+    const next=await dcRunCompare(cust, f);
+    const merged=dcCarryForward(JSON.parse(JSON.stringify(rec)), next, true);
+    const url=await upload(f,'drawingChecks'); if(!url) throw new Error(t('upload of your drawing failed'));
+    const out=Object.assign({}, rec, merged, { myDrawing:{name:f.name, url, type:f.type}, updatedAt:Date.now(),
+      recheckedBy:(QC_USER&&QC_USER.email)||'', recheckedAt:Date.now() });
+    delete out.custFile;
+    await dbSet('qc/drawingChecks/'+id, out);           // per-id write, never the whole collection
+    const rc=out.recheck||{};
+    try{ await qcLogAudit([{ drawCheckId:id, partNum:out.partNum||'', field:'drawcheck', action:'re-checked', verdict:out.verdict||'',
+      note:f.name+' · '+(rc.fixed||0)+' fixed, '+(rc.still||0)+' still open, '+(rc.fresh||0)+' new' }]); }
+    catch(e){ console.error('audit log failed', e); }
+    _dcv.sel=null; _dcv.pop=null; _dcv.place=null;
+    qcToast(t('Re-checked —')+' '+(rc.fixed||0)+' '+t('fixed')+', '+(rc.still||0)+' '+t('still open')+'.','ok');
+  }catch(e){
+    console.error('re-check failed', e);
+    qcToast(t('Re-check failed:')+' '+((e&&e.message)||e),'err');
+  }finally{ _dcBusy=null; render(); }
+};
 
 // nominal formatted the way the shop reads it — 3 places linear, 2 for angles.
 // Fractions land here already converted (3/8 → 0.375), which shows the conversion.
@@ -2046,7 +2217,7 @@ function dcRecomputeVerdict(res){
 // live panel (before save) vs a saved record — same controls, different home
 function dcResOf(where){ return where==='live' ? _dcResult : DRAWCHECKS[where]; }
 async function dcPersist(where,res,audit){
-  if(where==='live'){ qcDrawRenderResult(); return; }
+  if(where==='live'){ qcDrawRenderResult(); dcDraftSoon(); return; }
   const rec=Object.assign({}, res, {updatedAt:Date.now()});
   await dbSet('qc/drawingChecks/'+where, rec);   // per-id write, never the whole collection
   if(audit){
@@ -2113,43 +2284,114 @@ window.dcQAnswer=async (where,i,val)=>{
   if(where!=='live') await dcPersist(where,res,null);
 };
 
+// One AI comparison of a customer drawing against ours → a fresh result (no sign-offs yet).
+async function dcRunCompare(cust, mine){
+  const content=[
+    {type:'text',text:'CUSTOMER DRAWING (the specification):'},
+    aiContentBlock(await toBase64(cust), extFromFile(cust)),
+    {type:'text',text:'OUR DRAWING (made from our SolidWorks model):'},
+    aiContentBlock(await toBase64(mine), extFromFile(mine)),
+    {type:'text',text:DC_PROMPT}
+  ];
+  const res=await callAIJsonContent(content, 12000);   // dense drawings run long — 4000 truncated real checks
+  const truncated=!!res.__truncated; delete res.__truncated;
+  const tol=dcTolDefaults(res.custTitleBlock);
+  const rows=dcComputeRows(res.rows, tol.defaults).sort((a,b)=>(DC_ORDER[a.status]-DC_ORDER[b.status]));
+  const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail))
+    .map(q=>Object.assign({}, q, {custAt:dcAt(q.custAt)}));
+  return dcRecomputeVerdict({
+    custGrid:dcGrid(res.custGrid), mineGrid:dcGrid(res.mineGrid),
+    ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'', mineName:mine.name||'',
+    summary:(res.summary||'')+(truncated?((res.summary?' ':'')+'⚠ The AI reply was cut off at its length limit — this list may be missing features. Re-run the check to be sure it is complete.'):''),
+    rows, questions,
+    tolDefaults:tol.defaults, tolFromCustomer:tol.fromCustomer,
+    custTitleBlock:res.custTitleBlock||null           // raw, exactly as read
+  });
+}
+
+/* ---- re-checking after a fix ----
+   The usual loop: run the check, fix our drawing in SolidWorks, run it again.
+   The new run is a fresh read, but what you already decided carries over where it
+   still applies — and the result says what the fix changed:
+     · a row is "the same row" when the feature + the customer's text match
+       (falling back to the customer's text alone, when that's unique);
+     · a sign-off carries ONLY if our value is unchanged — if we edited it, the old
+       reason was about a different number, so the row asks again;
+     · question answers carry by topic (the customer drawing didn't change);
+     · customer-side pins you moved by hand carry (same customer drawing);
+       pins on our drawing don't — it's a new drawing;
+     · rows that were open and now match are marked "Fixed since last run". */
+function dcRowKey(r){ return dcNorm(r.feature)+'|'+dcNorm(r.cust); }
+function dcCarryForward(prev, next, sameCust){
+  const prows=vals(prev.rows||[]).filter(Boolean), used=new Set();
+  const byKey={}, byCust={};
+  prows.forEach(r=>{ (byKey[dcRowKey(r)]=byKey[dcRowKey(r)]||[]).push(r); if(r.cust) (byCust[dcNorm(r.cust)]=byCust[dcNorm(r.cust)]||[]).push(r); });
+  const take=(list)=>{ const r=(list||[]).find(x=>!used.has(x)); if(r) used.add(r); return r||null; };
+  let fixed=0, still=0, fresh=0, carried=0;
+  (next.rows||[]).forEach(r=>{
+    let p=take(byKey[dcRowKey(r)]);
+    if(!p && r.cust && (byCust[dcNorm(r.cust)]||[]).length===1) p=take(byCust[dcNorm(r.cust)]);
+    if(p){
+      r.prevMine=p.mine||'';
+      if(dcIsDeviation(r) && dcSignedOff(p) && dcNorm(p.mine)===dcNorm(r.mine)){
+        ['accepted','acceptWhy','acceptNote','acceptBy','acceptAt'].forEach(k=>{ if(p[k]!=null) r[k]=p[k]; });
+        r.carried=true; carried++;
+      }
+      if(sameCust && p.custAt && p.custAt.moved) r.custAt=p.custAt;
+    }
+    if(dcIsDeviation(r)){ if(dcSignedOff(r)) return; if(p&&dcIsDeviation(p)) still++; else fresh++; }
+    else if(p&&dcIsDeviation(p)){ r.fixedSinceLast=true; fixed++; }
+  });
+  // features that were open last time and the AI didn't report at all now
+  const gone=prows.filter(p=>!used.has(p)&&dcIsDeviation(p)&&!dcSignedOff(p)).map(p=>p.feature||'—');
+  const pq=vals(prev.questions||[]).filter(Boolean);
+  (next.questions||[]).forEach(q=>{
+    const o=pq.find(x=>dcNorm(x.topic)===dcNorm(q.topic)&&dcQDone(x));
+    if(o){ ['resolved','qWhy','answer','resolvedBy','resolvedAt'].forEach(k=>{ if(o[k]!=null) q[k]=o[k]; }); carried++; }
+    if(sameCust&&o&&o.custAt&&o.custAt.moved) q.custAt=o.custAt;
+  });
+  // what the earlier run looked like, so the record shows the drawing went round more than once
+  const runs=vals(prev.runs||[]).filter(Boolean).concat([{ ranAt:prev.ranAt||0, by:prev.by||prev.createdBy||'',
+    mine:(prev.myDrawing&&prev.myDrawing.name)||prev.mineName||'', myDrawing:prev.myDrawing||null,
+    verdict:prev.verdict||'', openCount:prev.openCount||0,
+    mismatch:prows.filter(r=>r.status==='mismatch').length, missing:prows.filter(r=>r.status==='missing_mine').length }]);
+  next.runs=runs;
+  next.recheck={ at:next.ranAt, prevAt:prev.ranAt||0, fixed, still, fresh, carried, gone };
+  return dcRecomputeVerdict(next);
+}
+
 async function qcDrawCompare(){
   if(!hasAIConnection()){ qcToast(t('No AI connection set — add the proxy URL in Settings (left menu).'),'err'); return; }
   const cust=(_pendingFiles['dccust']||[])[0], mine=(_pendingFiles['dcmine']||[])[0];
   if(!cust){ qcToast(t('Add the customer drawing first.'),'err'); return; }
   if(!mine){ qcToast(t('Add your drawing first.'),'err'); return; }
   const btn=$('dc-run'), panel=$('dc-panel');
+  const prev=_dcResult;                 // a re-check builds on the last run instead of wiping it
   if(btn) btn.disabled=true;
-  if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('AI is reading both drawings — this takes a few seconds…')}</div>`; }
+  if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${prev?t('Re-checking with your updated drawing — this takes a few seconds…'):t('AI is reading both drawings — this takes a few seconds…')}</div>`; }
   try{
-    const content=[
-      {type:'text',text:'CUSTOMER DRAWING (the specification):'},
-      aiContentBlock(await toBase64(cust), extFromFile(cust)),
-      {type:'text',text:'OUR DRAWING (made from our SolidWorks model):'},
-      aiContentBlock(await toBase64(mine), extFromFile(mine)),
-      {type:'text',text:DC_PROMPT}
-    ];
-    const res=await callAIJsonContent(content, 12000);   // dense drawings run long — 4000 truncated real checks
-    const truncated=!!res.__truncated; delete res.__truncated;
-    const tol=dcTolDefaults(res.custTitleBlock);
-    const rows=dcComputeRows(res.rows, tol.defaults).sort((a,b)=>(DC_ORDER[a.status]-DC_ORDER[b.status]));
-    const questions=(res.questions||[]).filter(q=>q&&(q.topic||q.detail))
-      .map(q=>Object.assign({}, q, {custAt:dcAt(q.custAt)}));
-    _dcResult=dcRecomputeVerdict({
-      custGrid:dcGrid(res.custGrid), mineGrid:dcGrid(res.mineGrid),
-      ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'',
-      summary:(res.summary||'')+(truncated?((res.summary?' ':'')+'⚠ The AI reply was cut off at its length limit — this list may be missing features. Re-run the check to be sure it is complete.'):''),
-      rows, questions,
-      tolDefaults:tol.defaults, tolFromCustomer:tol.fromCustomer,
-      custTitleBlock:res.custTitleBlock||null           // raw, exactly as read
-    });
-    qcDrawRenderResult();
+    const next=await dcRunCompare(cust, mine);
+    _dcResult=prev ? dcCarryForward(prev, next, prev.custFile===cust) : next;
+    _dcResult.custFile=cust;            // in memory only (stripped on save) — tells a re-check the customer side is unchanged
+    _dcv.sel=null; _dcv.pop=null; _dcv.place=null; _dcRestoredAt=0;
+    qcDrawRenderResult(); dcDraftSoon();
+    const rb=$('dc-run'); if(rb) rb.innerHTML='<i class="ti ti-sparkles"></i> '+t('Compare again');
   }catch(e){
     console.error('drawing check failed', e);
-    if(panel) panel.innerHTML=`<div class="hint" style="color:var(--red)"><i class="ti ti-alert-triangle"></i> ${esc(t('Drawing check failed:')+' '+((e&&e.message)||e))}</div>`;
+    // a failed re-run must not cost the check you already had
+    if(panel){
+      const err=`<div class="hint" style="color:var(--red);margin-bottom:8px"><i class="ti ti-alert-triangle"></i> ${esc(t('Drawing check failed:')+' '+((e&&e.message)||e))}</div>`;
+      panel.innerHTML=err+(prev?dcResultHtml(prev,'live'):'');
+    }
   }finally{ if(btn) btn.disabled=false; }
 }
 window.qcDrawCompare=qcDrawCompare;
+// "Re-check with an updated drawing": pick the new export, it replaces ours and the compare runs again
+window.qcDrawRecheckPick=(inputEl)=>{
+  const f=inputEl.files&&inputEl.files[0]; inputEl.value=''; if(!f) return;
+  _pendingFiles['dcmine']=[f]; qcRenderStrip('dcmine');
+  qcDrawCompare();
+};
 
 function dcResultHtml(res, where){
   const counts={mismatch:0,missing_mine:0,missing_cust:0,match:0};
@@ -2184,9 +2426,9 @@ function dcResultHtml(res, where){
       <td class="dc-no"><span class="dcv-dot c-${dcvColor(r)}">${i+1}</span></td>
       <td><b>${esc(r.feature||'—')}</b>${r.zone?` <span class="muted" style="font-size:10.5px;font-weight:700;white-space:nowrap" title="${esc(t('Where the callout sits on the customer drawing (border grid)'))}"><i class="ti ti-map-pin"></i> ${esc(r.zone)}</span>`:''}${r.note?`<div class="muted" style="font-size:11.5px">${esc(r.note)}</div>`:''}</td>
       <td class="dc-val">${esc(r.cust)||`<span class="muted">${t('— not stated —')}</span>`}</td>
-      <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}</td>
+      <td class="dc-val">${esc(r.mine)||`<span class="muted">${t('— not stated —')}</span>`}${(r.prevMine!=null&&dcNorm(r.prevMine)!==dcNorm(r.mine))?`<div class="dc-was">${t('was')} ${esc(r.prevMine)||t('— not stated —')}</div>`:''}</td>
       <td>
-        <span class="dc-st" style="color:${s.c}"><i class="ti ${s.ic}"></i> ${t(s.l)}</span>
+        <span class="dc-st" style="color:${s.c}"><i class="ti ${s.ic}"></i> ${t(s.l)}</span>${r.fixedSinceLast?` <span class="dc-fixed"><i class="ti ti-circle-check"></i> ${t('Fixed since last run')}</span>`:''}${r.carried&&done?` <span class="dc-carried" title="${esc(t('Our value didn’t change, so the earlier sign-off still applies'))}">${t('carried over')}</span>`:''}
         ${done?`<span class="dc-okchip ${(w&&w.real)?'real':'noise'}"><i class="ti ti-check"></i> ${(w&&w.real)?t('Accepted'):t('Not real')}</span>`:''}
         ${r.math?`<div class="dc-math">${esc(r.math)}</div>`:''}
         ${acceptUi}
@@ -2211,6 +2453,7 @@ function dcResultHtml(res, where){
     : t('The customer’s title block could not be read, so differences are judged against BSMP’s standard block (frac ±1/16, .00 ±.020, .000 ±.005, angular ±1°).');
   return `<div class="dc-res${_dcv.probOnly?' dc-probonly':''}" id="dc-res">${head}
     ${res.summary?`<div style="margin:2px 0 8px">${esc(res.summary)}</div>`:''}
+    ${dcRecheckHtml(res, where)}
     <div class="dc-chips">${chip('mismatch')}${chip('missing_mine')}${chip('missing_cust')}${chip('match')}${accChip}</div>
     ${dcViewerHtml(res, where)}
     ${rows?`<div class="dc-tblwrap"><table class="tbl dc-tbl">
@@ -2687,7 +2930,7 @@ async function dcvDropPin(side, key, X, Y){
   o.it[field]=at;
   _dcv.sel=key; _dcv.pop={side,key};
   dcvRenderLayer(side); DCV_SIDES.forEach(dcvRenderOver); dcvMarkSel(); dcvRenderPop();
-  if(where==='live') return;                    // saved with the check when you press Save
+  if(where==='live'){ dcDraftSoon(); return; }   // saved with the check when you press Save
   try{ await dbSet('qc/drawingChecks/'+where+'/'+(o.k==='r'?'rows':'questions')+'/'+o.i+'/'+field, at); }   // one field — never the record or the collection
   catch(e){ console.error('pin save failed', e); }
 }
@@ -2810,7 +3053,7 @@ function dcVerdictBadge(r){
 }
 window.qcDrawCheckOpen=(id)=>{ _dcView=id; render(); };
 window.qcDrawCheckBack=()=>{ _dcView=null; render(); };
-window.qcDrawCheckNew=()=>{ _dcView=null; _dcResult=null; _pendingFiles['dccust']=[]; _pendingFiles['dcmine']=[]; render(); };
+window.qcDrawCheckNew=()=>{ _dcView=null; _dcResult=null; _dcRestoredAt=0; _pendingFiles['dccust']=[]; _pendingFiles['dcmine']=[]; dcFormReset(); dcDraftClear(); render(); };
 window.qcDrawCheckDel=async (id)=>{
   if(!confirm(t('Delete this drawing check?'))) return;
   await dbRemove('qc/drawingChecks/'+id);
@@ -2836,6 +3079,8 @@ function viewDrawCheck(){
       </div>`;
   }
   // ---- new check ----
+  dcFormSnap();                                   // a re-render must not wipe what was typed
+  const F=_dcForm;
   const list=vals(DRAWCHECKS).filter(r=>r.kind!=='model').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).slice(0,25);
   const rows=list.map(r=>{
     // the list counts what's still OPEN — signed-off differences aren't outstanding work
@@ -2852,39 +3097,41 @@ function viewDrawCheck(){
   return `<div class="page-head"><h2>${t('Drawing check')}</h2><p>${t('Upload the customer’s drawing and the one you made from your model — AI compares them feature by feature, and lists what to ask the customer.')}</p></div>
   <div class="card">
     <div class="field"><label class="fl">${t('Link to an order')}</label>
-      ${orderSearchHtml('dc','')}
+      ${orderSearchHtml('dc',F.order&&ORDERS[F.order]?F.order:'')}
       <div class="hint">${t('Pick the order to auto-fill part / customer / job, or leave unlinked and type below.')}</div>
     </div>
     <div class="grid2">
-      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="dc-part"></div>
-      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="dc-customer"></div>
-      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="dc-job"></div>
-      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="dc-rev"></div>
+      <div class="field"><label class="fl">${t('Part #')}</label><input class="in" id="dc-part" value="${esc(F.part)}"></div>
+      <div class="field"><label class="fl">${t('Customer')}</label><input class="in" id="dc-customer" value="${esc(F.customer)}"></div>
+      <div class="field"><label class="fl">${t('Job #')}</label><input class="in" id="dc-job" value="${esc(F.job)}"></div>
+      <div class="field"><label class="fl">${t('Rev')}</label><input class="in" id="dc-rev" value="${esc(F.rev)}"></div>
     </div>
     <div class="dc-pair">
       <div class="field">
         <label class="fl"><i class="ti ti-file-text" style="color:var(--blue)"></i> ${t('Customer drawing')}</label>
         <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Upload')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('dccust',this)"></label>
         <button class="btn sm" onclick="qcDrawPickOpen('dccust')"><i class="ti ti-books"></i> ${t('From library')}</button>
-        <div class="thumbs" id="files-dccust"></div>
+        <div class="thumbs" id="files-dccust">${qcStripHtml('dccust')}</div>
         <div class="hint">${t('Their drawing — the spec everything is judged against.')}</div>
       </div>
       <div class="field">
         <label class="fl"><i class="ti ti-file-vector" style="color:var(--green)"></i> ${t('Your drawing')}</label>
         <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Upload')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('dcmine',this)"></label>
-        <div class="thumbs" id="files-dcmine"></div>
+        <div class="thumbs" id="files-dcmine">${qcStripHtml('dcmine')}</div>
         <div class="hint">${t('The drawing off your SolidWorks model, dimensioned like theirs.')}</div>
       </div>
     </div>
     <div class="field">
-      <button class="btn primary" id="dc-run" onclick="qcDrawCompare()"><i class="ti ti-sparkles"></i> ${t('Compare drawings (AI)')}</button>
+      <button class="btn primary" id="dc-run" onclick="qcDrawCompare()"><i class="ti ti-sparkles"></i> ${_dcResult?t('Compare again'):t('Compare drawings (AI)')}</button>
+      ${_dcRestoredAt&&_dcResult?`<div class="dc-restored"><i class="ti ti-history"></i> ${t('Restored your unsaved check from')} ${esc(fmtWhen(_dcRestoredAt))} — ${t('it stays on this computer until you save it or press Clear.')}</div>`:''}
       <div id="dc-panel" style="display:${_dcResult?'block':'none'};margin-top:10px">${_dcResult?dcResultHtml(_dcResult,'live'):''}</div>
     </div>
-    <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="dc-notes"></textarea></div>
+    <div class="field"><label class="fl">${t('Notes')}</label><textarea class="in" id="dc-notes">${esc(F.notes)}</textarea></div>
     <div class="toolbar" style="margin:4px 0 0">
       <button class="btn primary" id="dc-save" onclick="window.qcSaveDrawCheck()"><i class="ti ti-device-floppy"></i> ${t('Save check')}</button>
       ${_dcResult?`<button class="btn" onclick="qcDrawPrint('live')"><i class="ti ti-printer"></i> ${t('Print')}</button>`:''}
       <button class="btn" onclick="qcDrawCheckNew()">${t('Clear')}</button>
+      ${_dcResult?`<span class="hint" style="margin:0"><i class="ti ti-device-laptop"></i> ${t('Not saved yet — kept on this computer, so a reload won’t lose it.')}</span>`:''}
     </div>
   </div>
   <div class="card" style="padding:0;margin-top:14px">
@@ -2911,12 +3158,13 @@ window.qcSaveDrawCheck=async ()=>{
       partNum:part, customer:cust, job:gv('dc-job'), rev:gv('dc-rev'), notes:gv('dc-notes'),
       custDrawing:cf[0]||null, myDrawing:mf[0]||null
     });
+    delete rec.custFile;                              // in-memory File, never stored
     await dbSet('qc/drawingChecks/'+id, rec);
     try{ await qcLogAudit([{ drawCheckId:id, partNum:part, field:'drawcheck', action:'ai-drawing-check', verdict:rec.verdict||'',
       note:(rec.summary||'')+' · '+(rec.rows||[]).filter(r=>r.status==='mismatch').length+' mismatch, '+(rec.questions||[]).length+' question(s)' }]); }
     catch(e){ console.error('audit log failed', e); }
     dcvAdopt(id, cf[0], mf[0]);                       // the pin view keeps its rendered drawings + zoom
-    _dcResult=null; _dcView=id;
+    _dcResult=null; _dcView=id; _dcRestoredAt=0; dcFormReset(); dcDraftClear();
     qcToast(t('Drawing check saved.'),'ok');
     render();                                         // rebuilds the page, button comes back fresh
   }catch(e){
@@ -3369,7 +3617,8 @@ window.qcDrawPick=async (key,id)=>{
     const resp=await fetch(d.url); if(!resp.ok) throw new Error('HTTP '+resp.status);
     const blob=await resp.blob();
     const file=new File([blob], d.name||'drawing', {type:d.type||blob.type||''});
-    _pendingFiles[key]=_pendingFiles[key]||[]; _pendingFiles[key].push(file);
+    if(QC_SINGLE_FILE[key]) _pendingFiles[key]=[file];
+    else { _pendingFiles[key]=_pendingFiles[key]||[]; _pendingFiles[key].push(file); }
     const strip=$('files-'+key);
     if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map(f=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`).join(' ');
     qcToast(t('Drawing added to the form.'),'ok');

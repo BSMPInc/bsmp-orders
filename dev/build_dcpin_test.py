@@ -56,6 +56,11 @@ cust = sheet(['PART NO. 10-4471', 'REV B', 'MATERIAL: 16 GA 304 SS', 'FINISH: #4
               '.XX ±.020  .XXX ±.005  ANG ±1°'], cust_dims)
 mine = sheet(['PART NO. 10-4471', 'REV B', 'MATERIAL: 16 GA 304', 'FINISH: #4 BRUSH', 'BSMP  —  JOB 2617'], mine_dims)
 cust.save(OUT + 'cust.png'); mine.save(OUT + 'mine.png')
+# our drawing after the fix: length corrected, R.125 added (for the re-check test)
+mine2 = sheet(['PART NO. 10-4471', 'REV B', 'MATERIAL: 16 GA 304', 'FINISH: #4 BRUSH', 'BSMP  —  JOB 2617'],
+              [('12.000', (735, 210), 22), ('6.500', (185, 535), 22), ('Ø.250 THRU 4X', (480, 355), 18),
+               ('R.125', (1180, 790), 18), ('BEND UP 90°', (735, 815), 18)])
+mine2.save(OUT + 'mine_v2.png')
 notes = Image.new('RGB', (W, H), 'white'); dn = ImageDraw.Draw(notes)
 dn.rectangle([34, 34, W - 34, H - 34], outline='black', width=3)
 dn.text((120, 140), 'NOTES:', font=FB(26), fill='black')
@@ -99,6 +104,13 @@ AI = {
   'summary': 'Our length is .006 long and the R.125 corner and .80 edge distance are missing on ours.'
 }
 
+import copy
+AI2 = copy.deepcopy(AI)   # the AI's read of the fixed drawing
+for r in AI2['rows']:
+    if r['feature'] == 'Overall length': r['mine'] = '12.000'
+    if r['feature'] == 'Corner radius': r['mine'] = 'R.125'; r['mineAt'] = {'page': 1, 'x': fx(1180), 'y': fy(790)}
+AI2['summary'] = 'Length corrected; corner radius now shown.'
+
 src = io.open(ROOT + 'qc.html', encoding='utf-8').read()
 stub = '''<script>
 /* ---- test stub for the Firebase module ---- */
@@ -110,8 +122,8 @@ function __tick(){ setTimeout(()=>window.qcOnData('drawingChecks', __clone(__get
 window.qcSet=async (p,v)=>{ window.__writes.push({op:'set',path:p,val:__clone(v)}); __put(p,v); __tick(); };
 window.qcUpdate=async (p,v)=>{ window.__writes.push({op:'update',path:p,val:__clone(v)}); Object.keys(v).forEach(k=>__put(p+'/'+k,v[k])); __tick(); };
 window.qcRemove=async (p)=>{ window.__writes.push({op:'remove',path:p}); __put(p,null); __tick(); };
-window.qcUpload=async (file,prefix)=>'/dev/_dcpin/'+(/mine/.test(file.name)?'mine.png':(/pdf$/i.test(file.name)?'cust.pdf':'cust.png'));
-window.__AI=%s;
+window.qcUpload=async (file,prefix)=>'/dev/_dcpin/'+(/mine_v2/.test(file.name)?'mine_v2.png':/mine/.test(file.name)?'mine.png':(/pdf$/i.test(file.name)?'cust.pdf':'cust.png'));
+window.__AI=%s; window.__AI2=%s;
 const __SAVED=(id,cu,mi)=>({id, createdAt:Date.now()-86400000, createdBy:'ofc.edgar@bertsmp.com', partNum:'10-4471', customer:'Test Co', rev:'B',
   custDrawing:{name:cu.split('/').pop(), url:cu, type:/pdf$/.test(cu)?'application/pdf':'image/png'}, myDrawing:{name:mi.split('/').pop(), url:mi, type:'image/png'}});
 window.addEventListener('load', ()=>{
@@ -140,7 +152,10 @@ window.dcTestSaved=async (kind)=>{
   __put('qc/drawingChecks/'+rec.id, rec); window.qcOnData('drawingChecks', __clone(__get('qc/drawingChecks')));
   qcDrawCheckOpen(rec.id);
 };
-</script>''' % json.dumps(AI, ensure_ascii=False)
+// re-check: swap in the fixed drawing + the AI's read of it
+window.dcTestFixFile=async ()=>new File([await (await fetch('/dev/_dcpin/mine_v2.png')).blob()], 'mine_v2.png', {type:'image/png'});
+window.dcTestUseFixedAI=()=>{ window.__AI=__clone(window.__AI2); };
+</script>''' % (json.dumps(AI, ensure_ascii=False), json.dumps(AI2, ensure_ascii=False))
 out = re.sub(r'<script type="module">.*?</script>', lambda m: stub, src, count=1, flags=re.S)
 assert out != src
 io.open(OUT + 'qc_test.html', 'w', encoding='utf-8', newline='').write(out)
