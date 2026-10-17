@@ -88,7 +88,7 @@ The Work Queues page has a **Board / List** toggle (`setQueueView`, remembered i
 localStorage `bsmp_queue_view`; Board is the default). List = the old per-process
 tabs + table, unchanged.
 
-- **Board:** three columns Now / Next / Waiting (`QB_COLS`). One card per part (order
+- **Board:** three columns shown as **Priority 1 / Priority 2 / Priority 3** (`QB_COLS`; renamed from Now / Next / Waiting 2026-10-17 — the stored keys are still `now` / `next` / `wait`, so existing placements carry over). One card per part (order
   row): drawing thumbnail, customer, part/desc, job, qty, due, the part's current
   operation (`qbCurStep` = first enabled, not-done step in run order), who has it
   (`qbWhoHtml` → `.qb-who`: that step's assignee chip; an outside step with no
@@ -100,7 +100,7 @@ tabs + table, unchanged.
   Archived orders drop off automatically (`qbOnBoard`).
 - **Who does what:** managers add parts (`_qbAddOpen` picker, hides Invoiced /
   Completed / Ready for Invoice), drag cards between/within columns (HTML5 DnD, mouse
-  only), or use the Now/Next/Waiting, up/down and "Take off board" buttons in the card
+  only), or use the Priority 1/2/3, up/down and "Take off board" buttons in the card
   dialog. Operators only open cards and enter qty / check steps off.
 - **Card dialog** (`_qbOpen` → `renderQbDialog`, `#qb-modal`, z-index 60 so the
   confirm-done modal (70) and full drawing viewer (90) sit above it): big drawing on
@@ -118,7 +118,7 @@ tabs + table, unchanged.
 ### Open Orders feeds the board (added 2026-10-12)
 
 Managers can place parts on the Work Queues board straight from Open Orders:
-- Each part row in the PO detail pane has the same **Board** chip as Today, under the status badge (the description column can shrink to ~34px on a narrow panel) (`ciQbChip` -> `dispQbChip`): tap for Now / Next / Waiting / Take off board. Finished parts (Invoiced, Ready for Invoice, Completed) get no chip unless they are still on the board, so they can be taken off from here.
+- Each part row in the PO detail pane has the same **Board** chip as Today, under the status badge (the description column can shrink to ~34px on a narrow panel) (`ciQbChip` -> `dispQbChip`): tap for Priority 1 / 2 / 3 / Take off board. Finished parts (Invoiced, Ready for Invoice, Completed) get no chip unless they are still on the board, so they can be taken off from here.
 - The PO header has a **Board** button (`poQbBtn`, shows `on/total` once some are placed) that puts every unfinished part on the PO into one column in PO order (`_poQbMenu` / `_poQbPick`, one `qbPlace` per part), or takes them all off. It acts on the parts the current search/filter shows.
 - Operators see neither control (placement stays manager-only). Same `r.qb` field, so no new rule.
 

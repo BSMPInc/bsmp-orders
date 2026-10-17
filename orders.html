@@ -6829,7 +6829,7 @@ function renderQueues(){
   </table></div>`;
 }
 
-// ══════════════ WORK QUEUES BOARD (Now / Next / Waiting) ══════════════
+// ══════════════ WORK QUEUES BOARD (Priority 1 / 2 / 3 — keys now / next / wait) ══════════════
 // The Board view of Work Queues: one card per part (order row), placed by a manager
 // in one of three columns. Placement lives ON THE ORDER as r.qb = {col, seq, by, at}
 // so it saves through saveDB() like everything else (no new Firebase path or rule).
@@ -6837,9 +6837,9 @@ function renderQueues(){
 // big drawing and the part's operations, where operators enter qty and check steps off
 // (same _stepQty / _toggleStepDone handlers the List view uses).
 const QB_COLS = [
-  {k:'now',  label:'Now',     hint:'On the floor now',                     color:'#0f7a4f'},
-  {k:'next', label:'Next',    hint:'Up next',                              color:'#BA7517'},
-  {k:'wait', label:'Waiting', hint:'Parked: material, PO or outside work', color:'#8a93a5'},
+  {k:'now',  label:'Priority 1', hint:'On the floor now',                     color:'#0f7a4f'},
+  {k:'next', label:'Priority 2', hint:'Up next',                              color:'#BA7517'},
+  {k:'wait', label:'Priority 3', hint:'Parked: material, PO or outside work', color:'#8a93a5'},
 ];
 const QB_COL_KEYS = QB_COLS.map(c=>c.k);
 const QB_HIDE_STATUSES = ['Invoiced','Completed','Ready for Invoice'];   // not offered in "Add jobs"
@@ -6992,7 +6992,7 @@ function renderQueueBoard(){
     </div>`;
   }).join('');
   const intro = onBoard.length ? '' : `<div class="empty-state" style="padding:18px 10px 6px"><i class="ti ti-layout-columns"></i><p>${mgr
-    ? 'The board is empty. Use <b>Add jobs to board</b> to put parts in Now, Next or Waiting.'
+    ? 'The board is empty. Use <b>Add jobs to board</b> to put parts in Priority 1, 2 or 3.'
     : 'No jobs on the board yet. Switch to <b>List</b> to see every queue.'}</p></div>`;
   wrap.innerHTML = filters + intro + `<div class="qb-cols">${cols}</div>`;
   if(mgr) qbWireDnD(wrap);
