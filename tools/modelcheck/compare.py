@@ -18,6 +18,14 @@
 #              and .003. It used to be a fixed .0002 in3 / .004": that was tuned on a
 #              24" tray and threw away EVERY real difference on a .84" part with .016
 #              wall (Beyond 52520850, owner's flat-pattern reliefs, 2026-10-14).
+#   radii      a corner or bend radius that differs leaves a crescent whose AVERAGE
+#              thickness is only ~.27 x the radius change (.41 x at its fattest), so the
+#              hairline rule silently dropped radius changes up to ~.009" and small
+#              corner rounds outright (owner, 3000-227, 2026-10-17). Every piece is now
+#              checked for its curved faces: two radii >= RAD_DIFF apart, or one radius
+#              >= RAD_SHARP against a sharp corner, is listed whatever its thickness.
+#              Two curved faces of the SAME radius on different axes = one surface
+#              shifted (alignment / thickness noise), never a radius change.
 #   labels     suggestions only, the user signs every row off:
 #              negligible = the same feature in both, outline moved < .005 (a slot
 #                         .003 wider) — shown, never hidden, one click to confirm
@@ -36,6 +44,8 @@ MINVOL = 1e-7             # in3: numeric dust from the boolean
 THIN_FRAC, THIN_MIN, THIN_MAX = 0.05, 0.0015, 0.003   # hairline limit = 5% of wall, clamped (in)
 NEGLIGIBLE = 0.005        # in: a resized outline under this is pre-labelled negligible (BSMP .000 = ±.005)
 MASK_THK = 0.010          # in: thinner customer-only pads are paint masking
+RAD_DIFF = 0.005          # in: a corner / bend radius changed by at least this is always listed
+RAD_SHARP = 0.010         # in: a radius on one model, sharp on the other, is always listed from this size
 
 _mod = None
 def sw_app():
@@ -135,6 +145,63 @@ def _holes(mod, b):
         out[key] = (2*r*IN, [v*IN for v in c], [abs(a) for a in ax])
     return list(out.values())
 
+_dot = lambda a, b: sum(a[i]*b[i] for i in range(3))
+def _curved(mod, b):
+    """cylindrical faces of a body, one entry per cylinder (a cylinder split into several faces
+    counts once) as (radius in, axis, point on axis in); plus whether it has any other
+    curved face (B-spline, cone...), which makes the radius reading unreliable."""
+    out, odd = [], False
+    for fc in (b.GetFaces() or []):
+        f = mod.IFace2(fc._oleobj_); s = mod.ISurface(f.GetSurface()._oleobj_)
+        if s.IsPlane(): continue
+        if not s.IsCylinder(): odd = True; continue
+        p = s.CylinderParams; c = (p[6]*IN, list(p[3:6]), [v*IN for v in p[0:3]])
+        if not any(_same_cyl(c, d, 0.0005) for d in out): out.append(c)
+    return out, odd
+
+def _same_cyl(a, b, tol):
+    """same radius, parallel axes, same axis line (within tol, inches)"""
+    if abs(a[0]-b[0]) > 0.0005 or abs(abs(_dot(a[1], b[1])) - 1) > 1e-4: return False
+    d = [a[2][i]-b[2][i] for i in range(3)]; along = _dot(d, b[1])
+    return math.sqrt(max(_dot(d, d) - along*along, 0)) < tol
+
+def _radius_change(mod, x, sz, cyl):
+    """a leftover piece that is a corner / bend radius built differently -> {'ours': r, 'theirs': r}
+    (0 = sharp corner on that model), else None. Each curved face of the piece is traced back to
+    the model it came from, so the numbers say whose radius is whose."""
+    cl, odd = _curved(mod, x)
+    if not cl: return None
+    def owner(c):
+        for side in ('ours', 'theirs'):
+            if any(_same_cyl(c, d, 0.002) for d in cyl[side]): return side
+        return None
+    def corner_sized(ax, r, f=1.15):
+        # a corner piece is no wider than the bigger radius across the axis (its length runs along
+        # the axis: sheet thickness, or the bend length). Skins and edge strips are wider -> noise.
+        k = max(range(3), key=lambda i: abs(ax[i]))
+        if abs(ax[k]) < 0.999: return True               # tilted axis: can't box it, trust the radii
+        return all(sz[i] <= f*r + 0.005 for i in range(3) if i != k)
+    if len(cl) == 1:
+        # a round on one model, a sharp corner on the other: the piece fills an r x r corner
+        r = cl[0][0]; side = owner(cl[0])
+        if r < RAD_SHARP or odd or not side or not corner_sized(cl[0][1], r): return None
+        return {side: round(r, 4), ('theirs' if side == 'ours' else 'ours'): 0}
+    best = None
+    for a, b in itertools.combinations(cl, 2):
+        dr = abs(a[0]-b[0])
+        if abs(abs(_dot(a[1], b[1])) - 1) > 1e-3 or dr < RAD_DIFF: continue
+        sa, sb = owner(a), owner(b)
+        if not sa or not sb or sa == sb: continue        # same model on both = not a radius change
+        # the same corner: both arcs touch the same two faces, so the axes sit dr/sin(half angle)
+        # apart — dr (a flat 180 deg) up to ~3 x dr (a sharp 40 deg corner). Concentric = a hole
+        # or bend built a different size: axes 0 apart.
+        d = [a[2][i]-b[2][i] for i in range(3)]; along = _dot(d, a[1])
+        gap = math.sqrt(max(_dot(d, d) - along*along, 0))
+        if not (gap < 0.002 or 0.9*dr - 0.002 <= gap <= 3*dr + 0.002): continue
+        if not corner_sized(a[1], max(a[0], b[0]), 2.05 if gap < 0.002 else 1.15): continue   # a ring spans the whole hole
+        if best is None or dr > best[0]: best = (dr, {sa: round(a[0], 4), sb: round(b[0], 4)})
+    return best and best[1]
+
 def _rotations():
     rs = []
     for perm in itertools.permutations(range(3)):
@@ -222,28 +289,33 @@ def compare(ours_path, theirs_path, pictures=True):
         # ---- subtract both ways ----
         findings = []; slivers = {'ours': [0, 0.0], 'theirs': [0, 0.0]}; real_vol = {'ours': 0.0, 'theirs': 0.0}
         keep_bodies = {'ours': [], 'theirs': []}
+        cyl = {'ours': _curved(mod, bo)[0], 'theirs': _curved(mod, moved)[0]}   # to say whose radius is whose
         for side, A, B in (('ours', bo, moved), ('theirs', moved, bo)):
             pieces = []
             for x in _cut(mod, A, B):
                 mp = x.GetMassProperties(1.0); v = mp[3]*IN**3; a = mp[4]*IN**2
                 bb = x.GetBodyBox(); sz = [(bb[i+3]-bb[i])*IN for i in range(3)]
                 avg = 2*v/a if a > 0 else 0
-                if v < MINVOL or avg < thin_lim:
+                rad = _radius_change(mod, x, sz, cyl) if v >= MINVOL else None
+                if v < MINVOL or (avg < thin_lim and not rad):     # a changed radius is never a hairline
                     slivers[side][0] += 1; slivers[side][1] += v; continue
                 real_vol[side] += v
                 pieces.append({'vol': v, 'c': [mp[i]*IN for i in range(3)], 'size': sz, 'avg': avg,
-                               'box': [bb[i]*IN for i in range(6)]})
+                               'box': [bb[i]*IN for i in range(6)], 'radius': rad})
                 keep_bodies[side].append(x)
             groups = collections.OrderedDict()
             for p in sorted(pieces, key=lambda p: -p['vol']):
-                k = (round(p['vol'], 4), tuple(round(s, 2) for s in sorted(p['size'])))
+                rk = tuple(sorted((p['radius'] or {}).items()))
+                k = (round(p['vol'], 4), tuple(round(s, 2) for s in sorted(p['size'])), rk)
                 groups.setdefault(k, []).append(p)
-            for (v, _), ps in groups.items():
-                f = {'side': side, 'count': len(ps), 'vol': round(ps[0]['vol'], 5), 'size': [round(s, 3) for s in ps[0]['size']],
+            for (v, _, _), ps in groups.items():
+                f = {'side': side, 'count': len(ps), 'vol': round(ps[0]['vol'], 7), 'size': [round(s, 3) for s in ps[0]['size']],
                      'avgThk': round(ps[0]['avg'], 4), 'at': [[round(c, 3) for c in p['c']] for p in ps],
                      'boxes': [[round(c, 3) for c in p['box']] for p in ps]}
+                if ps[0]['radius']: f['radius'] = ps[0]['radius']
                 thin = min(ps[0]['size'])
-                if side == 'theirs' and thin <= MASK_THK and sorted(ps[0]['size'])[1] >= 0.1:
+                if f.get('radius'): pass                            # a radius change is never masking / a turret form
+                elif side == 'theirs' and thin <= MASK_THK and sorted(ps[0]['size'])[1] >= 0.1:
                     f['suggest'] = 'masking'
                     f['why'] = 'only %.3f" thick, only on the customer model' % thin
                 elif side == 'theirs':
@@ -274,7 +346,8 @@ def compare(ours_path, theirs_path, pictures=True):
                     a['pair'] = j; used.add(j); b['pairedWith'] = i
                     # same feature both sides, same size, surfaces under .005 apart = an outline resized slightly
                     if (all(abs(x-y) < 0.01 for x, y in zip(sorted(a['size']), sorted(b['size'])))
-                            and max(a['avgThk'], b['avgThk']) < NEGLIGIBLE and not a.get('suggest')):
+                            and max(a['avgThk'], b['avgThk']) < NEGLIGIBLE and not a.get('suggest')
+                            and not a.get('radius') and not b.get('radius')):
                         g = max(a['avgThk'], b['avgThk'])
                         a['suggest'] = b['suggest'] = 'negligible'
                         a['why'] = b['why'] = 'same feature in both, outline about %.3f" different (under .005)' % g
@@ -283,7 +356,8 @@ def compare(ours_path, theirs_path, pictures=True):
                'holesOurs': len(ho), 'holesTheirs': len(ht), 'findings': findings,
                'slivers': {k: {'count': v[0], 'vol': round(v[1], 5)} for k, v in slivers.items()},
                'diffVol': {k: round(v, 5) for k, v in real_vol.items()},
-               'limits': {'minVol': MINVOL, 'thinAvg': round(thin_lim, 4), 'wall': round(wall, 4), 'maskThk': MASK_THK, 'negligible': NEGLIGIBLE}}
+               'limits': {'minVol': MINVOL, 'thinAvg': round(thin_lim, 4), 'wall': round(wall, 4), 'maskThk': MASK_THK, 'negligible': NEGLIGIBLE,
+                          'radDiff': RAD_DIFF, 'radSharp': RAD_SHARP}}
         if pictures: out['pictures'] = _pictures(mod, sw, bo, keep_bodies)
         return out
     finally:

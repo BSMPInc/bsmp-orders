@@ -268,6 +268,7 @@ body.meas-open .fair-fs{padding-right:var(--measW,330px)}
 .mc-rcsides .fl{margin-bottom:3px}
 .mc-gone{margin-top:4px;font-size:12px;color:var(--text2)}
 .mc-gone li{margin:2px 0}
+.mc-rad{font-size:12px;font-weight:700;color:var(--text);margin-top:3px;display:flex;align-items:center;gap:4px}
 /* ---- drawing check: customer drawing vs ours ---- */
 .dc-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 @media(max-width:760px){.dc-pair{grid-template-columns:1fr}}
@@ -3230,9 +3231,15 @@ function mcRowsFrom(findings){
   return rows;
 }
 const mcIn=(v,d)=>(+v).toFixed(d==null?3:d);
+// a corner / bend radius built differently (the helper traces each curved face to its model; 0 = sharp)
+const mcR=(v)=>(+v)>0?('R'+mcIn(v).replace(/^0/,'')):t('sharp');
+function mcRadTxt(r){
+  const f=[r.ours,r.theirs].find(x=>x&&x.radius); if(!f) return '';
+  return t('Radius')+': '+t('yours')+' '+mcR(f.radius.ours||0)+' · '+t('customer')+' '+mcR(f.radius.theirs||0);
+}
 function mcPieceTxt(f){
   if(!f) return '';
-  return f.count+'× '+mcIn(f.vol,4)+' in³ · '+(f.size||[]).map(s=>mcIn(s)).join(' × ')+' in · '+t('avg thickness')+' '+mcIn(f.avgThk,4)+'"';
+  return f.count+'× '+mcIn(f.vol,(+f.vol)<0.001?6:4)+' in³ · '+(f.size||[]).map(s=>mcIn(s)).join(' × ')+' in · '+t('avg thickness')+' '+mcIn(f.avgThk,4)+'"';
 }
 function mcWhere(f){
   const at=(f&&f.at)||[];
@@ -3371,6 +3378,8 @@ function mcWorstGap(a,b){ const pa=mcPts(a), pb=mcPts(b); if(!pa.length||!pb.len
 function mcPieceSame(a,b){
   if(!a&&!b) return true; if(!a||!b) return false;
   if(+a.count!==+b.count) return false;
+  const ra=a.radius||{}, rb=b.radius||{};
+  if(Math.abs((ra.ours||0)-(rb.ours||0))>0.0005 || Math.abs((ra.theirs||0)-(rb.theirs||0))>0.0005) return false;   // a radius changed again
   const sa=a.size||[], sb=b.size||[];
   if(sa.length!==sb.length || sa.some((s,i)=>Math.abs(s-sb[i])>0.005)) return false;
   return Math.abs(a.vol-b.vol)<=Math.max(0.10*Math.max(a.vol,b.vol), 2e-6);
@@ -3527,6 +3536,7 @@ function mcResultHtml(res, where){
         </div>`;
     return `<tr class="dc-row${done?' dc-accepted':''}">
       <td><span class="dc-st" style="color:${k.c}"><i class="ti ${k.ic}"></i> ${t(k.l)}</span> <b>${r.count}×</b>${res.recheck&&r.isNew?` <span class="mc-new">${t('New')}</span>`:''}
+        ${mcRadTxt(r)?`<div class="mc-rad"><i class="ti ti-border-corner-rounded"></i> ${esc(mcRadTxt(r))}</div>`:''}
         <div class="dc-math">${t('at')} ${esc(mcWhere(f))}</div>${r.changed&&r.prevTxt?`<div class="dc-was" title="${esc(t('Same spot last run, different piece — the sign-off is asked again'))}">${t('was')}: ${esc(r.prevTxt)}</div>`:''}</td>
       <td class="dc-math">${r.ours?`<span style="color:var(--red)">■</span> ${esc(mcPieceTxt(r.ours))}`:''}${r.ours&&r.theirs?'<br>':''}${r.theirs?`<span style="color:var(--blue)">■</span> ${esc(mcPieceTxt(r.theirs))}`:''}</td>
       <td>${ui}</td></tr>`;
@@ -3554,6 +3564,7 @@ function mcResultHtml(res, where){
       </tbody></table>
       <div class="dc-math" style="margin-top:6px">${t('Customer model turned by')} ${esc(rot)} ${t('and moved')} (${(g.shift||[]).map(v=>mcIn(v,4)).join(', ')}) in ${t('onto yours; the move is set from the big flat faces')} (${esc(JSON.stringify(g.planeDeltas||[]))}).</div>
       <div class="dc-math">${t('Ignored as slivers: pieces under')} ${lim.minVol||''} in³ ${t('or thinner than')} ${lim.thinAvg||''}" ${t('on average (2 × volume ÷ area). Suggested masking = a customer-only pad')} ≤ ${lim.maskThk||''}" ${t('thick; suggested turret form = customer material inside one of your holes.')}</div>
+      ${lim.radDiff?`<div class="dc-math">${t('A corner or bend radius is never treated as a sliver: a piece whose curved faces show radii at least')} ${lim.radDiff}" ${t('apart, or a radius of')} ${lim.radSharp}" ${t('or more against a sharp corner, is always listed.')}</div>`:''}
     </details>
     <div class="hint">${t('Locations are in your model’s coordinates (inches). Signing a difference off never hides it — the numbers, your reason and your name stay on the record.')}</div>`;
 }
