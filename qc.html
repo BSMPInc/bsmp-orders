@@ -261,6 +261,13 @@ body.meas-open .fair-fs{padding-right:var(--measW,330px)}
 .mc-warn>i{font-size:18px;color:var(--amber)}
 .mc-work{margin:10px 0 6px;font-size:12px}
 .mc-work summary{cursor:pointer;font-weight:700;color:var(--text2)}
+/* model check — re-compare after a correction */
+.mc-new{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;padding:1px 6px;color:var(--amber);background:var(--amber-soft);white-space:nowrap}
+.mc-rcsides{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:12.5px}
+@media(max-width:760px){.mc-rcsides{grid-template-columns:1fr}}
+.mc-rcsides .fl{margin-bottom:3px}
+.mc-gone{margin-top:4px;font-size:12px;color:var(--text2)}
+.mc-gone li{margin:2px 0}
 /* ---- drawing check: customer drawing vs ours ---- */
 .dc-pair{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 @media(max-width:760px){.dc-pair{grid-template-columns:1fr}}
@@ -3188,7 +3195,9 @@ window.qcSaveDrawCheck=async ()=>{
    Owner-confirmed on Absolute 11207-001, 2026-10-14. =================== */
 const MC_HELPER='http://127.0.0.1:8767';
 let _mc={ f:{order:'',part:'',customer:'',job:'',rev:'',notes:''}, helper:null, pinging:false, parts:[],
-  oursPath:'', oursFile:null, theirsPath:'', theirsFile:null, running:false, started:0, result:null, view:null };
+  oursPath:'', oursFile:null, theirsPath:'', theirsFile:null, running:false, started:0, result:null, view:null,
+  busy:null,                                            // id of a saved check being re-compared right now
+  rc:{ours:'', oursFile:null, theirsFile:null} };       // what to re-compare a saved check with ('' = same as last time)
 // why a difference is fine. 'real' = a genuine geometric difference we own (shows in the roll-up)
 const MC_WHY=[
   {k:'clearance',  l:'My clearance (flatten)', real:true,  hint:'Relief or clearance you added so the part flattens / forms'},
@@ -3297,26 +3306,201 @@ window.mcFile=(side,input)=>{
 };
 // the order picker fills mc-part/-customer/-job; copy them into the page state so a re-render keeps them
 function mcSyncFields(){ ['part','customer','job','rev','notes'].forEach(k=>{ const el=$('mc-'+k); if(el) _mc.f[k]=el.value; }); const o=$('mc-order'); if(o) _mc.f.order=o.value; }
+// One run of the helper. Each side is {path} (a file SolidWorks opens — or uses as it is
+// right now, if it's already open), {file} (an upload), or {url,name} (a model stored on a
+// saved check, downloaded again). -> a fresh result, nothing signed off yet.
+async function mcHelperCheck(ours, theirs){
+  const send=async s=>{
+    if(s.path) return {path:s.path};
+    if(s.file) return {name:s.file.name, b64:await toBase64(s.file)};
+    let blob;
+    try{ const resp=await fetch(s.url); if(!resp.ok) throw new Error('HTTP '+resp.status); blob=await resp.blob(); }
+    catch(e){ throw new Error(t('could not download the saved model')+' '+(s.name||'')+' ('+((e&&e.message)||e)+')'); }
+    return {name:s.name||'model', b64:await toBase64(blob)};
+  };
+  const body=JSON.stringify({ ours:await send(ours), theirs:await send(theirs) });
+  const r=await mcFetch('/check',{method:'POST', headers:{'Content-Type':'application/json'}, body}, 15*60*1000);
+  if(!r||!r.ok) throw new Error((r&&r.error)||t('no answer from the helper'));
+  const pictures=r.pictures||{}; delete r.pictures; delete r.ok;
+  const nm=s=>s.path?s.path.split(/[\\/]/).pop():(s.file?s.file.name:(s.name||''));
+  return mcRecompute({ ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'', geo:r, rows:mcRowsFrom(r.findings), pics:pictures,
+    oursName:nm(ours), oursPath:ours.path||'', theirsName:nm(theirs), theirsPath:theirs.path||'' });
+}
+function mcTick(){ return setInterval(()=>{ const el=$('mc-elapsed'); if(el) el.textContent=Math.round((Date.now()-_mc.started)/1000)+' s'; },1000); }
+const mcErrTxt=(e)=>(e&&e.name==='AbortError')?t('it took longer than 15 minutes'):((e&&e.message)||String(e));
+
 window.mcRun=async ()=>{
   mcSyncFields();
+  if(_mc.running) return;
   if(!_mc.oursPath && !_mc.oursFile){ qcToast(t('Pick your model first.'),'err'); return; }
   if(!_mc.theirsPath && !_mc.theirsFile){ qcToast(t('Add the customer’s model first.'),'err'); return; }
-  const side=async (path,file)=>path?{path}:{name:file.name, b64:await toBase64(file)};
-  _mc.running=true; _mc.started=Date.now(); _mc.result=null; render();
-  const tick=setInterval(()=>{ const el=$('mc-elapsed'); if(el) el.textContent=Math.round((Date.now()-_mc.started)/1000)+' s'; },1000);
+  const prev=_mc.result;                 // a re-compare builds on the last run instead of wiping it
+  _mc.running=true; _mc.started=Date.now(); render();
+  const tick=mcTick();
   try{
-    const body=JSON.stringify({ ours:await side(_mc.oursPath,_mc.oursFile), theirs:await side(_mc.theirsPath,_mc.theirsFile) });
-    const r=await mcFetch('/check',{method:'POST', headers:{'Content-Type':'application/json'}, body}, 15*60*1000);
-    if(!r||!r.ok) throw new Error((r&&r.error)||t('no answer from the helper'));
-    const pictures=r.pictures||{}; delete r.pictures; delete r.ok;
-    _mc.result=mcRecompute({ ranAt:Date.now(), by:(QC_USER&&QC_USER.email)||'', geo:r, rows:mcRowsFrom(r.findings), pics:pictures,
-      oursName:_mc.oursPath?_mc.oursPath.split(/[\\/]/).pop():_mc.oursFile.name, oursPath:_mc.oursPath||'',
-      theirsName:_mc.theirsPath?_mc.theirsPath.split(/[\\/]/).pop():_mc.theirsFile.name, theirsPath:_mc.theirsPath||'' });
+    const next=await mcHelperCheck(_mc.oursPath?{path:_mc.oursPath}:{file:_mc.oursFile}, _mc.theirsPath?{path:_mc.theirsPath}:{file:_mc.theirsFile});
+    _mc.result=prev ? mcCarryForward(prev, next) : next;
+    if(prev){ const rc=_mc.result.recheck; qcToast(t('Re-compared —')+' '+rc.fixed+' '+t('gone')+', '+rc.still+' '+t('still open')+', '+rc.fresh+' '+t('new')+'.','ok'); }
   }catch(e){
     console.error('model check failed', e);
-    qcToast(t('Model check failed:')+' '+((e&&e.name==='AbortError')?t('it took longer than 15 minutes'):((e&&e.message)||e)),'err');
+    qcToast(t('Model check failed:')+' '+mcErrTxt(e)+(prev?' — '+t('the last result is still here.'):''),'err');
   }finally{ clearInterval(tick); _mc.running=false; render(); }
 };
+// live result: corrected an uploaded .SLDPRT -> it replaces ours and the compare runs again
+window.mcRecompareFile=(input)=>{
+  const f=input.files&&input.files[0]; input.value=''; if(!f) return;
+  _mc.oursFile=f; _mc.oursPath=''; mcRun();
+};
+
+/* ---- re-comparing after a correction ----
+   The usual loop: compare, fix our model in SolidWorks, compare again. The new run is a
+   fresh subtraction, but what you already decided carries over where it still applies,
+   and the result says what the fix changed:
+     · a row is "the same difference" when one of its spots is within MC_NEAR of one of the
+       last run's (locations are in our model's coordinates, so our edits don't move them);
+     · a sign-off carries ONLY if the difference is unchanged — same kind, same count, same
+       size (±.005") and volume (±10%), same spots (±MC_SAME). If the piece changed, the old
+       reason was about a different piece, so the row asks again and shows what it was;
+     · last run's rows with no match now are listed as gone — usually what the fix removed. */
+const MC_NEAR=0.10, MC_SAME=0.02;
+const mcPts=(r)=>[].concat(((r&&r.ours)||{}).at||[], ((r&&r.theirs)||{}).at||[]).filter(p=>p&&p.length===3);
+const mcDist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+function mcNearest(a,b){ let d=Infinity; mcPts(a).forEach(p=>mcPts(b).forEach(q=>{ d=Math.min(d,mcDist(p,q)); })); return d; }
+function mcWorstGap(a,b){ const pa=mcPts(a), pb=mcPts(b); if(!pa.length||!pb.length) return Infinity;
+  return Math.max(...pa.map(p=>Math.min(...pb.map(q=>mcDist(p,q))))); }
+function mcPieceSame(a,b){
+  if(!a&&!b) return true; if(!a||!b) return false;
+  if(+a.count!==+b.count) return false;
+  const sa=a.size||[], sb=b.size||[];
+  if(sa.length!==sb.length || sa.some((s,i)=>Math.abs(s-sb[i])>0.005)) return false;
+  return Math.abs(a.vol-b.vol)<=Math.max(0.10*Math.max(a.vol,b.vol), 2e-6);
+}
+const mcRowSame=(a,b)=>a.kind===b.kind && mcPieceSame(a.ours,b.ours) && mcPieceSame(a.theirs,b.theirs) && mcWorstGap(a,b)<=MC_SAME && mcWorstGap(b,a)<=MC_SAME;
+function mcRowTxt(r){ return [r.ours?t('yours')+' '+mcPieceTxt(r.ours):'', r.theirs?t('theirs')+' '+mcPieceTxt(r.theirs):''].filter(Boolean).join(' · '); }
+function mcCarryForward(prev, next){
+  const prows=vals(prev.rows||[]), used=new Set();
+  let still=0, fresh=0, carried=0;
+  (next.rows||[]).forEach(r=>{
+    let p=null, bd=Infinity;
+    prows.forEach(x=>{ if(used.has(x)) return; const d=mcNearest(r,x)+(x.kind===r.kind?0:MC_SAME); if(d<bd){ bd=d; p=x; } });
+    if(bd>MC_NEAR) p=null;
+    if(p){
+      used.add(p);
+      if(mcRowSame(r,p)){
+        if(mcSigned(p)){ ['accepted','acceptWhy','acceptNote','acceptBy','acceptAt'].forEach(k=>{ if(p[k]!=null) r[k]=p[k]; }); r.carried=true; carried++; }
+      } else { r.changed=true; r.prevTxt=t(((MC_KIND[p.kind]||{}).l)||'')+': '+mcRowTxt(p); }
+    } else r.isNew=true;
+    if(!mcSigned(r)){ if(p) still++; else fresh++; }
+  });
+  const gone=prows.filter(p=>!used.has(p)).map(p=>({ kind:p.kind||'', txt:mcRowTxt(p), where:mcWhere(p.ours||p.theirs), why:p.acceptWhy||'' }));
+  // what the earlier run looked like (with its pictures, once saved), so the record shows each round
+  next.runs=vals(prev.runs||[]).concat([{ ranAt:prev.ranAt||0, by:prev.by||prev.createdBy||'',
+    oursName:prev.oursName||'', theirsName:prev.theirsName||'', verdict:prev.verdict||'', openCount:prev.openCount||0,
+    diffs:prows.length, pictures:prev.pictures||null }]);
+  next.recheck={ at:next.ranAt, prevAt:prev.ranAt||0, fixed:gone.length, still, fresh, carried, gone };
+  return mcRecompute(next);
+}
+
+// the re-compare bar on a result: what to run it with, and what the last correction changed
+function mcRecheckHtml(res, where){
+  const rc=res.recheck, runs=vals(res.runs||[]);
+  const h=_mc.helper, ok=!!(h&&h.ok&&h.solidworks);
+  let act='';
+  if(where==='live'){
+    const dis=_mc.running||!ok?'disabled':'';
+    act=`<div class="dc-rc-top">
+        ${_mc.oursPath?`<button class="btn sm primary" onclick="mcRun()" ${dis}><i class="ti ${_mc.running?'ti-loader-2 spin':'ti-refresh'}"></i> ${_mc.running?t('Re-comparing…'):t('Re-compare')}</button>`:''}
+        <label class="btn sm${_mc.oursPath?'':' primary'}${_mc.running||!ok?' disabled':''}" style="${_mc.running||!ok?'pointer-events:none;opacity:.55':''}"><i class="ti ti-file-upload"></i> ${t('Re-compare with a corrected .SLDPRT')}<input type="file" accept=".sldprt,.SLDPRT" style="display:none" onchange="mcRecompareFile(this)"></label>
+        <span class="hint" style="margin:0">${_mc.oursPath
+          ?t('Fixed your model? Re-compare reads the part open in SolidWorks as it is right now — no need to save first. Sign-offs carry over where the difference didn’t change.')
+          :t('Fixed your model? Upload the corrected .SLDPRT — the customer model stays, and sign-offs carry over where the difference didn’t change.')}</span>
+      </div>`;
+  } else {
+    const busy=_mc.busy===where, rec=res, s=_mc.rc;
+    const chip=(f)=>f?`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`:'';
+    const lastOurs=rec.oursPath?rec.oursPath.split(/[\\/]/).pop():(rec.oursName||(rec.myModel&&rec.myModel.name)||'');
+    const lastTheirs=(rec.custModel&&rec.custModel.name)||rec.theirsName||'';
+    const parts=_mc.parts.map(p=>`<option value="${esc(p.path)}" ${p.path===s.ours&&!s.oursFile?'selected':''}>${esc(p.title)}</option>`).join('');
+    act=!h ? `<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('Looking for SolidWorks on this PC…')}</div>`
+      : !ok ? `<div class="hint"><i class="ti ti-plug-x"></i> ${t('Re-comparing needs SolidWorks and the Model Check helper running on this PC.')} <a class="dc-undo" onclick="_mc.helper=null;mcPing()">${t('try again')}</a></div>`
+      : `<div class="dc-rc-top"><span class="hint" style="margin:0">${t('Fixed your model (or got a corrected one from the customer)? Re-compare — this check is updated, sign-offs carry over where the difference didn’t change, and the earlier run stays on the record.')}</span></div>
+        <div class="mc-rcsides">
+          <div><div class="fl"><i class="ti ti-box" style="color:var(--green)"></i> ${t('Your model')}</div>
+            <select class="in" onchange="mcRcPick(this.value)" ${busy?'disabled':''}><option value="">${t('Same as last time')}${lastOurs?' — '+esc(lastOurs):''}</option>${parts}</select>
+            <div style="margin-top:5px"><label class="btn sm"${busy?' style="pointer-events:none;opacity:.55"':''}><i class="ti ti-file-upload"></i> ${t('or upload a corrected .SLDPRT')}<input type="file" accept=".sldprt,.SLDPRT" style="display:none" onchange="mcRcFile('ours',this)"></label> ${chip(s.oursFile)}</div></div>
+          <div><div class="fl"><i class="ti ti-box" style="color:var(--blue)"></i> ${t('Customer model')}</div>
+            <div>${s.theirsFile?'':`${t('Same as last time')}${lastTheirs?' — <b>'+esc(lastTheirs)+'</b>':''}`}</div>
+            <div style="margin-top:5px"><label class="btn sm"${busy?' style="pointer-events:none;opacity:.55"':''}><i class="ti ti-file-upload"></i> ${t('Upload a new customer revision')}<input type="file" accept=".step,.stp,.igs,.iges,.sldprt,.x_t,.x_b,.STEP,.STP,.IGS,.IGES,.SLDPRT,.X_T,.X_B" style="display:none" onchange="mcRcFile('theirs',this)"></label> ${chip(s.theirsFile)}</div></div>
+        </div>
+        <div style="margin-top:8px">
+          <button class="btn sm primary" onclick="mcRecompareSaved('${esc(where)}')" ${busy||_mc.busy?'disabled':''}><i class="ti ${busy?'ti-loader-2 spin':'ti-refresh'}"></i> ${busy?t('Re-comparing…'):t('Re-compare')}</button>
+          ${busy?`<span class="muted" style="margin-left:8px">${t('Leave SolidWorks alone until it finishes.')} <b id="mc-elapsed">${Math.round((Date.now()-_mc.started)/1000)} s</b></span>`:''}
+        </div>`;
+  }
+  let what='';
+  if(rc){
+    const bits=[`<b style="color:var(--green)">${rc.fixed||0} ${t('gone')}</b>`,
+      `<b style="color:${rc.still?'var(--red)':'var(--text3)'}">${rc.still||0} ${t('still open')}</b>`,
+      `<b style="color:${rc.fresh?'var(--amber)':'var(--text3)'}">${rc.fresh||0} ${t('new')}</b>`];
+    if(rc.carried) bits.push(`${rc.carried} ${t(rc.carried===1?'sign-off carried over':'sign-offs carried over')}`);
+    const gone=vals(rc.gone||[]);
+    what=`<div class="dc-rc-what"><i class="ti ti-git-compare"></i> ${t('Since the last run')}${rc.prevAt?` (${esc(fmtWhen(rc.prevAt))})`:''}: ${bits.join(' · ')}</div>
+      ${gone.length?`<details class="mc-gone"><summary>${t('Gone since the last run — usually what your fix removed')} (${gone.length})</summary><ul>${gone.map(g=>`<li><span class="dc-fixed"><i class="ti ti-check"></i> ${t('Gone')}</span> ${esc(t((MC_KIND[g.kind]||{}).l||''))} — <span class="dc-math" style="display:inline">${esc(g.txt)} · ${t('at')} ${esc(g.where)}${g.why?' · '+t('was signed off as')+' '+esc(t((mcWhyDef(g.why)||{}).l||g.why)):''}</span></li>`).join('')}</ul></details>`:''}`;
+  }
+  const runPic=(r)=>{ const p=r.pictures||{}, u=(p.diffs||p.iso||{}).url; return u?` (<a href="${esc(u)}" target="_blank" rel="noopener">${t('picture')}</a>)`:''; };
+  const hist=runs.length?`<div class="dc-rc-hist">${t('Run')} ${runs.length+1} · ${t('earlier')}: ${runs.slice(-3).reverse().map(r=>`${esc(fmtWhen(r.ranAt))}${r.oursName?' ('+esc(r.oursName)+')':''} — ${r.diffs||0} ${t('differences')}, ${r.openCount||0} ${t('open')}${runPic(r)}`).join(' · ')}</div>`:'';
+  return `<div class="dc-recheck">${act}${what}${hist}</div>`;
+}
+window.mcRcPick=(path)=>{ _mc.rc.ours=path; if(path) _mc.rc.oursFile=null; render(); };
+window.mcRcFile=(side,input)=>{
+  const f=input.files&&input.files[0]; input.value=''; if(!f) return;
+  if(side==='ours'){ _mc.rc.oursFile=f; _mc.rc.ours=''; } else _mc.rc.theirsFile=f;
+  render();
+};
+// Re-compare a SAVED check: run the helper again (new picks, or the same models as last time),
+// carry sign-offs forward, upload the new pictures, and update the same record (earlier runs kept).
+window.mcRecompareSaved=async (id)=>{
+  const rec=DRAWCHECKS[id]; if(!rec || _mc.busy || _mc.running) return;
+  const s=_mc.rc;
+  const ours=s.oursFile?{file:s.oursFile} : s.ours?{path:s.ours} : rec.oursPath?{path:rec.oursPath}
+    : (rec.myModel&&rec.myModel.url)?{url:rec.myModel.url, name:rec.myModel.name} : null;
+  const theirs=s.theirsFile?{file:s.theirsFile} : (rec.custModel&&rec.custModel.url)?{url:rec.custModel.url, name:rec.custModel.name}
+    : rec.theirsPath?{path:rec.theirsPath} : null;
+  if(!ours){ qcToast(t('Pick your model first.'),'err'); return; }
+  if(!theirs){ qcToast(t('This check has no customer model on file — upload it here.'),'err'); return; }
+  _mc.busy=id; _mc.started=Date.now(); render();
+  const tick=mcTick();
+  try{
+    const next=await mcHelperCheck(ours, theirs);
+    const merged=mcCarryForward(JSON.parse(JSON.stringify(rec)), next);
+    const pictures=await mcUploadPics(merged.pics, rec.partNum); delete merged.pics;
+    const out=Object.assign({}, rec, merged, { pictures, updatedAt:Date.now(), recheckedBy:(QC_USER&&QC_USER.email)||'', recheckedAt:Date.now() });
+    if(ours.file){ const up=await uploadPending2Model(ours.file); if(!up) throw new Error(t('upload of your model failed')); out.myModel=up; }
+    else if(ours.path) out.myModel=null;                    // now read from SolidWorks; the old upload is in runs[] history only by name
+    if(theirs.file){ const up=await uploadPending2Model(theirs.file); if(!up) throw new Error(t('upload of the customer model failed')); out.custModel=up; }
+    if(theirs.url) out.theirsName=theirs.name||out.theirsName;
+    if(ours.url) out.oursName=ours.name||out.oursName;
+    await dbSet('qc/drawingChecks/'+id, out);             // per-id write, never the whole collection
+    const rc=out.recheck||{};
+    try{ await qcLogAudit([{ drawCheckId:id, partNum:out.partNum||'', field:'modelcheck', action:'re-compared', verdict:out.verdict||'',
+      note:(out.oursName||'')+' vs '+(out.theirsName||'')+' · '+(rc.fixed||0)+' gone, '+(rc.still||0)+' still open, '+(rc.fresh||0)+' new, '+(rc.carried||0)+' carried' }]); }
+    catch(e){ console.error('audit log failed', e); }
+    _mc.rc={ours:'', oursFile:null, theirsFile:null};
+    qcToast(t('Re-compared —')+' '+(rc.fixed||0)+' '+t('gone')+', '+(rc.still||0)+' '+t('still open')+', '+(rc.fresh||0)+' '+t('new')+'.','ok');
+  }catch(e){
+    console.error('model re-compare failed', e);
+    qcToast(t('Re-compare failed:')+' '+mcErrTxt(e),'err');
+  }finally{ clearInterval(tick); _mc.busy=null; render(); }
+};
+async function mcUploadPics(pics, part){
+  const pictures={};
+  for(const [k,b64] of Object.entries(pics||{})){
+    const bin=atob(b64), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
+    const pf=new File([u8], (part||'model').replace(/[^\w.-]+/g,'_')+'_modelcheck_'+k+'.jpg', {type:'image/jpeg'});
+    const url=await upload(pf,'modelChecks'); if(url) pictures[k]={name:pf.name,url};
+  }
+  return pictures;
+}
 
 function mcResultHtml(res, where){
   const g=res.geo||{}, o=g.ours||{}, th=g.theirs||{};
@@ -3335,15 +3519,15 @@ function mcResultHtml(res, where){
     const ui=done
       ? `<div class="dc-acc"><div class="dc-why"><i class="ti ti-writing-sign"></i> ${esc(t((w&&w.l)||r.acceptWhy))}</div>
           <input class="dc-accnote" value="${esc(r.acceptNote||'')}" placeholder="${esc(t('Add detail (optional)'))}" onchange="mcAcceptNote('${esc(where)}',${i},this.value)">
-          <div class="dc-accby">${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+fmtWhen(r.acceptAt):''} · <a class="dc-undo" onclick="mcReopen('${esc(where)}',${i})">${t('Reopen')}</a></div></div>`
+          <div class="dc-accby">${esc((r.acceptBy||'').split('@')[0])}${r.acceptAt?' · '+fmtWhen(r.acceptAt):''}${r.carried?`<span class="dc-carried" title="${esc(t('This difference didn’t change, so the earlier sign-off still applies'))}">· ${t('carried over')}</span>`:''} · <a class="dc-undo" onclick="mcReopen('${esc(where)}',${i})">${t('Reopen')}</a></div></div>`
       : `<div class="dc-acc">
           ${r.suggest?`<div class="mc-sug"><i class="ti ti-bulb"></i> ${t('Looks like')} <b>${esc(t((mcWhyDef(r.suggest)||{}).l||r.suggest))}</b>${r.why?' — '+esc(r.why):''}</div>`:''}
           <div class="dc-asks">${t('Acceptable? Say why:')}</div>
           <div class="dc-whys">${MC_WHY.map(x=>`<button class="dc-whybtn${x.k===r.suggest?' mc-sugbtn':''}" title="${esc(t(x.hint))}" onclick="mcAccept('${esc(where)}',${i},'${x.k}')">${esc(t(x.l))}</button>`).join('')}</div>
         </div>`;
     return `<tr class="dc-row${done?' dc-accepted':''}">
-      <td><span class="dc-st" style="color:${k.c}"><i class="ti ${k.ic}"></i> ${t(k.l)}</span> <b>${r.count}×</b>
-        <div class="dc-math">${t('at')} ${esc(mcWhere(f))}</div></td>
+      <td><span class="dc-st" style="color:${k.c}"><i class="ti ${k.ic}"></i> ${t(k.l)}</span> <b>${r.count}×</b>${res.recheck&&r.isNew?` <span class="mc-new">${t('New')}</span>`:''}
+        <div class="dc-math">${t('at')} ${esc(mcWhere(f))}</div>${r.changed&&r.prevTxt?`<div class="dc-was" title="${esc(t('Same spot last run, different piece — the sign-off is asked again'))}">${t('was')}: ${esc(r.prevTxt)}</div>`:''}</td>
       <td class="dc-math">${r.ours?`<span style="color:var(--red)">■</span> ${esc(mcPieceTxt(r.ours))}`:''}${r.ours&&r.theirs?'<br>':''}${r.theirs?`<span style="color:var(--blue)">■</span> ${esc(mcPieceTxt(r.theirs))}`:''}</td>
       <td>${ui}</td></tr>`;
   }).join('');
@@ -3351,6 +3535,7 @@ function mcResultHtml(res, where){
   const rot=(g.rotation||[]).map(r=>'['+r.join(' ')+']').join(' ');
   const sl=g.slivers||{}, lim=g.limits||{};
   return `${head}
+    ${mcRecheckHtml(res, where)}
     <div class="mc-pics">${pic('iso')}${pic('top')}${pic('front')}${pic('diffs')}</div>
     <div class="hint" style="margin:2px 0 8px"><span style="color:var(--red)">■</span> ${t('only in your model')} · <span style="color:var(--blue)">■</span> ${t('only in the customer’s model')} · ${t('the last picture shows the differences alone, so ones hidden inside the part show too')} · ${t('click a picture to enlarge')}</div>
     ${sugN?`<button class="btn sm" style="margin-bottom:8px" onclick="mcAcceptSuggested('${esc(where)}')"><i class="ti ti-checks"></i> ${t('Confirm the')} ${sugN} ${t(sugN===1?'suggested label':'suggested labels')}</button>`:''}
@@ -3373,12 +3558,13 @@ function mcResultHtml(res, where){
     <div class="hint">${t('Locations are in your model’s coordinates (inches). Signing a difference off never hides it — the numbers, your reason and your name stay on the record.')}</div>`;
 }
 
-window.mcOpen=(id)=>{ _mc.view=id; render(); };
+window.mcOpen=(id)=>{ _mc.view=id; _mc.rc={ours:'', oursFile:null, theirsFile:null}; render(); };
 window.mcBack=()=>{ _mc.view=null; render(); };
-window.mcNew=()=>{ _mc.view=null; _mc.result=null; _mc.oursFile=null; _mc.theirsFile=null; _mc.oursPath=''; _mc.theirsPath=''; _mc.f={order:'',part:'',customer:'',job:'',rev:'',notes:''}; render(); };
+window.mcNew=()=>{ if(_mc.running) return; _mc.view=null; _mc.result=null; _mc.rc={ours:'', oursFile:null, theirsFile:null}; _mc.oursFile=null; _mc.theirsFile=null; _mc.oursPath=''; _mc.theirsPath=''; _mc.f={order:'',part:'',customer:'',job:'',rev:'',notes:''}; render(); };
 window.mcDel=async (id)=>{ if(!confirm(t('Delete this model check?'))) return; await dbRemove('qc/drawingChecks/'+id); if(_mc.view===id) _mc.view=null; render(); };
 function mcBadge(r){ return dcVerdictBadge(r); }
 function viewModelCheck(){
+  if(_mc.helper===null && !_mc.pinging) setTimeout(mcPing,0);
   if(_mc.view && DRAWCHECKS[_mc.view]){
     const r=DRAWCHECKS[_mc.view];
     const file=(f,lbl)=>f&&f.url?`<a class="btn sm" href="${esc(f.url)}" target="_blank"><i class="ti ti-file"></i> ${esc(lbl)}</a>`:'';
@@ -3394,7 +3580,6 @@ function viewModelCheck(){
         <div class="muted" style="font-size:11.5px;margin-top:8px">${t('Checked by')} ${esc((r.createdBy||'').split('@')[0])} · ${fmtWhen(r.createdAt)}</div>
       </div>`;
   }
-  if(_mc.helper===null && !_mc.pinging) setTimeout(mcPing,0);
   const h=_mc.helper;
   const status=!h ? `<div class="hint"><i class="ti ti-loader-2 spin"></i> ${t('Looking for SolidWorks on this PC…')}</div>`
     : !h.ok ? `<div class="mc-warn"><i class="ti ti-plug-x"></i> <div><b>${t('The Model Check helper is not running on this PC.')}</b><br>
@@ -3431,7 +3616,7 @@ function viewModelCheck(){
       </div>
     </div>
     <div class="field">
-      <button class="btn primary" onclick="mcRun()" ${_mc.running||!(h&&h.ok&&h.solidworks)?'disabled':''}><i class="ti ${_mc.running?'ti-loader-2 spin':'ti-3d-cube-sphere'}"></i> ${_mc.running?t('Comparing in SolidWorks…'):t('Compare models')}</button>
+      <button class="btn primary" onclick="mcRun()" ${_mc.running||!(h&&h.ok&&h.solidworks)?'disabled':''}><i class="ti ${_mc.running?'ti-loader-2 spin':'ti-3d-cube-sphere'}"></i> ${_mc.running?t('Comparing in SolidWorks…'):(_mc.result?t('Compare again'):t('Compare models'))}</button>
       ${_mc.running?`<span class="muted" style="margin-left:8px">${t('A tray takes about 2 minutes — leave SolidWorks alone until it finishes.')} <b id="mc-elapsed">0 s</b></span>`:''}
       ${_mc.result?`<div style="margin-top:12px">${mcResultHtml(_mc.result,'live')}</div>`:''}
     </div>
@@ -3460,12 +3645,7 @@ window.mcSave=async ()=>{
     const id=newId('mchk');
     const up=async (file)=>file?(await uploadPending2Model(file)):null;
     const custModel=await up(_mc.theirsFile), myModel=await up(_mc.oursFile);
-    const pictures={};
-    for(const [k,b64] of Object.entries(_mc.result.pics||{})){
-      const bin=atob(b64), u8=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) u8[i]=bin.charCodeAt(i);
-      const pf=new File([u8], (f.part||'model').replace(/[^\w.-]+/g,'_')+'_modelcheck_'+k+'.jpg', {type:'image/jpeg'});
-      const url=await upload(pf,'modelChecks'); if(url) pictures[k]={name:pf.name,url};
-    }
+    const pictures=await mcUploadPics(_mc.result.pics, f.part);
     const res=Object.assign({}, _mc.result); delete res.pics;
     const rec=Object.assign(res, { id, kind:'model', createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'', orderId:f.order||'',
       partNum:f.part, customer:f.customer, job:f.job, rev:f.rev, notes:f.notes, custModel, myModel, pictures });
