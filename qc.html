@@ -346,6 +346,7 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .dcv-pin::after{content:'';position:absolute;inset:-8px;border-radius:50%}
 .dcv-pin.sel{z-index:3;border-width:3px;box-shadow:0 0 0 2px #fff,0 0 0 4px var(--pc)}
 .dcv-pin.dragging{z-index:4;opacity:.85}
+.dcv-pin.guess{border-style:dashed}
 .dcv-pin.flash::before,.dcv-zone.flash::before{content:'';position:absolute;inset:-4px;border-radius:50%;border:3px solid var(--pc);animation:dcvPulse .6s ease-out 3}
 .dcv-zone.flash::before{border-radius:0}
 @keyframes dcvPulse{from{transform:scale(1);opacity:1}to{transform:scale(2.6);opacity:0}}
@@ -855,7 +856,9 @@ const I18N = {
     'No drawing on file':'No hay plano guardado','Showing the first':'Se muestran las primeras','of':'de',
     'Customer drawing':'Plano del cliente','Your drawing':'Tu plano','Does not match':'No coincide','Not on your drawing':'No está en tu plano',
     'Customer never states it':'El cliente no lo indica','Matches':'Coincide','Question':'Pregunta','Signed off':'Aprobado',
-    'Grid zone only (no pin)':'Solo zona de cuadrícula (sin marcador)','Pin moved by hand':'Marcador movido a mano','Placed by AI — approximate':'Colocado por la IA — aproximado',
+    'Grid zone only (no pin)':'Solo zona de cuadrícula (sin marcador)','Pin moved by hand':'Marcador movido a mano','Placed by AI — approximate':'Colocado por la IA — aproximado','On the matching text in the PDF':'Sobre el texto que coincide en el PDF',
+    'On the matching text in the PDF — drag it if it picked the wrong one.':'Sobre el texto que coincide en el PDF — arrástralo si eligió el equivocado.',
+    'Pins sit on the matching text where the PDF has it; dashed pins are AI guesses — drag one onto its callout to correct it.':'Los marcadores se colocan sobre el texto que coincide cuando el PDF lo tiene; los punteados son estimaciones de la IA — arrastra uno sobre su cota para corregirlo.',
     'Approximate — the grid zone the AI named, no exact spot':'Aproximado — la zona de cuadrícula que indicó la IA, sin punto exacto',
     'Click the drawing where':'Haz clic en el plano donde está','sits':'',
     'isn’t marked on this drawing':'no está marcado en este plano','isn’t on this drawing':'no está en este plano','Place it':'Colocarlo',
@@ -869,6 +872,10 @@ const I18N = {
     'Not saved yet — kept on this computer, so a reload won’t lose it.':'Aún sin guardar — se conserva en esta computadora, así que recargar no la borra.',
     'Re-checking with your updated drawing — a dense drawing can take a minute or two…':'Revisando de nuevo con tu plano corregido — un plano denso puede tardar uno o dos minutos…',
     'AI is reading both drawings — a dense drawing can take a minute or two…':'La IA está leyendo ambos planos — un plano denso puede tardar uno o dos minutos…',
+    'The customer drawing is no longer on the form — add it again (Upload or From library), then save.':'El plano del cliente ya no está en el formulario — agrégalo de nuevo (Subir o De la biblioteca) y guarda.',
+    'Drawings over 25 MB can’t be stored. Save a smaller PDF (fewer pages, or print to PDF) and add it again.':'Los planos de más de 25 MB no se pueden guardar. Guarda un PDF más pequeño (menos páginas, o imprime a PDF) y agrégalo de nuevo.',
+    'nothing was saved; the drawings are still on the form.':'no se guardó nada; los planos siguen en el formulario.',
+    'upload failed':'falló la subida',
     // AI replies that aren't a readable answer (timeouts, proxy errors)
     'The AI took too long to answer (timed out). Try again — if it keeps happening, send fewer pages (only the sheets that matter).':'La IA tardó demasiado en responder (tiempo agotado). Intenta de nuevo — si sigue pasando, envía menos páginas (solo las hojas importantes).',
     'The files are too large for the AI. Send fewer pages or a smaller PDF.':'Los archivos son demasiado grandes para la IA. Envía menos páginas o un PDF más pequeño.',
@@ -2586,7 +2593,7 @@ async function dcvLoad(src){
     const pg=await pdf.getPage(p); const vp1=pg.getViewport({scale:1});
     const vp=pg.getViewport({scale:Math.min(3, 2000/Math.max(vp1.width,1))});   // ~2000 px wide — sharp enough to read a callout at zoom
     if(pages.length && H+DCV_PAGE_GAP+vp.height>15000) break;                    // stay under canvas limits
-    pages.push({pg, vp, y0:pages.length?H+DCV_PAGE_GAP:0});
+    pages.push({pg, vp, y0:pages.length?H+DCV_PAGE_GAP:0, text:await dcvPageText(pg, vp)});
     H=(pages.length>1?H+DCV_PAGE_GAP:0)+vp.height; W=Math.max(W,vp.width);
   }
   const cv=document.createElement('canvas'); cv.width=Math.ceil(W); cv.height=Math.ceil(H);
@@ -2598,11 +2605,71 @@ async function dcvLoad(src){
     const pctx=pc.getContext('2d'); pctx.fillStyle='#fff'; pctx.fillRect(0,0,pc.width,pc.height);
     await p.pg.render({canvasContext:pctx, viewport:p.vp}).promise;
     ctx.drawImage(pc, x0, Math.round(p.y0));
-    out.push({x0, y0:Math.round(p.y0), w:pc.width, h:pc.height});
+    out.push({x0, y0:Math.round(p.y0), w:pc.width, h:pc.height, text:p.text});
   }
   const blob=await new Promise(res=>cv.toBlob(res,'image/png'));
   if(!blob) throw new Error('could not draw the PDF');
   return {url:URL.createObjectURL(blob), blob:true, w:cv.width, h:cv.height, total:pdf.numPages, pages:out};
+}
+/* ---- pins snap to the PDF's own text ----
+   The AI's x/y guess is rough (it can land an inch or more off), but most CAD PDFs
+   carry their dimension text as real text. So each pin looks for its callout in the
+   page's text layer and sits on it; the AI guess only picks WHICH copy when the same
+   value is printed more than once. Scans / photos have no text → the guess stays,
+   drawn dashed so it reads as approximate. Hand-moved pins are never touched. */
+async function dcvPageText(pg, vp){
+  try{
+    const tc=await pg.getTextContent(), out=[];
+    (tc.items||[]).forEach(it=>{
+      const str=String(it.str||'').trim(); if(!str||!it.transform) return;
+      const tr=it.transform, ul=Math.hypot(tr[0],tr[1])||1, dx=tr[0]/ul, dy=tr[1]/ul;
+      const fh=Math.hypot(tr[2],tr[3])||ul, w=it.width||0;
+      // middle of the text run: half way along the baseline, ~1/3 of a letter up (works for vertical text too)
+      const px=tr[4]+dx*w/2-dy*fh*0.35, py=tr[5]+dy*w/2+dx*fh*0.35;
+      const v=vp.convertToViewportPoint(px,py);
+      out.push({n:dcvTxtNorm(str), x:v[0]/vp.width, y:v[1]/vp.height});
+    });
+    return out;
+  }catch(e){ return []; }
+}
+const dcvTxtNorm=(s)=>String(s||'').toUpperCase().replace(/[⌀∅]/g,'Ø').replace(/\s+/g,'');
+const dcvNums=(n)=>(n.match(/\d*\.\d+|\d+/g)||[]).map(Number);
+// what to look for: the callout's main value (".250" of "2X Ø.250 THRU"), else a fraction, else its longest word
+function dcvKeyOfText(txt){
+  const raw=String(txt||'').toUpperCase();
+  const dec=raw.match(/\d*\.\d+/); if(dec) return {num:Number(dec[0])};
+  const fr=raw.match(/\d+\s*\/\s*\d+/); if(fr) return {sub:fr[0].replace(/\s+/g,'')};
+  const ints=(raw.match(/\d{2,}/g)||[]).sort((a,b)=>b.length-a.length); if(ints.length&&!/[A-Z]{2,}-?\d|\d-\d/.test(raw)) return {num:Number(ints[0])};
+  const words=raw.split(/\s+/).map(dcvTxtNorm).filter(w=>w.length>=2).sort((a,b)=>b.length-a.length);
+  return words.length?{sub:words[0]}:null;
+}
+const _dcvSnapMemo=new WeakMap();
+function dcvSnap(img, txt, guess){
+  if(!img||!img.pages||!txt) return null;
+  let memo=_dcvSnapMemo.get(img); if(!memo) _dcvSnapMemo.set(img, memo={});
+  const mk=txt+'|'+(guess?[guess.page,guess.x,guess.y].join(','):'');
+  if(mk in memo) return memo[mk];
+  const key=dcvKeyOfText(txt), hits=[];
+  if(key) img.pages.forEach((p,k)=>(p.text||[]).forEach(it=>{
+    const ok=key.num!=null ? dcvNums(it.n).some(v=>Math.abs(v-key.num)<1e-9) : it.n.indexOf(key.sub)>=0;
+    if(ok) hits.push({page:k+1, x:it.x, y:it.y});
+  }));
+  let best=null;
+  if(hits.length===1) best=hits[0];
+  else if(hits.length>1 && guess){
+    let bd=Infinity;
+    hits.forEach(h=>{ const d=Math.hypot(h.x-guess.x, h.y-guess.y)+(h.page===(guess.page||1)?0:2); if(d<bd){ bd=d; best=h; } });
+  }
+  return memo[mk]=best?{page:best.page, x:+best.x.toFixed(4), y:+best.y.toFixed(4), snap:true}:null;
+}
+// where a row's / question's pin actually goes on one side: hand-placed → as placed; else on its text; else the AI guess
+function dcvAtOf(img, side, key, it){
+  const isRow=dcvKeyOf(key).k==='r';
+  const at=side==='cust'?it.custAt:(isRow?it.mineAt:null);
+  if(at&&at.moved) return at;
+  if(!isRow && side==='cust') return at;              // a question is prose — nothing to match against
+  const txt=side==='cust'?it.cust:it.mine;
+  return dcvSnap(img, txt, at)||at||null;
 }
 function dcvEnsure(where){
   const ent=_dcvCache[where]||(_dcvCache[where]={});
@@ -2651,9 +2718,9 @@ function dcvMarks(res, side, img){
   const out=[]; if(!img) return out;
   const grid=side==='cust'?res.custGrid:res.mineGrid;
   const add=(key, it, c)=>{
-    const at=side==='cust'?it.custAt:(dcvKeyOf(key).k==='r'?it.mineAt:null);
+    const at=dcvAtOf(img, side, key, it);
     const px=dcvAtPx(img, at);
-    if(px){ out.push({key, c, pin:true, X:px.X, Y:px.Y, moved:!!(at&&at.moved)}); return; }
+    if(px){ out.push({key, c, pin:true, X:px.X, Y:px.Y, moved:!!(at&&at.moved), snap:!!(at&&at.snap)}); return; }
     const zone=side==='cust'?it.zone:(dcvKeyOf(key).k==='r'?it.mineZone:'');
     const rc=dcvZoneRect(img, zone, grid);
     if(rc) out.push(Object.assign({key, c, pin:false}, rc));
@@ -2679,7 +2746,7 @@ function dcViewerHtml(res, where){
   return `<div class="dcv${_dcv.sticky?' sticky':''}" id="dcv">
     <div class="dcv-bar">
       <b><i class="ti ti-map-pins"></i> ${t('On the drawings')}</b>
-      <span class="dcv-note"><i class="ti ti-info-circle"></i> ${pos?t('Pins are placed by AI and approximate — drag one onto its callout to correct it.'):t('No pin locations on this check — click a row, then place its pin.')}</span>
+      <span class="dcv-note"><i class="ti ti-info-circle"></i> ${pos?t('Pins sit on the matching text where the PDF has it; dashed pins are AI guesses — drag one onto its callout to correct it.'):t('No pin locations on this check — click a row, then place its pin.')}</span>
       <span class="dcv-tools">
         <label class="dcv-tog"><input type="checkbox" ${_dcv.probOnly?'checked':''} onchange="dcvProblems(this.checked)"> ${t('Problems only')}</label>
         <label class="dcv-tog" title="${esc(t('Keep the drawings on screen while you scroll the table'))}"><input type="checkbox" ${_dcv.sticky?'checked':''} onchange="dcvSticky(this.checked)"> ${t('Keep in view')}</label>
@@ -2776,7 +2843,7 @@ window.dcvInit=(side)=>{
 function dcvRenderLayer(side){
   const {l}=dcvEls(side), res=dcResOf(_dcv.where), img=dcvImg(side); if(!l||!res||!img) return;
   l.innerHTML=dcvMarks(res, side, img).map(m=>m.pin
-    ? `<div class="dcv-pin c-${m.c}${m.moved?' moved':''}${_dcv.sel===m.key?' sel':''}" data-key="${m.key}" data-x="${m.X}" data-y="${m.Y}" title="${esc(m.moved?t('Pin moved by hand'):t('Placed by AI — approximate'))}"><b>${dcvLabel(m.key)}</b></div>`
+    ? `<div class="dcv-pin c-${m.c}${m.moved?' moved':''}${!m.moved&&!m.snap?' guess':''}${_dcv.sel===m.key?' sel':''}" data-key="${m.key}" data-x="${m.X}" data-y="${m.Y}" title="${esc(m.moved?t('Pin moved by hand'):(m.snap?t('On the matching text in the PDF'):t('Placed by AI — approximate')))}"><b>${dcvLabel(m.key)}</b></div>`
     : `<div class="dcv-zone c-${m.c}${_dcv.sel===m.key?' sel':''}" data-key="${m.key}" data-x="${m.X}" data-y="${m.Y}" data-w="${m.W}" data-h="${m.H}" data-slot="${m.slot||1}" title="${esc(t('Approximate — the grid zone the AI named, no exact spot'))}"><span>${dcvLabel(m.key)}</span></div>`
   ).join('');
   dcvPosition(side);
@@ -2916,7 +2983,7 @@ function dcvPick(side, key){
 function dcvPopHtml(res, key, side){
   const o=dcvItem(res,key); if(!o) return '';
   const it=o.it, other=side==='cust'?'mine':'cust';
-  const at=side==='cust'?it.custAt:(o.k==='r'?it.mineAt:null);
+  const at=dcvAtOf(dcvImg(side), side, key, it);
   const zone=side==='cust'?it.zone:(o.k==='r'?it.mineZone:'');
   let body;
   if(o.k==='r'){
@@ -2933,7 +3000,7 @@ function dcvPopHtml(res, key, side){
       <div style="margin-top:4px">${esc(it.detail||'')}</div>
       ${done?`<div class="dcv-pop-off"><i class="ti ti-writing-sign"></i> ${esc(t((qw&&qw.l)||it.qWhy).replace('…',''))}${it.answer?': '+esc(it.answer):''}</div>`:''}`;
   }
-  const where_=at?(at.moved?`${t('Pin moved by')} ${esc((at.by||'').split('@')[0]||t('hand'))}${at.at?' · '+fmtWhen(at.at):''}`:t('Placed by AI — approximate. Drag the pin onto the callout to correct it.'))
+  const where_=at?(at.moved?`${t('Pin moved by')} ${esc((at.by||'').split('@')[0]||t('hand'))}${at.at?' · '+fmtWhen(at.at):''}`:(at.snap?t('On the matching text in the PDF — drag it if it picked the wrong one.'):t('Placed by AI — approximate. Drag the pin onto the callout to correct it.')))
     :(zone?`${t('No exact spot — shaded zone')} ${esc(zone)} ${t('is approximate.')}`:'');
   const otherHas=dcvStates(o,other)&&dcvImg(other)&&!dcvMarks(res, other, dcvImg(other)).some(m=>m.key===key && m.pin);
   return `<button class="dcv-pop-x" onclick="dcvPopClose()" title="${esc(t('Close'))}"><i class="ti ti-x"></i></button>${body}
@@ -3207,10 +3274,22 @@ window.qcSaveDrawCheck=async ()=>{
   // the button narrates the save — the file uploads are the slow part
   const setBtn=(html,dis)=>{ if(btn){ btn.disabled=dis; btn.innerHTML=html; } };
   try{
+    // both drawings must make it to storage: a check saved without the customer's drawing has
+    // lost its spec. So a failed upload stops the save and keeps the file on the form to retry.
+    const cFile=(_pendingFiles['dccust']||[])[0], mFile=(_pendingFiles['dcmine']||[])[0];
+    if(!cFile){ alert(t('The customer drawing is no longer on the form — add it again (Upload or From library), then save.')); return; }
+    const MAXMB=25;
+    for(const f of [cFile, mFile].filter(Boolean)) if(f.size>MAXMB*1024*1024){ alert(f.name+' — '+(f.size/1048576).toFixed(1)+' MB. '+t('Drawings over 25 MB can’t be stored. Save a smaller PDF (fewer pages, or print to PDF) and add it again.')); return; }
     setBtn('<i class="ti ti-loader-2 spin"></i> '+t('Uploading drawings…'), true);
     const id=newId('dchk');
-    const cf=await uploadPending('dccust','drawingChecks');
-    const mf=await uploadPending('dcmine','drawingChecks');
+    const up=async (f)=>{
+      if(!f) return [];
+      let u=''; try{ u=await upload(f,'drawingChecks'); }catch(e){ throw new Error(f.name+': '+((e&&(e.code||e.message))||e)); }
+      if(!u) throw new Error(f.name+': '+t('upload failed'));
+      return [{name:f.name, url:u, type:f.type||''}];
+    };
+    const cf=await up(cFile);
+    const mf=await up(mFile);
     setBtn('<i class="ti ti-loader-2 spin"></i> '+t('Saving…'), true);
     const rec=Object.assign({}, _dcResult, {
       id, createdAt:Date.now(), createdBy:(QC_USER&&QC_USER.email)||'', orderId:gv('dc-order'),
@@ -3219,6 +3298,7 @@ window.qcSaveDrawCheck=async ()=>{
     });
     delete rec.custFile;                              // in-memory File, never stored
     await dbSet('qc/drawingChecks/'+id, rec);
+    _pendingFiles['dccust']=[]; _pendingFiles['dcmine']=[];   // stored — only now off the form
     try{ await qcLogAudit([{ drawCheckId:id, partNum:part, field:'drawcheck', action:'ai-drawing-check', verdict:rec.verdict||'',
       note:(rec.summary||'')+' · '+(rec.rows||[]).filter(r=>r.status==='mismatch').length+' mismatch, '+(rec.questions||[]).length+' question(s)' }]); }
     catch(e){ console.error('audit log failed', e); }
@@ -3228,8 +3308,8 @@ window.qcSaveDrawCheck=async ()=>{
     render();                                         // rebuilds the page, button comes back fresh
   }catch(e){
     console.error('drawing check save failed', e);
-    qcToast(t('Save failed:')+' '+((e&&e.message)||e),'err');
-    setBtn('<i class="ti ti-device-floppy"></i> '+t('Save check'), false);   // result + fields are still here — try again
+    qcToast(t('Save failed:')+' '+((e&&e.message)||e)+' — '+t('nothing was saved; the drawings are still on the form.'),'err');
+    setBtn('<i class="ti ti-device-floppy"></i> '+t('Save check'), false);   // result + fields + both files are still here — try again
   }
 };
 
@@ -7180,7 +7260,10 @@ window.qcUpload = async (file, prefix)=>{
   const safe=(file.name||'file').replace(/[^A-Za-z0-9._-]/g,'_');
   const path='qc/'+(prefix||'misc')+'/'+Date.now()+'_'+Math.floor(Math.random()*1e4)+'_'+safe;
   // contentDisposition makes the browser save the file under its real name instead of the storage path
-  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
+  // a file with no type (some email / cloud-drive downloads) would be refused by the Storage rule (image|pdf only)
+  const ext=String(file.name||'').toLowerCase().split('.').pop();
+  const type=file.type||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',tif:'image/tiff',tiff:'image/tiff'})[ext]||'';
+  const task=uploadBytesResumable(sRef(storage,path), file, {contentType:type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
   await task;
   return await getDownloadURL(task.snapshot.ref);
 };
