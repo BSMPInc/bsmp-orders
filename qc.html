@@ -867,7 +867,15 @@ const I18N = {
     'Restored your unsaved check from':'Se recuperó tu revisión sin guardar de',
     'it stays on this computer until you save it or press Clear.':'se queda en esta computadora hasta que la guardes o presiones Borrar.',
     'Not saved yet — kept on this computer, so a reload won’t lose it.':'Aún sin guardar — se conserva en esta computadora, así que recargar no la borra.',
-    'Re-checking with your updated drawing — this takes a few seconds…':'Revisando de nuevo con tu plano corregido — tarda unos segundos…',
+    'Re-checking with your updated drawing — a dense drawing can take a minute or two…':'Revisando de nuevo con tu plano corregido — un plano denso puede tardar uno o dos minutos…',
+    'AI is reading both drawings — a dense drawing can take a minute or two…':'La IA está leyendo ambos planos — un plano denso puede tardar uno o dos minutos…',
+    // AI replies that aren't a readable answer (timeouts, proxy errors)
+    'The AI took too long to answer (timed out). Try again — if it keeps happening, send fewer pages (only the sheets that matter).':'La IA tardó demasiado en responder (tiempo agotado). Intenta de nuevo — si sigue pasando, envía menos páginas (solo las hojas importantes).',
+    'The files are too large for the AI. Send fewer pages or a smaller PDF.':'Los archivos son demasiado grandes para la IA. Envía menos páginas o un PDF más pequeño.',
+    'The AI is busy right now. Wait a minute and try again.':'La IA está ocupada ahora. Espera un minuto e intenta de nuevo.',
+    'The AI service had a problem':'El servicio de IA tuvo un problema',
+    'Try again in a minute.':'Intenta de nuevo en un minuto.',
+    'The AI connection sent back something unreadable':'La conexión de IA devolvió algo ilegible',
     'was':'antes',
     'Fixed since last run':'Corregido desde la última revisión',
     'Our value didn’t change, so the earlier sign-off still applies':'Nuestro valor no cambió, así que la aprobación anterior sigue valiendo',
@@ -1247,8 +1255,7 @@ window.qcTestProxy=async()=>{
   qcSetStatus('qc-proxy-status',t('Testing proxy…'));
   try{
     const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Hi'}]})});
-    const d=await r.json();
-    if(d.error) throw new Error(d.error.message||'error');
+    await aiData(r);
     qcSetStatus('qc-proxy-status',t('✓ Proxy working — AI runs through the secure proxy.'),'ok');
   }catch(e){
     qcSetStatus('qc-proxy-status',t('✗ Proxy test failed:')+' '+(e&&e.message?e.message:e),'err');
@@ -1341,12 +1348,59 @@ function withTimeout(p,ms,msg){ return Promise.race([p, new Promise((_,rej)=>set
 function getProxyUrl(){ try{ return (localStorage.getItem('bsmp_proxy_url')||'').trim(); }catch(e){ return ''; } }
 function getApiKey(){ try{ return localStorage.getItem('bsmp_apikey')||''; }catch(e){ return ''; } }
 function hasAIConnection(){ return !!(getProxyUrl()||getApiKey()); }
+// Long replies (a dense drawing compare runs 2+ minutes) are STREAMED: without it the
+// AI sends nothing until it is done, and Cloudflare cuts any request that is silent
+// for ~100 s ("error code: 524"). Read every reply through aiData(), never resp.json().
+const AI_STREAM_FROM=3000;   // max_tokens at or above this → stream
 async function callAnthropic(payload){
+  if(payload && payload.stream==null && (payload.max_tokens||0)>=AI_STREAM_FROM) payload=Object.assign({}, payload, {stream:true});
   const proxy=getProxyUrl();
   if(proxy) return fetch(proxy,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const key=getApiKey();
   if(!key) throw new Error('no-connection');
   return fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify(payload)});
+}
+// One AI reply → the Messages API object {content, stop_reason, usage}, whether it came
+// back as plain JSON or as a stream (the proxy hands a stream back whole, as text).
+// Anything that isn't a readable AI answer — a Cloudflare timeout page, a proxy crash,
+// an API error — becomes a plain-language Error instead of a JSON parse message.
+function aiReplyError(status, text){
+  const s=String(text||'').trim();
+  if(status===524||/error code:\s*524/i.test(s)) return new Error(t('The AI took too long to answer (timed out). Try again — if it keeps happening, send fewer pages (only the sheets that matter).'));
+  if(status===413||/too large|request_too_large/i.test(s)) return new Error(t('The files are too large for the AI. Send fewer pages or a smaller PDF.'));
+  if(status===429||status===529||/overloaded|rate.?limit/i.test(s)) return new Error(t('The AI is busy right now. Wait a minute and try again.'));
+  if(status>=500) return new Error(t('The AI service had a problem')+' (HTTP '+status+'). '+t('Try again in a minute.'));
+  return new Error(t('The AI connection sent back something unreadable')+(status?' (HTTP '+status+')':'')+(s?': '+s.slice(0,80):''));
+}
+function aiParseStream(text){
+  const msg={content:[], stop_reason:null, usage:null}; let cur=null, err=null;
+  text.split(/\r?\n/).forEach(line=>{
+    if(line.slice(0,5)!=='data:') return;
+    let ev; try{ ev=JSON.parse(line.slice(5)); }catch(e){ return; }
+    if(ev.type==='message_start'&&ev.message){ msg.usage=ev.message.usage||null; msg.model=ev.message.model; }
+    else if(ev.type==='content_block_start'){ cur=Object.assign({}, ev.content_block||{type:'text'}); if(cur.type==='text') cur.text=cur.text||''; msg.content.push(cur); }
+    else if(ev.type==='content_block_delta'&&ev.delta){ if(!cur){ cur={type:'text',text:''}; msg.content.push(cur); } if(ev.delta.type==='text_delta') cur.text=(cur.text||'')+(ev.delta.text||''); }
+    else if(ev.type==='content_block_stop') cur=null;
+    else if(ev.type==='message_delta'){ if(ev.delta&&ev.delta.stop_reason) msg.stop_reason=ev.delta.stop_reason; if(ev.usage) msg.usage=Object.assign({}, msg.usage||{}, ev.usage); }
+    else if(ev.type==='error') err=ev.error||{message:'AI error'};
+  });
+  if(err) msg.error=err;
+  return msg;
+}
+async function aiData(resp){
+  const text=await resp.text();
+  const head=text.replace(/^\s+/,'').slice(0,40);
+  let data;
+  if(/^(event|data):/.test(head)) data=aiParseStream(text);
+  else{ try{ data=JSON.parse(text); }catch(e){ throw aiReplyError(resp.status, text); } }
+  if(!data||typeof data!=='object') throw aiReplyError(resp.status, text);
+  if(data.error){
+    const m=(data.error&&data.error.message)||(typeof data.error==='string'?data.error:'');
+    if(/overloaded|rate.?limit/i.test(m)||resp.status===429||resp.status===529) throw aiReplyError(529, m);
+    throw new Error(m||'AI error');
+  }
+  if(!resp.ok) throw aiReplyError(resp.status, text);
+  return data;
 }
 function toBase64(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(file); }); }
 function aiContentBlock(b64, ext){
@@ -1359,8 +1413,7 @@ function extFromFile(file){ const n=(file.name||'').toLowerCase(); const m=n.mat
 async function callAIJson(file, promptText){
   const b64=await toBase64(file);
   const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:1200, messages:[{role:'user',content:[aiContentBlock(b64, extFromFile(file)), {type:'text',text:promptText}]}] });
-  const data=await resp.json();
-  if(data.error) throw new Error(data.error.message||'AI error');
+  const data=await aiData(resp);
   const raw=(data.content||[]).map(c=>c.text||'').join('');
   let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
   const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
@@ -1370,8 +1423,7 @@ async function callAIJson(file, promptText){
 }
 async function callAIJsonContent(content, maxTokens){
   const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:maxTokens||1500, messages:[{role:'user',content}] });
-  const data=await resp.json();
-  if(data.error) throw new Error(data.error.message||'AI error');
+  const data=await aiData(resp);
   const raw=(data.content||[]).map(c=>c.text||'').join('');
   let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
   const fb=clean.indexOf('{');
@@ -1572,8 +1624,7 @@ async function callAICerts(files){
   content.push({type:'text',text:CERT_PROMPT});
   // big packets can hold a dozen+ heat lots — give the reply plenty of room (only used tokens cost)
   const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:8000, messages:[{role:'user',content}] });
-  const data=await resp.json();
-  if(data.error) throw new Error(data.error.message||'AI error');
+  const data=await aiData(resp);
   const raw=(data.content||[]).map(c=>c.text||'').join('');
   let clean=raw.replace(/```json/gi,'').replace(/```/g,'').trim();
   const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}');
@@ -2376,7 +2427,7 @@ async function qcDrawCompare(){
   const btn=$('dc-run'), panel=$('dc-panel');
   const prev=_dcResult;                 // a re-check builds on the last run instead of wiping it
   if(btn) btn.disabled=true;
-  if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${prev?t('Re-checking with your updated drawing — this takes a few seconds…'):t('AI is reading both drawings — this takes a few seconds…')}</div>`; }
+  if(panel){ panel.style.display='block'; panel.innerHTML=`<div class="hint"><i class="ti ti-loader-2 spin"></i> ${prev?t('Re-checking with your updated drawing — a dense drawing can take a minute or two…'):t('AI is reading both drawings — a dense drawing can take a minute or two…')}</div>`; }
   try{
     const next=await dcRunCompare(cust, mine);
     _dcResult=prev ? dcCarryForward(prev, next, prev.custFile===cust) : next;
@@ -5116,7 +5167,7 @@ window.qcFairAutoBubble=async ()=>{
     const img=await qcFairDrawingImage();
     if(!img) throw new Error(t('Upload the drawing first (re-upload a saved one to auto-bubble it).'));
     const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:3200, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/png',data:img.dataUrl.split(',')[1]}},{type:'text',text:FAIR_BUBBLE_PROMPT}]}] });
-    const data=await resp.json();
+    const data=await aiData(resp);
     if(data.error) throw new Error(data.error.message||'AI error');
     let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
     const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
@@ -5194,7 +5245,7 @@ window.qcFairReadBubbles=async ()=>{
   try{
     const comp=await qcCompositeBalloonsDataUrl();
     const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:3000, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:comp.dataUrl.split(',')[1]}},{type:'text',text:FAIR_READ_PROMPT}]}] });
-    const data=await resp.json(); if(data.error) throw new Error(data.error.message||'AI error');
+    const data=await aiData(resp);
     let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
     const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
     clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
@@ -5227,7 +5278,7 @@ window.qcFairReadBallooned=async ()=>{
     const cv=document.createElement('canvas'); cv.width=im.naturalWidth; cv.height=im.naturalHeight; cv.getContext('2d').drawImage(im,0,0);
     const b64=cv.toDataURL('image/jpeg',0.9).split(',')[1];
     const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:3000, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:FAIR_READ_PROMPT}]}] });
-    const data=await resp.json(); if(data.error) throw new Error(data.error.message||'AI error');
+    const data=await aiData(resp);
     let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
     const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
     clean=clean.replace(/,\s*}/g,'}').replace(/,\s*]/g,']');
@@ -5318,7 +5369,7 @@ async function qcReadBox(b){
   try{
     crop=await cropRegion(b.box);
     const resp=await callAnthropic({ model:'claude-sonnet-4-6', max_tokens:400, messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/png',data:crop.split(',')[1]}},{type:'text',text:CROP_PROMPT}]}] });
-    const data=await resp.json(); if(data.error) throw new Error(data.error.message||'AI error');
+    const data=await aiData(resp);
     let clean=(data.content||[]).map(c=>c.text||'').join('').replace(/```json/gi,'').replace(/```/g,'').trim();
     const fb=clean.indexOf('{'), lb=clean.lastIndexOf('}'); if(fb>=0&&lb>fb) clean=clean.slice(fb,lb+1);
     const d=JSON.parse(clean.replace(/,\s*}/g,'}'));
