@@ -6405,11 +6405,12 @@ function reloadQuote(id){
 }
 // Laser speed for a material. Galvanized has no entry of its own: owner rule (2026-09-29) is to cut
 // it at the shop-air 304 SS speed of the nearest thickness, so it also follows his custom SS speeds.
+// Brass follows the same rule (owner, 2026-10-21: "I use the speed for stainless").
 // Returns {ips, pierce, via} where via names the borrowed entry (null for a direct hit).
 function laserSpeedFor(mat){
   if(!mat) return null;
   if(LASER_SPEEDS[mat]) return { ips:LASER_SPEEDS[mat].ips, pierce:LASER_SPEEDS[mat].pierce, via:null };
-  if(/galv/i.test(mat)){
+  if(/galv|brass/i.test(mat)){
     const t=parseFloat(mat);
     if(!(t>0)) return null;
     let best=null;
