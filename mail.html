@@ -415,7 +415,27 @@ body.sb-pinned .dock{left:var(--sb)}
 .tbl-edit.hdr tr:first-child input{font-weight:700;background:#f4f6f9}
 
 /* material price book — capture modal rows */
-.mp-modal{max-width:840px}
+.mp-modal{max-width:1320px;width:min(1320px,96vw);height:min(90vh,980px);max-height:none;overflow:hidden;display:flex;flex-direction:column}
+.mp-modal h3{flex:none}
+.mp-split{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.mp-main{min-height:0;overflow-y:auto;padding-right:2px}
+.mp-modal .mp-rows{max-height:none;overflow:visible}
+.mp-src{min-height:0;display:flex;flex-direction:column;border:1px solid var(--border);background:#3a4049}
+.mp-src-tabs{flex:none;display:flex;gap:4px;flex-wrap:wrap;padding:6px;background:#f4f6f9;border-bottom:1px solid var(--border)}
+.mp-src-tab{height:28px;padding:0 10px;border:1px solid var(--border2);background:#fff;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;max-width:240px;font-family:inherit;color:var(--text2)}
+.mp-src-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-src-tab.on{border-color:var(--accent);color:var(--text);font-weight:700}
+.mp-src-body{flex:1;min-height:0;overflow:auto;background:#fff}
+.mp-src-body iframe{width:100%;height:100%;border:none;display:block}
+.mp-src-text{white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.5;padding:12px 14px;color:var(--text)}
+.mp-src-text mark{background:#fde68a;padding:0 1px}
+.mp-src-note{padding:18px;font-size:12.5px;color:#d5dbe3;display:flex;align-items:center;gap:7px;height:100%;justify-content:center;background:#3a4049}
+@media (max-width:900px){
+  .mp-modal{height:auto;max-height:94vh;overflow-y:auto}
+  .mp-split{display:flex;flex-direction:column}
+  .mp-src{height:40vh;flex:none}
+  .mp-main{overflow:visible}
+}
 .mp-head{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
 .mp-head>div{flex:1;min-width:150px}
 .mp-rows{margin-top:12px;display:flex;flex-direction:column;gap:9px;max-height:46vh;overflow-y:auto;padding-right:2px}
@@ -434,7 +454,8 @@ body.sb-pinned .dock{left:var(--sb)}
 .mp-x{width:32px;height:32px;border:1px solid var(--border);background:#fff;color:var(--text3);font-size:14px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .mp-x:hover{border-color:var(--red);color:var(--red)}
 .mp-math{font-size:11.5px;color:var(--green);margin-top:5px;font-variant-numeric:tabular-nums}
-.mp-raw{font-size:11px;color:var(--text3);margin-top:3px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-raw{font-size:11px;color:var(--text3);margin-top:3px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.mp-raw:hover{color:var(--accent);text-decoration:underline}
 .mp-status{font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:7px;margin-top:10px;min-height:18px}
 /* material price book — search page */
 .mp-tblwrap{overflow-x:auto}
@@ -791,7 +812,14 @@ body.sb-pinned .dock{left:var(--sb)}
 <div class="modal-bg" id="price-modal">
   <div class="modal mp-modal">
     <h3><i class="ti ti-tags"></i> Save prices</h3>
-    <div class="set-help" style="margin-top:2px;margin-bottom:10px">AI fills the grid from this email (and any attached PDF quote) — a person checks it before anything saves. Every saved price keeps the vendor's exact wording and a link back to this email.</div>
+    <div class="mp-split">
+    <!-- what the AI read: the attached PDF quote(s) and the email text, side by side with its rows -->
+    <div class="mp-src">
+      <div class="mp-src-tabs" id="mp-src-tabs"></div>
+      <div class="mp-src-body" id="mp-src-body"></div>
+    </div>
+    <div class="mp-main">
+    <div class="set-help" style="margin-top:2px;margin-bottom:10px">AI fills the grid from this email (and any attached PDF quote — both shown alongside) — a person checks it before anything saves. Click a row’s quoted wording to find it in the email. Every saved price keeps the vendor's exact wording and a link back to this email.</div>
     <div class="mp-head">
       <div><label>Vendor</label><input id="mp-vendor" type="text"></div>
       <div><label>Vendor email</label><input id="mp-vemail" type="text"></div>
@@ -803,6 +831,8 @@ body.sb-pinned .dock{left:var(--sb)}
       <button class="btn" onclick="mpAddRow()" style="margin-right:auto"><i class="ti ti-plus"></i> Add a line</button>
       <button class="btn" onclick="closePriceCapture()">Cancel</button>
       <button class="btn primary" id="mp-save" onclick="savePrices()"><i class="ti ti-check"></i> Save prices</button>
+    </div>
+    </div>
     </div>
   </div>
 </div>
@@ -3247,11 +3277,83 @@ function renderPriceBtn(){
 }
 let _mpItems=[];
 function mpStatus(h){ const el=$('mp-status'); if(el) el.innerHTML=h; }
-window.closePriceCapture=()=>{ $('price-modal').style.display='none'; };
+// ── the source pane: what the AI reads (PDF quotes + the email text), shown beside its rows ──
+// _mpSrc.ready resolves once the PDFs are fetched; runPriceAI sends the same blobs, so the pane
+// always shows exactly what the AI was given. _mpSrcSeq drops a slow fetch from an earlier email.
+let _mpSrc={text:'', pdfs:[], tab:'text', ready:Promise.resolve()}, _mpSrcSeq=0;
+function mpEmailText(t, cap){
+  // newest message first — the latest prices are the ones that matter
+  let text='';
+  for(const m of t.messages.slice().reverse()){
+    const chunk='FROM: '+(m.fromName||'')+' <'+(m.fromEmail||'')+'>  DATE: '+new Date(Number(m.date)).toLocaleDateString()+'\n'+mailPlainText(m)+'\n\n----\n\n';
+    if(cap && text.length+chunk.length>cap) break;
+    text+=chunk;
+  }
+  return text;
+}
+function mpPdfList(t){
+  // PDF quote attachments ride along — vendor price lists usually live there
+  const box=(t.mailboxes||[])[0], pdfs=[];
+  for(const m of t.messages) for(const a of (m.attachments||[])){
+    if(pdfs.length>=2) break;
+    if(a.id && !sigJunk(m,a) && (a.size||0)<5*1048576 && ((a.mime||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(a.filename||'')))
+      pdfs.push({box, msg:m.id, att:a.id, mime:'application/pdf', name:a.filename||'quote.pdf', blob:null, url:'', err:''});
+  }
+  return pdfs;
+}
+function mpSrcFree(){ (_mpSrc.pdfs||[]).forEach(p=>{ if(p.url) URL.revokeObjectURL(p.url); }); }
+function mpLoadSources(t){
+  mpSrcFree();
+  const seq=++_mpSrcSeq, pdfs=mpPdfList(t);
+  _mpSrc={text:mpEmailText(t,0), pdfs, tab:pdfs.length?0:'text', ready:null};
+  _mpSrc.ready=Promise.all(pdfs.map(async p=>{
+    try{ const b=await fetchAttBlob(p); if(seq!==_mpSrcSeq) return; p.blob=b; p.url=URL.createObjectURL(new Blob([b],{type:'application/pdf'})); }
+    catch(e){ p.err=(e&&e.message)||'could not load'; }
+    if(seq===_mpSrcSeq) mpRenderSrc();
+  }));
+  mpRenderSrc();
+}
+function mpRenderSrc(hl){
+  const S=_mpSrc;
+  $('mp-src-tabs').innerHTML=S.pdfs.map((p,k)=>`<button type="button" class="mp-src-tab${S.tab===k?' on':''}" onclick="mpSrcTab(${k})" title="${esc(p.name)}"><i class="ti ti-file-type-pdf"></i><span>${esc(p.name)}</span></button>`).join('')
+    +`<button type="button" class="mp-src-tab${S.tab==='text'?' on':''}" onclick="mpSrcTab('text')"><i class="ti ti-mail"></i><span>Email text</span></button>`;
+  const body=$('mp-src-body');
+  if(S.tab==='text'){
+    const tx=S.text||'(no text in this email)';
+    // hl = [start,end) of the matched wording in the original text
+    const h=hl?esc(tx.slice(0,hl[0]))+'<mark id="mp-src-hit">'+esc(tx.slice(hl[0],hl[1]))+'</mark>'+esc(tx.slice(hl[1])):esc(tx);
+    body.innerHTML=`<div class="mp-src-text">${h}</div>`;
+    const hit=$('mp-src-hit'); if(hit) hit.scrollIntoView({block:'center'});
+    return;
+  }
+  const p=S.pdfs[S.tab];
+  body.innerHTML=!p?'' : p.url?`<iframe src="${p.url}#toolbar=0&navpanes=0" title="${esc(p.name)}"></iframe>`
+    : p.err?`<div class="mp-src-note"><i class="ti ti-alert-triangle"></i> Couldn’t load ${esc(p.name)} (${esc(p.err)}).</div>`
+    : `<div class="mp-src-note"><i class="ti ti-loader-2 nt-spin"></i> Loading ${esc(p.name)}…</div>`;
+}
+window.mpSrcTab=(k)=>{ _mpSrc.tab=k; mpRenderSrc(); };
+// a row's quoted vendor wording → find it in the email text. Words are matched loosely
+// (spacing differs between the AI's copy and the email); a PDF line can't be searched from here.
+window.mpShowRaw=(i)=>{
+  const raw=String((_mpItems[i]&&_mpItems[i].raw)||'').trim(); if(!raw) return;
+  const words=raw.split(/\s+/).filter(Boolean).map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  // try the whole quote, then fewer leading words of it (any run of spaces/newlines between words)
+  let hl=null;
+  for(const n of [words.length,8,5,3]){
+    const ws=words.slice(0,n); if(ws.join(' ').length<6) break;
+    const m=new RegExp(ws.join('\\s+'),'i').exec(_mpSrc.text||'');
+    if(m){ hl=[m.index, m.index+m[0].length]; break; }
+  }
+  if(hl){ _mpSrc.tab='text'; mpRenderSrc(hl); return; }
+  if(_mpSrc.pdfs.length){ _mpSrc.tab=0; mpRenderSrc(); toast('That line isn’t in the email text — it’s likely in the PDF.'); }
+  else toast('Couldn’t find that wording in the email text.',true);
+};
+window.closePriceCapture=()=>{ $('price-modal').style.display='none'; _mpSrcSeq++; mpSrcFree(); _mpSrc.pdfs=[]; };
 window.openPriceCapture=async ()=>{
   const t=CURRENT; if(!t) return;
   if(!t.messages){ toast('Give the conversation a second to finish loading, then try again.',true); return; }
   $('price-modal').style.display='flex';
+  mpLoadSources(t);
   $('mp-vendor').value=t.fromName||t.fromEmail||'';
   $('mp-vemail').value=t.fromEmail||'';
   const d=new Date(Number(t.date||Date.now()));
@@ -3269,24 +3371,13 @@ window.openPriceCapture=async ()=>{
 async function runPriceAI(t){
   mpStatus('<i class="ti ti-loader-2 nt-spin"></i> Reading the email with AI…'); $('mp-save').disabled=true;
   try{
-    const box=(t.mailboxes||[])[0];
-    // newest message first — the latest prices are the ones that matter
-    let text='';
-    for(const m of t.messages.slice().reverse()){
-      const chunk='FROM: '+(m.fromName||'')+' <'+(m.fromEmail||'')+'>  DATE: '+new Date(Number(m.date)).toLocaleDateString()+'\n'+mailPlainText(m)+'\n\n----\n\n';
-      if(text.length+chunk.length>16000) break;
-      text+=chunk;
-    }
-    // PDF quote attachments ride along — vendor price lists usually live there
-    const content=[], pdfs=[];
-    for(const m of t.messages) for(const a of (m.attachments||[])){
-      if(pdfs.length>=2) break;
-      if(a.id && !sigJunk(m,a) && (a.size||0)<5*1048576 && ((a.mime||'').toLowerCase().includes('pdf')||/\.pdf$/i.test(a.filename||'')))
-        pdfs.push({box, msg:m.id, att:a.id, mime:'application/pdf', name:a.filename||'quote.pdf'});
-    }
-    for(const p of pdfs){
-      try{ content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:await blobB64(await fetchAttBlob(p))}}); }
-      catch(e){ /* attachment fetch failed — the email text still goes */ }
+    const text=mpEmailText(t,16000);
+    // the same PDFs the source pane shows (fetched once, in mpLoadSources)
+    const content=[];
+    await _mpSrc.ready;
+    for(const p of _mpSrc.pdfs){
+      if(!p.blob) continue;   // attachment fetch failed — the email text still goes
+      try{ content.push({type:'document', source:{type:'base64', media_type:'application/pdf', data:await blobB64(p.blob)}}); }catch(e){}
     }
     content.push({type:'text', text:mpExtractPrompt({source:'email', hasDoc:content.length>0, hardware:true, text})});
     const r=await aiCall({model:'claude-sonnet-4-6', max_tokens:3000, messages:[{role:'user', content}]});
@@ -3376,7 +3467,7 @@ function renderMpRows(){
         <button class="mp-x" title="Remove this line" onclick="mpDelRow(${i})"><i class="ti ti-trash"></i></button>
       </div>
       <div class="mp-math" id="mp-math-${i}"></div>
-      ${x.raw?`<div class="mp-raw" title="${esc(x.raw)}">“${esc(x.raw)}”</div>`:''}
+      ${x.raw?`<div class="mp-raw" title="Find this in the email: ${esc(x.raw)}" onclick="mpShowRaw(${i})">“${esc(x.raw)}”</div>`:''}
     </div>`;
     const tube=x.form==='tube', s=tubeShape(x.shape), uoms=tube?TUBE_UOMS:UOMS;
     const dims=tube?`
@@ -3406,7 +3497,7 @@ function renderMpRows(){
         <button class="mp-x" title="Remove this line" onclick="mpDelRow(${i})"><i class="ti ti-trash"></i></button>
       </div>
       <div class="mp-math" id="mp-math-${i}"></div>
-      ${x.raw?`<div class="mp-raw" title="${esc(x.raw)}">“${esc(x.raw)}”</div>`:''}
+      ${x.raw?`<div class="mp-raw" title="Find this in the email: ${esc(x.raw)}" onclick="mpShowRaw(${i})">“${esc(x.raw)}”</div>`:''}
     </div>`;
   }).join('');
   _mpItems.forEach((x,i)=>window.mpTouched(i));
