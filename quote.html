@@ -5664,22 +5664,43 @@ function showClaudeReview(id){
     </div>`;
   };
   const who = r.reviewedBy ? ' by ' + qEsc(String(r.reviewedBy).replace(/@.*/,'').replace(/^(ofc|ops)\./,'')) : '';
+  // One decision per slide: swipe / trackpad / arrow keys / ‹ › / dots move between them, while the
+  // title, the summary notes and the nav stay fixed on top. Slide 0 is the "Please check" list when
+  // there is one. The open slide is remembered per quote so a pick (which re-renders) stays put.
+  const first = checks.length ? 1 : 0;
+  const slides = [];
+  if(checks.length) slides.push({ dot:'#d6a23a', html:`<div style="border:1px solid #ecd49c;background:#fdf8ec;border-radius:10px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:#8a5a12;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Please check before sending (${checks.length})${confirmed?` <span style="color:#2f7a55;text-transform:none;letter-spacing:0">· ${confirmed} done</span>`:''}</div>
+        <div style="font-size:11.5px;color:#8a5a12;margin-bottom:8px">Tap one to go to it, then click an option to switch to it, or click the chosen one to confirm it.</div>
+        ${checks.map(x=>`<div style="font-size:13px;margin:5px 0"><a href="#" onclick="crvGo(${x.i+first});return false" style="color:#8a5a12;font-weight:600">${qEsc(x.d.question)}</a> — <span style="color:#4b5563">${qEsc(x.d.choice)}</span></div>`).join('')}
+      </div>` });
+  r.decisions.forEach((d,i)=>slides.push({ dot: d.check && !d.pickedAt ? '#d6a23a' : (d.pickedAt ? '#2f7a55' : '#c3cad5'), html: node(d,i) }));
+  if(!document.getElementById('crv-style')){
+    const st=document.createElement('style'); st.id='crv-style';
+    st.textContent='#crv-track{scrollbar-width:none}#crv-track::-webkit-scrollbar{display:none}'
+      +'.crv-nav{flex:none;width:32px;height:32px;border-radius:50%;border:1px solid #d5dbe3;background:#fff;color:#1f2937;font-size:18px;line-height:1;cursor:pointer;font-family:inherit}'
+      +'.crv-nav:disabled{opacity:.35;cursor:default}.crv-dot{width:8px;height:8px;border-radius:50%;border:none;padding:0;cursor:pointer;opacity:.55;transition:transform .15s,opacity .15s}'
+      +'.crv-dot.on{opacity:1;transform:scale(1.45)}';
+    document.head.appendChild(st);
+  }
   const ov = document.createElement('div'); ov.id = 'claude-review-modal';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:11000;display:flex;align-items:center;justify-content:center;padding:16px';
-  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'DM Sans',system-ui,sans-serif">
-    <div style="padding:18px 20px 12px;border-bottom:1px solid #e2e6ec">
+  ov.innerHTML = `<div style="background:#fff;border-radius:14px;max-width:680px;width:100%;height:min(88vh,720px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);font-family:'DM Sans',system-ui,sans-serif">
+    <div style="flex:none;padding:18px 20px 12px;border-bottom:1px solid #e2e6ec">
       <div style="font-size:17px;font-weight:700;color:#0f172a">Claude’s decisions — ${qEsc(q.partNum)}${q.revision&&q.revision!=='—'?' Rev '+qEsc(q.revision):''}</div>
       <div style="font-size:12px;color:#8a93a5;margin-top:2px">${qEsc(q.customer)} · qty ${qEsc(q.qty)} · $${Number(q.pricePerPart||0).toFixed(2)}/part${when?' · built '+qEsc(when):''}</div>
+      ${r.summary?`<div style="font-size:13px;color:#4b5563;line-height:1.55;margin-top:8px;white-space:pre-wrap;max-height:6.3em;overflow-y:auto">${qEsc(r.summary)}</div>`:''}
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <button type="button" class="crv-nav" id="crv-prev" onclick="crvGo(-1,true)" aria-label="Previous decision">‹</button>
+        <div style="flex:1;min-width:0;text-align:center">
+          <div id="crv-count" style="font-size:11px;font-weight:700;color:#8a93a5;text-transform:uppercase;letter-spacing:.06em"></div>
+          <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:5px">${slides.map((s,k)=>`<button type="button" class="crv-dot" data-k="${k}" onclick="crvGo(${k})" aria-label="Go to slide ${k+1}" style="background:${s.dot}"></button>`).join('')}</div>
+        </div>
+        <button type="button" class="crv-nav" id="crv-next" onclick="crvGo(1,true)" aria-label="Next decision">›</button>
+      </div>
     </div>
-    <div style="padding:14px 20px;overflow:auto">
-      ${r.summary?`<div style="font-size:13px;color:#4b5563;line-height:1.6;margin-bottom:14px;white-space:pre-wrap">${qEsc(r.summary)}</div>`:''}
-      ${checks.length?`<div style="border:1px solid #ecd49c;background:#fdf8ec;border-radius:10px;padding:10px 14px;margin-bottom:14px">
-        <div style="font-size:11px;font-weight:700;color:#8a5a12;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Please check before sending (${checks.length})${confirmed?` <span style="color:#2f7a55;text-transform:none;letter-spacing:0">· ${confirmed} done</span>`:''}</div>
-        <div style="font-size:11.5px;color:#8a5a12;margin-bottom:6px">Click an option below to switch to it, or click the chosen one to confirm it.</div>
-        ${checks.map(x=>`<div style="font-size:13px;margin:3px 0"><a href="#" onclick="document.getElementById('crv-${x.i}').scrollIntoView({behavior:'smooth',block:'center'});return false" style="color:#8a5a12">${qEsc(x.d.question)}</a> — <span style="color:#4b5563">${qEsc(x.d.choice)}</span></div>`).join('')}
-      </div>`:''}
-      <div style="font-size:11px;font-weight:700;color:#8a93a5;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Decision tree</div>
-      ${r.decisions.map(node).join('')}
+    <div id="crv-track" style="flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch">
+      ${slides.map(s=>`<div style="flex:0 0 100%;min-width:0;scroll-snap-align:start;overflow-y:auto;padding:14px 20px;box-sizing:border-box">${s.html}</div>`).join('')}
     </div>
     <div style="padding:12px 20px;border-top:1px solid #e2e6ec;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <div style="flex:1;font-size:12px;color:#8a93a5">${r.reviewedAt ? ('Reviewed ' + qEsc(new Date(r.reviewedAt).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})) + who) : 'Not reviewed yet'}</div>
@@ -5688,7 +5709,42 @@ function showClaudeReview(id){
     </div></div>`;
   ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
   document.body.appendChild(ov);
+  const track = document.getElementById('crv-track');
+  track.addEventListener('scroll', () => { clearTimeout(track._t); track._t = setTimeout(crvSync, 60); }, {passive:true});
+  const keep = window._crvPos && window._crvPos.id === id ? Math.min(window._crvPos.k, slides.length-1) : 0;
+  window._crvPos = { id, k: keep };
+  track.scrollLeft = keep * track.clientWidth;   // instant: a pick re-renders the window on the same slide
+  crvSync();
 }
+// slide k (absolute), or a step of ±1 when rel is true
+function crvGo(k, rel){
+  const track = document.getElementById('crv-track'); if(!track) return;
+  const n = track.children.length, cur = Math.round(track.scrollLeft / (track.clientWidth||1));
+  const to = Math.max(0, Math.min(n-1, rel ? cur + k : k));
+  track.scrollTo({ left: to * track.clientWidth, behavior: 'smooth' });
+  if(window._crvPos) window._crvPos.k = to;
+  crvSync(to);
+}
+function crvSync(force){
+  const track = document.getElementById('crv-track'); if(!track) return;
+  const n = track.children.length;
+  const k = force != null ? force : Math.round(track.scrollLeft / (track.clientWidth||1));
+  if(force == null && window._crvPos) window._crvPos.k = k;
+  const hasList = !!document.querySelector('#crv-track > div:first-child [onclick^="crvGo"]');
+  const c = document.getElementById('crv-count');
+  if(c) c.textContent = hasList && k === 0 ? 'Please check · ' + (n-1) + ' decisions'
+    : 'Decision ' + (k + (hasList ? 0 : 1)) + ' of ' + (hasList ? n-1 : n);
+  const p = document.getElementById('crv-prev'), x = document.getElementById('crv-next');
+  if(p) p.disabled = k <= 0; if(x) x.disabled = k >= n-1;
+  document.querySelectorAll('#claude-review-modal .crv-dot').forEach(d => d.classList.toggle('on', +d.dataset.k === k));
+}
+document.addEventListener('keydown', e => {
+  if(!document.getElementById('claude-review-modal')) return;
+  if(/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) return;
+  if(e.key === 'ArrowRight'){ crvGo(1, true); e.preventDefault(); }
+  else if(e.key === 'ArrowLeft'){ crvGo(-1, true); e.preventDefault(); }
+  else if(e.key === 'Escape') document.getElementById('claude-review-modal').remove();
+});
 function markClaudeReviewed(id){
   const q = HISTORY.find(h=>h.id===id); if(!q || !q.claudeReview) return;
   q.claudeReview.reviewedAt = Date.now();
