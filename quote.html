@@ -128,6 +128,13 @@ body {
   justify-content: center; gap: 3px; min-width: 78px; padding: 0 14px; cursor: pointer; color: var(--text3); }
 .dock-tab .ti { font-size: 21px; }
 /* Still pending card (per quote) */
+.pend-sub { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #8a93a5; margin: 4px 0 6px; }
+.pend-own { display: flex; align-items: flex-start; gap: 9px; padding: 7px 9px; border: 1px solid #ecd49c; background: #fffdf6; border-radius: 8px; margin-bottom: 5px; }
+.pend-own input[type=checkbox] { width: 16px; height: 16px; min-width: 0; padding: 0; margin: 2px 0 0; flex: none; accent-color: var(--accent); cursor: pointer; }
+.pend-own .t { font-size: 13px; color: #1f2937; white-space: pre-wrap; word-break: break-word; }
+.pend-own .m { font-size: 11px; color: #8a93a5; margin-top: 1px; }
+.pend-own.done { border-color: #e5e7eb; background: #f9fafb; }
+.pend-own.done .t { color: #9ca3af; text-decoration: line-through; }
 .pend-item { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; padding: 9px 14px; border: none; border-top: 1px solid #f3f4f6; background: #fff; cursor: pointer; font-family: inherit; }
 .pend-item:first-of-type { border-top: none; }
 .pend-item:hover { background: #fffbf0; }
@@ -748,8 +755,8 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
   <!-- Claude's decisions for the loaded quote (only shown when the quote carries them) -->
   <div id="claude-review-bar" style="display:none"></div>
 
-  <!-- Still pending: this quote's unconfirmed "please check" items (shown only while there are some) -->
-  <div class="card" id="pending-card" style="display:none">
+  <!-- Still pending: your own to-dos for this quote + Claude's unconfirmed "please check" items -->
+  <div class="card" id="pending-card">
     <div class="card-title"><i class="ti ti-alert-circle"></i> Still pending</div>
     <div id="pending-card-body"></div>
   </div>
@@ -5332,6 +5339,9 @@ function saveQuote(){
     laborLines, hwLines, outLines,
     notes: document.getElementById('notes').value,
     leadTime: quoteLeadTime(true),
+    // the owner's own pending items (Pending section): a saved quote edits its record directly, so keep
+    // them; a quote that isn't saved yet carries the ones typed so far
+    pendingItems: existing ? pendingList(existing.pendingItems) : pendingList(window._qPendingDraft),
     // Claude's decision record: attached when Claude builds the quote, kept when the quote is re-saved
     claudeReview: window._pendingClaudeReview || (existing && existing.claudeReview) || null,
     img: currentPartImg||null,
@@ -5835,31 +5845,71 @@ async function pickClaudeOption(id, di, oi){
   const m=document.querySelector('#claude-review-modal > div > div');   // the header, so it shows above the fold
   if(m){ const b=document.createElement('div'); b.style.cssText='font-size:12.5px;font-weight:700;color:#2f7a55;margin-top:6px'; b.textContent=msg; m.appendChild(b); }
 }
-// ── Still pending (per quote): the loaded quote's unconfirmed "please check" items (check && !pickedAt).
-// It's a section on the quote's own rail (SECTIONS 'pending'), shown only while there are items; a quote
-// marked reviewed has none. The card + rail badge are kept in step by the wrappers below.
+// ── Still pending (per quote): the owner's own to-dos for this quote (q.pendingItems) plus Claude's
+// unconfirmed "please check" items (check && !pickedAt; a quote marked reviewed has none of those).
+// It's the first section on the quote's rail (SECTIONS 'pending'), amber with a count while anything is
+// open. A saved quote's items are written straight to its record + cloud copy (no Save click needed);
+// before the first save they wait in _qPendingDraft and saveQuote takes them along.
+window._qPendingDraft = [];
+// RTDB hands arrays back object-shaped with null holes — normalize before every use
+function pendingList(v){ return (Array.isArray(v) ? v : (v ? Object.values(v) : [])).filter(x=>x && x.text); }
+function pendingRec(){ return currentQuoteId!=null ? HISTORY.find(h=>h.id===currentQuoteId) || null : null; }
+function quoteOwnItems(){ const q=pendingRec(); return q ? pendingList(q.pendingItems) : pendingList(window._qPendingDraft); }
 function quotePendingItems(){
-  const q = currentQuoteId!=null ? HISTORY.find(h=>h.id===currentQuoteId) : null;
-  const r = claudeReviewOf(q); if(!r || r.reviewedAt) return [];
+  const r = claudeReviewOf(pendingRec()); if(!r || r.reviewedAt) return [];
   return r.decisions.map((d,i)=>({d,i})).filter(x=>x.d.check && !x.d.pickedAt);
 }
-window.quotePendingItems = quotePendingItems;
+function quotePendingCount(){ return quoteOwnItems().filter(x=>!x.doneAt).length + quotePendingItems().length; }
+window.quotePendingItems = quotePendingItems; window.quotePendingCount = quotePendingCount;
+function savePendingItems(list){
+  const q=pendingRec();
+  if(!q){ window._qPendingDraft=list; renderQuotePending(); return; }
+  q.pendingItems=list;
+  try{ persistHistory(); }catch(e){}
+  try{ if(window._qCloudSyncQuote) window._qCloudSyncQuote(q); }catch(e){}
+  renderQuotePending();
+}
+function addPendingItem(){
+  const inp=document.getElementById('pend-new'); const text=(inp&&inp.value||'').trim(); if(!text) return;
+  const by=(window._qUserEmail && window._qUserEmail())||'';
+  savePendingItems(quoteOwnItems().concat([{ id:'p'+Date.now().toString(36)+Math.floor(Math.random()*1e3), text, by, at:Date.now() }]));
+  const again=document.getElementById('pend-new'); if(again){ again.value=''; again.focus(); }
+}
+function togglePendingItem(id){
+  const by=(window._qUserEmail && window._qUserEmail())||'';
+  savePendingItems(quoteOwnItems().map(x=>x.id!==id ? x : (x.doneAt ? Object.assign({},x,{doneAt:null,doneBy:null}) : Object.assign({},x,{doneAt:Date.now(),doneBy:by}))));
+}
+function deletePendingItem(id){ savePendingItems(quoteOwnItems().filter(x=>x.id!==id)); }
 function renderQuotePending(){
   const card=document.getElementById('pending-card'), body=document.getElementById('pending-card-body'); if(!card||!body) return;
-  const items=quotePendingItems();
-  card.style.display = items.length ? '' : 'none';
-  if(items.length){
-    const id=currentQuoteId;
-    body.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <span style="font-size:12.5px;color:#8a5a12;flex:1;min-width:200px"><strong>${items.length}</strong> item${items.length!==1?'s':''} to check before you send this quote. Click one to confirm it or switch the option.</span>
+  const keepFocus=document.activeElement && document.activeElement.id==='pend-new';
+  const typed=((document.getElementById('pend-new')||{}).value)||'';
+  const own=quoteOwnItems(), open=own.filter(x=>!x.doneAt), done=own.filter(x=>x.doneAt), claude=quotePendingItems(), id=currentQuoteId;
+  const who=e=>qEsc(String(e||'').replace(/@.*/,'').replace(/^(ofc|ops)\./,''));
+  const day=t=>t?new Date(t).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'';
+  const row=x=>`<div class="pend-own${x.doneAt?' done':''}">
+      <input type="checkbox" ${x.doneAt?'checked':''} onchange="togglePendingItem('${x.id}')" title="${x.doneAt?'Mark as not done':'Mark done'}">
+      <div style="flex:1;min-width:0"><div class="t">${qEsc(x.text)}</div><div class="m">${x.by?who(x.by)+' · ':''}${day(x.at)}${x.doneAt?' · done '+day(x.doneAt)+(x.doneBy?' by '+who(x.doneBy):''):''}</div></div>
+      <button class="qd-ic" title="Delete this item" onclick="deletePendingItem('${x.id}')"><i class="ti ti-trash"></i></button>
+    </div>`;
+  const total=open.length+claude.length;
+  body.innerHTML=`<div style="font-size:12.5px;color:${total?'#8a5a12':'#2f7a55'};margin-bottom:8px">${total?`<strong>${total}</strong> item${total!==1?'s':''} still pending on this quote.`:'Nothing pending on this quote.'}</div>
+    <div class="pend-sub">Your items</div>
+    ${open.map(row).join('')}
+    <div style="display:flex;gap:6px;margin:6px 0 4px">
+      <input id="pend-new" type="text" placeholder="Add a pending item — e.g. waiting on bender price" onkeydown="if(event.key==='Enter'){event.preventDefault();addPendingItem();}" style="flex:1;min-width:0">
+      <button class="btn btn-sm" onclick="addPendingItem()"><i class="ti ti-plus"></i> Add</button>
+    </div>
+    ${id==null?'<div style="font-size:11px;color:#8a93a5">Saved with the quote when you click Save quote.</div>':''}
+    ${done.length?`<details style="margin-top:6px"><summary style="font-size:11.5px;color:#8a93a5;cursor:pointer">Done (${done.length})</summary>${done.map(row).join('')}</details>`:''}
+    ${claude.length?`<div class="pend-sub" style="margin-top:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="flex:1">From Claude’s decisions</span>
         <button class="btn btn-sm" onclick="pendingOpen(${id},-1)"><i class="ti ti-list-check"></i> Review all</button>
-        <button class="btn btn-sm" onclick="markClaudeReviewed(${id})" title="Sign off the whole quote — clears Pending"><i class="ti ti-check"></i> Mark reviewed</button>
-      </div>
-      <div style="border:1px solid #ecd49c;border-radius:10px;overflow:hidden">${items.map(({d,i})=>`<button type="button" class="pend-item" onclick="pendingOpen(${id},${i})">
+        <button class="btn btn-sm" onclick="markClaudeReviewed(${id})" title="Sign off Claude’s checks on this quote"><i class="ti ti-check"></i> Mark reviewed</button></div>
+      <div style="border:1px solid #ecd49c;border-radius:10px;overflow:hidden">${claude.map(({d,i})=>`<button type="button" class="pend-item" onclick="pendingOpen(${id},${i})">
         <span class="area">${qEsc(d.area||'')}</span>
         <span style="min-width:0"><div class="q">${qEsc(d.question||'')}</div><div class="c">${qEsc(d.choice||'')}</div>${d.because?`<div class="w">${qEsc(d.because)}</div>`:''}</span>
-      </button>`).join('')}</div>`;
-  } else body.innerHTML='';
+      </button>`).join('')}</div>`:''}`;
+  const ni=document.getElementById('pend-new'); if(ni){ ni.value=typed; if(keepFocus) ni.focus(); }
   try{ if(window.qdRefresh) window.qdRefresh(); }catch(e){}
 }
 // open Claude's decisions on one item (slide i+1: slide 0 is the "Please check" list), or on that list (i<0)
@@ -5873,6 +5923,12 @@ function pendingOpen(id, i){
     window[name] = function(){ const out = f.apply(this, arguments); try{ renderClaudeReviewBar(); }catch(e){}
       try{ renderQuotePending(); }catch(e){} return out; }; };
   ['reloadQuote','resetForm','saveQuote','renderHistory'].forEach(wrap);
+})();
+(function(){
+  const clr = (name, when) => { const f = window[name]; if(typeof f !== 'function') return;
+    window[name] = function(){ if(!when || when()) window._qPendingDraft = []; const out = f.apply(this, arguments);
+      if(name==='saveQuote' && currentQuoteId!=null) window._qPendingDraft = []; try{ renderQuotePending(); }catch(e){} return out; }; };
+  clr('reloadQuote'); clr('resetForm'); clr('saveQuote', ()=>false);
 })();
 
 const QUOTE_STATUSES = {
@@ -10864,7 +10920,7 @@ window.syncOptCards=function(){
   // Rail sections: key, label, icon, how to find the card. core = always on the rail;
   // the others appear only while that optional calculator is switched on.
   var SECTIONS=[
-    {k:'pending', label:'Pending',    name:'Still pending — items to check before sending', ic:'ti-alert-circle', find:function(){return $('pending-card');}, warn:true},
+    {k:'pending', label:'Pending',    name:'Still pending — items to check before sending', ic:'ti-alert-circle', find:function(){return $('pending-card');}, core:true, warn:true},
     {k:'upload',  label:'Upload',     name:'Drawing upload & AI extract', ic:'ti-cloud-upload',  find:function(){return $('upload-card');}, core:true},
     {k:'job',     label:'Job',        name:'Job info', ic:'ti-file-invoice',  title:'Job Info', core:true},
     {k:'material',label:'Material',   name:'Material & blank', ic:'ti-stack-2',       title:'Material', core:true},
@@ -10923,7 +10979,6 @@ window.syncOptCards=function(){
         case 'qb':   return (window._qtyBreaksResults||[]).length>0;
         case 'deburr': return !!($('batch-deburr-enabled')||{}).checked;
         case 'tap':  return !!($('batch-tap-enabled')||{}).checked;
-        case 'pending': return (window.quotePendingItems ? window.quotePendingItems().length : 0) > 0;
       }
     }catch(e){}
     return false;
@@ -11006,7 +11061,7 @@ window.syncOptCards=function(){
       if(s.k==='ops'){ var n=0; document.querySelectorAll('#ops-container select').forEach(function(x){ if(x.value) n++; }); return n||''; }
       if(s.k==='hw'){ var h=0; document.querySelectorAll('#hw-container input[id^="hw-desc-"]').forEach(function(x){ if(x.value.trim()) h++; }); return h||''; }
       if(s.k==='qb'){ return (window._qtyBreaksResults||[]).length||''; }
-      if(s.k==='pending'){ return window.quotePendingItems ? (window.quotePendingItems().length||'') : ''; }
+      if(s.k==='pending'){ return window.quotePendingCount ? (window.quotePendingCount()||'') : ''; }
     }catch(e){}
     return '';
   }
@@ -11017,7 +11072,7 @@ window.syncOptCards=function(){
       if(!isOn(s)) return;
       if(s.k==='notes') html+='<div class="qd-sep"></div>';
       var b=badge(s);
-      html+='<button class="qd-item'+(s.add?' qd-add':'')+(s.warn?' qd-warn':'')+(active===s.k?' active':'')+'" title="'+s.label+'" onclick="qdToggle(\''+s.k+'\')">'
+      html+='<button class="qd-item'+(s.add?' qd-add':'')+(s.warn&&b!==''?' qd-warn':'')+(active===s.k?' active':'')+'" title="'+s.label+'" onclick="qdToggle(\''+s.k+'\')">'
         +'<i class="ti '+s.ic+'"></i><span>'+s.label+'</span>'+(b!==''?'<span class="qd-badge">'+b+'</span>':'')+'</button>';
     });
     html+='<button class="qd-item qd-classic" title="Back to the long single-page layout" onclick="qdSetLayout(false)"><i class="ti ti-layout-list"></i><span>Classic</span></button>';
