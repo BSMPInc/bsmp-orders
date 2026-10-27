@@ -196,6 +196,22 @@ body.sb-pinned .dock{left:var(--sb)}
 .pr-help h4{font-size:12px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 6px}
 .pr-help ul{margin:0 0 4px 18px;padding:0}
 .pr-help ul li{font-size:13px;margin-bottom:6px}
+/* ResMed invoices page (reuses the payroll page's form/preview styles) */
+.ri-drop{display:flex;gap:10px;align-items:center;padding:12px 14px;border:1.5px dashed var(--border2);background:var(--bg);cursor:pointer;font-size:13px;color:var(--text2)}
+.ri-drop:hover,.ri-drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.ri-drop.has{border-style:solid;background:#fff;color:var(--text)}
+.ri-drop .ti{font-size:20px;color:var(--text3)}
+.ri-drop.has .ti{color:var(--red)}
+.ri-hint{margin-top:6px;font-size:12.5px;color:var(--text2)}
+.ri-hint a{color:var(--accent);font-weight:700;cursor:pointer}
+.ri-row{display:flex;gap:10px;align-items:center;padding:9px 12px;font-size:13px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.ri-row:last-child{border-bottom:0}
+.ri-row .who{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.ri-st{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:2px 8px;white-space:nowrap}
+.ri-st.ok{background:var(--green-soft);color:var(--green)}
+.ri-st.wait{background:var(--bg);color:var(--text3)}
+.ri-st.late{background:var(--amber-soft);color:var(--amber)}
+.ri-st.bad{background:var(--red-soft);color:var(--red)}
 @media (max-width:640px){ .pr-tbl th:nth-child(2),.pr-tbl td:nth-child(2){width:92px} }
 /* compose To autocomplete */
 .ac-wrap{position:relative}
@@ -554,6 +570,7 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="nav-item" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span class="nav-label">Waiting on customer</span></div>
       <div class="nav-sec">Records</div>
       <div class="nav-item" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span class="nav-label">Certs &amp; invoices</span></div>
+      <div class="nav-item" data-page="resinv" onclick="go('resinv')"><i class="ti ti-file-invoice"></i><span class="nav-label">ResMed invoices</span><span class="n" id="n-resinv" style="display:none" title="Sent invoices Basware hasn't confirmed yet"></span></div>
       <div class="nav-item" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span class="nav-label">Price book</span></div>
       <div class="nav-item" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span class="nav-label">Contacts</span></div>
       <div class="nav-item pr-owner-only" data-page="payroll" style="display:none" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span class="nav-label">Payroll hours</span></div>
@@ -688,6 +705,9 @@ body.sb-pinned .dock{left:var(--sb)}
 
     <!-- ============ PAYROLL HOURS ============ -->
     <div class="content" id="v-payroll" style="display:none"></div>
+
+    <!-- ============ RESMED INVOICES ============ -->
+    <div class="content" id="v-resinv" style="display:none"></div>
   </main>
 </div>
 
@@ -698,6 +718,7 @@ body.sb-pinned .dock{left:var(--sb)}
   <button class="dock-tab" data-page="quoted" onclick="go('quoted')"><span class="qsent-ico"><i class="ti ti-currency-dollar qs-d"></i><i class="ti ti-arrow-up-right qs-a"></i></span><span>Quoted</span></button>
   <button class="dock-tab" data-page="waiting" onclick="go('waiting')"><i class="ti ti-clock"></i><span>Waiting</span></button>
   <button class="dock-tab" data-page="certs" onclick="go('certs')"><i class="ti ti-certificate"></i><span>Certs</span></button>
+  <button class="dock-tab" data-page="resinv" onclick="go('resinv')"><i class="ti ti-file-invoice"></i><span>ResMed</span></button>
   <button class="dock-tab" data-page="prices" onclick="go('prices')"><i class="ti ti-tags"></i><span>Prices</span></button>
   <button class="dock-tab" data-page="contacts" onclick="go('contacts')"><i class="ti ti-address-book"></i><span>Contacts</span></button>
   <button class="dock-tab pr-owner-only" data-page="payroll" style="display:none" onclick="go('payroll')"><i class="ti ti-clock-dollar"></i><span>Payroll</span></button>
@@ -1716,6 +1737,357 @@ window._prSend=()=>{
       loadThreads(false);
     }});
 };
+// ── ResMed invoices ───────────────────────────────────────────────────────────
+// ResMed's process: the invoice PDF goes to the buyer who placed the PO AND to
+// their AP inbox, both on To. Their Basware system then mails back
+// "Email received | Success | Re: [External] <our subject>" from
+// no-reply@pdf.basware.com — that echo of our subject is how a sent invoice is
+// marked confirmed. The list comes from Gmail (everything ever sent to the AP
+// address, so invoices sent by hand count too), merged with
+// mail/resmedInvoices/<id> = {inv, po, to[], who[], subject, from, file, note, sentAt, by}
+// for ones sent from here (they show before Gmail's search catches up).
+// The wording lives only in riCompose(): the preview renders it, send posts it.
+const RI_AP='USA107-AccountsPayable@resmed.com', RI_BASWARE='no-reply@pdf.basware.com';
+const RI_LATE_MS=2*3600e3;   // Basware usually answers within minutes (invoice 6563: 7 min)
+let RESINV={}, _riForm=null, _riPreview=false, _riGm=null, _riLoading=false, _riLoadErr='', _riLoadedAt=0, _riRowsCache=[], _riBoot=false;
+const _riPast=new Map();   // buyer email → "Name <email>", harvested from past invoice emails
+const riClean=(v)=>String(v||'').trim().replace(/^(inv(oice)?|p\.?o\.?)\s*/i,'').replace(/^#\s*/,'').trim();
+const riInvOf=(s)=>{ const m=/\binv(?:oice)?\.?\s*(?:no\.?\s*)?#?\s*(\d{3,7})\b/i.exec(String(s||'')); return m?m[1]:''; };
+const riPoOf=(s)=>{ const m=/\bP\.?O\.?\s*(?:no\.?\s*)?#?\s*(\d{5,10})\b/i.exec(String(s||''))||/\b(\d{7,10})\b/.exec(String(s||'')); return m?m[1]:''; };
+const riInvFromName=(n)=>{ const m=/\b(\d{4,6})\b/.exec(String(n||'').replace(/\.pdf$/i,'')); return m?m[1]:''; };
+// "Email received | Success | Re: [External] Invoice 6563 for PO 67005054" → "invoice 6563 for po 67005054"
+const riNorm=(s)=>String(s||'').toLowerCase().replace(/^email received\s*\|[^|]*\|\s*/,'')
+  .replace(/^((re|fwd?|fw)\s*:\s*|\[external\]\s*)+/,'').replace(/\s+/g,' ').trim();
+const riWhen=(ts)=>new Date(ts).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const riDay=(ts)=>new Date(ts).toLocaleDateString('en-US',{month:'short',day:'numeric',year:new Date(ts).getFullYear()===new Date().getFullYear()?undefined:'2-digit'});
+const riArr=(x)=>(Array.isArray(x)?x:Object.values(x||{})).filter(Boolean);
+// ResMed's shared/system mailboxes — never "the person who placed the order"
+const riSystem=(a)=>/^(oracle|us-procurement|usa107-accountspayable|no-?reply|noreply|do-?not-?reply)@/i.test(addrOf(a));
+function riRecList(){
+  return Object.keys(RESINV||{}).map(k=>RESINV[k]&&RESINV[k].sentAt?Object.assign({id:k},RESINV[k]):null).filter(Boolean)
+    .sort((a,b)=>b.sentAt-a.sentAt);
+}
+// first name for "Hello Renee," — the typed name, then the address book, then the address itself
+function riFirst(a){
+  const m=/^\s*"?([^"<]+?)"?\s*<[^>]+>\s*$/.exec(String(a||''));
+  let n=m?m[1].trim():'';
+  if(!n){ const c=CONTACTS[mkey(addrOf(a))]; n=String((c&&c.name)||'').trim(); }
+  if(n) return n.split(/\s+/)[0];
+  const lp=addrOf(a).split('@')[0].split(/[._-]/)[0]||'';
+  return lp?lp.charAt(0).toUpperCase()+lp.slice(1).toLowerCase():'';
+}
+const riBuyers=(f)=>toList(f.who).filter(a=>addrOf(a)!==RI_AP.toLowerCase());
+function riCompose(f){
+  const inv=riClean(f.inv), po=riClean(f.po), who=riBuyers(f);
+  const names=[...new Set(who.map(riFirst).filter(Boolean))];
+  const hello='Hello'+(names.length?' '+(names.length>1?names.slice(0,-1).join(', ')+' and '+names[names.length-1]:names[0]):'')+',';
+  const note=String(f.note||'').trim();
+  return {to:who.concat([RI_AP]), subject:'Invoice '+inv+(po?' for PO '+po:''),
+    body:hello+'\n\nAttached is Invoice #'+inv+(po?' for PO#'+po:'')+'.'+(note?'\n\n'+note:'')+'\n\nThank you.'};
+}
+function riProblems(f){
+  const out=[];
+  if(!f.file) out.push('Attach the invoice PDF.');
+  if(!riClean(f.inv)) out.push('Enter the invoice number.');
+  const who=riBuyers(f);
+  if(!who.length) out.push('Enter who placed the order — their ResMed email address.');
+  const bad=who.filter(a=>!toAddrOk(a));
+  if(bad.length) out.push('Not an email address: '+bad.join(', '));
+  if(!f.from) out.push('No mailbox to send from — check Settings.');
+  return out;
+}
+function riNewForm(){
+  const boxes=SETTINGS.mailboxes||[], last=riRecList()[0];
+  const from=(last&&boxes.includes(last.from))?last.from:(boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||''));
+  return {who:'', inv:'', invAuto:false, po:'', note:'', from, file:null, poHint:null};
+}
+// every sent invoice: ours first (exact time + who), then Gmail's for ones sent by hand
+function riRows(){
+  const out=[], seen=new Set(), keyOf=(inv,subj)=>inv?('i'+inv):('s'+riNorm(subj));
+  riRecList().forEach(r=>{ const k=keyOf(r.inv,r.subject); if(seen.has(k)) return; seen.add(k);
+    out.push({inv:r.inv||'', po:r.po||'', subject:r.subject||'', sentAt:r.sentAt, to:riArr(r.to), by:r.by||'', own:true}); });
+  ((_riGm&&_riGm.sent)||[]).forEach(t=>{
+    if(!/\binv/i.test(t.subject||'')) return;   // other mail to AP (statements, questions) isn't an invoice
+    const inv=riInvOf(t.subject), k=keyOf(inv,t.subject); if(seen.has(k)) return; seen.add(k);
+    out.push({inv, po:riPoOf(t.subject), subject:t.subject||'', sentAt:_riPast.get('d:'+t.key)||t.date, to:riArr(_riPast.get('t:'+t.key)), own:false});
+  });
+  out.forEach(r=>{ r.conf=riConfFor(r); r.st=riStatus(r); });
+  return out.sort((a,b)=>b.sentAt-a.sentAt);
+}
+function riConfFor(r){
+  const n=riNorm(r.subject);
+  return ((_riGm&&_riGm.conf)||[]).filter(c=>{
+    const ci=riInvOf(c.subject);
+    const same=riNorm(c.subject)===n || (r.inv&&ci===r.inv) || (!r.inv&&!ci&&r.po&&riPoOf(c.subject)===r.po);
+    return same && (!r.own || c.date>=r.sentAt-10*60e3);
+  }).sort((a,b)=>b.date-a.date)[0]||null;
+}
+function riStatus(r){
+  if(r.conf){
+    const m=/^email received\s*\|\s*([^|]+?)\s*\|/i.exec(r.conf.subject||''), s=m?m[1]:'';
+    if(!s||/success/i.test(s)) return {cls:'ok', html:'<i class="ti ti-circle-check"></i> Basware '+esc(riWhen(r.conf.date)), tip:'Basware accepted it — '+r.conf.subject};
+    return {cls:'bad', html:'<i class="ti ti-alert-triangle"></i> Basware: '+esc(s), tip:r.conf.subject};
+  }
+  if(!_riGm) return {cls:'wait', html:_riLoading?'Checking…':'—', tip:''};
+  if(Date.now()-r.sentAt<RI_LATE_MS) return {cls:'wait', html:'<i class="ti ti-clock"></i> Waiting for Basware', tip:'Basware usually confirms within a few minutes.'};
+  return {cls:'late', html:'<i class="ti ti-alert-circle"></i> No confirmation', tip:'No email from '+RI_BASWARE+' matches this invoice. Check it went to '+RI_AP+', or send it again.'};
+}
+async function riLoad(force){
+  if(_riLoading) return;
+  if(!force&&_riGm&&Date.now()-_riLoadedAt<60e3){ riPaintList(); return; }
+  _riLoading=true; _riLoadErr=''; riPaintList();
+  try{
+    const q=(s)=>api('/threads?q='+encodeURIComponent(s),{cache:'no-store'}).then(d=>(d&&d.threads)||[]);
+    const [sent,conf]=await Promise.all([q('to:'+RI_AP+' newer_than:1y'), q('from:'+RI_BASWARE+' newer_than:1y')]);
+    _riGm={sent, conf}; _riLoadedAt=Date.now();
+  }catch(e){ _riLoadErr=e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':String((e&&e.message)||e); }
+  _riLoading=false; riPaintList();
+  if(_riGm) riHarvest();
+}
+// who earlier invoices went to (besides AP): fills the "placed the order" suggestions
+// and the list's To column for invoices sent by hand. A few recent threads, once a session.
+let _riHarvested=false;
+async function riHarvest(){
+  if(_riHarvested) return; _riHarvested=true;
+  const ts=((_riGm&&_riGm.sent)||[]).filter(t=>/\binv/i.test(t.subject||'')).slice(0,10);
+  await Promise.all(ts.map(async t=>{
+    const box=Object.keys(t.ids||{})[0]; if(!box) return;
+    try{
+      const d=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(t.ids[box]));
+      const first=((d&&d.messages)||[]).find(m=>riArr(m.to).some(a=>addrOf(a)===RI_AP.toLowerCase()));
+      if(!first) return;
+      const buyers=riArr(first.to).filter(a=>/@resmed\.com$/i.test(addrOf(a))&&!riSystem(a));
+      _riPast.set('t:'+t.key, buyers.concat([RI_AP]));
+      if(first.date) _riPast.set('d:'+t.key, first.date);   // the thread's date is its LAST message — this is when it went out
+      buyers.forEach(a=>{ const e=addrOf(a); if(!_riPast.has(e)) _riPast.set(e,e); });
+    }catch(e){ /* a missing thread just means fewer suggestions */ }
+  }));
+  riPaintList(); riPaintWhoList();
+}
+function riWhoSuggest(){
+  const m=new Map(), ap=RI_AP.toLowerCase();
+  const add=(a)=>{
+    const e=addrOf(a); if(!e||e===ap||m.has(e)||riSystem(e)) return;
+    const typed=/<[^>]+>\s*$/.test(String(a))?String(a).replace(/<[^>]+>\s*$/,'').replace(/[",;<>]/g,'').trim():'';
+    const c=CONTACTS[mkey(e)], nm=typed||String((c&&c.name)||'').replace(/[",;<>]/g,'').trim();
+    m.set(e, nm?nm+' <'+e+'>':e);
+  };
+  riRecList().forEach(r=>riArr(r.who).forEach(add));
+  _riPast.forEach((v,k)=>{ if(!/^[td]:/.test(k)) add(v); });
+  Object.values(CONTACTS||{}).forEach(c=>{ if(c&&/@resmed\.com$/i.test(c.email||'')) add(c.email); });
+  return [...m.values()];
+}
+function riPaintWhoList(){ const d=$('ri-who-list'); if(d) d.innerHTML=riWhoSuggest().map(v=>`<option value="${esc(v)}"></option>`).join(''); }
+function renderResInv(){
+  const el=$('v-resinv'); if(!el) return;
+  if(!_riForm) _riForm=riNewForm();
+  const f=_riForm, boxes=SETTINGS.mailboxes||[];
+  if(!boxes.includes(f.from)) f.from=boxes.includes('info@bertsmp.com')?'info@bertsmp.com':(boxes[0]||'');   // settings arrived after the form was made
+  if(_riPreview){ el.innerHTML=riPreviewHtml(f); return; }
+  el.innerHTML=`<div class="pr-wrap">
+    <div class="page-head"><h2>ResMed invoices</h2><p>ResMed wants each invoice PDF emailed to <b>the person who placed the order</b> and to <b>${esc(RI_AP)}</b>. This sends one email to both. Their Basware system answers every invoice with a confirmation from ${esc(RI_BASWARE)} — the list below shows which ones came back.</p></div>
+    <div class="card" style="padding:16px">
+      <label style="display:block;font-size:11px;font-weight:700;color:var(--text2);margin-bottom:4px">Invoice PDF</label>
+      <div class="ri-drop" id="ri-drop" onclick="_riPick()" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="_riDrop(event)"></div>
+      <div class="pr-top" style="margin-top:12px">
+        <div><label>Invoice #</label><input id="ri-inv" style="width:120px" value="${esc(f.inv)}" placeholder="6563" oninput="_riSet('inv',this.value)"></div>
+        <div><label>PO #</label><input id="ri-po" style="width:150px" value="${esc(f.po)}" placeholder="67005054" oninput="_riSet('po',this.value)"></div>
+        <div><label>Send from</label><select onchange="_riSet('from',this.value)">${boxes.map(a=>`<option value="${esc(a)}"${a===f.from?' selected':''}>${esc(a)}</option>`).join('')}</select></div>
+      </div>
+      <div class="pr-top" style="margin-bottom:0">
+        <div style="flex:1;min-width:240px"><label>Placed the order (ResMed buyer)</label>
+          <input id="ri-who" list="ri-who-list" style="width:100%" value="${esc(f.who)}" placeholder="name@resmed.com" autocomplete="off" oninput="_riSet('who',this.value)">
+          <datalist id="ri-who-list"></datalist></div>
+      </div>
+      <div class="ri-hint" id="ri-po-hint"></div>
+      <div class="ri-hint">Also goes to <b>${esc(RI_AP)}</b> — added automatically.</div>
+      <label style="display:block;font-size:11px;font-weight:700;color:var(--text2);margin:14px 0 4px">Note (optional — goes above “Thank you.”)</label>
+      <textarea class="pr-note" oninput="_riSet('note',this.value)">${esc(f.note)}</textarea>
+      <div id="ri-err" class="hint" style="color:var(--red);margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn primary" onclick="_riReview()"><i class="ti ti-eye"></i> Review email</button>
+        <button class="btn" onclick="_riClear()">Clear</button>
+      </div>
+    </div>
+    <div class="page-head" style="margin-top:22px;display:flex;align-items:center;gap:10px"><h2 style="font-size:15px">Sent invoices</h2>
+      <button class="btn sm" style="margin-left:auto" title="Look for new Basware confirmations" onclick="riLoad(true)"><i class="ti ti-refresh"></i> Check again</button></div>
+    <div class="card" style="padding:0" id="ri-list"></div>
+  </div>`;
+  riPaintFile(); riPaintPoHint(); riPaintWhoList(); riPaintList();
+}
+function riPaintFile(){
+  const el=$('ri-drop'); if(!el||!_riForm) return;
+  const fl=_riForm.file;
+  el.classList.toggle('has',!!fl);
+  el.innerHTML=fl
+    ? `<i class="ti ti-file-type-pdf"></i><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">${esc(fl.name)}</b><span style="color:var(--text3);white-space:nowrap">${Math.max(1,Math.round(fl.size/1024))} KB</span>
+       <span style="margin-left:auto;display:flex;gap:12px;white-space:nowrap" class="ri-hint"><a onclick="event.stopPropagation();_riView()">View</a><a onclick="event.stopPropagation();_riPick()">Change</a></span>`
+    : `<i class="ti ti-upload"></i><span>Drop the invoice PDF here, or <b style="color:var(--accent)">click to pick it</b>. The invoice # fills in from the file name.</span>`;
+}
+function riPaintPoHint(){
+  const el=$('ri-po-hint'); if(!el||!_riForm) return;
+  const h=_riForm.poHint;
+  if(!h){ el.innerHTML=''; return; }
+  if(h.loading){ el.innerHTML='<i class="ti ti-loader-2 nt-spin"></i> Looking for the PO '+esc(h.po)+' email…'; return; }
+  if(!h.email){ el.innerHTML=h.err?'':'No email from ResMed mentions PO '+esc(h.po)+' — type the buyer’s address.'; return; }
+  const on=riBuyers(_riForm).some(a=>addrOf(a)===h.email.toLowerCase());
+  el.innerHTML=`PO ${esc(h.po)} came from <b>${esc(h.name||h.email)}</b>${h.name?' ('+esc(h.email)+')':''}${h.date?' on '+esc(riDay(h.date)):''} · `
+    +(on?'<span style="color:var(--green)"><i class="ti ti-check"></i> going to them</span>':'<a onclick="_riUse()">Send it to them</a>');
+}
+// type a PO # → find the ResMed email it came on, and offer its sender as the buyer
+// (offered, never filled in by itself — a wrong guess has to be picked on purpose)
+let _riPoTimer=null, _riPoSeq=0;
+function riPoLookup(){
+  clearTimeout(_riPoTimer);
+  const f=_riForm, po=riClean(f&&f.po);
+  if(!/^\d{6,}$/.test(po)){ if(f){ f.poHint=null; riPaintPoHint(); } return; }
+  if(f.poHint&&f.poHint.po===po&&!f.poHint.loading) return;
+  _riPoTimer=setTimeout(async ()=>{
+    const seq=++_riPoSeq; f.poHint={po, loading:true}; riPaintPoHint();
+    let hint={po};
+    try{
+      const d=await api('/threads?q='+encodeURIComponent('"'+po+'" from:resmed.com -from:'+RI_AP),{cache:'no-store'});
+      const ts=((d&&d.threads)||[]).slice().sort((a,b)=>a.date-b.date);
+      // ResMed's PO email comes from oracle@resmed.com addressed to us, us-procurement and
+      // the requester — the requester is the person who placed the order
+      let email='', date=0;
+      const po_t=ts.find(t=>/purchase order/i.test(t.subject||'')&&/^oracle@/i.test(t.fromEmail||''));
+      if(po_t){
+        const box=Object.keys(po_t.ids||{})[0];
+        if(box){ const th=await api('/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(po_t.ids[box]));
+          const m=((th&&th.messages)||[]).find(m=>/^oracle@/i.test(m.fromEmail||''));
+          const req=m&&riArr(m.to).map(addrOf).find(a=>/@resmed\.com$/.test(a)&&!riSystem(a));
+          if(req){ email=req; date=m.date||po_t.date; } }
+      }
+      if(!email){ const t=ts.find(t=>/@resmed\.com$/i.test(t.fromEmail||'')&&!riSystem(t.fromEmail)); if(t){ email=addrOf(t.fromEmail); date=t.date; } }
+      if(email){
+        const named=ts.find(t=>addrOf(t.fromEmail||'')===email&&t.fromName), c=CONTACTS[mkey(email)];
+        hint={po, email, date, name:String((named&&named.fromName)||(c&&c.name)||'').replace(/[",;<>]/g,'').trim()};
+      }
+    }catch(e){ hint={po, err:true}; }
+    if(seq!==_riPoSeq||_riForm!==f) return;
+    f.poHint=hint; riPaintPoHint();
+  },600);
+}
+window._riUse=()=>{
+  const h=_riForm&&_riForm.poHint; if(!h||!h.email) return;
+  const v=h.name?h.name+' <'+h.email+'>':h.email;
+  _riForm.who=v; _riForm.dirty=true; const e=$('ri-who'); if(e) e.value=v; riPaintPoHint();
+};
+window._riSet=(k,v)=>{
+  if(!_riForm) return; _riForm[k]=v; _riForm.dirty=true;
+  if(k==='inv') _riForm.invAuto=false;
+  if(k==='po') riPoLookup();
+  if(k==='who') riPaintPoHint();
+};
+window._riPick=()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='application/pdf,.pdf';
+  inp.onchange=()=>riTakeFile(inp.files&&inp.files[0]); inp.click();
+};
+window._riDrop=(ev)=>{ ev.preventDefault(); const d=$('ri-drop'); if(d) d.classList.remove('over'); riTakeFile(ev.dataTransfer&&ev.dataTransfer.files&&ev.dataTransfer.files[0]); };
+async function riTakeFile(file){
+  if(!file||!_riForm) return;
+  if(!/pdf$/i.test(file.type||'')&&!/\.pdf$/i.test(file.name||'')){ toast('That isn’t a PDF — pick the invoice PDF.',true); return; }
+  if(file.size>MAX_ATT_TOTAL){ toast('That PDF is over 18 MB — too big to email.',true); return; }
+  let data;
+  try{ data=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||''); r.onerror=()=>rej(new Error('read')); r.readAsDataURL(file); }); }
+  catch(e){ toast('Could not read '+file.name+'.',true); return; }
+  const f=_riForm;
+  if(f.file&&f.file.url) URL.revokeObjectURL(f.file.url);
+  f.file={name:file.name||'Invoice.pdf', size:file.size, data, url:URL.createObjectURL(file)};
+  f.dirty=true;
+  const n=riInvFromName(file.name);
+  if(n&&(!riClean(f.inv)||f.invAuto)){ f.inv=n; f.invAuto=true; const e=$('ri-inv'); if(e) e.value=n; }
+  riPaintFile();
+}
+window._riView=()=>{ const fl=_riForm&&_riForm.file; if(fl&&fl.url) window.open(fl.url,'_blank'); };
+window._riClear=()=>{
+  if(_riForm&&_riForm.dirty&&!confirm('Clear this invoice and start over?')) return;
+  if(_riForm&&_riForm.file&&_riForm.file.url) URL.revokeObjectURL(_riForm.file.url);
+  _riForm=riNewForm(); _riPreview=false; renderResInv();
+};
+window._riReview=()=>{
+  const probs=riProblems(_riForm);
+  if(probs.length){ const e=$('ri-err'); if(e) e.innerHTML=probs.map(esc).join('<br>'); return; }
+  _riPreview=true; renderResInv(); window.scrollTo(0,0);
+};
+window._riBack=()=>{ _riPreview=false; renderResInv(); };
+function riPreviewHtml(f){
+  const c=riCompose(f), sig=sigOf(f.from), logo=sigLogoOf(f.from), inv=riClean(f.inv);
+  const warn=[];
+  const dup=riRows().find(r=>r.inv&&r.inv===inv);
+  if(dup) warn.push(`<b>Invoice ${esc(inv)} already went out</b> ${esc(riWhen(dup.sentAt))}${dup.conf?' and Basware confirmed it':''}. Sending again sends a second copy — say why in the note.`);
+  if(!riClean(f.po)) warn.push('<b>No PO #</b> — ResMed matches invoices to POs, so add it if you have it.');
+  const outside=riBuyers(f).filter(a=>!/@resmed\.com$/i.test(addrOf(a)));
+  if(outside.length) warn.push('<b>Not a ResMed address:</b> '+esc(outside.join(', '))+' — check this is the person who placed the order.');
+  const kb=Math.max(1,Math.round(f.file.size/1024));
+  return `<div class="pr-wrap">
+    <div class="page-head"><h2>Review the invoice email</h2><p>This is exactly what goes out. Nothing is sent until you press Send.</p></div>
+    ${warn.map(w=>`<div class="card" style="padding:10px 14px;margin-bottom:10px;border-left:3px solid var(--amber);background:var(--amber-soft)">${w}</div>`).join('')}
+    <div class="pr-meta"><b>From:</b> ${esc(f.from)}<br><b>To:</b> ${esc(c.to.join(', '))}<br><b>Subject:</b> ${esc(c.subject)}<br>
+      <b>Attached:</b> <a style="color:var(--accent);font-weight:700;cursor:pointer" onclick="_riView()">${esc(f.file.name)}</a> (${kb} KB)</div>
+    <div class="pr-prev">${esc(c.body).replace(/\n/g,'<br>')}
+      ${sig?'<br><br>'+esc('-- \n'+sig).replace(/\n/g,'<br>'):''}
+      ${logo?`<div style="margin-top:10px"><img src="data:${esc(logo.mime)};base64,${logo.data}" width="${logo.width}" style="display:block;max-width:100%;height:auto" alt=""></div>`:''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" onclick="_riBack()"><i class="ti ti-arrow-left"></i> Back — edit</button>
+      <button class="btn primary" onclick="_riSend()"><svg class="i" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg> Send</button>
+    </div></div>`;
+}
+window._riSend=()=>{
+  const f=_riForm; if(!f) return;
+  const probs=riProblems(f);
+  if(probs.length){ _riPreview=false; renderResInv(); const e=$('ri-err'); if(e) e.innerHTML=probs.map(esc).join('<br>'); return; }
+  const c=riCompose(f);
+  const payload={replyAs:f.from, to:c.to.map(addrOf).join(', '), subject:c.subject, body:withSig(c.body,f.from), sigLogo:sigLogoOf(f.from),
+    attachments:[{name:f.file.name, mime:'application/pdf', data:f.file.data}]};
+  const rec={inv:riClean(f.inv), po:riClean(f.po), to:c.to.map(addrOf), who:riBuyers(f), subject:c.subject, from:f.from,
+    file:f.file.name, note:String(f.note||'').trim()};
+  _riForm=null; _riPreview=false; renderResInv();
+  showUndo('Sending invoice '+rec.inv,{countdown:true, secs:8,
+    onUndo:()=>{ _riForm=f; _riPreview=true; if(navPage==='resinv') renderResInv(); toast('Send canceled — the invoice email is back for review.'); },
+    onTimeout:async ()=>{
+      try{ await api('/send',{method:'POST',body:JSON.stringify(payload)}); }
+      catch(e){ _riForm=f; _riPreview=true; if(navPage==='resinv') renderResInv();
+        toast(e.notConnected?'Mail isn’t connected yet — finish the setup in Settings.':('Send failed: '+e.message),true); return; }
+      toast('Invoice '+rec.inv+' sent to '+rec.to.join(' and ')+' ✓');
+      const id='i'+Date.now().toString(36);
+      rec.sentAt=Date.now(); rec.by=(auth.currentUser&&auth.currentUser.email)||'';
+      RESINV[id]=rec;
+      set(ref(db,'mail/resmedInvoices/'+id), rec).catch(()=>toast('Sent, but the record did not save — check the mail database rule.',true));
+      if(f.file.url) URL.revokeObjectURL(f.file.url);
+      riPaintList(); loadThreads(false);
+      [3,10].forEach(m=>setTimeout(()=>riLoad(true), m*60e3));   // Basware answers in minutes — look again
+    }});
+};
+window._riFind=(i)=>{
+  const r=_riRowsCache[i]; if(!r) return;
+  go('inbox'); $('search').value=r.inv?('invoice '+r.inv):(r.po||r.subject); window.searchAll();
+};
+function riPaintList(){
+  if(!_riBoot&&SETTINGS.proxyUrl&&auth.currentUser){ _riBoot=true; setTimeout(()=>riLoad(),8000); }   // fills the nav count once per visit
+  const rows=riRows(); _riRowsCache=rows;
+  const late=_riGm?rows.filter(r=>r.st.cls==='late'&&Date.now()-r.sentAt<45*864e5).length:0;
+  const b=$('n-resinv'); if(b){ b.textContent=late||''; b.style.display=late?'':'none'; }
+  const el=$('ri-list'); if(!el||navPage!=='resinv'||_riPreview) return;
+  const head=_riLoadErr?`<div class="hint" style="padding:10px 12px;color:var(--red)">Couldn’t check Gmail: ${esc(_riLoadErr)}</div>`
+    :(_riLoading&&!_riGm?'<div class="hint" style="padding:10px 12px"><i class="ti ti-loader-2 nt-spin"></i> Checking Gmail for sent invoices and Basware confirmations…</div>':'');
+  const ap=RI_AP.toLowerCase();
+  const list=rows.slice(0,40).map((r,i)=>{
+    const who=r.to.filter(a=>addrOf(a)!==ap).map(a=>{ const c=CONTACTS[mkey(addrOf(a))]; return (c&&c.name)||addrOf(a); });
+    return `<div class="ri-row">
+      <b style="min-width:96px">Invoice ${esc(r.inv||'—')}</b>
+      <span style="min-width:104px;color:var(--text2)">${r.po?'PO '+esc(r.po):''}</span>
+      <span class="who" title="${esc(r.subject)}">${who.length?esc(who.join(', ')):'<span style="color:var(--text3)">'+esc(r.subject)+'</span>'}</span>
+      <span style="color:var(--text3);font-size:12px;white-space:nowrap">sent ${esc(riDay(r.sentAt))}</span>
+      <span class="ri-st ${r.st.cls}" title="${esc(r.st.tip)}">${r.st.html}</span>
+      <span class="icon-btn" title="Find this invoice’s emails" style="cursor:pointer;color:var(--text3)" onclick="_riFind(${i})"><i class="ti ti-search"></i></span>
+    </div>`;
+  }).join('');
+  el.innerHTML=head+(list||(_riGm||_riLoadErr?'<div class="empty" style="padding:22px">No invoices sent to ResMed accounts payable in the last year.</div>':''));
+}
+
 // save-the-sender button shown on an open conversation
 function renderContactBtn(){
   const b=$('contact-btn'); if(!b) return;
@@ -1841,12 +2213,14 @@ window.go=(page)=>{
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   document.querySelectorAll('.dock-tab').forEach(n=>n.classList.toggle('active', n.dataset.page===page));
   backToList();
-  const full = page==='settings'||page==='contacts'||page==='prices'||page==='payroll';
+  const full = page==='settings'||page==='contacts'||page==='prices'||page==='payroll'||page==='resinv';
   $('v-list').style.display = full?'none':'';
   $('v-settings').style.display = page==='settings'?'':'none';
   $('v-contacts').style.display = page==='contacts'?'':'none';
   $('v-prices').style.display = page==='prices'?'':'none';
   $('v-payroll').style.display = page==='payroll'?'':'none';
+  $('v-resinv').style.display = page==='resinv'?'':'none';
+  if(page==='resinv'){ $('tb-t').textContent='ResMed invoices'; $('tb-s').textContent='Invoice PDF to the buyer + ResMed accounts payable, confirmed by Basware'; _riPreview=false; renderResInv(); riLoad(); return; }
   if(page==='payroll'&&!prIsOwner()){ window.go('inbox'); return; }
   if(page==='payroll'){ $('tb-t').textContent='Payroll hours'; $('tb-s').textContent='Hours and pay for each pay period, emailed to the payroll service'; _prPreview=false; renderPayroll(); return; }
   if(page==='settings'){ $('tb-t').textContent='Settings'; $('tb-s').textContent='Mail connection'; renderSettings(); return; }
@@ -2023,7 +2397,7 @@ function fmtWhen(ms){
 function isWide(){ return window.matchMedia('(min-width:1000px)').matches; }
 function placeConvo(){
   const convo=$('v-convo'), rp=$('read-pane');
-  const fullPage = navPage==='settings'||navPage==='contacts'||navPage==='prices'||navPage==='payroll';   // own full-screen views
+  const fullPage = navPage==='settings'||navPage==='contacts'||navPage==='prices'||navPage==='payroll'||navPage==='resinv';   // own full-screen views
   if(isWide()){
     if(convo.parentElement!==rp) rp.appendChild(convo);
     convo.classList.add('embedded');
@@ -4658,6 +5032,10 @@ onAuthStateChanged(auth,(user)=>{
         // only repaint an untouched page — never wipe hours someone is typing
         if(navPage==='payroll' && (!_prForm || (!_prForm.dirty && !_prPreview))){ _prForm=null; renderPayroll(); }
       }, err=>{ _prDenied=true; console.warn('payroll read denied',err); if(navPage==='payroll') renderPayroll(); });
+      onValue(ref(db,'mail/resmedInvoices'),snap=>{
+        RESINV=(snap.val()&&typeof snap.val()==='object')?snap.val():{};
+        riPaintList();
+      });
       onValue(ref(db,'mail/contacts'),snap=>{
         CONTACTS=snap.val()||{};
         if(navPage==='contacts') renderContacts();
