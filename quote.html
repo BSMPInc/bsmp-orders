@@ -10295,6 +10295,22 @@ function printAssemblyQuote(){
   });
 }
 
+// Read-only preview of the prices the schedule will print, so the dialog shows them before printing.
+function qbDialogPriceTable(breaks, unit, minNote){
+  const m = v => '$'+(+v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const th = 'background:#f1f5f9;padding:6px 10px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em';
+  const td = 'padding:6px 10px;font-size:13px;color:#0f172a;border-top:1px solid #e2e8f0';
+  const rows = breaks.map(b=>`<tr><td style="${td};font-weight:700">${b.qty.toLocaleString()}</td><td style="${td};text-align:right">${m(b.price)}</td><td style="${td};text-align:right">${m(b.total)}</td></tr>`).join('');
+  return `<div style="grid-column:1/3">
+          <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Prices on this schedule</label>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+            <thead><tr><th style="${th};text-align:left">Quantity</th><th style="${th};text-align:right">Price / ${unit}</th><th style="${th};text-align:right">Extended total</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          ${minNote?`<div style="font-size:11px;color:#64748b;margin-top:4px;font-style:italic">${minNote}</div>`:''}
+        </div>`;
+}
+
 function printQtyBreaks(){
   if(!window._qtyBreaks || !window._qtyBreaks.length){ alert("Calculate the quantity breaks first."); return; }
 
@@ -10335,6 +10351,7 @@ function printQtyBreaks(){
       <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:4px">Quantity Price Schedule</div>
       <div style="font-size:13px;color:#64748b;margin-bottom:18px">A customer quote showing price per part at each quantity break.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        ${qbDialogPriceTable(breaks, 'part', minNote)}
         <div style="grid-column:1/3">
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Bill To (name + address)</label>
           <textarea id="qbf-billto" rows="3" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit;resize:vertical">${customer}\n</textarea>
@@ -10413,6 +10430,7 @@ function printAsmQtyBreaks(){
       <div style="font-size:18px;font-weight:700;color:#0f172a;margin-bottom:4px">Quantity Price Schedule</div>
       <div style="font-size:13px;color:#64748b;margin-bottom:18px">A customer quote showing price per assembly at each quantity break.</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        ${qbDialogPriceTable(breaks, 'assembly', '')}
         <div style="grid-column:1/3">
           <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:4px">Bill To (name + address)</label>
           <textarea id="qbf-billto" rows="3" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit;resize:vertical">${customer}\n</textarea>
