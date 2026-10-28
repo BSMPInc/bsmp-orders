@@ -303,6 +303,16 @@ select:focus{border-color:var(--green)}
 .qba-row{display:grid;grid-template-columns:80px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border)}
 .qba-row .qb-thumb{width:80px;height:62px}
 .qba-btns{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+.pod-drop{border:2px dashed var(--border2);border-radius:10px;padding:16px;text-align:center;color:var(--text2);font-size:13px;cursor:pointer;background:#faf9f5}
+.pod-drop.drag,.pod-drop:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.pod-list{max-height:52vh;overflow-y:auto;border-top:1px solid var(--border);margin-top:10px}
+.pod-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:10px;align-items:center;padding:8px 4px;border-bottom:1px solid var(--border)}
+.pod-row .pod-part{font-weight:700;font-size:13px}
+.pod-row .pod-sub{font-size:11px;color:var(--text3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod-row select{width:100%;font:inherit;font-size:12px;padding:6px 8px;border:1px solid var(--border2);border-radius:7px;background:#fff}
+.pod-row.set select{border-color:var(--green2);background:#f0faf3}
+.pod-cur{font-size:11px;margin-top:3px}
+.pod-loose{margin-top:10px;font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px}
 @media (max-width:640px){ .qba-row{grid-template-columns:64px minmax(0,1fr)} .qba-row .qb-thumb{width:64px;height:50px} .qba-btns{grid-column:1 / -1;justify-content:flex-start} }
 /* Operator (restricted) role — hide manager-only chrome */
 body.role-operator .mgr-only{display:none !important}
@@ -2248,6 +2258,28 @@ body.sb-hidden .topbar{padding-left:24px}
   </div>
 </div>
 
+<!-- Drawings for a whole PO: drop many files at once, each matched to a line by part number -->
+<div class="modal-bg" id="pod-modal" style="display:none;z-index:60" onclick="if(event.target===this)closeModal('pod-modal')">
+  <div class="modal" style="width:760px">
+    <div class="modal-header"><i class="ti ti-files"></i><h2 id="pod-title">Drawings for this PO</h2>
+      <button class="btn sm" style="margin-left:auto" onclick="closeModal('pod-modal')"><i class="ti ti-x"></i></button></div>
+    <div class="pod-drop" id="pod-drop" onclick="document.getElementById('pod-file').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')"
+      ondrop="event.preventDefault();this.classList.remove('drag');window._podAdd(event.dataTransfer.files)">
+      <i class="ti ti-upload" style="font-size:22px;display:block;margin-bottom:4px"></i>
+      Drop all the drawings here, or click to choose them
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">Each file goes to the line whose part # is in its file name. Fix any line with its drop-down.</div>
+    </div>
+    <input type="file" id="pod-file" multiple accept="image/*,.pdf,.dxf,.dwg" style="display:none" onchange="window._podAdd(this.files);this.value=''">
+    <div class="pod-list" id="pod-list"></div>
+    <div id="pod-loose"></div>
+    <div class="modal-actions" style="align-items:center">
+      <span id="pod-msg" style="font-size:12px;color:var(--text2);margin-right:auto"></span>
+      <button class="btn" onclick="closeModal('pod-modal')">Cancel</button>
+      <button class="btn green" id="pod-save" onclick="window._podSave()"><i class="ti ti-paperclip"></i> Attach drawings</button>
+    </div>
+  </div>
+</div>
 <div class="modal-bg" id="draw-modal" style="display:none;z-index:90">
   <div class="modal" style="max-width:94vw;width:1100px;height:92vh;padding:0;display:flex;flex-direction:column;overflow:hidden">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--card)">
@@ -4055,6 +4087,7 @@ function detailInner(r){
       <div class="detail-actions">
         <button class="act-ico" title="Edit full details" aria-label="Edit full details" onclick="window._oe('${r.id}');event.stopPropagation()"><i class="ti ti-edit"></i></button>
         <button class="act-ico primary" title="Add part to this PO" aria-label="Add part to this PO" onclick="window.addPartToPO('${r.id}');event.stopPropagation()"><i class="ti ti-plus"></i></button>
+        <button class="act-ico" title="Drawings for this PO — drop several drawings at once and attach each one to its line" aria-label="Drawings for this PO" onclick="window._podOpen('${r.id}');event.stopPropagation()"><i class="ti ti-files"></i></button>
         <button class="act-ico" title="Duplicate order — a reorder of this part: same customer, part, qty, price, drawing and steps, with a new PO and job #" aria-label="Duplicate order" onclick="window.duplicateOrder('${r.id}');event.stopPropagation()"><i class="ti ti-copy"></i></button>
         <button class="act-ico" title="Split order — turn in a partial qty now, or split off a production run to track separately; the balance stays due on the same PO" aria-label="Split order" onclick="window.openSplit('${r.id}');event.stopPropagation()"><i class="ti ti-scissors"></i></button>
         <button class="act-ico" title="Archive order" aria-label="Archive order" onclick="window._archiveOrder('${r.id}');event.stopPropagation()"><i class="ti ti-archive"></i></button>
@@ -10328,6 +10361,96 @@ window._editDrawing = (id) => {
     const u=document.getElementById('draw-url-'+id), l=document.getElementById('draw-label-'+id);
     if(u && cur.kind==='link') u.value=cur.url||''; if(l) l.value=cur.label||'';
   },30);
+};
+
+// ── Drawings for a whole PO ── drop many files at once; each lands on the line
+// whose part # is in its file name, and a drop-down per line fixes the rest.
+let _pod = null;   // {ids:[order ids on the PO], files:[File], pick:{orderId: fileIndex}}
+const podKey = s => String(s||'').replace(/\s*rev\b.*$/i,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// the part # is in the file name, and not just the start of a longer number (ABC-1 vs ABC-12.pdf)
+const podHit = (name, k) => { const at=name.indexOf(k); return at>=0 && !(/\d/.test(k.slice(-1)) && /\d/.test(name[at+k.length]||'')); };
+window._podOpen = (id) => {
+  const r = orders.find(o=>o.id===id); if(!r) return;
+  const ids = orders.filter(o=>!o.archived && o.customer===r.customer && (o.po||'')===(r.po||'')).map(o=>o.id);
+  _pod = { ids, files:[], pick:{} };
+  document.getElementById('pod-title').textContent = 'Drawings for PO '+(r.po||'(verbal)')+' · '+(r.customer||'');
+  document.getElementById('pod-msg').textContent = '';
+  document.getElementById('pod-save').disabled = false;
+  podRender();
+  openModalById('pod-modal');
+};
+window._podAdd = (list) => {
+  if(!_pod || !list || !list.length) return;
+  const start = _pod.files.length;
+  _pod.files.push(...list);
+  // match only the new files, and only to lines that don't have a pick yet
+  _pod.ids.forEach(id=>{
+    if(_pod.pick[id]!=null) return;
+    const k = podKey(orders.find(o=>o.id===id)?.part); if(k.length<3) return;
+    for(let i=start;i<_pod.files.length;i++){
+      if(podHit(_pod.files[i].name.replace(/\.[^.]+$/,'').toLowerCase().replace(/[^a-z0-9]/g,''), k)){ _pod.pick[id]=i; break; }
+    }
+  });
+  podRender();
+};
+window._podPick = (id, v) => { if(!_pod) return; if(v==='') delete _pod.pick[id]; else _pod.pick[id]=+v; podRender(); };
+function podRender(){
+  if(!_pod) return;
+  document.getElementById('pod-list').innerHTML = _pod.ids.map(id=>{
+    const r = orders.find(o=>o.id===id); if(!r) return '';
+    const d = r.drawing||{}, p = _pod.pick[id];
+    const cur = d.url ? `<div class="pod-cur" style="color:${p!=null?'#b45309':'var(--green)'}"><i class="ti ti-paperclip"></i> ${p!=null?'Replaces':'Has'} ${esc2(d.label||d.name||'a drawing')}</div>`
+                      : `<div class="pod-cur" style="color:var(--text3)">No drawing yet</div>`;
+    const opts = _pod.files.map((f,i)=>`<option value="${i}"${p===i?' selected':''}>${esc2(f.name)}</option>`).join('');
+    return `<div class="pod-row${p!=null?' set':''}">
+      <div><div class="pod-part">${esc2(r.part||'(no part #)')}${r.job?` <span style="font-weight:500;color:var(--text3)">· Job ${esc2(r.job)}</span>`:''}</div>
+        <div class="pod-sub">${esc2(r.desc||'')}${r.qty?` · Qty ${esc2(r.qty)}`:''}</div>${cur}</div>
+      <select onchange="window._podPick('${id}',this.value)"${_pod.files.length?'':' disabled'}>
+        <option value="">${d.url?'Keep current drawing':'No new drawing'}</option>${opts}</select>
+    </div>`;
+  }).join('');
+  const used = new Set(Object.values(_pod.pick));
+  const loose = _pod.files.filter((f,i)=>!used.has(i));
+  document.getElementById('pod-loose').innerHTML = loose.length
+    ? `<div class="pod-loose"><i class="ti ti-alert-triangle"></i> Not matched to a line yet: <b>${loose.map(f=>esc2(f.name)).join(', ')}</b>. Pick them in the drop-downs above, or they won't be attached.</div>` : '';
+  const n = Object.keys(_pod.pick).length;
+  document.getElementById('pod-save').innerHTML = `<i class="ti ti-paperclip"></i> Attach ${n} drawing${n!==1?'s':''}`;
+}
+window._podSave = async () => {
+  if(!_pod) return;
+  const ids = Object.keys(_pod.pick).filter(id=>orders.some(o=>o.id===id));
+  if(!ids.length){ alert('Drop the drawings in first, then pick a file for each line.'); return; }
+  const btn = document.getElementById('pod-save'), msg = document.getElementById('pod-msg');
+  btn.disabled = true;
+  // one upload per file, even when several lines share it
+  const byFile = new Map();
+  ids.forEach(id=>{ const i=_pod.pick[id]; if(!byFile.has(i)) byFile.set(i,[]); byFile.get(i).push(id); });
+  let done = 0; const failed = [];
+  for(const [i, lineIds] of byFile){
+    const file = _pod.files[i];
+    msg.textContent = `Uploading ${done+failed.length+1} of ${byFile.size}: ${file.name}…`;
+    const path = `drawings/${lineIds[0]}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,'_')}`;
+    try{
+      const task = uploadBytesResumable(sRef(storage, path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
+      await task;
+      const url = await getDownloadURL(task.snapshot.ref);
+      lineIds.forEach((id,n)=>{
+        const r = orders.find(o=>o.id===id); if(!r) return;
+        // the first line owns the stored file; the others share it by URL only
+        // (same as Split), so removing it from one line can't delete it for the rest
+        r.drawing = n===0 ? { url, label:file.name, name:file.name, kind:'upload', path, ctype:file.type }
+                          : { url, label:file.name, name:file.name, ctype:file.type };
+      });
+      done++;
+    }catch(err){ failed.push(file.name+' ('+err.message+')'); }
+  }
+  if(done){ saveDB(); render(); }
+  if(failed.length){
+    btn.disabled = false; msg.textContent = '';
+    alert(`Attached ${done} of ${byFile.size} file${byFile.size!==1?'s':''}. These failed:\n\n`+failed.join('\n'));
+    return;
+  }
+  closeModal('pod-modal'); _pod = null;
 };
 
 // ── Schedule rendering (board + calendar + gantt) ────────────────────────────
