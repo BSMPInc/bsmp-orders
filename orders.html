@@ -474,6 +474,12 @@ tr:hover .del-btn{opacity:1}
 .ai-row .form-group input.miss{border-color:var(--amber);background:#fdf8ee}
 .ai-x{width:26px;height:26px;border:1px solid var(--border);background:#fff;color:var(--text3);font-size:13px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 .ai-x:hover{border-color:var(--red);color:var(--red)}
+.ai-draw{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.ai-draw select{flex:1;min-width:0;padding:5px 6px;font-size:12px;border:1px solid var(--border);background:#fff;font-family:inherit}
+.ai-draw.has select{border-color:var(--green);background:#f1f8f2}
+.ai-draw .btn{height:28px;padding:0 10px;font-size:11.5px}
+.ai-draw-status{font-size:12px;color:var(--text2);margin:8px 2px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ai-draw-status:empty{display:none}
 @media (max-width:900px){
   .ai-modal.has-src{height:auto;max-height:94vh;overflow-y:auto}
   .ai-modal.has-src .ai-split{display:flex;flex-direction:column;flex:none}
@@ -2523,6 +2529,7 @@ body.sb-hidden .topbar{padding-left:24px}
       <div class="form-group"><label>Order date <span style="color:var(--text3);font-weight:400">(received)</span></label><input id="ai-ordered" type="date"></div>
     </div>
     <div class="ai-rows" id="ai-rows"></div>
+    <div class="ai-draw-status" id="ai-draw-status"></div>
     <div class="modal-actions" style="margin-top:10px">
       <button class="btn sm" style="margin-right:auto" onclick="aiAddRow()"><i class="ti ti-plus"></i> Add line</button>
       <button class="btn" onclick="aiClear()">Clear</button>
@@ -6000,6 +6007,7 @@ async function readPOFile(files, text, seq, note){
     aiSetRows(Array.isArray(rows)?rows:(rows&&typeof rows==='object'?[rows]:[]));
     const n=aiParsed.length;
     aiStatus('<i class="ti ti-checks"></i> Found '+n+' line item'+(n!==1?'s':'')+'. Check each one against the original and fix anything misread, then import.'+(note?'\n'+esc2(note):''));
+    aiFindDrawings(seq);   // runs on its own — the lines are usable while it looks
   }catch(err){ if(seq===_aiSrcSeq) aiStatus('Error: '+esc2(err.message),true); }
 }
 
@@ -6008,8 +6016,207 @@ function aiNum(v){ const n=parseFloat(String(v==null?'':v).replace(/[$,\s]/g,'')
 function aiTot(r){ const q=aiNum(r.qty), c=aiNum(r.cost); return q&&c?(q+' × $'+c+' = '+fmtMoney(q*c)):''; }
 // the AI is told to give the bare revision; strip a stray "Rev" / "Rev." / "Revision" anyway
 function aiRev(v){ return String(v==null?'':v).trim().replace(/^rev(ision)?\.?\s*[:#-]?\s*/i,'').trim(); }
+// ── Drawings from the mail ──
+// After the AI reads the lines, each part's drawing is looked for: first in the PO's own
+// email thread, then (Gmail search over the whole mailbox) in earlier emails with an
+// attachment named for the part #. A PDF in the PO's thread whose name says nothing
+// (scan001.pdf) is read by the AI for the part # in its title block. Found drawings open as
+// tabs in the source pane; each line has a pick list, and Import uploads the picks the
+// same way "Drawings for this PO" does. Managers only — the mail worker refuses operators,
+// and then this quietly does nothing.
+const AI_DRAW_EXT=/\.(pdf|png|jpe?g|tiff?|dxf|dwg)$/i;
+let _aiDraw={seq:-1, cands:[], busy:false, msg:''};
+// cand: {box, msg, att, name, mime, size, date, from, same, aiPart, file, doc}
+function aiDrawNorm(name){ return String(name||'').replace(/\.[^.]+$/,'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function aiDrawFits(c, r){
+  const k=podKey(r.part); if(k.length<3) return false;
+  return podHit(aiDrawNorm(c.name), k) || (!!c.aiPart && podKey(c.aiPart)===k);
+}
+function aiDrawScore(c, r){
+  const rv=String(r.rev||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  return (c.same?8:0) + (/\.pdf$/i.test(c.name)?3:/\.(png|jpe?g|tiff?)$/i.test(c.name)?1:0)
+    + (rv && aiDrawNorm(c.name).includes('rev'+rv)?2:0) + (c.date||0)/1e13;
+}
+function aiDrawAuto(){
+  aiParsed.forEach(r=>{
+    if(r._dwSet) return;   // a pick made by hand stays
+    let best=null, bs=-1;
+    _aiDraw.cands.forEach((c,k)=>{ if(aiDrawFits(c,r)){ const s=aiDrawScore(c,r); if(s>bs){ bs=s; best=k; } } });
+    r._dw=best;
+  });
+}
+function aiDrawHtml(r, i){
+  if(!_aiDraw.cands.length) return '';
+  const esc=esc2, fits=_aiDraw.cands.map((c,k)=>({c,k})).filter(x=>aiDrawFits(x.c,r)), rest=_aiDraw.cands.map((c,k)=>({c,k})).filter(x=>!aiDrawFits(x.c,r));
+  const opt=x=>`<option value="${x.k}"${r._dw===x.k?' selected':''}>${esc(x.c.name)} — ${esc(x.c.from)}</option>`;
+  const c=r._dw!=null?_aiDraw.cands[r._dw]:null;
+  return `<div class="ai-draw full${c?' has':''}"><i class="ti ti-paperclip"></i>
+    <select onchange="aiDrawPick(${i},this.value)" title="Drawing to attach to this order">
+      <option value="">No drawing</option>
+      ${fits.length?`<optgroup label="Named for this part">${fits.map(opt).join('')}</optgroup>`:''}
+      ${rest.length?`<optgroup label="Other drawings found">${rest.map(opt).join('')}</optgroup>`:''}
+    </select>${c&&c.doc!=null?`<button type="button" class="btn sm" onclick="aiSrcTab(${c.doc})">View</button>`:''}</div>`;
+}
+window.aiDrawPick=async(i,v)=>{
+  const r=aiParsed[i]; if(!r) return;
+  r._dw=v===''?null:+v; r._dwSet=true;
+  aiRenderRows();
+  const c=r._dw!=null?_aiDraw.cands[r._dw]:null;
+  if(c&&!c.file){ try{ await aiDrawLoad(c, await aiMailCfg(), _aiSrcSeq); aiRenderRows(); }catch(e){} }
+};
+function aiDrawStatus(){
+  const el=document.getElementById('ai-draw-status'); if(!el) return;
+  const n=aiParsed.filter(r=>r._dw!=null).length, tot=aiParsed.filter(r=>podKey(r.part).length>=3).length;
+  el.innerHTML=_aiDraw.busy?`<i class="ti ti-loader-2 spin"></i> ${esc2(_aiDraw.msg||'Looking for drawings in the emails…')}`
+    : _aiDraw.seq===_aiSrcSeq&&tot ? `<i class="ti ti-paperclip"></i> ${n?`Drawing found for ${n} of ${tot} line${tot!==1?'s':''} — check each one in its tab before importing.`:'No drawings named for these parts in the emails.'}${_aiDraw.msg?' '+esc2(_aiDraw.msg):''} <button type="button" class="btn sm" onclick="aiDrawAgain()"><i class="ti ti-refresh"></i> Search again</button>`
+    : '';
+}
+async function aiMailCfg(){
+  const s=await get(ref(db,'mail/settings'));
+  const proxy=(((s.val()||{}).proxyUrl)||'').replace(/\/+$/,'');
+  if(!proxy) throw new Error('mail proxy address not set');
+  return {proxy, tok:await auth.currentUser.getIdToken()};
+}
+async function aiMailJson(cfg, path){
+  const r=await fetch(cfg.proxy+path,{headers:{Authorization:'Bearer '+cfg.tok}});
+  if(!r.ok) throw new Error('mail worker '+r.status);
+  return r.json();
+}
+// drawing-type attachments in one thread; signature logos and tiny images are left out
+function aiDrawFromThread(box, th, from, same){
+  const out=[];
+  (th.messages||[]).forEach(m=>(m.attachments||[]).forEach(a=>{
+    const name=a.filename||'', mime=String(a.mime||'').toLowerCase();
+    if(!a.id || !AI_DRAW_EXT.test(name)) return;
+    if(mime.startsWith('image/') && (a.cid || a.inline || (a.size||0)<30000)) return;
+    out.push({box, msg:m.id, att:a.id, name, mime:a.mime||'', size:a.size||0, date:m.date||0, from, same, aiPart:'', file:null, doc:null});
+  }));
+  return out;
+}
+async function aiDrawLoad(c, cfg, seq){
+  if(c.file) return c.file;
+  const r=await fetch(cfg.proxy+'/attachment?box='+encodeURIComponent(c.box)+'&msg='+encodeURIComponent(c.msg)+'&id='+encodeURIComponent(c.att)+'&mime='+encodeURIComponent(c.mime||'application/octet-stream')+'&name='+encodeURIComponent(c.name),{headers:{Authorization:'Bearer '+cfg.tok}});
+  if(!r.ok) throw new Error('attachment '+r.status);
+  const blob=await r.blob();
+  const viewable=/\.(pdf|png|jpe?g)$/i.test(c.name);
+  const type=viewable?aiMime(c.name,c.mime||blob.type):(c.mime||blob.type||'application/octet-stream');
+  c.file=new File([blob], c.name, {type});
+  // show it beside the lines so it can be checked against the part (DXF/DWG/TIFF can't be shown)
+  if(viewable && seq===_aiSrcSeq && c.doc==null){
+    const d=aiSrcDoc('Drawing · '+c.name, type); aiSrcSet(d, c.file); c.doc=_aiSrc.docs.indexOf(d); aiRenderSrc();
+  }
+  return c.file;
+}
+// a PDF in the PO's thread with a name that says nothing: ask the AI whose drawing it is
+async function aiDrawIdentify(c, parts){
+  const b64=await new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result).split(',')[1]); fr.onerror=rej; fr.readAsDataURL(c.file); });
+  const prompt='This PDF came with a purchase order to a sheet metal shop. If it is an engineering drawing, read its title block and return {"drawing":true,"part":"<the drawing / part number>","rev":"<revision or empty>"}. If it is not a drawing (a PO, quote, invoice, cert, letter), return {"drawing":false}. The PO lists these part numbers: '+parts.join(', ')+'. Return ONLY JSON.';
+  const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:200,messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:prompt}]}]})});
+  const data=await resp.json();
+  const out=((data.content||[]).map(x=>x.text||'').join('')).replace(/```json|```/g,'').trim();
+  const j=JSON.parse(out);
+  return j&&j.drawing&&j.part?String(j.part):'';
+}
+window.aiDrawAgain=()=>aiFindDrawings(_aiSrcSeq,true);
+async function aiFindDrawings(seq, again){
+  if(seq!==_aiSrcSeq || !aiParsed.length) return;
+  const parts=[...new Set(aiParsed.map(r=>String(r.part||'').replace(/\s*rev\b.*$/i,'').trim()).filter(p=>podKey(p).length>=3))];
+  if(!parts.length) return;
+  if(!again) _aiDraw={seq, cands:[], busy:true, msg:''};
+  else { _aiDraw.busy=true; _aiDraw.msg=''; aiParsed.forEach(r=>{ if(!r._dwSet) r._dw=null; }); }
+  aiDrawStatus();
+  const live=()=>seq===_aiSrcSeq;
+  let cfg;
+  try{ cfg=await aiMailCfg(); }catch(e){ if(live()){ _aiDraw.busy=false; _aiDraw.seq=-1; aiDrawStatus(); } return; }
+  const seen=new Set(_aiDraw.cands.map(c=>c.box+'|'+c.msg+'|'+c.att));
+  const add=list=>list.forEach(c=>{
+    const k=c.box+'|'+c.msg+'|'+c.att, dup=_aiDraw.cands.find(x=>x.name===c.name&&x.size===c.size);
+    if(seen.has(k)) return; seen.add(k);
+    if(dup){ if(c.same&&!dup.same) Object.assign(dup,{box:c.box,msg:c.msg,att:c.att,from:c.from,same:true}); return; }   // same file sent twice
+    _aiDraw.cands.push(c);
+  });
+  try{
+    // 1. the PO's own email thread
+    if(_fromMailKey){
+      _aiDraw.msg='Checking the PO email for drawings…'; aiDrawStatus();
+      const meta=((await get(ref(db,'mail/threads/'+_fromMailKey))).val()||{}).meta||{};
+      const idl=(meta.idList||[]).filter(x=>x&&x.box&&x.id)[0];
+      if(idl){
+        const th=await aiMailJson(cfg,'/thread?box='+encodeURIComponent(idl.box)+'&id='+encodeURIComponent(idl.id));
+        const list=aiDrawFromThread(idl.box, th, 'the PO email', true);
+        // a file already pulled in as the PO (and open in its own tab) isn't fetched or shown twice
+        list.forEach(c=>{ const k=(_mailAttList||[]).findIndex(a=>a&&a.m===c.msg&&a.a===c.att), d=_aiSrc.docs[k];
+          if(k>=0 && d && d.file && d.name===(_mailAttList[k].n||'PO')){ c.file=d.file; c.doc=k; } });
+        add(list);
+      }
+    }
+    if(!live()) return;
+    // 2. earlier emails, for parts still without a drawing named for them
+    const missing=parts.filter(p=>!_aiDraw.cands.some(c=>aiDrawFits(c,{part:p})));
+    for(let i=0;i<missing.length && live();i+=6){
+      _aiDraw.msg='Searching earlier emails for '+missing.slice(i,i+6).join(', ')+'…'; aiDrawStatus();
+      const q='has:attachment {'+missing.slice(i,i+6).map(p=>'"'+p.replace(/"/g,'')+'"').join(' ')+'}';
+      const res=await aiMailJson(cfg,'/threads?q='+encodeURIComponent(q));
+      const ths=(res.threads||[]).filter(t=>t.key!==_fromMailKey).slice(0,12);
+      const got=await Promise.all(ths.map(async t=>{
+        const box=(t.mailboxes||[])[0], id=box&&(t.ids||{})[box]; if(!id) return [];
+        try{
+          const th=await aiMailJson(cfg,'/thread?box='+encodeURIComponent(box)+'&id='+encodeURIComponent(id));
+          const when=t.date?new Date(t.date).toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'2-digit'}):'';
+          // only files named for one of the parts — a search hit alone isn't a match
+          return aiDrawFromThread(box, th, 'email “'+String(t.subject||'').slice(0,40)+'” '+when, false).filter(c=>parts.some(p=>aiDrawFits(c,{part:p})));
+        }catch(e){ return []; }
+      }));
+      if(live()) add(got.flat());
+    }
+    if(!live()) return;
+    // 3. unnamed PDFs in the PO's thread, read by the AI (a few, and only while lines still lack one)
+    const stillMissing=parts.filter(p=>!_aiDraw.cands.some(c=>aiDrawFits(c,{part:p})));
+    const unnamed=_aiDraw.cands.filter(c=>c.same && !c.aiPart && /\.pdf$/i.test(c.name) && c.size<5e6 && !parts.some(p=>aiDrawFits(c,{part:p}))).slice(0,4);
+    if(stillMissing.length && unnamed.length){
+      _aiDraw.msg='Reading '+unnamed.length+' unnamed PDF'+(unnamed.length!==1?'s':'')+' for part numbers…'; aiDrawStatus();
+      await Promise.all(unnamed.map(async c=>{ try{ await aiDrawLoad(c,cfg,seq); c.aiPart=await aiDrawIdentify(c, parts); if(c.aiPart) c.from+=' · title block says '+c.aiPart; }catch(e){} }));
+    }
+    if(!live()) return;
+    aiDrawAuto();
+    _aiDraw.msg=''; _aiDraw.busy=false; aiRenderRows(); aiDrawStatus();
+    // pull the picked files now so they show beside the lines
+    const picked=[...new Set(aiParsed.map(r=>r._dw).filter(k=>k!=null))].map(k=>_aiDraw.cands[k]);
+    await Promise.all(picked.map(c=>aiDrawLoad(c,cfg,seq).catch(e=>{ c.err=e.message; })));
+    if(live()) aiRenderRows();
+  }catch(e){
+    if(!live()) return;
+    _aiDraw.busy=false; aiDrawAuto(); aiRenderRows();
+    _aiDraw.msg='(Search stopped: '+((e&&e.message)||e)+')'; aiDrawStatus();
+  }
+}
+// after Import: upload each picked drawing once and hang it on its orders (the first
+// line owns the stored file, the rest share the URL — same rule as "Drawings for this PO")
+async function aiAttachDrawings(jobs, cands){
+  if(!jobs.length) return;
+  let cfg=null; const failed=[];
+  const byCand=new Map(); jobs.forEach(j=>{ if(!byCand.has(j.k)) byCand.set(j.k,[]); byCand.get(j.k).push(j.id); });
+  for(const [k, ids] of byCand){
+    const c=cands[k]; if(!c) continue;
+    try{
+      if(!c.file){ cfg=cfg||await aiMailCfg(); await aiDrawLoad(c, cfg, -1); }
+      const file=c.file, path=`drawings/${ids[0]}/${Date.now()}_${file.name.replace(/[^\w.\-]/g,'_')}`;
+      const task=uploadBytesResumable(sRef(storage, path), file, {contentType:file.type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
+      await task;
+      const url=await getDownloadURL(task.snapshot.ref);
+      ids.forEach((id,n)=>{
+        const r=orders.find(o=>o.id===id); if(!r) return;
+        r.drawing = n===0 ? { url, label:file.name, name:file.name, kind:'upload', path, ctype:file.type }
+                          : { url, label:file.name, name:file.name, ctype:file.type };
+      });
+      saveDB(); render();
+    }catch(err){ failed.push(c.name+' ('+((err&&err.message)||err)+')'); }
+  }
+  if(failed.length) alert('The orders were imported, but these drawings didn’t attach:\n\n'+failed.join('\n')+'\n\nAttach them from the order with “Drawings for this PO”.');
+}
 function aiSetRows(rows){
   const s=v=>v==null?'':String(v).trim();
+  _aiDraw={seq:-1, cands:[], busy:false, msg:''};
   aiParsed=rows.filter(r=>r&&typeof r==='object').map(r=>({customer:s(r.customer), po:s(r.po), part:s(r.part), rev:aiRev(r.rev), desc:s(r.desc),
     qty:s(r.qty), cost:s(r.cost), due:/^\d{4}-\d{2}-\d{2}$/.test(s(r.due))?s(r.due):'', poNotes:s(r.poNotes), status:s(r.status)}));
   // one PO from one customer is the usual case — those two are edited once, above the lines
@@ -6037,9 +6244,11 @@ function aiRenderRows(){
         ${f('part','Part #')}${f('rev','Rev')}${f('qty','Qty')}${f('cost','Unit $')}
         ${f('due','Due','','date')}
         ${f('desc','Material','w3')}${f('poNotes','PO notes','full')}
+        ${aiDrawHtml(r,i)}
       </div>
     </div>`;
   }).join('')||'<div class="ai-status">No line items — add one, or read a different file.</div>';
+  aiDrawStatus();
   const ib=document.getElementById('ai-import-btn'), n=aiParsed.length;
   ib.disabled=!n; ib.innerHTML='<i class="ti ti-download"></i> Import '+(n?n+' order'+(n!==1?'s':''):'Orders');
 }
@@ -6071,10 +6280,12 @@ window.importAIOrders=()=>{
   // build new order objects, then assign internal job numbers per customer+PO
   let firstNewId=null;
   const ordered=document.getElementById('ai-ordered').value||'';
+  const drawJobs=[], drawCands=_aiDraw.cands.slice();   // picked drawings upload after the orders are saved
   rows.forEach(r=>{
     const qty=aiNum(r.qty), cost=aiNum(r.cost);
     const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),rev:aiRev(r.rev),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered,due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
     if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
+    if(r._dw!=null) drawJobs.push({id:o.id, k:r._dw});
     // assign job number considering existing + already-added-this-batch orders
     o.job = suggestJobNumber(o.customer, o.po);
     orders.unshift(o);                 // add first so same-PO siblings get -2, -3…
@@ -6094,6 +6305,7 @@ window.importAIOrders=()=>{
   _fromMailRcvd=''; document.getElementById('ai-ordered').value='';
   saveDB();closeAI();aiParsed=[];
   if(firstNewId) landOnNewOrders(firstNewId, rows.length); else render();
+  aiAttachDrawings(drawJobs, drawCands);
 };
 // After an import: show the open-orders list with nothing hiding the new lines (a
 // search, a status/process filter, another page), flash them, and offer the next
