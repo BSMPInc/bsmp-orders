@@ -1139,7 +1139,7 @@ function viewSettings(){
    serves them next to this file, so a relative link is all a row needs. To add or revise a
    document: drop the file into docs/<area>/, then edit RESOURCES below (title, id/rev, date, file).
    Keep RES_UPDATED current — it prints at the bottom of the page. */
-const RES_UPDATED='2026-10-10';
+const RES_UPDATED='2026-10-29';
 const RESOURCES=[
   { key:'equipment', title:'Equipment manuals & maintenance', icon:'ti-tool', items:[
     { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'B', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts overload troubleshooting voltage second compressor',
@@ -1173,6 +1173,9 @@ const RESOURCES=[
     { title:'Internal Audit Checklist', id:'QF-003', rev:'A', date:'2026-08-13', tags:'audit internal checklist form',
       desc:'Annual internal audit: three-order trace-through plus NCR, supplier, calibration, training and records checks, with a findings log.',
       file:'docs/quality/QF-003 Internal Audit Checklist.pdf', docx:'docs/quality/QF-003 Internal Audit Checklist.docx' },
+    { title:'Credit Card Authorization — One-Time Charge', id:'PF-001', rev:'A', date:'2026-10-29', tags:'credit card authorization vendor purchasing payment charge one time cc form',
+      desc:'Give to a vendor to charge the company card once, for a stated amount against a BSMP PO. Print it and write the card number by hand. Never email it with the number filled in.',
+      file:'docs/purchasing/PF-001 Credit Card Authorization.pdf' },
   ]},
 ];
 // Maintenance schedules shown on the Resources page. `guide` points at a RESOURCES item by id.
