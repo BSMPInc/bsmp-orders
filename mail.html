@@ -3241,10 +3241,18 @@ window.sendPoToOrders=async ()=>{
       atts.push({b:box, m:m.id, a:a.id, t:a.mime||'', n:name});
   }));
   atts=atts.slice(0,3);
+  // the day the order came in = the newest message carrying the PO file, or (PO typed in
+  // the email) the newest message from outside BSMP — Orders uses it as the order date
+  const byNew=(a,b)=>(Number(b.date)||0)-(Number(a.date)||0);
+  const withPo=(t.messages||[]).filter(m=>atts.some(a=>a.m===m.id)).sort(byNew);
+  const fromCust=(t.messages||[]).filter(m=>!/@bertsmp\.com$/i.test(m.fromEmail||'')).sort(byNew);
+  const rcvdMs=Number((withPo[0]||fromCust[0]||{}).date)||Number(t.date)||0;
+  const rcvd=rcvdMs?new Date(rcvdMs).toLocaleDateString('en-CA'):'';   // local YYYY-MM-DD
   // carry the prefill in the link itself — same reasoning as the quote handoff
   const ordUrl='orders.html?fromMail='+encodeURIComponent(t.key)
     +'&cust='+encodeURIComponent(t.fromName||t.fromEmail||'')
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
+    +(rcvd?('&rcvd='+rcvd):'')
     +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
   // the email text is too long for the link, so it waits in localStorage (same site, read
   // once and removed by orders.html) — the AI reads it too, so a PO typed in the email body

@@ -2519,6 +2519,9 @@ body.sb-hidden .topbar{padding-left:24px}
       <div class="form-group"><label>Customer</label><input id="ai-cust" type="text" oninput="aiHead()"></div>
       <div class="form-group"><label>PO #</label><input id="ai-po" type="text" oninput="aiHead()"></div>
     </div>
+    <div class="ai-head">
+      <div class="form-group"><label>Order date <span style="color:var(--text3);font-weight:400">(received)</span></label><input id="ai-ordered" type="date"></div>
+    </div>
     <div class="ai-rows" id="ai-rows"></div>
     <div class="modal-actions" style="margin-top:10px">
       <button class="btn sm" style="margin-right:auto" onclick="aiAddRow()"><i class="ti ti-plus"></i> Add line</button>
@@ -5872,7 +5875,7 @@ window.closeAI=()=>{ closeModal('ai-modal'); _aiSrcSeq++; aiSrcFree(); _aiSrc.do
 //     stamps mailKey on each order and links the mail thread back here.
 // orders.html?order=<id>  (the mail app's "Order — open")
 //   → jumps straight to that order once the list has loaded.
-let _fromMailKey='', _fromMailSubj='', _fromMailCust='', _fromMailText='', _mailAttList=[], _deepOrderId='', _mailParamsDone=false;
+let _fromMailKey='', _fromMailSubj='', _fromMailCust='', _fromMailText='', _fromMailRcvd='', _mailAttList=[], _deepOrderId='', _mailParamsDone=false;
 // mail.html leaves the email text in localStorage (too long for the link) — read once, then gone
 function takeMailText(key){
   let t='';
@@ -5892,6 +5895,8 @@ function handleMailParams(){
   try{ history.replaceState(null,'',location.pathname); }catch(e){}   // a refresh shouldn't replay the hand-off
   if(oid){ _deepOrderId=oid; tryRevealDeepOrder(); return; }
   _fromMailKey=fm; _fromMailSubj=p.get('subj')||''; _fromMailCust=p.get('cust')||''; _fromMailText=mailText;
+  _fromMailRcvd=/^\d{4}-\d{2}-\d{2}$/.test(p.get('rcvd')||'')?p.get('rcvd'):'';   // the day the PO email arrived
+  document.getElementById('ai-ordered').value='';
   try{ _mailAttList=JSON.parse(p.get('atts')||'[]')||[]; }catch(e){ _mailAttList=[]; }
   fetchMailPO();
 }
@@ -6012,6 +6017,10 @@ function aiSetRows(rows){
   const f=aiParsed[0]||{};
   document.getElementById('ai-cust').value=f.customer||'';
   document.getElementById('ai-po').value=f.po||'';
+  // order date = the day it was received: the PO email's date on a mail hand-off, else today.
+  // Only filled when empty, so a date typed in survives reading a different file.
+  const od=document.getElementById('ai-ordered');
+  if(!od.value) od.value=_fromMailRcvd||new Date().toLocaleDateString('en-CA');
   document.getElementById('ai-result-box').style.display='block';
   aiRenderRows();
 }
@@ -6055,15 +6064,16 @@ window.aiAddRow=()=>{
   if(rows.length){ const el=rows[rows.length-1].querySelectorAll('.ai-grid input')[_aiMixed?2:0]; if(el){ el.scrollIntoView({block:'nearest'}); el.focus(); } }
 };
 window.aiDelRow=(i)=>{ aiParsed.splice(i,1); aiRenderRows(); };
-window.aiClear=()=>{ aiParsed=[]; document.getElementById('ai-result-box').style.display='none'; aiStatus(''); };
+window.aiClear=()=>{ aiParsed=[]; document.getElementById('ai-result-box').style.display='none'; document.getElementById('ai-ordered').value=''; aiStatus(''); };
 window.importAIOrders=()=>{
   const rows=(aiParsed||[]).filter(r=>r.part.trim()||r.desc.trim()||aiNum(r.qty));   // a line left blank is skipped
   if(!rows.length)return;
   // build new order objects, then assign internal job numbers per customer+PO
   let firstNewId=null;
+  const ordered=document.getElementById('ai-ordered').value||'';
   rows.forEach(r=>{
     const qty=aiNum(r.qty), cost=aiNum(r.cost);
-    const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),rev:aiRev(r.rev),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
+    const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),rev:aiRev(r.rev),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered,due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
     if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
     // assign job number considering existing + already-added-this-batch orders
     o.job = suggestJobNumber(o.customer, o.po);
@@ -6081,6 +6091,7 @@ window.importAIOrders=()=>{
       .catch(()=>{/* mail link-back is best-effort; the orders themselves are saved */});
     _fromMailKey=''; _fromMailText='';
   }
+  _fromMailRcvd=''; document.getElementById('ai-ordered').value='';
   saveDB();render();closeAI();aiParsed=[];
 };
 
