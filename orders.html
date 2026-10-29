@@ -4967,16 +4967,19 @@ window.printOrderTags=(id)=>{
 function _renderConfirmEmailStatus(msg,err){
   const el=document.getElementById('confirm-email-status'); if(!el) return;
   el.style.color=err?'var(--red)':'var(--text2)';
+  const btn=document.getElementById('confirm-email-btn');
   if(msg!==undefined){ el.textContent=msg; return; }
   const sent=(_confirmItems||[]).map(i=>i.confirmEmailed).filter(Boolean).sort((a,b)=>(b.at||0)-(a.at||0))[0];
+  if(btn) btn.innerHTML='<i class="ti ti-send"></i> '+(sent?'Email again':'Email to customer');
   if(!sent){ el.textContent=''; el.title=''; return; }
   const tos=(Array.isArray(sent.tos)&&sent.tos.length)?sent.tos:[sent.to].filter(Boolean);
   const ccs=Array.isArray(sent.ccs)?sent.ccs:[];
   const extra=(tos.length-1)+ccs.length;
   const who=extra>0?(tos[0]+' +'+extra+' more'):(tos[0]||sent.to||'');
-  el.textContent='Emailed to '+who+' · '+new Date(sent.at).toLocaleDateString();
+  // the green tag says it plainly; who/when follows, ellipsised on a narrow window
+  el.innerHTML=`<span style="display:inline-flex;align-items:center;gap:4px;background:#e6f4ea;color:#1e7a3c;border:1px solid #a8d5b5;border-radius:999px;padding:2px 9px;font-weight:700;font-size:11.5px;margin-right:6px;vertical-align:middle"><i class="ti ti-mail-check"></i> Confirmed via email</span>${esc2('to '+who+' · '+new Date(sent.at).toLocaleDateString())}`;
   // the row is one line and ellipsised — hover for the full list
-  el.title='To: '+tos.join(', ')+(ccs.length?('\nCc: '+ccs.join(', ')):'');
+  el.title='To: '+tos.join(', ')+(ccs.length?('\nCc: '+ccs.join(', ')):'')+(sent.by?('\nSent by '+sent.by):'');
 }
 // ── who it goes to ───────────────────────────────────────────────────────────
 // The address book is the same shared one the Mail app keeps at mail/contacts,
@@ -5375,9 +5378,9 @@ async function _sendConfirmationTo(list, ccList){
       const cr=customers.find(c=>(c.name||'').toLowerCase()===cust.toLowerCase());
       if(cr&&!cr.email){ cr.email=tos[0]; saveCustomersDB(); }
     }
-    _renderConfirmEmailStatus('Sent to '+(tos.length>1?(tos.length+' recipients'):to)
-      +(ccs.length?(' · cc '+ccs.length):'')+' ✓'
-      +(bumped?(' — '+bumped+' order'+(bumped!==1?'s':'')+' marked Confirmed'):''));
+    _renderConfirmEmailStatus();   // the green "Confirmed via email" tag, straight away
+    const st=document.getElementById('confirm-email-status');
+    if(st&&bumped) st.title+='\n'+bumped+' order'+(bumped!==1?'s':'')+' marked Confirmed';
   }catch(e){
     _renderConfirmEmailStatus('Send failed: '+((e&&e.message)||e),true);
   }finally{
