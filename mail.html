@@ -3241,6 +3241,10 @@ window.sendPoToOrders=async ()=>{
     +'&cust='+encodeURIComponent(t.fromName||t.fromEmail||'')
     +'&subj='+encodeURIComponent((t.subject||'').slice(0,140))
     +(atts.length?('&atts='+encodeURIComponent(JSON.stringify(atts))):'');
+  // the email text is too long for the link, so it waits in localStorage (same site, read
+  // once and removed by orders.html) — the AI reads it too, so a PO typed in the email body
+  // works, and the owner sees it beside the extracted lines
+  try{ localStorage.setItem('bsmp_poMailText', JSON.stringify({key:t.key, at:Date.now(), text:t.messages?mpEmailText(t,16000):''})); }catch(e){}
   // open Orders in its own named tab so mail stays put; the same name means
   // repeat transfers reuse that tab instead of piling up new ones
   const w=window.open(ordUrl,'bsmpOrders');

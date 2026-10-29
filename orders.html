@@ -430,6 +430,56 @@ tr:hover .del-btn{opacity:1}
 .upload-hint{font-size:11px;color:var(--text3);margin-top:4px}
 #file-input{display:none}
 .ai-result{font-size:11px;background:#f7f9fc;border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-top:10px;max-height:160px;overflow-y:auto;white-space:pre-wrap;color:var(--text2)}
+/* AI Extract — once a PO is loaded the window splits: the PO / email the AI read beside the
+   lines it pulled out (same source pane as mail.html's Save prices window), stacked under 900px */
+.ai-modal.has-src{width:min(1320px,96vw);max-width:none;height:min(92vh,980px);max-height:none;overflow:hidden;display:flex;flex-direction:column;padding:18px 20px}
+.ai-modal.has-src .modal-header{flex:none;margin-bottom:12px;padding-bottom:10px}
+.ai-modal.has-src>.modal-actions{flex:none;margin-top:10px}
+.ai-split{display:block}
+.ai-modal.has-src .ai-split{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.ai-main{min-height:0}
+.ai-modal.has-src .ai-main{overflow-y:auto;padding-right:2px}
+.mp-src{display:none}
+.ai-modal.has-src .mp-src{min-height:0;display:flex;flex-direction:column;border:1px solid var(--border);background:#3a4049}
+.mp-src-tabs{flex:none;display:flex;gap:4px;flex-wrap:wrap;padding:6px;background:#f4f6f9;border-bottom:1px solid var(--border)}
+.mp-src-tab{height:28px;padding:0 10px;border:1px solid var(--border2);background:#fff;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;max-width:240px;font-family:inherit;color:var(--text2)}
+.mp-src-tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mp-src-tab.on{border-color:var(--accent);color:var(--text);font-weight:700}
+.mp-src-body{flex:1;min-height:0;overflow:auto;background:#fff}
+.mp-src-body iframe{width:100%;height:100%;border:none;display:block}
+.mp-src-body img{display:block;max-width:100%;margin:0 auto}
+.mp-src-text{white-space:pre-wrap;word-break:break-word;font-size:12.5px;line-height:1.5;padding:12px 14px;color:var(--text)}
+.mp-src-text mark{background:#fde68a;padding:0 1px}
+.mp-src-note{padding:18px;font-size:12.5px;color:#d5dbe3;display:flex;align-items:center;gap:7px;height:100%;justify-content:center;background:#3a4049;text-align:center}
+.ai-modal.has-src .upload-area{padding:9px 12px;font-size:12px;display:flex;align-items:center;justify-content:center;gap:8px}
+.ai-modal.has-src .upload-area i{font-size:16px;display:inline;margin:0}
+.ai-modal.has-src .upload-hint{display:none}
+.ai-modal.has-src .section-card{padding:10px 12px;margin-bottom:10px}
+.ai-modal.has-src .section-card>.section-title,.ai-modal.has-src .section-card>p{display:none}
+.upload-area.drag{border-color:var(--green);background:#f3f9ec}
+.ai-status{font-size:12.5px;color:var(--text2);display:flex;align-items:flex-start;gap:7px;min-height:18px;white-space:pre-wrap;line-height:1.45}
+.ai-status i{margin-top:2px}
+.ai-status.err{color:var(--red)}
+.ai-head{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.ai-rows{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.ai-row{border:1px solid var(--border);background:#fff;padding:8px 10px}
+.ai-row-top{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.ai-row-top .ai-tot{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;color:var(--green);font-variant-numeric:tabular-nums;font-size:12px}
+.ai-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.3fr);gap:6px 8px}
+.ai-grid .w2{grid-column:span 2}
+.ai-grid .full{grid-column:1/-1}
+.ai-row .form-group label,.ai-head .form-group label{font-size:10px}
+.ai-row .form-group input,.ai-head .form-group input{padding:6px 8px;font-size:12.5px;border-radius:0;min-width:0;width:100%}
+.ai-row .form-group input.miss{border-color:var(--amber);background:#fdf8ee}
+.ai-x{width:26px;height:26px;border:1px solid var(--border);background:#fff;color:var(--text3);font-size:13px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.ai-x:hover{border-color:var(--red);color:var(--red)}
+@media (max-width:900px){
+  .ai-modal.has-src{height:auto;max-height:94vh;overflow-y:auto}
+  .ai-modal.has-src .ai-split{display:flex;flex-direction:column;flex:none}
+  .ai-modal.has-src .mp-src{height:46vh;flex:none}
+  .ai-modal.has-src .ai-main{overflow:visible}
+}
+@media (max-width:560px){ .ai-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .ai-grid .w2{grid-column:1/-1} .ai-head{grid-template-columns:1fr} }
 
 .picker{display:none;position:fixed;background:var(--card);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:4px;z-index:300;min-width:190px;box-shadow:0 6px 24px rgba(0,0,0,0.14)}
 .picker-item{padding:6px 12px;cursor:pointer;border-radius:6px;font-size:12px}
@@ -2442,26 +2492,41 @@ body.sb-hidden .topbar{padding-left:24px}
 
 <!-- AI Modal -->
 <div class="modal-bg" id="ai-modal" style="display:none">
-<div class="modal">
+<div class="modal ai-modal" id="ai-modal-box">
   <div class="modal-header"><i class="ti ti-sparkles"></i><h2>AI Extract from PDF or Image</h2></div>
+  <div class="ai-split">
+  <!-- what the AI read: the PO document(s) and the email text, side by side with the lines it pulled out -->
+  <div class="mp-src">
+    <div class="mp-src-tabs" id="mp-src-tabs"></div>
+    <div class="mp-src-body" id="mp-src-body"></div>
+  </div>
+  <div class="ai-main">
   <div class="section-card">
     <div class="section-title"><i class="ti ti-upload"></i> Drawing Upload</div>
     <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Upload a purchase order, email screenshot, or any document — Claude will extract all line items automatically.</p>
-    <div class="upload-area" onclick="document.getElementById('file-input').click()">
+    <div class="upload-area" id="ai-drop" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="aiDrop(event)">
       <i class="ti ti-file-upload"></i>
-      Drop file here or click to browse
+      <span id="ai-drop-label">Drop file here or click to browse</span>
       <div class="upload-hint">PDF · PNG · JPG — AI reads order details automatically</div>
     </div>
     <input type="file" id="file-input" accept="image/*,.pdf" onchange="handleFile(this)">
   </div>
+  <div class="ai-status" id="ai-status"></div>
   <div id="ai-result-box" style="display:none">
-    <div class="ai-result" id="ai-result-text"></div>
+    <div class="ai-head" id="ai-head">
+      <div class="form-group"><label>Customer</label><input id="ai-cust" type="text" oninput="aiHead()"></div>
+      <div class="form-group"><label>PO #</label><input id="ai-po" type="text" oninput="aiHead()"></div>
+    </div>
+    <div class="ai-rows" id="ai-rows"></div>
     <div class="modal-actions" style="margin-top:10px">
-      <button class="btn" onclick="document.getElementById('ai-result-box').style.display='none';aiParsed=[]">Clear</button>
+      <button class="btn sm" style="margin-right:auto" onclick="aiAddRow()"><i class="ti ti-plus"></i> Add line</button>
+      <button class="btn" onclick="aiClear()">Clear</button>
       <button class="btn green" id="ai-import-btn" onclick="importAIOrders()"><i class="ti ti-download"></i> Import Orders</button>
     </div>
   </div>
-  <div class="modal-actions"><button class="btn" onclick="closeModal('ai-modal')">Close</button></div>
+  </div>
+  </div>
+  <div class="modal-actions"><button class="btn" onclick="closeAI()">Close</button></div>
 </div>
 </div>
 
@@ -5724,24 +5789,80 @@ window._doQuoteImport = (id) => {
 };
 
 window.closeModal=(id)=>document.getElementById(id).style.display='none';
-window.openAI=()=>{document.getElementById('ai-modal').style.display='flex';aiParsed=[];};
+
+// ── AI Extract: read a PO, check it against the original, import ─────────────
+// Once a PO is loaded the window splits: the source pane shows exactly what the AI
+// was given (the PO document(s) and, from the mail hand-off, the email text) beside
+// the lines it pulled out, which stay editable until Import. Same pane as mail.html's
+// Save prices window (mpLoadSources / mpRenderSrc there). _aiSrcSeq drops a slow read
+// that belongs to an earlier file.
+let _aiSrc={docs:[], text:'', tab:'text'}, _aiSrcSeq=0, _aiMixed=false;
+function aiSrcFree(){ (_aiSrc.docs||[]).forEach(d=>{ if(d.url) URL.revokeObjectURL(d.url); }); }
+function aiSrcReset(text){ aiSrcFree(); _aiSrc={docs:[], text:text||'', tab:'text'}; }
+function aiSrcDoc(name, mime){ const d={name:name||'PO', img:String(mime||'').startsWith('image/'), file:null, url:'', err:''}; _aiSrc.docs.push(d); return d; }
+function aiSrcSet(d, file){ d.file=file; d.img=String(file.type||'').startsWith('image/'); d.url=URL.createObjectURL(file); }
+// mail attachments often say application/octet-stream; the viewer and the AI both need the real type
+function aiMime(name, t){
+  t=String(t||'').toLowerCase(); const n=String(name||'').toLowerCase();
+  if(t.includes('pdf')||/\.pdf$/.test(n)) return 'application/pdf';
+  if(t.startsWith('image/')) return t;
+  if(/\.png$/.test(n)) return 'image/png';
+  if(/\.jpe?g$/.test(n)) return 'image/jpeg';
+  return 'application/pdf';
+}
+function aiShowSrc(on){ document.getElementById('ai-modal-box').classList.toggle('has-src', !!on); }
+function aiRenderSrc(){
+  const S=_aiSrc, esc=esc2;
+  document.getElementById('mp-src-tabs').innerHTML=S.docs.map((d,k)=>`<button type="button" class="mp-src-tab${S.tab===k?' on':''}" onclick="aiSrcTab(${k})" title="${esc(d.name)}"><i class="ti ti-${d.img?'photo':'file-type-pdf'}"></i><span>${esc(d.name)}</span></button>`).join('')
+    +(S.text?`<button type="button" class="mp-src-tab${S.tab==='text'?' on':''}" onclick="aiSrcTab('text')"><i class="ti ti-mail"></i><span>Email text</span></button>`:'');
+  const body=document.getElementById('mp-src-body');
+  if(S.tab==='text'){ body.innerHTML=S.text?`<div class="mp-src-text">${esc(S.text)}</div>`:''; return; }
+  const d=S.docs[S.tab];
+  // the browser's own PDF viewer shows every page, with its zoom bar for small print
+  body.innerHTML=!d?'' : d.url?(d.img?`<img src="${d.url}" alt="${esc(d.name)}">`:`<iframe src="${d.url}#navpanes=0" title="${esc(d.name)}"></iframe>`)
+    : d.err?`<div class="mp-src-note"><i class="ti ti-alert-triangle"></i> Couldn’t load ${esc(d.name)} (${esc(d.err)}).</div>`
+    : `<div class="mp-src-note"><i class="ti ti-loader-2 spin"></i> Loading ${esc(d.name)}…</div>`;
+}
+window.aiSrcTab=(k)=>{ _aiSrc.tab=k; aiRenderSrc(); };
+function aiStatus(h, err){ const el=document.getElementById('ai-status'); el.innerHTML=h||''; el.classList.toggle('err', !!err); }
+
+window.openAI=()=>{
+  _aiSrcSeq++; aiSrcReset(''); aiShowSrc(false); aiRenderSrc();
+  aiParsed=[]; _aiMixed=false; aiStatus('');
+  document.getElementById('ai-result-box').style.display='none';
+  document.getElementById('file-input').value='';
+  document.getElementById('ai-drop-label').textContent='Drop file here or click to browse';
+  document.getElementById('ai-modal').style.display='flex';
+};
+window.closeAI=()=>{ closeModal('ai-modal'); _aiSrcSeq++; aiSrcFree(); _aiSrc.docs=[]; };
 
 // ── Hand-off from the mail app ───────────────────────────────────────────────
 // orders.html?fromMail=<threadKey>&cust=…&subj=…&atts=<json>  ("Create orders from this PO")
-//   → pulls the PO document out of the email through the mail worker and runs it
-//     through the same AI reader as a hand-uploaded file; importing stamps mailKey
-//     on each order and links the mail thread back here.
+//   → pulls the PO document(s) out of the email through the mail worker and runs them,
+//     with the email text, through the same AI reader as a hand-uploaded file; importing
+//     stamps mailKey on each order and links the mail thread back here.
 // orders.html?order=<id>  (the mail app's "Order — open")
 //   → jumps straight to that order once the list has loaded.
-let _fromMailKey='', _fromMailSubj='', _fromMailCust='', _mailAttList=[], _deepOrderId='', _mailParamsDone=false;
+let _fromMailKey='', _fromMailSubj='', _fromMailCust='', _fromMailText='', _mailAttList=[], _deepOrderId='', _mailParamsDone=false;
+// mail.html leaves the email text in localStorage (too long for the link) — read once, then gone
+function takeMailText(key){
+  let t='';
+  try{
+    const raw=localStorage.getItem('bsmp_poMailText'); localStorage.removeItem('bsmp_poMailText');
+    const j=JSON.parse(raw||'null');
+    if(key && j && j.key===key && Date.now()-(Number(j.at)||0)<36e5) t=String(j.text||'');
+  }catch(e){}
+  return t;
+}
 function handleMailParams(){
   if(_mailParamsDone) return; _mailParamsDone=true;
   let p; try{ p=new URLSearchParams(location.search); }catch(e){ return; }
   const fm=p.get('fromMail')||'', oid=p.get('order')||'';
+  const mailText=takeMailText(fm);   // always taken, so a stale copy never lingers
   if(!fm&&!oid) return;
   try{ history.replaceState(null,'',location.pathname); }catch(e){}   // a refresh shouldn't replay the hand-off
   if(oid){ _deepOrderId=oid; tryRevealDeepOrder(); return; }
-  _fromMailKey=fm; _fromMailSubj=p.get('subj')||''; _fromMailCust=p.get('cust')||'';
+  _fromMailKey=fm; _fromMailSubj=p.get('subj')||''; _fromMailCust=p.get('cust')||''; _fromMailText=mailText;
   try{ _mailAttList=JSON.parse(p.get('atts')||'[]')||[]; }catch(e){ _mailAttList=[]; }
   fetchMailPO();
 }
@@ -5754,62 +5875,163 @@ function tryRevealDeepOrder(){
 }
 async function fetchMailPO(){
   openAI();
-  const rb=document.getElementById('ai-result-box'),rt=document.getElementById('ai-result-text'),ib=document.getElementById('ai-import-btn');
-  rb.style.display='block'; ib.disabled=true;
-  const a=_mailAttList[0];
-  if(!a||!a.a||!a.b||!a.m){
-    rt.textContent='The email from '+(_fromMailCust||'the customer')+' ("'+(_fromMailSubj||'no subject')+'") has no PO attachment I can read.\n\nDrop the PO file above by hand — importing will still link the orders back to the email.';
+  const seq=_aiSrcSeq, esc=esc2;
+  aiSrcReset(_fromMailText);
+  const atts=(Array.isArray(_mailAttList)?_mailAttList:[]).filter(a=>a&&a.a&&a.b&&a.m);
+  const docs=atts.map(a=>aiSrcDoc(a.n||'PO', aiMime(a.n,a.t)));
+  if(!docs.length && !_fromMailText){
+    aiStatus('The email from '+esc(_fromMailCust||'the customer')+' (“'+esc(_fromMailSubj||'no subject')+'”) has no PO attachment or text I can read.\n\nDrop the PO file above by hand — importing will still link the orders back to the email.', true);
     return;
   }
-  rt.textContent='Pulling "'+(a.n||'the PO')+'" out of the email…';
-  try{
-    const s=await get(ref(db,'mail/settings'));
-    const proxy=(((s.val()||{}).proxyUrl)||'').replace(/\/+$/,'');
-    if(!proxy) throw new Error('mail proxy address not set');
-    const tok=await auth.currentUser.getIdToken();
-    const r=await fetch(proxy+'/attachment?box='+encodeURIComponent(a.b)+'&msg='+encodeURIComponent(a.m)+'&id='+encodeURIComponent(a.a)+'&mime='+encodeURIComponent(a.t||'application/octet-stream')+'&name='+encodeURIComponent(a.n||'po'),{headers:{Authorization:'Bearer '+tok}});
-    if(!r.ok) throw new Error('attachment fetch failed ('+r.status+')');
-    const blob=await r.blob();
-    let name=a.n||'po';
-    if(!/\.[a-z0-9]{2,4}$/i.test(name)){   // the reader routes by type; give the file a sensible extension
-      const mt=(a.t||blob.type||'').toLowerCase();
-      name+=mt.includes('pdf')?'.pdf':mt.includes('png')?'.png':'.jpg';
-    }
-    await readPOFile(new File([blob],name,{type:a.t||blob.type||'application/pdf'}));
-    if(_mailAttList.length>1) rt.textContent+='\n\n(The email has '+_mailAttList.length+' attachments — I read the first. Open the email in Mail for the rest.)';
-  }catch(e){
-    rt.textContent='Could not pull the PO out of the email: '+((e&&e.message)||e)+'\n\nYou can still drop the file in above by hand — importing will still link the orders back to the email.';
+  document.getElementById('ai-drop-label').textContent='Read a different file instead';
+  _aiSrc.tab=docs.length?0:'text'; aiShowSrc(true); aiRenderSrc();
+  aiStatus('<i class="ti ti-loader-2 spin"></i> '+(docs.length?'Pulling '+(docs.length>1?docs.length+' attachments':'“'+esc(docs[0].name)+'”')+' out of the email…':'Reading the email…'));
+  let proxy='', tok='';
+  if(docs.length){
+    try{
+      const s=await get(ref(db,'mail/settings'));
+      proxy=(((s.val()||{}).proxyUrl)||'').replace(/\/+$/,'');
+      if(!proxy) throw new Error('mail proxy address not set');
+      tok=await auth.currentUser.getIdToken();
+    }catch(e){ docs.forEach(d=>{ d.err=(e&&e.message)||String(e); }); }
   }
+  await Promise.all(atts.map(async (a,k)=>{
+    const d=docs[k]; if(d.err) return;
+    try{
+      const r=await fetch(proxy+'/attachment?box='+encodeURIComponent(a.b)+'&msg='+encodeURIComponent(a.m)+'&id='+encodeURIComponent(a.a)+'&mime='+encodeURIComponent(a.t||'application/octet-stream')+'&name='+encodeURIComponent(a.n||'po'),{headers:{Authorization:'Bearer '+tok}});
+      if(!r.ok) throw new Error('attachment fetch failed ('+r.status+')');
+      const blob=await r.blob(); if(seq!==_aiSrcSeq) return;
+      let name=a.n||'po';
+      const mime=aiMime(name, a.t||blob.type);
+      if(!/\.[a-z0-9]{2,4}$/i.test(name)) name+=mime==='application/pdf'?'.pdf':mime==='image/png'?'.png':'.jpg';
+      aiSrcSet(d, new File([blob],name,{type:mime}));
+    }catch(e){ d.err=(e&&e.message)||String(e); }
+    if(seq===_aiSrcSeq) aiRenderSrc();
+  }));
+  if(seq!==_aiSrcSeq) return;
+  const files=docs.filter(d=>d.file).map(d=>d.file), bad=docs.filter(d=>d.err);
+  if(!files.length && !_fromMailText){
+    aiStatus('Could not pull the PO out of the email: '+esc(bad.length?bad[0].err:'unknown error')+'\n\nYou can still drop the file in above by hand — importing will still link the orders back to the email.', true);
+    return;
+  }
+  await readPOFile(files, _fromMailText, seq, bad.length?('Couldn’t load '+bad.map(d=>d.name).join(', ')+' — the AI read '+(files.length?'the rest':'the email text only')+'.'):'');
 }
 window.handleFile=async(input)=>{
-  const file=input.files[0];if(!file)return;
-  await readPOFile(file);
+  const file=input.files[0]; input.value=''; if(!file) return;
+  await aiReadUpload(file);
 };
-// the AI reader itself — used by the upload box above and by the mail hand-off,
-// which fetches the PO out of the email and passes it in as a File
-async function readPOFile(file){
-  const rb=document.getElementById('ai-result-box'),rt=document.getElementById('ai-result-text'),ib=document.getElementById('ai-import-btn');
-  rb.style.display='block';rt.textContent='Extracting order details…';ib.disabled=true;
+window.aiDrop=(e)=>{
+  e.preventDefault(); e.currentTarget.classList.remove('drag');
+  const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(f) aiReadUpload(f);
+};
+async function aiReadUpload(file){
+  const mime=aiMime(file.name, file.type);
+  if(mime!=='application/pdf' && !mime.startsWith('image/')){ aiStatus('That isn’t a PDF or a picture — drop the PO as a PDF, PNG or JPG.', true); return; }
+  if(mime!==file.type) file=new File([file], file.name, {type:mime});
+  // a hand-dropped file replaces the documents; the email text (mail hand-off) stays alongside
+  const seq=++_aiSrcSeq; aiSrcReset(_aiSrc.text);
+  aiSrcSet(aiSrcDoc(file.name, mime), file); _aiSrc.tab=0;
+  document.getElementById('ai-drop-label').textContent='Read a different file instead';
+  aiShowSrc(true); aiRenderSrc();
+  await readPOFile([file], _aiSrc.text, seq, '');
+}
+const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number, drawing number, or part/revision identifier (e.g. B66735 Rev.6, 610-1094 Rev A). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. Empty string for other missing fields.';
+// the AI reader itself — used by the upload box above and by the mail hand-off, which
+// fetches the PO document(s) out of the email and passes them in as Files with the email text
+async function readPOFile(files, text, seq, note){
+  if(seq==null) seq=_aiSrcSeq;
+  const ib=document.getElementById('ai-import-btn');
+  document.getElementById('ai-result-box').style.display='none'; ib.disabled=true; aiParsed=[];
+  aiStatus('<i class="ti ti-loader-2 spin"></i> Reading the PO with AI…');
   const toB64=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});
   try{
-    const b64=await toB64(file);
-    const isImg=file.type.startsWith('image/');
-    const content=isImg?[{type:'image',source:{type:'base64',media_type:file.type,data:b64}},{type:'text',text:'Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number, drawing number, or part/revision identifier (e.g. B66735 Rev.6, 610-1094 Rev A). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. Empty string for other missing fields. ONLY valid JSON, no markdown.'}]:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number, drawing number, or part/revision identifier (e.g. B66735 Rev.6, 610-1094 Rev A). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. Empty string for other missing fields. ONLY valid JSON, no markdown.'}];
-    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:2000,messages:[{role:'user',content}]})});
+    const content=[];
+    for(const f of files){
+      const b64=await toB64(f);
+      content.push(f.type.startsWith('image/')?{type:'image',source:{type:'base64',media_type:f.type,data:b64}}:{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}});
+    }
+    let prompt=PO_PROMPT;
+    if(text) prompt+=(files.length
+      ? ' The customer\'s email thread that came with '+(files.length>1?'these attachments':'this attachment')+' follows (newest message first). Take the line items from the attached PO; use the email only to fill gaps (e.g. a due date or PO # written in it). If an attachment is a drawing rather than the PO, make no line items from it.'
+      : ' There is no attached document: the purchase order is in this email thread from the customer (newest message first). Read the line items from the newest customer message; earlier messages (an RFQ, Bert\'s quote) are history, so make no line items from them unless the PO refers to them.')
+      +'\n\nEMAIL:\n'+text+'\n\n';
+    content.push({type:'text',text:prompt+' Return ONLY valid JSON, no markdown.'});
+    const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:3000,messages:[{role:'user',content}]})});
     const data=await resp.json();
-    if(data.error){rt.textContent='API error:\n\n'+JSON.stringify(data.error,null,2);return;}
-    if(!data.content){rt.textContent='Unexpected response:\n\n'+JSON.stringify(data,null,2);return;}
-    const text=data.content?.map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
-    try{aiParsed=JSON.parse(text);rt.textContent=`Found ${aiParsed.length} line item${aiParsed.length!==1?'s':''}:\n\n`+JSON.stringify(aiParsed,null,2);ib.disabled=false;}
-    catch{rt.textContent='Could not parse:\n\n'+text;}
-  }catch(err){rt.textContent='Error: '+err.message;}
+    if(seq!==_aiSrcSeq) return;
+    if(data.error){aiStatus('API error:\n\n'+esc2(JSON.stringify(data.error,null,2)),true);return;}
+    if(!data.content){aiStatus('Unexpected response:\n\n'+esc2(JSON.stringify(data,null,2)),true);return;}
+    const out=data.content.map(c=>c.text||'').join('').trim().replace(/```json|```/g,'').trim();
+    let rows; try{ rows=JSON.parse(out); }catch{ aiStatus('Could not parse:\n\n'+esc2(out),true); return; }
+    aiSetRows(Array.isArray(rows)?rows:(rows&&typeof rows==='object'?[rows]:[]));
+    const n=aiParsed.length;
+    aiStatus('<i class="ti ti-checks"></i> Found '+n+' line item'+(n!==1?'s':'')+'. Check each one against the original and fix anything misread, then import.'+(note?'\n'+esc2(note):''));
+  }catch(err){ if(seq===_aiSrcSeq) aiStatus('Error: '+esc2(err.message),true); }
+}
+
+// ── the extracted lines, editable until Import ──
+function aiNum(v){ const n=parseFloat(String(v==null?'':v).replace(/[$,\s]/g,'')); return isFinite(n)?n:0; }
+function aiTot(r){ const q=aiNum(r.qty), c=aiNum(r.cost); return q&&c?(q+' × $'+c+' = '+fmtMoney(q*c)):''; }
+function aiSetRows(rows){
+  const s=v=>v==null?'':String(v).trim();
+  aiParsed=rows.filter(r=>r&&typeof r==='object').map(r=>({customer:s(r.customer), po:s(r.po), part:s(r.part), desc:s(r.desc),
+    qty:s(r.qty), cost:s(r.cost), due:/^\d{4}-\d{2}-\d{2}$/.test(s(r.due))?s(r.due):'', poNotes:s(r.poNotes), status:s(r.status)}));
+  // one PO from one customer is the usual case — those two are edited once, above the lines
+  _aiMixed=new Set(aiParsed.map(r=>r.customer.toLowerCase()+'|'+r.po.toLowerCase())).size>1;
+  const f=aiParsed[0]||{};
+  document.getElementById('ai-cust').value=f.customer||'';
+  document.getElementById('ai-po').value=f.po||'';
+  document.getElementById('ai-result-box').style.display='block';
+  aiRenderRows();
+}
+function aiRenderRows(){
+  const esc=esc2, mixed=_aiMixed;
+  document.getElementById('ai-head').style.display=mixed?'none':'';
+  document.getElementById('ai-rows').innerHTML=aiParsed.map((r,i)=>{
+    const miss=k=>(k==='part'&&!r.part)||(k==='qty'&&!(aiNum(r.qty)>0));
+    const f=(k,label,cls,type)=>`<div class="form-group ${cls||''}"><label>${label}</label><input type="${type||'text'}"${k==='qty'||k==='cost'?' inputmode="decimal"':''} value="${esc(r[k])}" class="${miss(k)?'miss':''}" oninput="aiSet(${i},'${k}',this)"></div>`;
+    return `<div class="ai-row">
+      <div class="ai-row-top">Line ${i+1}<span class="ai-tot" id="ai-tot-${i}">${aiTot(r)}</span><button type="button" class="ai-x" title="Remove this line" onclick="aiDelRow(${i})"><i class="ti ti-trash"></i></button></div>
+      <div class="ai-grid">
+        ${mixed?f('customer','Customer','w2')+f('po','PO #','w2'):''}
+        ${f('part','Part #')}${f('qty','Qty')}${f('cost','Unit $')}${f('due','Due','','date')}
+        ${f('desc','Material','w2')}${f('poNotes','PO notes','w2')}
+      </div>
+    </div>`;
+  }).join('')||'<div class="ai-status">No line items — add one, or read a different file.</div>';
+  const ib=document.getElementById('ai-import-btn'), n=aiParsed.length;
+  ib.disabled=!n; ib.innerHTML='<i class="ti ti-download"></i> Import '+(n?n+' order'+(n!==1?'s':''):'Orders');
+}
+window.aiSet=(i,k,el)=>{
+  const r=aiParsed[i]; if(!r) return;
+  r[k]=el.value;
+  if(k==='part') el.classList.toggle('miss', !el.value.trim());
+  if(k==='qty') el.classList.toggle('miss', !(aiNum(el.value)>0));
+  if(k==='qty'||k==='cost'){ const t=document.getElementById('ai-tot-'+i); if(t) t.textContent=aiTot(r); }
 };
+window.aiHead=()=>{
+  if(_aiMixed) return;
+  const c=document.getElementById('ai-cust').value, p=document.getElementById('ai-po').value;
+  aiParsed.forEach(r=>{ r.customer=c; r.po=p; });
+};
+window.aiAddRow=()=>{
+  const last=aiParsed[aiParsed.length-1]||{};
+  aiParsed.push({customer:_aiMixed?(last.customer||''):document.getElementById('ai-cust').value, po:_aiMixed?(last.po||''):document.getElementById('ai-po').value,
+    part:'', desc:'', qty:'', cost:'', due:last.due||'', poNotes:'', status:''});
+  aiRenderRows();
+  const rows=document.querySelectorAll('#ai-rows .ai-row');
+  if(rows.length){ const el=rows[rows.length-1].querySelectorAll('.ai-grid input')[_aiMixed?2:0]; if(el){ el.scrollIntoView({block:'nearest'}); el.focus(); } }
+};
+window.aiDelRow=(i)=>{ aiParsed.splice(i,1); aiRenderRows(); };
+window.aiClear=()=>{ aiParsed=[]; document.getElementById('ai-result-box').style.display='none'; aiStatus(''); };
 window.importAIOrders=()=>{
-  if(!aiParsed||!aiParsed.length)return;
+  const rows=(aiParsed||[]).filter(r=>r.part.trim()||r.desc.trim()||aiNum(r.qty));   // a line left blank is skipped
+  if(!rows.length)return;
   // build new order objects, then assign internal job numbers per customer+PO
   let firstNewId=null;
-  aiParsed.forEach(r=>{
-    const o={id:uid(),customer:r.customer||'',po:r.po||'',job:'',part:r.part||'',desc:r.desc||'',qty:parseFloat(r.qty)||0,cost:parseFloat(r.cost)||0,total:(parseFloat(r.qty)||0)*(parseFloat(r.cost)||0),ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
+  rows.forEach(r=>{
+    const qty=aiNum(r.qty), cost=aiNum(r.cost);
+    const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
     if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
     // assign job number considering existing + already-added-this-batch orders
     o.job = suggestJobNumber(o.customer, o.po);
@@ -5825,9 +6047,9 @@ window.importAIOrders=()=>{
     const first=orders.find(x=>x.id===firstNewId)||{};
     update(ref(db,'mail/threads/'+_fromMailKey),{link:{app:'orders', id:firstNewId, label:'Order'+(first.job?(' '+first.job):(first.po?(' PO '+first.po):''))}})
       .catch(()=>{/* mail link-back is best-effort; the orders themselves are saved */});
-    _fromMailKey='';
+    _fromMailKey=''; _fromMailText='';
   }
-  saveDB();render();closeModal('ai-modal');document.getElementById('ai-result-box').style.display='none';document.getElementById('file-input').value='';aiParsed=[];
+  saveDB();render();closeAI();aiParsed=[];
 };
 
 window.exportCSV=()=>{
