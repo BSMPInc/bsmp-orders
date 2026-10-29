@@ -2991,6 +2991,7 @@ function startDataListeners(){
     if(document.getElementById('archive-page')?.style.display==='block') renderArchive();
     if(document.getElementById('board-page')?.style.display!=='none') renderBoardPage();
     queuesLiveRefresh();   // Work Queues (board or list) follows other devices' changes
+    sweepMailConfirmed();
   }, () => setSyncStatus('error'));
   startCustomerListener();
   startTeamListener();
@@ -5296,6 +5297,28 @@ async function _confirmMailCfg(){
   }catch(e){ /* no signature — the fallback sign-off in _confirmCompose covers it */ }
   return {proxy, replyAs, sigText, sigLogo};
 }
+// Mail's Won → Order confirmed. Once a PO's confirmation has gone out, the email
+// it came in on moves off the Won tab. Only threads still on Won are touched (a
+// flag someone set by hand stays), and update() writes just the flag fields —
+// never the thread's link/meta. Mail flags are a convenience: a failure here
+// never blocks or fails the send.
+async function markMailConfirmed(keys){
+  const by=(auth.currentUser&&auth.currentUser.email)||'';
+  for(const k of new Set((keys||[]).filter(Boolean))){
+    try{
+      const f=(await get(ref(db,'mail/threads/'+k+'/flag'))).val();
+      if(f==='won') await update(ref(db,'mail/threads/'+k),{flag:'confirmed', by, at:Date.now()});
+    }catch(e){}
+  }
+}
+// One pass per page load: POs confirmed before the Order confirmed tab existed
+// (or confirmed from a device running an older copy) still get moved.
+let _mailConfirmSwept=false;
+function sweepMailConfirmed(){
+  if(_mailConfirmSwept||!orders.length) return;
+  _mailConfirmSwept=true;
+  markMailConfirmed(orders.filter(o=>o.mailKey&&o.confirmEmailed).map(o=>o.mailKey));
+}
 async function _sendConfirmationTo(list, ccList){
   const items=_confirmItems||[]; if(!items.length) return;
   const btn=document.getElementById('confirm-email-btn');
@@ -5333,6 +5356,7 @@ async function _sendConfirmationTo(list, ccList){
       if(!i.status||i.status==='Received'){ i.status='Confirmed'; bumped++; }
     });
     saveDB(); render();
+    markMailConfirmed(items.map(i=>i.mailKey));
     // remember the first address on the customer card so next time it's one click
     if(cust){
       autoIndexCustomer(cust,'');

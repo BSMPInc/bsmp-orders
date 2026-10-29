@@ -114,6 +114,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .badge.quoted{background:var(--blue-soft);color:var(--blue)}
 .badge.waiting{background:var(--purple-soft);color:var(--purple)}
 .badge.won{background:var(--green-soft);color:var(--green)}
+.badge.confirmed{background:#e2f1ee;color:#1b6b63}
 .badge.lost{background:var(--red-soft);color:var(--red)}
 .badge.cert{background:var(--accent-soft);color:var(--accent)}
 .badge.invoice{background:#f1ece1;color:#7a6236}
@@ -255,6 +256,7 @@ body.sb-pinned .dock{left:var(--sb)}
 .spill.on-rfq{background:var(--amber-soft);border-color:var(--amber);color:var(--amber)}
 .spill.on-quoted{background:var(--blue-soft);border-color:var(--blue);color:var(--blue)}
 .spill.on-won{background:var(--green-soft);border-color:var(--green);color:var(--green)}
+.spill.on-confirmed{background:#e2f1ee;border-color:#1b6b63;color:#1b6b63}
 .spill.on-lost{background:var(--red-soft);border-color:var(--red);color:var(--red)}
 .spill.on-waiting{background:var(--purple-soft);border-color:var(--purple);color:var(--purple)}
 .spill.on-cert{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
@@ -1028,6 +1030,9 @@ const FLAG_DEFS=[
   {k:'quoted',  label:'Quote submitted', icon:'currency-dollar', ico:'qsent'},
   {k:'waiting', label:'Waiting on customer', icon:'clock'},
   {k:'won',     label:'Won',             icon:'trophy'},
+  // set by the Orders app when the order confirmation email goes out for a PO
+  // imported from this conversation (Won → Order confirmed)
+  {k:'confirmed', label:'Order confirmed', icon:'circle-check'},
   {k:'lost',    label:'Lost',            icon:'circle-x'},
   {k:'cert',    label:'Cert',            icon:'certificate'},
   {k:'invoice', label:'Invoice',         icon:'file-dollar'},
