@@ -467,6 +467,7 @@ tr:hover .del-btn{opacity:1}
 .ai-row-top .ai-tot{margin-left:auto;font-weight:600;text-transform:none;letter-spacing:0;color:var(--green);font-variant-numeric:tabular-nums;font-size:12px}
 .ai-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.3fr);gap:6px 8px}
 .ai-grid .w2{grid-column:span 2}
+.ai-grid .w3{grid-column:span 3}
 .ai-grid .full{grid-column:1/-1}
 .ai-row .form-group label,.ai-head .form-group label{font-size:10px}
 .ai-row .form-group input,.ai-head .form-group input{padding:6px 8px;font-size:12.5px;border-radius:0;min-width:0;width:100%}
@@ -479,7 +480,7 @@ tr:hover .del-btn{opacity:1}
   .ai-modal.has-src .mp-src{height:46vh;flex:none}
   .ai-modal.has-src .ai-main{overflow:visible}
 }
-@media (max-width:560px){ .ai-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .ai-grid .w2{grid-column:1/-1} .ai-head{grid-template-columns:1fr} }
+@media (max-width:560px){ .ai-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .ai-grid .w2,.ai-grid .w3{grid-column:1/-1} .ai-head{grid-template-columns:1fr} }
 
 .picker{display:none;position:fixed;background:var(--card);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:4px;z-index:300;min-width:190px;box-shadow:0 6px 24px rgba(0,0,0,0.14)}
 .picker-item{padding:6px 12px;cursor:pointer;border-radius:6px;font-size:12px}
@@ -2451,6 +2452,7 @@ body.sb-hidden .topbar{padding-left:24px}
         </div>
       </div>
       <div class="form-group"><label>Part Number</label><input id="f-part" type="text" placeholder="Part number"></div>
+      <div class="form-group"><label>Revision</label><input id="f-rev" type="text" placeholder="e.g. A or 6 — blank if none"></div>
       <div class="form-group full"><label>Description</label><input id="f-desc" type="text" placeholder="Material — e.g. 0.060 thk 304 SS"></div>
     </div>
   </div>
@@ -3726,7 +3728,7 @@ function poItemsHtml(g){
     return `<div class="ci-row${expanded.has(r.id)?' expanded-line':''}${r.buildOnly?' build-only':''}" data-rowid="${r.id}" onclick="window._tl('${r.id}',event)">
       <span class="ci-job">${r.job||'—'}</span>
       <div class="ci-desc">
-        <span class="ci-desc-main" title="${((r.part?('Part '+r.part):'')+(r.part&&r.desc?' · ':'')+(r.desc||'')).replace(/"/g,'&quot;')}">${missBadge}${clip}${r.part||r.desc||'<span style="color:var(--text3)">(no part #)</span>'}</span>
+        <span class="ci-desc-main" title="${((r.part?('Part '+r.part+(r.rev?' Rev '+r.rev:'')):'')+(r.part&&r.desc?' · ':'')+(r.desc||'')).replace(/"/g,'&quot;')}">${missBadge}${clip}${r.part||r.desc||'<span style="color:var(--text3)">(no part #)</span>'}${r.rev?` <span style="font-weight:500;color:var(--text3)">Rev ${esc2(r.rev)}</span>`:''}</span>
         ${(r.part||r.desc)?`<i class="ti ti-copy ci-copy" title="Copy part #" onclick="window._cpyPart('${r.id}',event)"></i>`:''}
         ${r.invoice?`<span class="inv-chip" title="Invoice number${r.invoiceDate?(' · invoiced '+fmtDate(r.invoiceDate)):''}">Inv ${r.invoice}${r.invoiceDate?` · ${fmtDate(r.invoiceDate)}`:''}</span>`:''}
         ${splitChip(r)}
@@ -5387,14 +5389,14 @@ let _prefillSteps = null;
 let _editLoaded=null;
 function _snapEditForm(){
   const g=id=>document.getElementById(id).value;
-  return {customer:g('f-customer'),po:g('f-po'),job:g('f-job'),part:g('f-part'),desc:g('f-desc'),
+  return {customer:g('f-customer'),po:g('f-po'),job:g('f-job'),part:g('f-part'),rev:g('f-rev'),desc:g('f-desc'),
     qty:g('f-qty'),cost:g('f-cost'),ordered:g('f-ordered'),due:g('f-due'),status:g('f-status'),
     invoice:g('f-invoice'),invoiceDate:g('f-invoice-date'),payment:g('f-payment'),notes:g('f-notes'),
     buildOnly:document.getElementById('f-buildonly').checked};
 }
 window.openAdd=()=>{
   editId=null;_prefillSteps=null;_prefillDrawing=null;_prefillDupOf=null;document.getElementById('modal-title').textContent='Add New Order';document.getElementById('save-btn').innerHTML='<i class="ti ti-check"></i> Save Order';
-  ['customer','po','job','part','desc','notes','invoice'].forEach(f=>document.getElementById('f-'+f).value='');
+  ['customer','po','job','part','rev','desc','notes','invoice'].forEach(f=>document.getElementById('f-'+f).value='');
   ['qty','cost'].forEach(f=>document.getElementById('f-'+f).value='');
   document.getElementById('f-status').value='Received';document.getElementById('f-payment').value='Unpaid';populateCustomerDropdown();document.getElementById('f-customer-select').value='';document.getElementById('f-customer').style.display='none';
   document.getElementById('f-ordered').value='';document.getElementById('f-due').value='';document.getElementById('f-invoice-date').value='';
@@ -5406,7 +5408,7 @@ function openEdit(id){
   const r=orders.find(o=>o.id===id);if(!r)return;editId=id;
   document.getElementById('modal-title').textContent='Edit Order';document.getElementById('save-btn').innerHTML='<i class="ti ti-check"></i> Save Changes';
   document.getElementById('f-customer').value=r.customer||'';document.getElementById('f-po').value=r.po||'';
-  document.getElementById('f-job').value=r.job||'';document.getElementById('f-part').value=r.part||'';
+  document.getElementById('f-job').value=r.job||'';document.getElementById('f-part').value=r.part||'';document.getElementById('f-rev').value=r.rev||'';
   document.getElementById('f-desc').value=r.desc||'';document.getElementById('f-qty').value=r.qty||'';
   document.getElementById('f-cost').value=r.cost||'';document.getElementById('f-ordered').value=r.ordered||'';
   document.getElementById('f-due').value=r.due||'';document.getElementById('f-status').value=r.status||'Confirmed';
@@ -5447,6 +5449,7 @@ window.addPartToPO = (id) => {
   } else { _prefillSteps = null; }
   // leave part / desc / qty / cost blank for the user to fill
   document.getElementById('f-part').value='';
+  document.getElementById('f-rev').value='';
   document.getElementById('f-desc').value='';
   document.getElementById('f-qty').value='';
   document.getElementById('f-cost').value='';
@@ -5491,6 +5494,7 @@ window.duplicateOrder = (id) => {
   if(hasOption){ sel.value=r.customer; document.getElementById('f-customer').style.display='none'; document.getElementById('f-customer').value=r.customer; }
   else { sel.value='__new__'; const ci=document.getElementById('f-customer'); ci.style.display='block'; ci.value=r.customer||''; }
   document.getElementById('f-part').value = r.part||'';
+  document.getElementById('f-rev').value = r.rev||'';
   document.getElementById('f-desc').value = r.desc||'';
   document.getElementById('f-qty').value = r.qty||'';
   document.getElementById('f-buildonly').checked = !!r.buildOnly; window._toggleBuildOnly(!!r.buildOnly);
@@ -5642,7 +5646,7 @@ window.saveOrder=()=>{
     id:editId||uid(),
     customer:fresh('customer', customer, ex.customer||customer),
     po:fresh('po', now.po.trim(), ex.po||''),job:fresh('job', now.job.trim(), ex.job||''),
-    part:fresh('part', now.part.trim(), ex.part||''),desc:fresh('desc', now.desc.trim(), ex.desc||''),
+    part:fresh('part', now.part.trim(), ex.part||''),rev:fresh('rev', aiRev(now.rev), ex.rev||''),desc:fresh('desc', now.desc.trim(), ex.desc||''),
     qty,cost,total:qty&&cost?qty*cost:0,buildOnly,
     ordered:fresh('ordered', now.ordered, ex.ordered||''),due:fresh('due', now.due, ex.due||''),
     status:fresh('status', now.status, ex.status||'Received'),invoice:fresh('invoice', now.invoice.trim(), ex.invoice||''),invoiceDate:fresh('invoiceDate', now.invoiceDate, ex.invoiceDate||''),
@@ -5794,7 +5798,8 @@ window._doQuoteImport = (id) => {
     po: (q.poNumber||'').trim(),
     job: '',
     part: (q.partNum && q.partNum!=='—') ? q.partNum : '',
-    desc: [ (q.material && q.material!=='—') ? q.material : '', (q.revision && q.revision!=='—') ? ('Rev '+q.revision) : '' ].filter(Boolean).join(' · '),
+    rev: (q.revision && q.revision!=='—') ? aiRev(q.revision) : '',
+    desc: (q.material && q.material!=='—') ? q.material : '',
     qty, cost, total: qty&&cost ? qty*cost : 0,
     ordered: today, due: (q.dueDate||''),
     status: 'Received', invoice: '', payment: 'Unpaid',
@@ -5959,7 +5964,7 @@ async function aiReadUpload(file){
   aiShowSrc(true); aiRenderSrc();
   await readPOFile([file], _aiSrc.text, seq, '');
 }
-const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number, drawing number, or part/revision identifier (e.g. B66735 Rev.6, 610-1094 Rev A). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. Empty string for other missing fields.';
+const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, rev, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number or drawing number, WITHOUT the revision (e.g. B66735, 610-1094). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. rev = ONLY the revision of that part when the PO gives one, just the letter/number with no \"Rev\" word (e.g. \"B66735 Rev.6\" -> part B66735, rev 6; \"610-1094 Rev A\" -> part 610-1094, rev A; \"REV: C\" in a column -> rev C). Empty string when no revision is stated; never guess one. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. Empty string for other missing fields.';
 // the AI reader itself — used by the upload box above and by the mail hand-off, which
 // fetches the PO document(s) out of the email and passes them in as Files with the email text
 async function readPOFile(files, text, seq, note){
@@ -5996,9 +6001,11 @@ async function readPOFile(files, text, seq, note){
 // ── the extracted lines, editable until Import ──
 function aiNum(v){ const n=parseFloat(String(v==null?'':v).replace(/[$,\s]/g,'')); return isFinite(n)?n:0; }
 function aiTot(r){ const q=aiNum(r.qty), c=aiNum(r.cost); return q&&c?(q+' × $'+c+' = '+fmtMoney(q*c)):''; }
+// the AI is told to give the bare revision; strip a stray "Rev" / "Rev." / "Revision" anyway
+function aiRev(v){ return String(v==null?'':v).trim().replace(/^rev(ision)?\.?\s*[:#-]?\s*/i,'').trim(); }
 function aiSetRows(rows){
   const s=v=>v==null?'':String(v).trim();
-  aiParsed=rows.filter(r=>r&&typeof r==='object').map(r=>({customer:s(r.customer), po:s(r.po), part:s(r.part), desc:s(r.desc),
+  aiParsed=rows.filter(r=>r&&typeof r==='object').map(r=>({customer:s(r.customer), po:s(r.po), part:s(r.part), rev:aiRev(r.rev), desc:s(r.desc),
     qty:s(r.qty), cost:s(r.cost), due:/^\d{4}-\d{2}-\d{2}$/.test(s(r.due))?s(r.due):'', poNotes:s(r.poNotes), status:s(r.status)}));
   // one PO from one customer is the usual case — those two are edited once, above the lines
   _aiMixed=new Set(aiParsed.map(r=>r.customer.toLowerCase()+'|'+r.po.toLowerCase())).size>1;
@@ -6018,8 +6025,9 @@ function aiRenderRows(){
       <div class="ai-row-top">Line ${i+1}<span class="ai-tot" id="ai-tot-${i}">${aiTot(r)}</span><button type="button" class="ai-x" title="Remove this line" onclick="aiDelRow(${i})"><i class="ti ti-trash"></i></button></div>
       <div class="ai-grid">
         ${mixed?f('customer','Customer','w2')+f('po','PO #','w2'):''}
-        ${f('part','Part #')}${f('qty','Qty')}${f('cost','Unit $')}${f('due','Due','','date')}
-        ${f('desc','Material','w2')}${f('poNotes','PO notes','w2')}
+        ${f('part','Part #')}${f('rev','Rev')}${f('qty','Qty')}${f('cost','Unit $')}
+        ${f('due','Due','','date')}
+        ${f('desc','Material','w3')}${f('poNotes','PO notes','full')}
       </div>
     </div>`;
   }).join('')||'<div class="ai-status">No line items — add one, or read a different file.</div>';
@@ -6041,7 +6049,7 @@ window.aiHead=()=>{
 window.aiAddRow=()=>{
   const last=aiParsed[aiParsed.length-1]||{};
   aiParsed.push({customer:_aiMixed?(last.customer||''):document.getElementById('ai-cust').value, po:_aiMixed?(last.po||''):document.getElementById('ai-po').value,
-    part:'', desc:'', qty:'', cost:'', due:last.due||'', poNotes:'', status:''});
+    part:'', rev:'', desc:'', qty:'', cost:'', due:last.due||'', poNotes:'', status:''});
   aiRenderRows();
   const rows=document.querySelectorAll('#ai-rows .ai-row');
   if(rows.length){ const el=rows[rows.length-1].querySelectorAll('.ai-grid input')[_aiMixed?2:0]; if(el){ el.scrollIntoView({block:'nearest'}); el.focus(); } }
@@ -6055,7 +6063,7 @@ window.importAIOrders=()=>{
   let firstNewId=null;
   rows.forEach(r=>{
     const qty=aiNum(r.qty), cost=aiNum(r.cost);
-    const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
+    const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),rev:aiRev(r.rev),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered:'',due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
     if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
     // assign job number considering existing + already-added-this-batch orders
     o.job = suggestJobNumber(o.customer, o.po);
@@ -8920,6 +8928,7 @@ window.openStepDetail = (orderId, stepName) => {
       ${drawHtml}
       <div class="iod-sect">Order</div>
       ${info('Part #', esc(r.part)||esc(r.desc))}
+      ${r.rev?info('Rev', esc(r.rev)):''}
       ${info('Description', esc(r.desc))}
       ${info('Customer', esc(r.customer))}
       ${info('Customer PO', r.po?esc(r.po):'—')}
