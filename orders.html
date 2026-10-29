@@ -6092,8 +6092,28 @@ window.importAIOrders=()=>{
     _fromMailKey=''; _fromMailText='';
   }
   _fromMailRcvd=''; document.getElementById('ai-ordered').value='';
-  saveDB();render();closeAI();aiParsed=[];
+  saveDB();closeAI();aiParsed=[];
+  if(firstNewId) landOnNewOrders(firstNewId, rows.length); else render();
 };
+// After an import: show the open-orders list with nothing hiding the new lines (a
+// search, a status/process filter, another page), flash them, and offer the next
+// step of the workflow — the customer confirmation for that PO — as one click.
+function landOnNewOrders(firstId, n){
+  if(document.getElementById('orders-page')?.style.display!=='block') window.showPage('orders');
+  ['search','filter-status','filter-process'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  render(); revealNewOrder(firstId);
+  const r=orders.find(o=>o.id===firstId)||{};
+  let el=document.getElementById('next-toast');
+  if(!el){ el=document.createElement('div'); el.id='next-toast'; el.className='undo-toast'; document.body.appendChild(el); }
+  const what=n+' order'+(n!==1?'s':'')+' added'+(r.po?(' — PO '+r.po):'')+(r.customer?(' · '+r.customer):'');
+  el.innerHTML=`<span class="ut-msg"><i class="ti ti-circle-check"></i> ${esc2(what)}</span><button class="ut-undo" id="nt-go"><i class="ti ti-receipt"></i> Order confirmation</button><button class="ut-x" id="nt-x" title="Dismiss"><i class="ti ti-x"></i></button>`;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  const hide=()=>el.classList.remove('show');
+  document.getElementById('nt-go').onclick=()=>{ hide(); window._showConfirmation(firstId); };
+  document.getElementById('nt-x').onclick=hide;
+  el._t=setTimeout(hide, 30000);
+}
 
 window.exportCSV=()=>{
   const rows=filteredOrders();
