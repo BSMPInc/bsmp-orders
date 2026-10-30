@@ -3929,7 +3929,10 @@ function sizeCardPanes(){
   }
   requestAnimationFrame(()=>{
     const top=list.getBoundingClientRect().top;
-    const h=Math.max(240, Math.round(window.innerHeight - top - 14));
+    // stop above the fixed bottom dock, or the last lines sit under it
+    const dock=document.querySelector('.dock'); const dr=dock && dock.getBoundingClientRect();
+    const floor=(dr && dr.height) ? Math.min(dr.top, window.innerHeight) : window.innerHeight;
+    const h=Math.max(240, Math.round(floor - top - 14));
     list.style.maxHeight=h+'px'; list.style.overflowY='auto';
     if(det){ det.style.maxHeight=h+'px'; det.style.overflowY='auto'; }
   });
@@ -4264,8 +4267,16 @@ function renderSummary(){
 
 function showPicker(picker,anchor){
   picker.style.display='block';
+  picker.style.maxHeight=''; picker.style.overflowY='';
   const r=anchor.getBoundingClientRect();
-  picker.style.left=r.left+'px';picker.style.top=(r.bottom+4)+'px';
+  // keep the menu on screen: on the last lines of a long PO there's no room below the
+  // badge, so open it upward (or pin it to the bottom edge), and scroll it if it's taller than the window
+  const pad=6, floor=window.innerHeight-pad;
+  if(picker.offsetHeight>floor-pad){ picker.style.maxHeight=(floor-pad)+'px'; picker.style.overflowY='auto'; }
+  const ph=picker.offsetHeight, pw=picker.offsetWidth;
+  let top=r.bottom+4;
+  if(top+ph>floor) top = (r.top-4-ph>=pad) ? r.top-4-ph : Math.max(pad, floor-ph);
+  picker.style.left=Math.max(pad, Math.min(r.left, window.innerWidth-pw-pad))+'px';picker.style.top=top+'px';
   setTimeout(()=>document.addEventListener('click',()=>{picker.style.display='none';},{once:true}),0);
 }
 
