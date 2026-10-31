@@ -2148,13 +2148,15 @@ window.qcSaveSelf=async ()=>{
   try{
   const id=editId||newId('insp');
   const prev=editId?INSPECTIONS[editId]:null;
-  const photos=(prev&&prev.photos)?prev.photos.slice():[];
+  // RTDB hands a list back object-shaped (with null holes) once an entry was deleted — normalize first
+  const photos=vals(prev&&prev.photos);
   const fresh=await withTimeout(uploadPending('sc','inspections'), 90000, t('Photo upload timed out — check the connection.'));
   fresh.forEach(f=>photos.push(f));
   const dfresh=await withTimeout(uploadPending('scdraw','inspections'), 90000, t('Drawing upload timed out — check the connection.'));
   // keep every attached drawing (flat pattern + dimensioned customer print);
   // rec.drawing stays the first one so older readers keep working
-  const drawings=((prev&&(prev.drawings||(prev.drawing?[prev.drawing]:[])))||[]).concat(dfresh);
+  const prevDraws=vals(prev&&prev.drawings);
+  const drawings=(prevDraws.length?prevDraws:((prev&&prev.drawing)?[prev.drawing]:[])).concat(dfresh);
   const drawing=drawings[0]||null;
   const photoCheck=(_scPhotoCheck&&_scPhotoCheckFor===(editId||'new'))?_scPhotoCheck:((prev&&prev.photoCheck)||null);
   const rec={
@@ -5853,7 +5855,7 @@ window.qcSaveFair=async (action)=>{
   const fresh=await withTimeout(uploadPending('frdraw','fair-drawings'), 90000, t('Drawing upload timed out — check the connection.'));
   if(fresh.length) drawing=fresh[0];
   // part photos + the AI photo-vs-drawing verdict ride on the report like the self-check
-  const photos=((prev&&prev.photos)||[]).slice();
+  const photos=vals(prev&&prev.photos);           // object-shaped / null-hole safe
   const phFresh=await withTimeout(uploadPending('frphoto','inspections'), 90000, t('Photo upload timed out — check the connection.'));
   phFresh.forEach(f=>photos.push(f));
   const photoCheck=_frPhotoCheck||(prev&&prev.photoCheck)||null;
