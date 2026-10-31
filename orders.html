@@ -903,6 +903,9 @@ select.ss-vin{width:170px;flex-shrink:0}
 /* alternate tile shades so adjacent orders are easy to tell apart */
 .po-list .po-mini:nth-child(even){background:#e9f0fb}
 .po-list .po-mini.active{background:#fff}
+/* invoiced = done: flat gray, drained of color so it reads as archived at a glance */
+.po-list .po-mini.done{opacity:.45;filter:grayscale(1);background:#e6e8ec;border-color:#d5d9e0;box-shadow:none}
+.po-list .po-mini.done:hover,.po-list .po-mini.done.active{opacity:1;filter:none;background:var(--card)}
 .pm-accent{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
 .pm-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .pm-cust{font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
