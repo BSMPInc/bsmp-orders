@@ -5336,6 +5336,7 @@ function saveQuote(){
       hw:d.hwCostPart||0, out:d.outCostPart||0, purch:d.purchasing||0,
       pps:d.pps||null, costSheet:d.costSheet||null, margin:d.margin!=null?d.margin:null },
     qtyBreaks: window._qtyBreaksResults || [],
+    breakLadder: markupTierRowIsDefault('mt-') ? null : readMarkupTierRow('mt-'),   // this quote's own break markups
     laborLines, hwLines, outLines,
     notes: document.getElementById('notes').value,
     leadTime: quoteLeadTime(true),
@@ -5533,6 +5534,7 @@ function resetForm(){
     const cCard=document.getElementById('cnc-card'); if(cCard) cCard.style.display='none';
     if(typeof syncOptCards==='function') syncOptCards(); }
   _qbClearResults();   // a fresh quote must not inherit the last quote's break table
+  setMarkupTierRow('mt-', null);   // ...or its own break markups
   calculate();
 }
 
@@ -6546,7 +6548,8 @@ function reloadQuote(id){
   // Open/close the optional cards to match what the quote actually uses
   if(typeof syncOptCards==='function') syncOptCards();
 
-  // ---- Quantity breaks: this quote's own quantities, never the last quote's ----
+  // ---- Quantity breaks: this quote's own quantities and break markups, never the last quote's ----
+  setMarkupTierRow('mt-', q.breakLadder||null);
   const savedQbs=_qbQtysOf(q);
   for(let i=1;i<=8;i++){ const el=document.getElementById('qb-'+i); if(el) el.value = savedQbs[i-1]!==undefined ? savedQbs[i-1] : ''; }
 
@@ -7054,6 +7057,7 @@ function qbMixHtml(results){
 
 function calcQtyBreaks(){
   clearQbAiReview('part'); // numbers are changing — a shown review would be stale
+  showOwnTierNote('mt-');
   const qtys=[...new Set([1,2,3,4,5,6,7,8]
     .map(i=>parseFloat(document.getElementById(`qb-${i}`).value)||0)
     .filter(q=>q>0))].sort((a,b)=>a-b);
@@ -9460,6 +9464,9 @@ function buildMarkupTierRow(pre, onchange, resetFn){
         </div>`
    +`<button class="btn btn-sm" onclick="${resetFn}()" style="margin-left:8px;margin-bottom:1px;height:30px;align-self:flex-end">Reset defaults</button>`;
   box.innerHTML=h;
+  // part quotes save a changed ladder with the quote (see setMarkupTierRow); say so when one is showing
+  if(pre==='mt-' && !document.getElementById(pre+'own-note'))
+    box.insertAdjacentHTML('afterend', `<div id="${pre}own-note" style="display:none;margin-top:6px;font-size:11px;color:#92400e">This quote has its own break markups, saved with it. Reset defaults to go back to the standard ladder.</div>`);
 }
 
 // The filled bands only, lowest threshold first. Sorting means bands typed out
@@ -9492,6 +9499,35 @@ function resetMarkupTierRow(pre, after){
   }
   const a=document.getElementById(pre+'markup-above'); if(a) a.value=MT_DEF_ABOVE;
   after();
+}
+
+// A quote can carry its own break ladder (owner, 2026-10-30: A-Tech 967128-3 held last year's
+// 150 @ 3.70 / 250 @ 3.35, but every Calculate put the breaks back on the 30/25% defaults). It is
+// saved only when it differs from the defaults, and opening any quote or starting a new one sets
+// the row again, so one quote's ladder never prices the next.
+function readMarkupTierRow(pre){
+  const v=id=>String(document.getElementById(pre+id)?.value??'');
+  const lad={thresh:[], markup:[], above:v('markup-above')};
+  for(let i=1;i<=MT_BANDS;i++){ lad.thresh.push(v('thresh-'+i)); lad.markup.push(v('markup-'+i)); }
+  return lad;
+}
+function markupTierRowIsDefault(pre){
+  const lad=readMarkupTierRow(pre), same=(a,b)=>String(a)===String(b);
+  return same(lad.above,MT_DEF_ABOVE) && lad.thresh.every((t,i)=>same(t,MT_DEF_THRESH[i])) && lad.markup.every((m,i)=>same(m,MT_DEF_MARKUP[i]));
+}
+// lad = a saved breakLadder (RTDB may hand its lists back object-shaped), or null for the defaults
+function setMarkupTierRow(pre, lad){
+  const at=(list,i,def)=>{ const x=list ? list[i] : undefined; return x==null ? def : x; };
+  for(let i=1;i<=MT_BANDS;i++){
+    const t=document.getElementById(pre+'thresh-'+i); if(t) t.value=lad ? at(lad.thresh,i-1,'') : MT_DEF_THRESH[i-1];
+    const m=document.getElementById(pre+'markup-'+i); if(m) m.value=lad ? at(lad.markup,i-1,'') : MT_DEF_MARKUP[i-1];
+  }
+  const a=document.getElementById(pre+'markup-above'); if(a) a.value=lad && lad.above!=null ? lad.above : MT_DEF_ABOVE;
+  showOwnTierNote(pre);
+}
+function showOwnTierNote(pre){
+  const n=document.getElementById(pre+'own-note'); if(!n) return;
+  n.style.display = markupTierRowIsDefault(pre) ? 'none' : 'block';
 }
 
 function getMarkupForQty(qty){ return markupTierFor('mt-', qty, 'markup'); }
