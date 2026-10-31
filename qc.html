@@ -389,6 +389,43 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 @media(max-height:860px){.dcv.sticky .dcv-legend{display:none}.dcv.sticky .dcv-canvas,.dcv.sticky .dcv-msg{height:clamp(190px,36vh,360px)}}
 @media(max-width:640px){.dcv-pair{grid-template-columns:1fr}.dcv.sticky{position:relative;top:auto}.dcv.sticky .dcv-canvas,.dcv.sticky .dcv-msg{height:min(52vh,420px)}}
 .thumb{width:84px;height:84px;border:1px solid var(--border);object-fit:cover;background:var(--accent-soft)}
+.thumb.pv-click{cursor:zoom-in}
+.thumb.pend{border-style:dashed;border-color:var(--text3)}
+.pv-chip{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:0 6px;font-size:11px;font-weight:700;color:var(--text2);background:#fff;border:1px solid var(--border2);cursor:zoom-in;vertical-align:1px}
+.pv-chip:hover{border-color:var(--accent);color:var(--accent)}
+/* full-size photo viewer + drawing-over-photo editor */
+#pv-ov{position:fixed;inset:0;z-index:10000;background:rgba(12,14,18,.94);display:flex;flex-direction:column}
+.pv-bar,.ov-row{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 10px;background:#23272e;color:#e9ecef;border-bottom:1px solid #353b45}
+.pv-ttl{flex:1;min-width:120px;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pv-ttl span{color:#a9b1bc;font-weight:600}
+#pv-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:10px}
+#pv-stage img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;background:#fff;box-shadow:0 6px 30px rgba(0,0,0,.5)}
+#pv-stage.zoom{display:block;overflow:auto;padding:0}
+#pv-stage.zoom img{max-width:none;max-height:none;cursor:zoom-out;box-shadow:none}
+.pv-nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;border:0;background:rgba(35,39,46,.75);color:#fff;font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.pv-nav.prev{left:8px}
+.pv-nav.next{right:8px}
+.pv-nav:hover{background:rgba(35,39,46,.95)}
+#ov-ed{position:fixed;inset:0;z-index:10000;background:#14171b;display:flex;flex-direction:column;color:#e9ecef}
+.ov-row{gap:6px 12px;font-size:12px;padding:6px 10px}
+.ov-ttl{font-size:13px;display:flex;align-items:center;gap:6px;margin-right:4px}
+.ov-grp{display:inline-flex;align-items:center;gap:4px}
+.ov-grp label{color:#a9b1bc;font-weight:700;font-size:11.5px;margin-right:2px}
+.ov-grp label.btn{color:var(--text);font-size:12.5px;margin-right:0}
+.ov-row .in{width:auto;max-width:240px;min-height:30px;height:30px;padding:0 6px;font-size:12px;color:var(--text);background:#fff}
+.ov-row .in.ov-num{width:58px;text-align:right}
+.ov-row input[type=range]{width:110px;accent-color:#ffd166}
+.ov-val{color:#a9b1bc;font-size:11.5px}
+.ov-row .btn.ov-ic{padding:0 8px;min-width:32px;justify-content:center}
+.ov-row .btn.on{background:#ffd166;border-color:#ffd166;color:#1b1e23}
+#ov-stage{flex:1;min-height:0;position:relative;touch-action:none;overflow:hidden}
+#ov-cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#ov-busy{position:absolute;left:50%;top:14px;transform:translateX(-50%);display:none;align-items:center;gap:6px;background:#23272e;color:#fff;padding:6px 12px;font-size:12.5px;font-weight:700}
+.ov-status{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;padding:6px 10px;min-height:30px;background:#23272e;border-top:1px solid #353b45;font-size:12px;color:#cfd5dc}
+.ov-status .pick{color:#ffd166;font-weight:800}
+.ov-status .err{color:#ff8a8a;font-weight:700}
+.ov-status .ov-work{font-variant-numeric:tabular-nums}
+.ov-status .ov-help{margin-left:auto;color:#8a93a0;font-size:11px}
 .seg{display:inline-flex;border:1px solid var(--border2)}
 .seg button{height:36px;padding:0 14px;background:#fff;border:none;border-right:1px solid var(--border2);cursor:pointer;font-weight:700;color:var(--text2)}
 .seg button:last-child{border-right:none}
@@ -565,7 +602,8 @@ const I18N = {
     'dock:start':'Start', 'dock:selfcheck':'Self-Check', 'dock:inspections':'Inspections', 'dock:firstarticles':'First Articles', 'dock:ncr':'NCRs', 'dock:materialcerts':'Certs',
     'dock:drawcheck':'Drawing Check', 'dock:settings':'Settings', 'nav:coc':'Certs of Conformance', 'nav:packages':'Ship Packages',
     'nav:materialcerts':'Material Certs', 'nav:resources':'Resources', 'dock:resources':'Resources',
-    'msr:hole':'Hole Ø'
+    'msr:hole':'Hole Ø',
+    'ovlook:red':'Red lines', 'ovlook:blue':'Blue lines', 'ovlook:green':'Green lines', 'ovlook:asis':'As drawn (black)'
   },
   es: {
     // shell / auth
@@ -904,7 +942,37 @@ const I18N = {
     'could not fetch the saved customer drawing':'no se pudo descargar el plano del cliente guardado',
     'upload of your drawing failed':'falló la subida de tu plano',
     'Re-checked —':'Revisado de nuevo —',
-    'Re-check failed:':'Falló la nueva revisión:'
+    'Re-check failed:':'Falló la nueva revisión:',
+    // inspection photo viewer + drawing-over-photo overlay
+    'Open original':'Abrir original','Open the photos':'Abrir las fotos','Photo':'Foto','Previous':'Anterior','Next':'Siguiente',
+    'not saved yet':'aún sin guardar','Overlay drawing':'Superponer plano','Re-align':'Volver a alinear','Drawing overlays':'Planos superpuestos',
+    'Remove this overlay from the inspection?':'¿Quitar esta superposición de la inspección?','Overlay removed.':'Superposición quitada.',
+    'Drawing over photo':'Plano sobre la foto','Upload a drawing':'Subir un plano','Download PNG':'Descargar PNG','Save to inspection':'Guardar en la inspección',
+    'Opacity':'Opacidad','Lines':'Líneas','Size':'Tamaño','Rotate':'Girar','Rotation':'Rotación','Mirror':'Espejo','Mirrored':'En espejo',
+    'Match 2 points':'Alinear 2 puntos','Reset':'Restablecer','Shift-click = 10 % steps':'Shift-clic = pasos de 10 %',
+    '+ = clockwise · Shift-click = 5° steps':'+ = sentido horario · Shift-clic = pasos de 5°',
+    'For a part photographed from the back side':'Para una parte fotografiada por el reverso','Hand: drag moves the view, not the drawing':'Mano: arrastrar mueve la vista, no el plano',
+    '— none —':'— ninguno —','library':'biblioteca','uploaded':'subido',
+    'Add a part photo first.':'Agrega primero una foto de la parte.','Loading photo…':'Cargando foto…','Could not load the photo.':'No se pudo cargar la foto.',
+    'the picture did not load':'la imagen no cargó','Could not load this drawing:':'No se pudo cargar este plano:',
+    'No drawing on this inspection yet — pick one from the library or upload it (top bar).':'Esta inspección aún no tiene plano — elige uno de la biblioteca o súbelo (barra de arriba).',
+    'A DXF can’t be shown here — use the PDF or an image of the drawing.':'Un DXF no se puede mostrar aquí — usa el PDF o una imagen del plano.',
+    'No drawing':'Sin plano','scale':'escala','2-point match':'Alineación de 2 puntos','photo':'foto','drawing':'plano','rotation':'rotación','then adjusted by hand':'luego ajustado a mano',
+    'Step':'Paso','Click point 1 on the DRAWING — a hole centre or a sharp corner.':'Haz clic en el punto 1 del PLANO — el centro de un barreno o una esquina viva.',
+    'Click point 2 on the DRAWING — far from point 1.':'Haz clic en el punto 2 del PLANO — lejos del punto 1.',
+    'Now click point 1 on the PHOTO — the same feature.':'Ahora haz clic en el punto 1 de la FOTO — la misma característica.',
+    'Click point 2 on the PHOTO.':'Haz clic en el punto 2 de la FOTO.','Wheel = zoom · right-drag = pan':'Rueda = zoom · arrastrar con clic derecho = mover vista',
+    'Drag = move drawing · wheel = zoom · right-drag or Shift-drag = pan · Alt+wheel = size · arrow keys = nudge · two fingers = size / turn':'Arrastrar = mover plano · rueda = zoom · clic derecho o Shift + arrastrar = mover vista · Alt+rueda = tamaño · flechas = ajuste fino · dos dedos = tamaño / giro',
+    'Pick a drawing first.':'Elige primero un plano.','That spot is off the drawing.':'Ese punto está fuera del plano.','That spot is off the photo.':'Ese punto está fuera de la foto.',
+    'Pick point 2 farther from point 1 — it makes the match accurate.':'Elige el punto 2 más lejos del punto 1 — así la alineación es precisa.',
+    'Visual comparison only — not a measurement.':'Solo comparación visual — no es una medición.',
+    'The browser was not allowed to copy this photo or drawing into a picture — open the app from the BSMP site and try again.':'El navegador no tuvo permiso para copiar esta foto o plano a una imagen — abre la app desde el sitio de BSMP e inténtalo de nuevo.',
+    'Could not make the PNG:':'No se pudo crear el PNG:','Overlay downloaded.':'Superposición descargada.',
+    'Save the inspection first, then save the overlay to it.':'Guarda primero la inspección y luego guarda la superposición en ella.',
+    'This photo isn’t saved yet — save the inspection first, then save the overlay.':'Esta foto aún no está guardada — guarda primero la inspección y luego la superposición.',
+    'Overlay saved to this inspection.':'Superposición guardada en esta inspección.','Overlay NOT saved:':'Superposición NO guardada:',
+    'drawing overlay saved':'plano superpuesto guardado','drawing overlay removed':'plano superpuesto quitado','AI photo check':'Revisión de foto con IA',
+    'ovlook:red':'Líneas rojas','ovlook:blue':'Líneas azules','ovlook:green':'Líneas verdes','ovlook:asis':'Como está dibujado (negro)'
   }
 };
 let LANG = (function(){ try{ const s=localStorage.getItem('bsmp_qc_lang'); if(s==='en'||s==='es') return s; }catch(e){} return (navigator.language||'').toLowerCase().indexOf('es')===0?'es':'en'; })();
@@ -1094,6 +1162,7 @@ function render(){
   else if(page==='settings') c.innerHTML=viewSettings();
   else if(page==='resources') c.innerHTML=viewResources();
   else if(page==='ccauth') c.innerHTML=viewCcAuth();
+  if(_formKeep) qcFormRestore();
   if(_deepCert && page==='certs'){
     const tr=document.getElementById('certrow-'+_deepCert);
     if(tr){
@@ -1455,7 +1524,7 @@ window.qcPickFiles=(key,inputEl)=>{
   _pendingFiles[key]=_pendingFiles[key]||[];
   [...inputEl.files].forEach(f=>_pendingFiles[key].push(f));
   const strip=$('files-'+key);
-  if(strip) strip.innerHTML=(_pendingFiles[key]||[]).map(f=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`).join(' ');
+  if(strip) strip.innerHTML=qcPendingBadges(key);
   inputEl.value='';
 };
 async function uploadPending(key,prefix){
@@ -1919,7 +1988,7 @@ function fairStatusBadge(s){
 function viewInspections(){
   const list=vals(INSPECTIONS).filter(i=>i.type==='self').sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const rows=list.map(i=>`<tr class="click" onclick="window.qcOpenSelf('${i.id}')">
-    <td><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')}</div></td>
+    <td><b>${esc(i.partNum||'—')}</b>${qcPhotoChip(i)}<div class="muted" style="font-size:12px">${esc(i.customer||'')}</div></td>
     <td>${esc(i.job||'—')}${i.po?` <span class="muted">· ${t('PO #')} ${esc(i.po)}</span>`:''}</td>
     <td>${esc(i.qty||'')}</td>
     <td>${resultBadge(i.result)}</td>
@@ -1946,7 +2015,7 @@ window.qcOpenSelf=(id)=>{
    check — then route into the self-check or the First Article with the photos,
    drawing, order link and AI verdict carried along. Uses the same 'sc'/'scdraw'
    pending buckets as the self-check so the check machinery is shared unchanged. */
-function qcPendingBadges(key){ return (_pendingFiles[key]||[]).map(f=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`).join(' '); }
+function qcPendingBadges(key){ if(PHOTO_BUCKETS[key]) return qcPhotoThumbs('pend:'+key,true); return (_pendingFiles[key]||[]).map(f=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)}</span>`).join(' '); }
 function viewStart(){
   const ranNow=(_scPhotoCheck&&_scPhotoCheckFor==='new');
   return `<div class="page-head"><h2>${t('Start Inspection')}</h2><p>${t('Step 1 — photo the part, attach its drawing, run the AI check. Then continue into the form.')}</p></div>
@@ -1957,6 +2026,7 @@ function viewStart(){
     </div>
     <div class="field"><label class="fl">${t('Part photo(s)')}</label>
       <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('sc',this)"></label>
+      <button class="btn sm" onclick="qcOverlayFromForm('sc')"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>
       <div class="thumbs" id="files-sc">${qcPendingBadges('sc')}</div>
     </div>
     <div class="field"><label class="fl">${t('Reference drawing')}</label>
@@ -2027,8 +2097,9 @@ function viewSelfCheck(){
     </div>
     <div class="field"><label class="fl">${t('Part photo(s)')}</label>
       <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('sc',this)"></label>
+      <button class="btn sm" onclick="qcOverlayFromForm('sc')"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>
       <div class="thumbs" id="files-sc">${qcPendingBadges('sc')}</div>
-      ${(r&&r.photos&&r.photos.length)?`<div class="thumbs">${r.photos.map(p=>`<img class="thumb" src="${esc(p.url)}">`).join('')}</div>`:''}
+      ${r?qcPhotoThumbs('rec:'+r.id):''}${r?qcOverlayThumbs(r.id):''}
     </div>
     <div class="field"><label class="fl">${t('Reference drawing')}</label>
       <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Add drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('scdraw',this)"></label>
@@ -2090,7 +2161,8 @@ window.qcSaveSelf=async ()=>{
     id, type:'self', createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'',
     updatedAt:Date.now(), orderId:gv('sc-order'),
     partNum:part, customer:cust, rev:gv('sc-rev'), po:gv('sc-po'), job:gv('sc-job'), qty:gv('sc-qty'),
-    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos, drawing, drawings, photoCheck
+    result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos, drawing, drawings, photoCheck,
+    overlays:(prev&&prev.overlays)||null
   };
   await dbSet('qc/inspections/'+id, rec);
   if(result==='Flag' && !(prev&&prev.ncrId)){
@@ -2116,6 +2188,603 @@ window.qcSaveSelf=async ()=>{
     if(btn){ btn.disabled=false; btn.innerHTML=label; }
   }
 };
+
+
+/* =================== INSPECTION PHOTOS — full-size viewer + drawing-over-photo overlay ===================
+   Operator photos are rec.photos[{name,url,type}] (Storage qc/inspections/…); photos picked but not saved
+   yet are Files in _pendingFiles['sc'|'frphoto']. A source key names one set of pictures:
+   'rec:<id>' saved photos · 'pend:<bucket>' picked, not saved yet · 'ovl:<id>' saved overlays.
+   An overlay lays the part's drawing over a photo (drag / size / turn / mirror, or match 2 points) and
+   flattens it to a PNG with a caption strip that prints the alignment numbers (show-the-work). Saved per
+   child at qc/inspections/<id>/overlays/<ovId> — never a whole-record write — together with the numbers
+   that made it, so it can be reopened and re-aligned. Coordinates: the drawing maps into PHOTO pixels as
+   p = T + s·R(rot)·(flip·(x − w/2), y − h/2); the screen view is a separate pan/zoom (view.s, view.x/y). */
+const PHOTO_BUCKETS={sc:1, frphoto:1};
+const OV_LOOKS=[{k:'red',c:[230,30,30]},{k:'blue',c:[0,120,255]},{k:'green',c:[0,200,90]},{k:'asis',c:null}];
+const OV_MAX_SIDE=2800;      // longest side of the downloaded / saved PNG (photo part)
+const _pvUrls=new WeakMap();
+let _pv=null, _ov=null, _formKeep=null;
+function qcFileUrl(f){ let u=_pvUrls.get(f); if(!u){ u=URL.createObjectURL(f); _pvUrls.set(f,u); } return u; }
+function qcIsDxf(x){ return /\.(dxf|dwg)$/i.test(String((x&&x.name)||''))||/dxf|dwg/i.test(String((x&&x.type)||'')); }
+function qcIsPdf(x){ return /pdf/i.test(String((x&&x.type)||''))||/\.pdf$/i.test(String((x&&x.name)||''))||/\.pdf$/i.test(String((x&&x.url)||'').split('?')[0]); }
+function qcPhotoItems(key){
+  const k=String(key||''), i=k.indexOf(':'), kind=k.slice(0,i), ref=k.slice(i+1);
+  if(kind==='pend') return (_pendingFiles[ref]||[]).filter(Boolean).map(f=>({name:f.name||'', url:qcFileUrl(f), type:f.type||'', file:f}));
+  const r=INSPECTIONS[ref]; if(!r) return [];
+  if(kind==='rec') return vals(r.photos).filter(p=>p&&p.url).map(p=>({name:p.name||'', url:p.url, type:p.type||''}));
+  if(kind==='ovl') return vals(r.overlays).filter(o=>o&&o.url).sort((a,b)=>(a.at||0)-(b.at||0)).map(o=>({name:o.name||'', url:o.url, type:'image/png', ov:o}));
+  return [];
+}
+// clickable thumbnails; bare = just the <img>s (for a strip that already is a .thumbs box)
+function qcPhotoThumbs(key,bare){
+  const items=qcPhotoItems(key); if(!items.length) return '';
+  const pend=key.indexOf('pend:')===0;
+  const imgs=items.map((p,i)=>`<img class="thumb pv-click${pend?' pend':''}" src="${esc(p.url)}" alt="" title="${esc((p.name||'')+(pend?' · '+t('not saved yet'):''))}" onclick="qcPhotoView('${esc(key)}',${i})">`).join('');
+  return bare?imgs:`<div class="thumbs">${imgs}</div>`;
+}
+function qcOverlayThumbs(id){
+  const n=qcPhotoItems('ovl:'+id).length; if(!n) return '';
+  return `<div class="hint" style="margin-top:8px"><i class="ti ti-layers-intersect"></i> ${t('Drawing overlays')} (${n})</div>${qcPhotoThumbs('ovl:'+id)}`;
+}
+// little "N photos" chip on a list row — opens the viewer without opening the record
+function qcPhotoChip(i){
+  const n=vals(i&&i.photos).filter(p=>p&&p.url).length; if(!n) return '';
+  return ` <span class="pv-chip" title="${esc(t('Open the photos'))}" onclick="event.stopPropagation();qcPhotoView('rec:${esc(i.id)}',0)"><i class="ti ti-photo"></i> ${n}</span>`;
+}
+
+/* ---- full-size viewer ---- */
+window.qcPhotoView=(key,i)=>{
+  const items=qcPhotoItems(key); if(!items.length) return;
+  _pv={key:String(key), items, i:Math.max(0,Math.min(+i||0,items.length-1)), zoom:false};
+  pvRender();
+};
+function pvRender(){
+  if(!_pv) return;
+  let el=$('pv-ov');
+  if(!el){
+    el=document.createElement('div'); el.id='pv-ov'; document.body.appendChild(el);
+    el.addEventListener('click',e=>{ if(e.target===el||e.target.id==='pv-stage') qcPhotoClose(); });
+  }
+  const it=_pv.items[_pv.i], n=_pv.items.length, ov=it.ov;
+  const meta=ov?[ov.drawing&&ov.drawing.name, (ov.by||'').split('@')[0], fmtWhen(ov.at)].filter(Boolean).join(' · '):(it.file?t('not saved yet'):'');
+  el.innerHTML=`<div class="pv-bar">
+      <div class="pv-ttl"><b>${esc(it.name||t('Photo'))}</b>${n>1?` <span>${_pv.i+1} / ${n}</span>`:''}${meta?` <span>· ${esc(meta)}</span>`:''}</div>
+      <button class="btn sm" onclick="qcPhotoZoom()"><i class="ti ti-${_pv.zoom?'zoom-out':'zoom-in'}"></i> ${_pv.zoom?t('Fit'):'100%'}</button>
+      ${ov?`<button class="btn sm primary" onclick="qcOvReopen()"><i class="ti ti-adjustments"></i> ${t('Re-align')}</button>${isMgr()?`<button class="btn sm" style="color:var(--red)" title="${esc(t('Remove this overlay from the inspection?'))}" onclick="qcOvDelete()"><i class="ti ti-trash"></i></button>`:''}`
+          :`<button class="btn sm primary" onclick="qcPhotoToOverlay()"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>`}
+      <a class="btn sm" href="${esc(it.url)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> ${t('Open original')}</a>
+      <button class="btn sm" onclick="qcPhotoClose()" title="${esc(t('Close'))} (Esc)"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="pv-stage" class="${_pv.zoom?'zoom':''}"><img id="pv-img" src="${esc(it.url)}" alt="" onclick="qcPhotoZoom(event)"></div>
+    ${n>1?`<button class="pv-nav prev" onclick="qcPhotoStep(-1)" aria-label="${esc(t('Previous'))}"><i class="ti ti-chevron-left"></i></button><button class="pv-nav next" onclick="qcPhotoStep(1)" aria-label="${esc(t('Next'))}"><i class="ti ti-chevron-right"></i></button>`:''}`;
+}
+window.qcPhotoStep=(d)=>{ if(!_pv) return; const n=_pv.items.length; _pv.i=(_pv.i+d+n)%n; _pv.zoom=false; pvRender(); };
+window.qcPhotoClose=()=>{ _pv=null; const el=$('pv-ov'); if(el) el.remove(); };
+// click the picture: fit ⇄ 100 % (actual pixels), keeping the clicked spot in view
+window.qcPhotoZoom=(e)=>{
+  if(!_pv) return;
+  const img=$('pv-img'); let fx=.5, fy=.5;
+  if(e&&img){ const b=img.getBoundingClientRect(); if(b.width&&b.height){ fx=(e.clientX-b.left)/b.width; fy=(e.clientY-b.top)/b.height; } }
+  _pv.zoom=!_pv.zoom; pvRender();
+  if(_pv.zoom){
+    const st=$('pv-stage'), im=$('pv-img'); if(!st||!im) return;
+    const go=()=>{ st.scrollLeft=fx*im.naturalWidth-st.clientWidth/2; st.scrollTop=fy*im.naturalHeight-st.clientHeight/2; };
+    if(im.complete) go(); else im.onload=go;
+  }
+};
+// which record / pending bucket a viewer set belongs to (pending files only count on their own open form)
+function qcOvCtxFromKey(key){
+  const i=key.indexOf(':'), kind=key.slice(0,i), ref=key.slice(i+1);
+  if(kind==='pend') return {recId:(page==='selfcheck'||page==='fair')?(editId||null):null, bucket:ref, withPend:true};
+  const r=INSPECTIONS[ref], bucket=(r&&r.type==='fair')?'frphoto':'sc';
+  const onForm=(page==='selfcheck'&&bucket==='sc')||(page==='fair'&&bucket==='frphoto');
+  return {recId:ref, bucket, withPend:onForm&&editId===ref};
+}
+window.qcPhotoToOverlay=()=>{ if(!_pv) return; const it=_pv.items[_pv.i], ctx=qcOvCtxFromKey(_pv.key); qcPhotoClose(); qcOverlayOpen(ctx,{url:it.url}); };
+window.qcOverlayFromForm=(bucket)=>{ qcOverlayOpen({recId:(page==='selfcheck'||page==='fair')?(editId||null):null, bucket, withPend:true}); };
+window.qcOvReopen=()=>{
+  if(!_pv) return; const it=_pv.items[_pv.i], ov=it&&it.ov; if(!ov) return;
+  const ctx=qcOvCtxFromKey('rec:'+_pv.key.slice(4)); qcPhotoClose();
+  qcOverlayOpen(ctx,{url:ov.photo&&ov.photo.url, ov});
+};
+window.qcOvDelete=async ()=>{
+  if(!_pv||!isMgr()) return; const it=_pv.items[_pv.i], ov=it&&it.ov, id=_pv.key.slice(4);
+  if(!ov||!ov.id||!confirm(t('Remove this overlay from the inspection?'))) return;
+  qcFormKeep();
+  try{ await dbSet('qc/inspections/'+id+'/overlays/'+ov.id, null); }catch(e){ return; }
+  try{ await qcLogAudit([{ inspectionId:id, partNum:(INSPECTIONS[id]||{}).partNum||'', field:'overlay', action:'overlay-removed', note:ov.name||'' }]); }catch(e){ console.error('audit log failed', e); }
+  qcPhotoClose(); qcToast(t('Overlay removed.'),'ok');
+};
+// a write under the open record re-renders the form — keep what was typed but not saved yet
+function qcFormKeep(){
+  const c=$('content'); if(!c) return; const v={};
+  c.querySelectorAll('input[id],textarea[id],select[id]').forEach(el=>{ if(el.type==='file'||el.type==='radio') return; v[el.id]=el.type==='checkbox'?{c:el.checked}:el.value; });
+  _formKeep={at:Date.now(), page, editId, v};
+}
+function qcFormRestore(){
+  const k=_formKeep; if(!k) return;
+  if(Date.now()-k.at>8000||k.page!==page||k.editId!==editId){ _formKeep=null; return; }
+  Object.keys(k.v).forEach(id=>{ const el=$(id), x=k.v[id]; if(!el) return; if(x&&typeof x==='object'){ el.checked=!!x.c; } else if(el.value!==x) el.value=x; });
+  if(k.v['sc-result']&&$('sc-pass')) qcPickResult(k.v['sc-result']);
+}
+
+/* ---- drawing-over-photo editor ---- */
+function qcOvInfoFor(ctx,rec){
+  const r=rec||{}; let part=r.partNum||'', rev=r.rev||'', customer=r.customer||'', job=r.job||'';
+  if(ctx&&ctx.withPend){
+    const pre=page==='fair'?'fr':(page==='selfcheck'?'sc':'');
+    if(pre){ part=gv(pre+'-part')||part; rev=gv(pre+'-rev')||rev; customer=gv(pre+'-customer')||customer; job=gv(pre+'-job')||job; }
+    else if(page==='start'){ const od=ORDERS[gv('st-order')]; if(od){ part=od.part||od.partNum||part; customer=od.customer||customer; job=od.job||job; } }
+  }
+  return {part,rev,customer,job};
+}
+// drawings this overlay can use: the form's picked ones, the record's, then the library's for the same part #
+function qcOvDrawCands(ctx,rec){
+  const out=[], seen={};
+  const add=c=>{ if(!c||qcIsDxf(c)) return; const k=c.url||(c.file&&('f:'+c.file.name+':'+c.file.size)); if(!k||seen[k]) return; seen[k]=1; out.push(c); };
+  if(ctx.withPend) (_pendingFiles[ctx.bucket==='frphoto'?'frdraw':'scdraw']||[]).forEach(f=>f&&add({file:f, name:f.name||'', type:f.type||'', src:'form', label:(f.name||t('Drawing'))+' · '+t('not saved yet')}));
+  if(rec){
+    const ds=vals(rec.drawings);
+    (ds.length?ds:(rec.drawing?[rec.drawing]:[])).forEach(d=>d&&d.url&&add({url:d.url, name:d.name||'', type:d.type||'', src:'record', label:d.name||t('Saved drawing')}));
+    const b=rec.ballooned, bu=typeof b==='string'?b:(b&&b.url);
+    if(bu) add({url:bu, name:(b&&b.name)||'ballooned.jpg', type:(b&&b.type)||'image/jpeg', src:'record', label:t('Ballooned drawing')});
+  }
+  const pn=qcOvInfoFor(ctx,rec).part, norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  if(norm(pn)) vals(DRAWINGS).filter(d=>d.url&&norm(d.partNum)===norm(pn)).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0))
+    .forEach(d=>add({url:d.url, name:d.name||'', type:d.type||'', src:'library', label:(d.name||d.partNum)+(d.rev?(' · Rev '+d.rev):'')+' · '+t('library')}));
+  return out;
+}
+async function qcOverlayOpen(ctx,want){
+  const rec=ctx.recId?INSPECTIONS[ctx.recId]:null;
+  const photos=(rec?qcPhotoItems('rec:'+ctx.recId):[]).concat(ctx.withPend?qcPhotoItems('pend:'+ctx.bucket):[]);
+  if(want&&want.url&&!photos.some(p=>p.url===want.url)) photos.push({name:(want.ov&&want.ov.photo&&want.ov.photo.name)||t('Photo'), url:want.url, type:''});
+  if(!photos.length){ qcToast(t('Add a part photo first.'),'err'); return; }
+  let pi=0; if(want&&want.url){ const j=photos.findIndex(p=>p.url===want.url); if(j>=0) pi=j; }
+  const ov=want&&want.ov, a=(ov&&ov.align)||{};
+  _ov={ ctx, rec, photos, pi, cands:qcOvDrawCands(ctx,rec), di:-1, page:1,
+    photoImg:null, photoTainted:false, pw:0, ph:0, cw:0, ch:0, draw:null,
+    T:{x:0,y:0}, s:1, s0:1, rot:0, flip:!!a.flip, op:a.op!=null?+a.op:0.6, look:a.look||'red',
+    view:{s:1,x:0,y:0}, viewTouched:false, pick:null, fit:null, pan:false, ptrs:new Map(), drag:null, raf:0, msg:null };
+  const o=_ov;
+  ovBuild();
+  await ovLoadPhoto(pi, true);
+  if(_ov!==o) return;
+  let di=0;
+  if(ov&&ov.drawing&&ov.drawing.url){
+    di=o.cands.findIndex(c=>c.url===ov.drawing.url);
+    if(di<0){ o.cands.push({url:ov.drawing.url, name:ov.drawing.name||'', type:ov.drawing.type||'', src:ov.drawing.src||'saved', label:ov.drawing.name||t('Saved drawing')}); di=o.cands.length-1; }
+  }
+  if(o.cands.length) await ovLoadDrawing(di, (ov&&ov.drawing&&ov.drawing.page)||1, ov?a:null);
+  else { o.msg={text:t('No drawing on this inspection yet — pick one from the library or upload it (top bar).'), kind:'pick'}; ovFillSelects(); ovDraw(); }
+}
+window.qcOverlayOpen=qcOverlayOpen;
+window.qcOvClose=()=>{ if(_ov&&_ov.raf) cancelAnimationFrame(_ov.raf); _ov=null; const el=$('ov-ed'); if(el) el.remove(); };
+function ovBuild(){
+  let el=$('ov-ed'); if(el) el.remove();
+  el=document.createElement('div'); el.id='ov-ed'; document.body.appendChild(el);
+  const canSave=!!(_ov.ctx.recId&&INSPECTIONS[_ov.ctx.recId]);
+  el.innerHTML=`<div class="ov-row ov-top">
+      <b class="ov-ttl"><i class="ti ti-layers-intersect"></i> ${t('Drawing over photo')}</b>
+      <span class="ov-grp" id="ov-photo-grp"></span>
+      <span class="ov-grp"><label>${t('Drawing')}</label><select class="in" id="ov-draw" onchange="ovPickDrawing(this.value)"></select><span class="ov-grp" id="ov-page-grp"></span>
+        <button class="btn sm ov-ic" title="${esc(t('From library'))}" onclick="qcDrawPickOpen('ovdraw')"><i class="ti ti-books"></i></button>
+        <label class="btn sm ov-ic" title="${esc(t('Upload a drawing'))}"><i class="ti ti-file-upload"></i><input type="file" accept=".pdf,image/*" style="display:none" onchange="ovUpload(this)"></label></span>
+      <span style="flex:1"></span>
+      <button class="btn sm" onclick="ovDownload()"><i class="ti ti-download"></i> ${t('Download PNG')}</button>
+      ${canSave?`<button class="btn sm primary" id="ov-save-btn" onclick="ovSave()"><i class="ti ti-device-floppy"></i> ${t('Save to inspection')}</button>`:''}
+      <button class="btn sm ov-ic" onclick="qcOvClose()" title="${esc(t('Close'))} (Esc)"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="ov-row">
+      <span class="ov-grp"><label>${t('Opacity')}</label><input type="range" id="ov-op" min="5" max="100" step="1" oninput="ovSet('op',this.value/100)"><span id="ov-op-v" class="ov-val"></span></span>
+      <span class="ov-grp"><label>${t('Lines')}</label><select class="in" id="ov-look" onchange="ovSet('look',this.value)">${OV_LOOKS.map(l=>`<option value="${l.k}">${t('ovlook:'+l.k)}</option>`).join('')}</select></span>
+      <span class="ov-grp" title="${esc(t('Shift-click = 10 % steps'))}"><label>${t('Size')}</label><button class="btn sm ov-ic" onclick="ovNudge('s',-1,event)">−</button><input class="in ov-num" id="ov-s" inputmode="decimal" onchange="ovSetNum('s',this.value)"><span class="ov-val">%</span><button class="btn sm ov-ic" onclick="ovNudge('s',1,event)">+</button></span>
+      <span class="ov-grp" title="${esc(t('+ = clockwise · Shift-click = 5° steps'))}"><label>${t('Rotate')}</label><button class="btn sm ov-ic" title="−90°" onclick="ovNudge('r90',-1)"><i class="ti ti-rotate-2"></i></button><button class="btn sm ov-ic" onclick="ovNudge('r',-1,event)">−</button><input class="in ov-num" id="ov-r" inputmode="decimal" onchange="ovSetNum('r',this.value)"><span class="ov-val">°</span><button class="btn sm ov-ic" onclick="ovNudge('r',1,event)">+</button><button class="btn sm ov-ic" title="+90°" onclick="ovNudge('r90',1)"><i class="ti ti-rotate-clockwise-2"></i></button></span>
+      <button class="btn sm" id="ov-flip" onclick="ovSet('flip',!_ov.flip)" title="${esc(t('For a part photographed from the back side'))}"><i class="ti ti-flip-vertical"></i> ${t('Mirror')}</button>
+      <button class="btn sm" id="ov-pick-btn" onclick="ovPickStart()"><i class="ti ti-target-arrow"></i> ${t('Match 2 points')}</button>
+      <button class="btn sm" onclick="ovResetDrawing()"><i class="ti ti-refresh"></i> ${t('Reset')}</button>
+      <span class="ov-grp"><button class="btn sm ov-ic" id="ov-pan" title="${esc(t('Hand: drag moves the view, not the drawing'))}" onclick="ovSet('pan',!_ov.pan)"><i class="ti ti-hand-stop"></i></button><button class="btn sm ov-ic" onclick="ovZoom(1/1.25)"><i class="ti ti-zoom-out"></i></button><button class="btn sm" onclick="ovFitView();ovDraw()">${t('Fit')}</button><button class="btn sm ov-ic" onclick="ovZoom(1.25)"><i class="ti ti-zoom-in"></i></button></span>
+    </div>
+    <div id="ov-stage"><canvas id="ov-cv"></canvas><div id="ov-busy"></div></div>
+    <div class="ov-status" id="ov-status"></div>`;
+  const cv=$('ov-cv');
+  cv.addEventListener('contextmenu',e=>e.preventDefault());
+  cv.addEventListener('pointerdown',ovPDown); cv.addEventListener('pointermove',ovPMove);
+  cv.addEventListener('pointerup',ovPUp); cv.addEventListener('pointercancel',ovPUp);
+  cv.addEventListener('wheel',ovWheel,{passive:false});
+  ovFillSelects(); ovSyncControls(); ovResize(true);
+}
+function ovFillSelects(){
+  const o=_ov; if(!o) return;
+  const pg=$('ov-photo-grp');
+  if(pg) pg.innerHTML=o.photos.length>1?`<label>${t('Photo')}</label><select class="in" onchange="ovPickPhoto(this.value)">${o.photos.map((p,i)=>`<option value="${i}" ${i===o.pi?'selected':''}>${i+1}. ${esc(p.name||t('Photo'))}${p.file?' · '+esc(t('not saved yet')):''}</option>`).join('')}</select>`:'';
+  const ds=$('ov-draw');
+  if(ds) ds.innerHTML=o.cands.length?o.cands.map((c,i)=>`<option value="${i}" ${i===o.di?'selected':''}>${esc(c.label||c.name||t('Drawing'))}</option>`).join(''):`<option value="">${esc(t('— none —'))}</option>`;
+  const pp=$('ov-page-grp'), n=(o.draw&&o.draw.pages)||1;
+  if(pp) pp.innerHTML=n>1?`<select class="in" onchange="ovPickPage(this.value)">${Array.from({length:n},(_,i)=>`<option value="${i+1}" ${i+1===o.page?'selected':''}>${t('page')} ${i+1}/${n}</option>`).join('')}</select>`:'';
+}
+function ovBusy(msg){ const b=$('ov-busy'); if(!b) return; b.style.display=msg?'flex':'none'; b.innerHTML=msg?`<i class="ti ti-loader-2 spin"></i> ${esc(msg)}`:''; }
+function ovLoadImage(url,cross){
+  // CORS first (so the PNG export may copy it); a store that refuses CORS still shows, export is then blocked
+  return loadImg(url,cross).then(img=>({img,tainted:false}), ()=>cross?loadImg(url,false).then(img=>({img,tainted:true})):Promise.reject(new Error(t('the picture did not load'))));
+}
+async function ovLoadPhoto(pi,keepDrawing){
+  const o=_ov, p=o.photos[pi]; if(!p) return; o.pi=pi;
+  ovBusy(t('Loading photo…'));
+  try{
+    const r=await ovLoadImage(p.url, !p.file); if(_ov!==o) return;
+    o.photoImg=r.img; o.photoTainted=r.tainted; o.pw=r.img.naturalWidth; o.ph=r.img.naturalHeight;
+  }catch(e){ o.msg={text:t('Could not load the photo.')+' '+((e&&e.message)||''), kind:'err'}; }
+  finally{ ovBusy(''); }
+  if(_ov!==o) return;
+  ovResize(true);
+  if(o.draw&&!keepDrawing) ovPlaceDefault();
+  ovFillSelects(); ovSyncControls(); ovDraw();
+}
+window.ovPickPhoto=(i)=>ovLoadPhoto(+i||0,false);
+async function ovLoadDrawing(di,pageNo,align){
+  const o=_ov, c=o.cands[di]; if(!c) return;
+  o.di=di; ovBusy(t('Loading drawing…'));
+  try{
+    let cv, pages=1, tainted=false, pn=1;
+    if(qcIsPdf(c)){
+      if(typeof pdfjsLib==='undefined') throw new Error('pdf.js not loaded');
+      const pdf=await pdfjsLib.getDocument(c.file?{data:await c.file.arrayBuffer()}:{url:c.url}).promise;
+      pages=pdf.numPages; pn=Math.min(Math.max(1,+pageNo||1),pages);
+      const pg=await pdf.getPage(pn), v1=pg.getViewport({scale:1});
+      const vp=pg.getViewport({scale:Math.min(4, 2600/Math.max(v1.width,v1.height))});
+      cv=document.createElement('canvas'); cv.width=Math.round(vp.width); cv.height=Math.round(vp.height);
+      const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height);
+      await pg.render({canvasContext:g, viewport:vp}).promise;
+    } else {
+      const r=await ovLoadImage(c.file?qcFileUrl(c.file):c.url, !c.file); tainted=r.tainted;
+      const k=Math.min(1, 3000/Math.max(r.img.naturalWidth,r.img.naturalHeight));
+      cv=document.createElement('canvas'); cv.width=Math.round(r.img.naturalWidth*k); cv.height=Math.round(r.img.naturalHeight*k);
+      const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height); g.drawImage(r.img,0,0,cv.width,cv.height);
+    }
+    if(_ov!==o) return;
+    o.page=pn; o.draw={cv, w:cv.width, h:cv.height, pages, tainted, ink:{}}; o.msg=null;
+    if(align&&align.s) ovApplyAlign(align); else ovPlaceDefault();
+  }catch(e){
+    console.error('overlay drawing load failed', e);
+    if(_ov!==o) return;
+    o.draw=null; o.msg={text:t('Could not load this drawing:')+' '+((e&&e.message)||e), kind:'err'};
+  }finally{ ovBusy(''); }
+  ovFillSelects(); ovSyncControls(); ovDraw();
+}
+window.ovPickDrawing=(v)=>{ if(v!=='') ovLoadDrawing(+v,1,null); };
+window.ovPickPage=(n)=>{ const o=_ov; if(!o) return; ovLoadDrawing(o.di,+n,o.draw?ovAlign():null); };
+window.ovUpload=(inp)=>{
+  const f=inp.files&&inp.files[0]; inp.value=''; if(!f||!_ov) return;
+  if(qcIsDxf(f)){ qcToast(t('A DXF can’t be shown here — use the PDF or an image of the drawing.'),'err'); return; }
+  _ov.cands.push({file:f, name:f.name||'', type:f.type||'', src:'upload', label:(f.name||t('Drawing'))+' · '+t('uploaded')});
+  ovLoadDrawing(_ov.cands.length-1,1,null);
+};
+// "From library" in the editor: use the library file straight from its URL
+window.ovAddLibrary=(d)=>{
+  const o=_ov; if(!o||!d||!d.url) return;
+  if(qcIsDxf(d)){ qcToast(t('A DXF can’t be shown here — use the PDF or an image of the drawing.'),'err'); return; }
+  let i=o.cands.findIndex(c=>c.url===d.url);
+  if(i<0){ o.cands.push({url:d.url, name:d.name||'', type:d.type||'', src:'library', label:(d.name||d.partNum||t('Drawing'))+(d.rev?(' · Rev '+d.rev):'')+' · '+t('library')}); i=o.cands.length-1; }
+  ovLoadDrawing(i,1,null);
+};
+function ovPlaceDefault(){
+  const o=_ov, d=o.draw; if(!d||!o.pw) return;
+  o.s0=Math.min(o.pw/d.w, o.ph/d.h)*0.85; o.s=o.s0; o.T={x:o.pw/2, y:o.ph/2}; o.rot=0; o.fit=null;
+}
+function ovApplyAlign(a){
+  const o=_ov, d=o.draw; o.s0=Math.min(o.pw/d.w, o.ph/d.h)*0.85;
+  o.s=+a.s||o.s0; o.T={x:+a.tx||o.pw/2, y:+a.ty||o.ph/2}; o.rot=+a.rot||0; o.flip=!!a.flip;
+  if(a.op!=null) o.op=+a.op; if(a.look) o.look=a.look;
+  o.fit=a.fit?JSON.parse(JSON.stringify(a.fit)):null;
+}
+function ovAlign(){ const o=_ov; return {tx:+o.T.x.toFixed(2), ty:+o.T.y.toFixed(2), s:+o.s.toFixed(6), rot:+o.rot.toFixed(3), flip:!!o.flip, op:+o.op.toFixed(2), look:o.look, fit:o.fit||null}; }
+window.ovResetDrawing=()=>{ if(!_ov||!_ov.draw) return; _ov.flip=false; ovPlaceDefault(); ovSyncControls(); ovDraw(); };
+function ovTouched(){ if(_ov&&_ov.fit) _ov.fit.adjusted=true; }
+function ovNormDeg(d){ d=((d+180)%360+360)%360-180; return Math.abs(d)<1e-9?0:d; }
+function ovDeg(d,n){ return (d<0?'−':'')+Math.abs(d).toFixed(n==null?1:n)+'°'; }
+window.ovSet=(k,v)=>{
+  const o=_ov; if(!o) return;
+  if(k==='op') o.op=Math.min(1,Math.max(0.05,+v||0.6));
+  else if(k==='look') o.look=v;
+  else if(k==='flip'){ o.flip=!!v; ovTouched(); }
+  else if(k==='pan') o.pan=!!v;
+  ovSyncControls(); ovDraw();
+};
+window.ovNudge=(k,dir,e)=>{
+  const o=_ov; if(!o||!o.draw) return; const big=e&&e.shiftKey;
+  if(k==='s') o.s*=1+(big?0.10:0.01)*dir;
+  else if(k==='r') o.rot=ovNormDeg(o.rot+(big?5:0.5)*dir);
+  else if(k==='r90') o.rot=ovNormDeg(o.rot+90*dir);
+  ovTouched(); ovSyncControls(); ovDraw();
+};
+window.ovSetNum=(k,v)=>{
+  const o=_ov; if(!o||!o.draw) return; const n=parseFloat(String(v).replace('−','-').replace(',','.'));
+  if(!isFinite(n)){ ovSyncControls(); return; }
+  if(k==='s'&&n>0) o.s=o.s0*n/100; else if(k==='r') o.rot=ovNormDeg(n);
+  ovTouched(); ovSyncControls(); ovDraw();
+};
+function ovSyncControls(){
+  const o=_ov; if(!o) return;
+  const set=(id,v)=>{ const el=$(id); if(el&&document.activeElement!==el) el.value=v; };
+  set('ov-op',Math.round(o.op*100)); const ovv=$('ov-op-v'); if(ovv) ovv.textContent=Math.round(o.op*100)+'%';
+  set('ov-look',o.look); set('ov-s',o.draw?(o.s/o.s0*100).toFixed(1):''); set('ov-r',o.draw?o.rot.toFixed(1):'');
+  const tg=(id,on)=>{ const b=$(id); if(b) b.classList.toggle('on',!!on); };
+  tg('ov-flip',o.flip); tg('ov-pick-btn',o.pick); tg('ov-pan',o.pan);
+  const cv=$('ov-cv'); if(cv) cv.style.cursor=o.pick?'crosshair':((o.pan||!o.draw)?'grab':'move');
+}
+function ovResize(refit){
+  const o=_ov, st=$('ov-stage'), cv=$('ov-cv'); if(!o||!st||!cv) return;
+  const dpr=window.devicePixelRatio||1; o.cw=st.clientWidth; o.ch=st.clientHeight;
+  cv.width=Math.max(1,Math.round(o.cw*dpr)); cv.height=Math.max(1,Math.round(o.ch*dpr));
+  if(refit||!o.viewTouched) ovFitView();
+  ovDraw();
+}
+window.addEventListener('resize',()=>{ if(_ov) ovResize(false); });
+function ovFitView(){
+  const o=_ov; if(!o||!o.pw||!o.cw) return;
+  const s=Math.min((o.cw-24)/o.pw,(o.ch-24)/o.ph);
+  o.view={s, x:(o.cw-o.pw*s)/2, y:(o.ch-o.ph*s)/2}; o.viewTouched=false;
+}
+window.ovFitView=ovFitView;
+window.ovZoom=(f)=>{ const o=_ov; if(!o) return; const v=o.view, cx=o.cw/2, cy=o.ch/2, px=(cx-v.x)/v.s, py=(cy-v.y)/v.s; v.s*=f; v.x=cx-px*v.s; v.y=cy-py*v.s; o.viewTouched=true; ovDraw(); };
+// drawing px ⇄ photo px ⇄ screen px
+function ovXf(g){ const o=_ov; g.translate(o.T.x,o.T.y); g.rotate(o.rot*Math.PI/180); g.scale(o.s*(o.flip?-1:1), o.s); }
+function ovD2P(q){ const o=_ov, d=o.draw, f=o.flip?-1:1, a=o.rot*Math.PI/180, ux=f*(q.x-d.w/2)*o.s, uy=(q.y-d.h/2)*o.s; return {x:o.T.x+ux*Math.cos(a)-uy*Math.sin(a), y:o.T.y+ux*Math.sin(a)+uy*Math.cos(a)}; }
+function ovP2D(p){ const o=_ov, d=o.draw, f=o.flip?-1:1, a=-o.rot*Math.PI/180, qx=(p.x-o.T.x)/o.s, qy=(p.y-o.T.y)/o.s; const ux=qx*Math.cos(a)-qy*Math.sin(a), uy=qx*Math.sin(a)+qy*Math.cos(a); return {x:f*ux+d.w/2, y:uy+d.h/2}; }
+function ovS2P(q){ const v=_ov.view; return {x:(q.x-v.x)/v.s, y:(q.y-v.y)/v.s}; }
+function ovPt(e){ const b=$('ov-cv').getBoundingClientRect(); return {x:e.clientX-b.left, y:e.clientY-b.top}; }
+// "Lines" look: white paper drops out, the ink is recoloured so it shows on bare metal
+function ovInk(src,rgb){
+  const o=document.createElement('canvas'); o.width=src.width; o.height=src.height;
+  const g=o.getContext('2d'); g.drawImage(src,0,0);
+  const im=g.getImageData(0,0,o.width,o.height), a=im.data;
+  for(let i=0;i<a.length;i+=4){
+    const l=0.299*a[i]+0.587*a[i+1]+0.114*a[i+2];
+    a[i+3]=l>215?0:Math.min(255,(255-l)*1.6); a[i]=rgb[0]; a[i+1]=rgb[1]; a[i+2]=rgb[2];
+  }
+  // thicken by one pixel each way (max filter, rows then columns) — hairlines vanish once scaled onto a photo
+  const w=o.width, h=o.height, A=new Uint8ClampedArray(w*h), B=new Uint8ClampedArray(w*h);
+  for(let p=0;p<w*h;p++) A[p]=a[p*4+3];
+  for(let y=0;y<h;y++){ const r=y*w; for(let x=0;x<w;x++){ let m=A[r+x]; if(x>0&&A[r+x-1]>m) m=A[r+x-1]; if(x<w-1&&A[r+x+1]>m) m=A[r+x+1]; B[r+x]=m; } }
+  for(let y=0;y<h;y++){ const r=y*w; for(let x=0;x<w;x++){ let m=B[r+x]; if(y>0&&B[r-w+x]>m) m=B[r-w+x]; if(y<h-1&&B[r+w+x]>m) m=B[r+w+x]; a[(r+x)*4+3]=m; } }
+  g.putImageData(im,0,0); return o;
+}
+function ovLayer(){
+  const o=_ov, d=o&&o.draw; if(!d) return null;
+  const lk=OV_LOOKS.find(l=>l.k===o.look);
+  if(!lk||!lk.c||d.tainted) return {cv:d.cv, multiply:true};       // as drawn: multiply keeps black lines, drops white
+  if(!d.ink[o.look]){ try{ d.ink[o.look]=ovInk(d.cv,lk.c); }catch(e){ d.tainted=true; return {cv:d.cv, multiply:true}; } }
+  return {cv:d.ink[o.look], multiply:false};
+}
+function ovDraw(){ const o=_ov; if(!o||o.raf) return; o.raf=requestAnimationFrame(()=>{ if(_ov!==o) return; o.raf=0; ovPaint(); }); }
+function ovPaint(){
+  const o=_ov, cv=$('ov-cv'); if(!o||!cv) return;
+  const g=cv.getContext('2d'), dpr=window.devicePixelRatio||1, v=o.view;
+  g.setTransform(1,0,0,1,0,0); g.globalAlpha=1; g.globalCompositeOperation='source-over';
+  g.fillStyle='#14171b'; g.fillRect(0,0,cv.width,cv.height);
+  if(o.photoImg){
+    g.setTransform(dpr*v.s,0,0,dpr*v.s,dpr*v.x,dpr*v.y); g.imageSmoothingQuality='high';
+    const pk=o.pick, onDraw=pk&&pk.step<2, onPhoto=pk&&pk.step>=2;
+    g.globalAlpha=onDraw?0.25:1; g.drawImage(o.photoImg,0,0); g.globalAlpha=1;
+    const L=ovLayer();
+    if(L){
+      const d=o.draw, u=1/(o.s*v.s);
+      g.save(); ovXf(g);
+      g.globalAlpha=onDraw?1:(onPhoto?0.15:o.op); if(L.multiply) g.globalCompositeOperation='multiply';
+      g.drawImage(L.cv,-d.w/2,-d.h/2);
+      g.globalAlpha=1; g.globalCompositeOperation='source-over';
+      g.lineWidth=u; g.setLineDash([6*u,4*u]); g.strokeStyle='rgba(255,209,102,.6)'; g.strokeRect(-d.w/2,-d.h/2,d.w,d.h); g.setLineDash([]);
+      g.restore();
+    }
+    // 2-point markers: yellow rings = drawing points, blue crosses = photo points
+    const mk=(P,label,col,cross)=>{ const r=9/v.s; g.lineWidth=2/v.s; g.strokeStyle=col; g.beginPath();
+      if(cross){ g.moveTo(P.x-r*1.5,P.y); g.lineTo(P.x+r*1.5,P.y); g.moveTo(P.x,P.y-r*1.5); g.lineTo(P.x,P.y+r*1.5); }
+      g.moveTo(P.x+r,P.y); g.arc(P.x,P.y,r,0,Math.PI*2); g.stroke();
+      g.fillStyle=col; g.font='bold '+(13/v.s)+'px sans-serif'; g.fillText(label,P.x+r+3/v.s,P.y-r); };
+    const show=pk||(o.fit&&!o.fit.adjusted?o.fit:null);
+    if(show&&o.draw){ (show.d||[]).forEach((q,i)=>mk(ovD2P(q),String(i+1),'#ffd166',false)); (show.p||[]).forEach((q,i)=>mk(q,String(i+1),'#4cc9f0',true)); }
+  }
+  ovHint();
+}
+function ovWorkText(){
+  const o=_ov; if(!o||!o.draw) return t('No drawing');
+  const parts=[t('Size')+' '+(o.s/o.s0*100).toFixed(1)+'% ('+t('scale')+' '+o.s.toFixed(4)+')', t('Rotation')+' '+ovDeg(o.rot,2), o.flip?t('Mirrored'):'', t('Opacity')+' '+Math.round(o.op*100)+'%', t('ovlook:'+o.look)];
+  if(o.fit) parts.push(t('2-point match')+': '+t('scale')+' = '+t('photo')+' '+o.fit.photoPx+' px ÷ '+t('drawing')+' '+o.fit.drawPx+' px = '+(+o.fit.s).toFixed(4)+', '+t('rotation')+' '+ovDeg(+o.fit.rot,2)+(o.fit.adjusted?(' — '+t('then adjusted by hand')):''));
+  return parts.filter(Boolean).join(' · ');
+}
+function ovHint(){
+  const o=_ov, el=$('ov-status'); if(!o||!el) return;
+  let h;
+  if(o.pick){
+    const steps=[t('Click point 1 on the DRAWING — a hole centre or a sharp corner.'), t('Click point 2 on the DRAWING — far from point 1.'), t('Now click point 1 on the PHOTO — the same feature.'), t('Click point 2 on the PHOTO.')];
+    h=`<span class="pick"><i class="ti ti-target-arrow"></i> ${t('Step')} ${o.pick.step+1}/4 — ${esc(steps[o.pick.step])}</span> <button class="btn sm" onclick="ovPickCancel()">${t('Cancel')}</button>${o.pick.warn?` <span class="err">${esc(o.pick.warn)}</span>`:''} <span class="ov-help">${t('Wheel = zoom · right-drag = pan')}</span>`;
+  } else {
+    h=(o.msg?`<span class="${o.msg.kind==='err'?'err':'pick'}">${esc(o.msg.text)}</span> `:'')+(o.draw?`<span class="ov-work">${esc(ovWorkText())}</span>`:'')
+      +`<span class="ov-help">${t('Drag = move drawing · wheel = zoom · right-drag or Shift-drag = pan · Alt+wheel = size · arrow keys = nudge · two fingers = size / turn')}</span>`;
+  }
+  if(el._h!==h){ el.innerHTML=h; el._h=h; }
+}
+/* pointer: drag moves the drawing (or pans with the hand / right button / Shift); two fingers size + turn it;
+   in 2-point mode a tap picks a point and a drag pans */
+function ovPDown(e){
+  const o=_ov; if(!o) return; const q=ovPt(e);
+  try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
+  o.ptrs.set(e.pointerId,q);
+  if(o.ptrs.size===2){ o.drag={mode:'pinch'}; return; }
+  if(o.ptrs.size>2) return;
+  const pan=e.button===1||e.button===2||e.shiftKey||o.pan||!o.draw;
+  if(o.pick&&!pan&&e.button===0){ o.drag={mode:'tap', x:q.x, y:q.y}; return; }
+  o.drag={mode:pan?'pan':'move'};
+}
+function ovPMove(e){
+  const o=_ov; if(!o||!o.ptrs.has(e.pointerId)) return;
+  const q=ovPt(e), prev=o.ptrs.get(e.pointerId);
+  if(o.drag&&o.drag.mode==='pinch'&&o.ptrs.size===2){
+    const ids=[...o.ptrs.keys()], a0=o.ptrs.get(ids[0]), b0=o.ptrs.get(ids[1]);
+    o.ptrs.set(e.pointerId,q);
+    const a1=o.ptrs.get(ids[0]), b1=o.ptrs.get(ids[1]);
+    if(o.pick||o.pan||!o.draw) ovPinchView(a0,b0,a1,b1); else ovPinchDrawing(a0,b0,a1,b1);
+    ovSyncControls(); ovDraw(); return;
+  }
+  o.ptrs.set(e.pointerId,q);
+  const d=o.drag; if(!d) return;
+  if(d.mode==='tap'){ if(Math.hypot(q.x-d.x,q.y-d.y)<=6) return; d.mode='pan'; }
+  const dx=q.x-prev.x, dy=q.y-prev.y;
+  if(d.mode==='pan'){ o.view.x+=dx; o.view.y+=dy; o.viewTouched=true; }
+  else if(d.mode==='move'){ o.T.x+=dx/o.view.s; o.T.y+=dy/o.view.s; ovTouched(); }
+  else return;
+  ovDraw();
+}
+function ovPUp(e){
+  const o=_ov; if(!o) return; const d=o.drag;
+  if(d&&d.mode==='tap'&&o.ptrs.size===1&&o.ptrs.has(e.pointerId)) ovPickAt(ovPt(e));
+  o.ptrs.delete(e.pointerId);
+  if(!o.ptrs.size) o.drag=null; else if(d&&d.mode==='pinch') o.drag={mode:'none'};
+}
+function ovPinchDrawing(a0,b0,a1,b1){
+  const o=_ov, A0=ovS2P(a0), B0=ovS2P(b0), A1=ovS2P(a1), B1=ovS2P(b1);
+  const l0=Math.hypot(B0.x-A0.x,B0.y-A0.y), l1=Math.hypot(B1.x-A1.x,B1.y-A1.y); if(l0*o.view.s<8) return;
+  const k=l1/l0, ph=Math.atan2(B1.y-A1.y,B1.x-A1.x)-Math.atan2(B0.y-A0.y,B0.x-A0.x), cs=Math.cos(ph), sn=Math.sin(ph);
+  const c0={x:(A0.x+B0.x)/2,y:(A0.y+B0.y)/2}, c1={x:(A1.x+B1.x)/2,y:(A1.y+B1.y)/2}, rx=o.T.x-c0.x, ry=o.T.y-c0.y;
+  o.T={x:c1.x+k*(rx*cs-ry*sn), y:c1.y+k*(rx*sn+ry*cs)}; o.s*=k; o.rot=ovNormDeg(o.rot+ph*180/Math.PI); ovTouched();
+}
+function ovPinchView(a0,b0,a1,b1){
+  const o=_ov, v=o.view, l0=Math.hypot(b0.x-a0.x,b0.y-a0.y), l1=Math.hypot(b1.x-a1.x,b1.y-a1.y); if(l0<8) return;
+  const c0={x:(a0.x+b0.x)/2,y:(a0.y+b0.y)/2}, c1={x:(a1.x+b1.x)/2,y:(a1.y+b1.y)/2}, px=(c0.x-v.x)/v.s, py=(c0.y-v.y)/v.s;
+  v.s*=l1/l0; v.x=c1.x-px*v.s; v.y=c1.y-py*v.s; o.viewTouched=true;
+}
+function ovWheel(e){
+  e.preventDefault(); const o=_ov; if(!o) return; const q=ovPt(e);
+  const dy=e.deltaY||e.deltaX||0, f=Math.exp(-dy*(e.deltaMode===1?0.05:0.0015));
+  if(e.altKey&&o.draw&&!o.pick){ o.s*=f; ovTouched(); ovSyncControls(); }
+  else { const v=o.view, px=(q.x-v.x)/v.s, py=(q.y-v.y)/v.s; v.s=Math.min(60,Math.max(0.01,v.s*f)); v.x=q.x-px*v.s; v.y=q.y-py*v.s; o.viewTouched=true; }
+  ovDraw();
+}
+/* ---- 2-point match: the same two features on the drawing and the photo give size, turn and position ---- */
+window.ovPickStart=()=>{
+  const o=_ov; if(!o) return;
+  if(!o.draw){ qcToast(t('Pick a drawing first.'),'err'); return; }
+  if(o.pick){ ovPickCancel(); return; }
+  o.pick={step:0, d:[], p:[]}; o.msg=null; ovSyncControls(); ovDraw();
+};
+window.ovPickCancel=()=>{ if(!_ov) return; _ov.pick=null; ovSyncControls(); ovDraw(); };
+function ovPickAt(q){
+  const o=_ov, pk=o&&o.pick; if(!pk||!o.draw) return;
+  const P=ovS2P(q); pk.warn='';
+  if(pk.step<2){
+    const D=ovP2D(P);
+    if(D.x<0||D.y<0||D.x>o.draw.w||D.y>o.draw.h){ pk.warn=t('That spot is off the drawing.'); ovDraw(); return; }
+    if(pk.step===1&&Math.hypot(D.x-pk.d[0].x,D.y-pk.d[0].y)<0.03*Math.max(o.draw.w,o.draw.h)){ pk.warn=t('Pick point 2 farther from point 1 — it makes the match accurate.'); ovDraw(); return; }
+    pk.d.push({x:+D.x.toFixed(2), y:+D.y.toFixed(2)});
+  } else {
+    if(P.x<0||P.y<0||P.x>o.pw||P.y>o.ph){ pk.warn=t('That spot is off the photo.'); ovDraw(); return; }
+    if(pk.step===3&&Math.hypot(P.x-pk.p[0].x,P.y-pk.p[0].y)<0.02*Math.max(o.pw,o.ph)){ pk.warn=t('Pick point 2 farther from point 1 — it makes the match accurate.'); ovDraw(); return; }
+    pk.p.push({x:+P.x.toFixed(2), y:+P.y.toFixed(2)});
+  }
+  pk.step++;
+  if(pk.step===4){ ovSolve(pk); o.pick=null; }
+  ovSyncControls(); ovDraw();
+}
+function ovSolve(pk){
+  const o=_ov, d=o.draw, f=o.flip?-1:1;
+  const u=pk.d.map(q=>({x:f*(q.x-d.w/2), y:q.y-d.h/2}));
+  const du={x:u[1].x-u[0].x, y:u[1].y-u[0].y}, dp={x:pk.p[1].x-pk.p[0].x, y:pk.p[1].y-pk.p[0].y};
+  const lu=Math.hypot(du.x,du.y), lp=Math.hypot(dp.x,dp.y); if(lu<1||lp<1) return;
+  const s=lp/lu, th=Math.atan2(dp.y,dp.x)-Math.atan2(du.y,du.x), cs=Math.cos(th), sn=Math.sin(th);
+  o.s=s; o.rot=ovNormDeg(th*180/Math.PI);
+  o.T={x:pk.p[0].x-s*(u[0].x*cs-u[0].y*sn), y:pk.p[0].y-s*(u[0].x*sn+u[0].y*cs)};
+  o.fit={d:pk.d, p:pk.p, drawPx:+lu.toFixed(1), photoPx:+lp.toFixed(1), s:+s.toFixed(5), rot:+o.rot.toFixed(2), flip:!!o.flip, adjusted:false};
+}
+/* ---- the flattened picture: photo + drawing + a caption strip with the numbers ---- */
+function ovCaption(){
+  const o=_ov, inf=qcOvInfoFor(o.ctx,o.rec), c=o.cands[o.di]||{}, p=o.photos[o.pi]||{};
+  return [
+    ['BSMP — '+t('Drawing over photo'), inf.part?(t('Part')+' '+inf.part+(inf.rev?(' Rev '+inf.rev):'')):'', inf.customer, inf.job?(t('Job #')+' '+inf.job):''].filter(Boolean).join('  ·  '),
+    t('Photo')+': '+(p.name||'—')+'  ·  '+t('Drawing')+': '+(c.name||'—')+((o.draw&&o.draw.pages>1)?(' ('+t('page')+' '+o.page+'/'+o.draw.pages+')'):''),
+    ovWorkText(),
+    ((QC_USER&&QC_USER.email)||'').split('@')[0]+'  ·  '+new Date().toLocaleString(LANG==='es'?'es-MX':'en-US')+'  ·  '+t('Visual comparison only — not a measurement.')
+  ];
+}
+function ovCompose(){
+  const o=_ov; if(!o||!o.photoImg) return null;
+  const e=Math.min(1, OV_MAX_SIDE/Math.max(o.pw,o.ph)), W=Math.round(o.pw*e), H=Math.round(o.ph*e);
+  const fs=Math.max(14,Math.round(W/95)), lh=Math.round(fs*1.4), pad=Math.round(fs*0.7), font=b=>(b?'bold ':'')+fs+'px "Hanken Grotesk", Arial, sans-serif';
+  // wrap the caption to the picture width
+  const m=document.createElement('canvas').getContext('2d'), lines=[];
+  ovCaption().forEach((txt,i)=>{ m.font=font(i===0); let cur='';
+    String(txt).split(' ').forEach(w=>{ const tryS=cur?cur+' '+w:w; if(cur&&m.measureText(tryS).width>W-pad*2){ lines.push([cur,i===0]); cur=w; } else cur=tryS; });
+    if(cur) lines.push([cur,i===0]); });
+  const band=lines.length*lh+pad*2;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H+band;
+  const g=cv.getContext('2d'); g.imageSmoothingQuality='high';
+  g.drawImage(o.photoImg,0,0,W,H);
+  const L=ovLayer();
+  if(L){ g.save(); g.beginPath(); g.rect(0,0,W,H); g.clip(); g.scale(e,e); ovXf(g); g.globalAlpha=o.op; if(L.multiply) g.globalCompositeOperation='multiply'; g.drawImage(L.cv,-o.draw.w/2,-o.draw.h/2); g.restore(); }
+  g.fillStyle='#23272e'; g.fillRect(0,H,W,band); g.fillStyle='#ffffff'; g.textBaseline='top';
+  lines.forEach(([txt,b],i)=>{ g.font=font(b); g.fillText(txt,pad,H+pad+i*lh); });
+  return cv;
+}
+async function ovBlob(){
+  const o=_ov; if(!o||!o.photoImg) return null;
+  if(!o.draw){ qcToast(t('Pick a drawing first.'),'err'); return null; }
+  if(o.photoTainted||o.draw.tainted){ qcToast(t('The browser was not allowed to copy this photo or drawing into a picture — open the app from the BSMP site and try again.'),'err'); return null; }
+  try{ const cv=ovCompose(); return await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error('PNG could not be made')),'image/png')); }
+  catch(e){ console.error('overlay compose failed', e); qcToast(t('Could not make the PNG:')+' '+((e&&e.message)||e),'err'); return null; }
+}
+function ovFileName(){
+  const inf=qcOvInfoFor(_ov.ctx,_ov.rec), d=new Date();
+  const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
+  return ((inf.part||'part')+'_drawing-overlay_'+ds).replace(/[^A-Za-z0-9._-]+/g,'_')+'.png';
+}
+window.ovDownload=async ()=>{
+  const b=await ovBlob(); if(!b) return;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=ovFileName();
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+  qcToast(t('Overlay downloaded.'),'ok');
+};
+window.ovSave=async ()=>{
+  const o=_ov; if(!o) return; const id=o.ctx.recId, rec=id&&INSPECTIONS[id];
+  if(!rec){ qcToast(t('Save the inspection first, then save the overlay to it.'),'err'); return; }
+  const p=o.photos[o.pi]||{}, c=o.cands[o.di];
+  if(p.file){ qcToast(t('This photo isn’t saved yet — save the inspection first, then save the overlay.'),'err'); return; }
+  const blob=await ovBlob(); if(!blob||!c) return;
+  const btn=$('ov-save-btn'), lbl=btn?btn.innerHTML:'';
+  if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin"></i> '+t('Saving…'); }
+  try{
+    // a drawing picked from this computer gets stored too, so the overlay can be re-made later
+    if(!c.url&&c.file){ const u=await withTimeout(upload(c.file,'inspections'),90000,t('Drawing upload timed out — check the connection.')); if(!u) throw new Error(t('File upload failed:')+' '+c.name); c.url=u; }
+    const name=ovFileName();
+    const url=await withTimeout(upload(new File([blob],name,{type:'image/png'}),'inspections'),120000,t('Photo upload timed out — check the connection.'));
+    if(!url) throw new Error(t('File upload failed:')+' '+name);
+    const ovId=newId('ovl');
+    const entry={ id:ovId, url, name, at:Date.now(), by:(QC_USER&&QC_USER.email)||'',
+      photo:{url:p.url, name:p.name||'', w:o.pw, h:o.ph},
+      drawing:{url:c.url, name:c.name||'', type:c.type||'', src:c.src||'', page:o.page||1, w:o.draw.w, h:o.draw.h},
+      align:ovAlign(), work:ovWorkText() };
+    qcFormKeep();
+    await dbSet('qc/inspections/'+id+'/overlays/'+ovId, entry);
+    try{ await qcLogAudit([{ inspectionId:id, partNum:rec.partNum||'', field:'overlay', action:'overlay-saved', note:(c.name||'drawing')+' on '+(p.name||'photo')+' · '+entry.work }]); }
+    catch(e){ console.error('audit log failed', e); }
+    qcToast(t('Overlay saved to this inspection.'),'ok');
+  }catch(e){ console.error('overlay save failed', e); qcToast(t('Overlay NOT saved:')+' '+((e&&e.message)||e),'err'); }
+  finally{ if(btn){ btn.disabled=false; btn.innerHTML=lbl; } }
+};
+document.addEventListener('keydown',e=>{
+  if(_ov&&$('ov-ed')){
+    if($('dl-overlay')) return;
+    const typing=/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'');
+    if(e.key==='Escape'){ e.preventDefault(); if(_ov.pick) ovPickCancel(); else qcOvClose(); return; }
+    if(typing) return;
+    const k={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
+    if(k&&_ov.draw){ const st=(e.shiftKey?10:1)/_ov.view.s; _ov.T.x+=k[0]*st; _ov.T.y+=k[1]*st; ovTouched(); ovDraw(); e.preventDefault(); }
+    return;
+  }
+  if(_pv&&$('pv-ov')){
+    if(e.key==='Escape'){ e.preventDefault(); qcPhotoClose(); }
+    else if(e.key==='ArrowLeft') qcPhotoStep(-1);
+    else if(e.key==='ArrowRight') qcPhotoStep(1);
+  }
+});
 
 /* =================== DRAWING CHECK ===================
    Compare OUR drawing (made from our SolidWorks model) against the CUSTOMER's
@@ -4058,6 +4727,7 @@ window.qcDrawPickList=(key)=>{
 window.qcDrawPick=async (key,id)=>{
   const d=DRAWINGS[id]; if(!d) return;
   const ov=$('dl-overlay'); if(ov) ov.remove();
+  if(key==='ovdraw'){ ovAddLibrary(d); return; }
   qcToast(t('Loading drawing…'),'');
   try{
     const resp=await fetch(d.url); if(!resp.ok) throw new Error('HTTP '+resp.status);
@@ -4131,7 +4801,7 @@ function viewFairs(){
   }
   const list=all.filter(i=>!i.deleted).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   const rows=list.map(i=>`<tr class="click" onclick="window.qcOpenFair('${i.id}')">
-    <td><b>${esc(i.partNum||'—')}</b><div class="muted" style="font-size:12px">${esc(i.customer||'')} ${i.rev?('· Rev '+esc(i.rev)):''}</div></td>
+    <td><b>${esc(i.partNum||'—')}</b>${qcPhotoChip(i)}<div class="muted" style="font-size:12px">${esc(i.customer||'')} ${i.rev?('· Rev '+esc(i.rev)):''}</div></td>
     <td>${i.mode==='as9102'?t('AS9102'):i.mode==='manual'?t('Handwritten'):t('Simple FAR')}</td>
     <td>${i.mode==='manual'?(fairSheets(i).length?`<i class="ti ti-scan"></i> ${fairSheets(i).length}`:`<span class="muted">${t('Awaiting sheet')}</span>`):(i.characteristics||[]).length}</td>
     <td>${fairStatusBadge(i.fairStatus)}${(i.ncrId&&NCRS[i.ncrId]&&NCRS[i.ncrId].status!=='closed')?` <span class="hist-badge ncr">${t('Open NCR')}</span>`:''}</td>
@@ -4847,9 +5517,10 @@ function viewFair(){
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('frphoto',this)"></label>
             <button class="btn sm primary" id="fr-aicheck-btn" onclick="qcFairPhotoCheck()"><i class="ti ti-sparkles"></i> ${t('Check photo against drawing (AI)')}</button>
+            <button class="btn sm" onclick="qcOverlayFromForm('frphoto')"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>
           </div>
           <div class="thumbs" id="files-frphoto">${qcPendingBadges('frphoto')}</div>
-          ${(r&&r.photos&&r.photos.length)?`<div class="thumbs">${r.photos.map(p=>`<img class="thumb" src="${esc(p.url)}">`).join('')}</div>`:''}
+          ${r?qcPhotoThumbs('rec:'+r.id):''}${r?qcOverlayThumbs(r.id):''}
           <div id="fr-ai-panel" style="display:${(_frPhotoCheck||(r&&r.photoCheck))?'block':'none'};margin-top:8px">${_frPhotoCheck?qcSelfAIHtml(_frPhotoCheck,{measure:false}):((r&&r.photoCheck)?qcSelfAIHtml(r.photoCheck,{measure:false}):'')}</div>
         </div>
       </div>
@@ -5154,6 +5825,7 @@ function farHistoryCard(id){
   const banner=(ncr&&ncr.status!=='closed')?`<div class="hint" style="color:var(--red)"><i class="ti ti-alert-triangle"></i> ${t('Open NCR')} · ${esc((ncr.description||'').slice(0,140))}</div>`:'';
   const rows=list.map(a=>{
     if(a.field==='ncr') return `<div class="hist-row"><span class="hist-badge ncr"><i class="ti ti-clipboard-x"></i> ${farActionLabel(a)}</span><span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
+    if(a.field==='overlay'||a.field==='photocheck') return `<div class="hist-row"><span class="hist-badge ncr" style="background:var(--accent-soft);color:var(--text)"><i class="ti ti-${a.field==='overlay'?'layers-intersect':'sparkles'}"></i> ${a.field==='overlay'?t(a.action==='overlay-removed'?'drawing overlay removed':'drawing overlay saved'):t('AI photo check')}</span><span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
     if(a.field==='record') return `<div class="hist-row"><span class="hist-badge ${a.action==='restored'?'ok':'oot'}"><i class="ti ti-${a.action==='restored'?'arrow-back-up':'trash'}"></i> ${farActionLabel(a)}</span><span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
     if(a.field==='sheet') return `<div class="hist-row"><span class="hist-badge ${a.action==='sheet-result'?(a.note==='reject'?'oot':'ok'):'ncr'}" style="${a.action==='sheet-result'?'':'background:var(--accent-soft);color:var(--text)'}"><i class="ti ti-${a.action==='sheet-result'?'clipboard-check':'scan'}"></i> ${farActionLabel(a)}</span> ${a.action==='sheet-result'?`<b>${esc(a.note==='reject'?t('REJECT'):t('ACCEPT'))}</b>`:`<code>${esc(a.note||'')}</code>`}<span class="muted">${esc((a.user||'').split('@')[0])} · ${fmtWhen(a.ts)}</span></div>`;
     const badge=a.nowOot?`<span class="hist-badge oot">${t('Out of tolerance')}</span>`:`<span class="hist-badge ok">${t('In tolerance')}</span>`;
@@ -5204,7 +5876,7 @@ window.qcSaveFair=async (action)=>{
     createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
-    drawing, photos, photoCheck, characteristics:_chars, fairStatus:status, tolDefaults:qcReadTolDefaults(),
+    drawing, photos, photoCheck, overlays:(prev&&prev.overlays)||null, characteristics:_chars, fairStatus:status, tolDefaults:qcReadTolDefaults(),
     ballooned:_fairBalloonedUrl||(prev&&prev.ballooned)||null,
     bubbles: _fairBubbles.length ? _fairBubbles.map(b=>({no:b.no,bx:b.bx,by:b.by,value:b.value||'',tol:b.tol||'',category:b.category||'',group:b.group||null,box:b.box||null})) : ((prev&&prev.bubbles)||null)
   };
