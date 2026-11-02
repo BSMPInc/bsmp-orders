@@ -902,6 +902,11 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         </div>
       </div>
     </div>
+    <!-- Bill whole sheets: material we have to buy by the piece (e.g. a 12x12 cut of an odd alloy) -->
+    <label style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px" title="For material bought by the piece: every quantity pays for the full sheets it uses, rounded up to whole sheets instead of 1/8ths. Applies to By Sheet pricing only.">
+      <input id="whole-sheets" type="checkbox" style="width:16px;height:16px;min-width:0;padding:0;margin:0;flex:none;accent-color:var(--accent);cursor:pointer" onchange="calculate();if(window._qtyBreaksResults&&window._qtyBreaksResults.length)calcQtyBreaks()"> Bill whole sheets
+      <span style="font-weight:400;color:var(--text3)">(bought by the piece · By Sheet only)</span>
+    </label>
 
     <!-- Material Price Breaks -->
     <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
@@ -4410,7 +4415,7 @@ function calculate(){
     const pw=area*tIn*dens, bw=pw*(1+scrap/100);
     matBasisNote = `by weight · ${bw.toFixed(2)} lb (incl ${scrap}% drop)`;
   } else {
-    matBasisNote = (pps>1&&ph&&pl)?`${pps} parts/sheet · ${sheetsReq} sheets`:'';
+    matBasisNote = (pps>1&&ph&&pl)?`${pps} parts/sheet · ${sheetsReq} sheets${wholeSheetsOn()?' (whole sheets)':''}`:'';
   }
   bd += br('Material / part', fmt(matCostPart), matBasisNote);
   laborLines.forEach(l=>{
@@ -5350,6 +5355,7 @@ function saveQuote(){
 
     // ---- Full snapshot for accurate reload ----
     recool: !!document.getElementById('recool')?.checked,
+    wholeSheets: !!document.getElementById('whole-sheets')?.checked,
     matMode: matMode,
     matPriceMode: matPriceMode,
     nestingEfficiency: document.getElementById('nesting-efficiency')?.value || '85',
@@ -5502,6 +5508,7 @@ function resetForm(){
   document.getElementById('perim').value='';
   document.getElementById('pierces').value='1';
   { const rc=document.getElementById('recool'); if(rc) rc.checked=false; }
+  { const ws=document.getElementById('whole-sheets'); if(ws) ws.checked=false; }
   document.getElementById('notes').value='';
   { const lt=document.getElementById('q-leadtime'); if(lt) lt.value=''; }
   { const et=document.getElementById('exp-type'); if(et) et.value='none';
@@ -6376,6 +6383,7 @@ function reloadQuote(id){
     sv('parth', q.parth); sv('partl', q.partl);
     sv('perim', q.perim); sv('pierces', q.pierces);
     { const rc=document.getElementById('recool'); if(rc) rc.checked=!!q.recool; }
+    { const ws=document.getElementById('whole-sheets'); if(ws) ws.checked=!!q.wholeSheets; }
     sv('costsheet', q.costsheet);
   }
   sv('purchasing', q.purchasing);
@@ -7270,7 +7278,7 @@ function qbCliffCheckHtml(results){
       const matUp=hi.matCostPart > lo.matCostPart+0.005;
       if(matUp && hiPer > loPer+1e-12 && hi.pps>0){
         const used=hi.qty*scrapFactor/hi.pps;
-        line+=`<br>Why: ${unit}s are billed in 1/${SHEET_STEP_DEN}ths, rounded up — ${hi.qty.toLocaleString()} pcs bills ${hi.sheetsReq} ${unit}${hi.sheetsReq===1?'':'s'} (${used.toFixed(3)} actually used) against ${lo.sheetsReq} for ${lo.qty.toLocaleString()}, so material goes ${fmt3(lo.matCostPart)} → ${fmt3(hi.matCostPart)}/part.`;
+        line+=`<br>Why: ${unit}s are billed in ${unit==='sheet'&&wholeSheetsOn()?'whole sheets (Bill whole sheets is on)':`1/${SHEET_STEP_DEN}ths`}, rounded up —${hi.qty.toLocaleString()} pcs bills ${hi.sheetsReq} ${unit}${hi.sheetsReq===1?'':'s'} (${used.toFixed(3)} actually used) against ${lo.sheetsReq} for ${lo.qty.toLocaleString()}, so material goes ${fmt3(lo.matCostPart)} → ${fmt3(hi.matCostPart)}/part.`;
         const back=maxQtyForSheets(lo.sheetsReq, hi.pps, scrapFactor);   // same sheets as the lower break
         const fill=maxQtyForSheets(hi.sheetsReq, hi.pps, scrapFactor);   // fills what this break already buys
         const opts=[];
@@ -7309,7 +7317,7 @@ function qbCliffCheckHtml(results){
   let body=`<strong>⚠ Price-break check</strong><br>`;
   if(costWarns.length){
     body+=costWarns.join('<br><br>')
-      +`<br><span style="font-size:11px">A break that lands just past a 1/${SHEET_STEP_DEN} boundary pays for material it cannot use — moving the quantity is usually cheaper than absorbing it. (Or hold the price at the smaller break's and eat the difference.)</span>`;
+      +`<br><span style="font-size:11px">A break that lands just past a ${wholeSheetsOn()?'whole-sheet':`1/${SHEET_STEP_DEN}`} boundary pays for material it cannot use — moving the quantity is usually cheaper than absorbing it. (Or hold the price at the smaller break's and eat the difference.)</span>`;
     if(warns.length) body+=`<hr style="border:none;border-top:1px solid #f0c98a;margin:9px 0">`;
   }
   if(warns.length){
@@ -9841,7 +9849,10 @@ function roundingChanged(){
 // Sheets are bought and billed in eighths - the price-break check quotes this
 // same number when it explains a cost/part that rises with quantity.
 const SHEET_STEP_DEN = 8;
+// "Bill whole sheets" (per quote): material bought by the piece is billed by the piece
+function wholeSheetsOn(){ return !!document.getElementById('whole-sheets')?.checked; }
 function billableSheets(exactSheets){
+  if(wholeSheetsOn()) return exactSheets > 0 ? Math.ceil(exactSheets - 1e-9) : 0;
   // Round up to nearest 1/8 sheet
   let rounded = Math.ceil(exactSheets * SHEET_STEP_DEN) / SHEET_STEP_DEN;
   // Apply minimum floor (but only if the part actually uses material)
