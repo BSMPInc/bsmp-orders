@@ -9929,9 +9929,10 @@ function renderCombineBar(){
   if(!combineSelected.size){ bar.style.display='none'; bar.innerHTML=''; return; }
   const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   const money = v => '$'+(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const picked = HISTORY.filter(q=>combineSelected.has(q.id));
+  // in the order they were ticked, which is the order they print in (reorder in the combine form)
+  const picked = [...combineSelected].map(id=>HISTORY.find(q=>q.id===id)).filter(Boolean);
   let totalJob = 0; picked.forEach(q=> totalJob += parseFloat(q.jobTotal)||0);
-  const chips = picked.map(q=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--sky-mid);border-radius:16px;padding:3px 4px 3px 11px;margin:3px 5px 3px 0;font-size:12px;font-weight:600;color:#1e40af">${esc(q.partNum||'Part')}${q.quoteNo?` <span style="color:#0369a1;font-weight:700">#${esc(q.quoteNo)}</span>`:''} · ${money(q.jobTotal)}<button onclick="toggleCombine(${q.id}, false)" title="Remove from selection" aria-label="Remove" style="border:none;background:none;color:#64748b;cursor:pointer;font-size:15px;line-height:1;padding:0 3px;border-radius:50%">×</button></span>`).join('');
+  const chips = picked.map((q,n)=>`<span style="display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--sky-mid);border-radius:16px;padding:3px 4px 3px 11px;margin:3px 5px 3px 0;font-size:12px;font-weight:600;color:#1e40af"><span style="color:#64748b;font-weight:700">${n+1}.</span> ${esc(q.partNum||'Part')}${q.quoteNo?` <span style="color:#0369a1;font-weight:700">#${esc(q.quoteNo)}</span>`:''} · ${money(q.jobTotal)}<button onclick="toggleCombine(${q.id}, false)" title="Remove from selection" aria-label="Remove" style="border:none;background:none;color:#64748b;cursor:pointer;font-size:15px;line-height:1;padding:0 3px;border-radius:50%">×</button></span>`).join('');
   bar.style.display='block';
   bar.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div style="flex:1;min-width:0">
@@ -9978,8 +9979,9 @@ function titleCaseLine(s){
 
 function buildCombinedQuote(){
   if(combineSelected.size < 1){ alert("Select at least one quote (check the boxes) to combine."); return; }
-  // Gather selected quotes in the order they appear in HISTORY
-  const picked = HISTORY.filter(q => combineSelected.has(q.id));
+  // Gather selected quotes in the order they were ticked (the numbered chips); the combine
+  // form can still reorder the lines before printing.
+  const picked = [...combineSelected].map(id => HISTORY.find(q => q.id === id)).filter(Boolean);
   if(!picked.length){ alert("No matching quotes found."); return; }
 
   // Use the first selected quote's customer as the default bill-to
@@ -10003,7 +10005,8 @@ function buildCombinedQuote(){
     const fee = parseFloat(q.expediteFee) || 0;
     if(!(fee > 0)) return [line];
     const pn = q.partNum && q.partNum!=='—' ? q.partNum : 'Part';
-    return [line, { srcId:q.id, desc: 'Expedite Fee — Expedited Lead Time (' + pn + ')', qty: 1, rate: fee, amt: fee }];
+    // rides with its part when the lines are reordered
+    return [line, { srcId:q.id, fee:true, desc: 'Expedite Fee — Expedited Lead Time (' + pn + ')', qty: 1, rate: fee, amt: fee }];
   });
 
   // The minimum is per ORDER: on unless every picked quote was set to waive it.
@@ -10017,23 +10020,42 @@ function openCombineForm(items, firstCust, applyMin, leadTime){
   const overlay = document.createElement("div");
   overlay.style.cssText = "position:fixed;inset:0;background:rgba(15,23,42,0.55);z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto";
 
-  const itemRows = items.map((it,idx)=>`
-    <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px">
+  // Line order = print order. Lines move with ▲ ▼, by dragging the ⠿ handle, or "Sort by part #";
+  // an expedite-fee line (fee:true) always rides right under its part.
+  const ccMvBtn = 'border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:5px;width:26px;height:22px;font-size:11px;line-height:1;cursor:pointer;padding:0';
+  const itemRow = (it,idx)=> it.fee ? `
+    <div class="cc-item" data-idx="${idx}" style="border:1px dashed #e2e8f0;border-radius:8px;padding:8px 10px;margin:-4px 0 8px 30px">
       <div style="display:grid;grid-template-columns:1fr 70px 90px;gap:8px;align-items:start">
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:3px">Description <span style="font-weight:400;text-transform:none">(moves with the part above)</span></label>
+          <textarea id="ci-desc-${idx}" rows="1" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit;resize:vertical">${(it.desc||'').replace(/</g,'&lt;')}</textarea>
+        </div>
+        <div><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:3px">Qty</label><input id="ci-qty-${idx}" type="number" value="${it.qtyS!=null?it.qtyS:it.qty}" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit"></div>
+        <div><label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:3px">Rate</label><input id="ci-rate-${idx}" type="number" step="0.01" value="${it.rateS!=null?it.rateS:it.rate.toFixed(2)}" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit"></div>
+      </div>
+    </div>` : `
+    <div class="cc-item" data-idx="${idx}" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px 10px 10px 6px;margin-bottom:8px;background:#fff">
+      <div style="display:grid;grid-template-columns:20px 1fr 70px 90px 26px;gap:8px;align-items:start">
+        <div class="cc-grip" title="Drag to reorder" style="cursor:grab;color:#94a3b8;font-size:16px;line-height:1;padding-top:22px;text-align:center;user-select:none">⠿</div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:3px">Description</label>
           <textarea id="ci-desc-${idx}" rows="2" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit;resize:vertical">${(it.desc||'').replace(/</g,'&lt;')}</textarea>
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:3px">Qty</label>
-          <input id="ci-qty-${idx}" type="number" value="${it.qty}" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit">
+          <input id="ci-qty-${idx}" type="number" value="${it.qtyS!=null?it.qtyS:it.qty}" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit">
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;display:block;margin-bottom:3px">Rate</label>
-          <input id="ci-rate-${idx}" type="number" step="0.01" value="${it.rate.toFixed(2)}" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit">
+          <input id="ci-rate-${idx}" type="number" step="0.01" value="${it.rateS!=null?it.rateS:it.rate.toFixed(2)}" style="width:100%;border:1px solid #cbd5e1;border-radius:6px;padding:6px;font-size:12px;font-family:inherit">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;padding-top:16px">
+          <button type="button" class="cc-mv" data-idx="${idx}" data-dir="-1" title="Move up" aria-label="Move up" style="${ccMvBtn}">▲</button>
+          <button type="button" class="cc-mv" data-idx="${idx}" data-dir="1" title="Move down" aria-label="Move down" style="${ccMvBtn}">▼</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  const itemRows = items.map(itemRow).join('');
 
   overlay.innerHTML = `
     <div style="background:#fff;border-radius:14px;max-width:640px;width:100%;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);font-family:'DM Sans',system-ui,sans-serif;max-height:90vh;overflow:auto">
@@ -10061,8 +10083,12 @@ function openCombineForm(items, firstCust, applyMin, leadTime){
           <input id="cc-leadtime" type="text" value="${qEsc(leadTime||'3-4 Weeks')}" style="width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:8px;font-size:13px;font-family:inherit">
         </div>
       </div>
-      <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Line items</div>
-      ${itemRows}
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em">Line items</div>
+        <div style="font-size:11px;color:#94a3b8">print in this order: drag ⠿ or use ▲ ▼</div>
+        ${items.filter(it=>!it.fee).length>1?`<button type="button" id="cc-sort" title="Put the lines in part-number order (press again to reverse)" style="margin-left:auto;border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:6px;padding:4px 10px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">Sort by part # A→Z</button>`:''}
+      </div>
+      <div id="cc-items">${itemRows}</div>
       ${MIN_ORDER>0 ? `<label style="font-size:12px;color:#475569;display:flex;align-items:center;gap:6px;cursor:pointer;flex-wrap:wrap;margin-top:8px"><input id="cc-minorder" type="checkbox" ${applyMin!==false?'checked':''} style="width:auto"> Minimum order charge if the whole order is under ${minOrderMoney(MIN_ORDER)} (prints as its own line) <span id="cc-minorder-hint" style="font-weight:700;color:#0f172a"></span></label>` : ''}
       <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
         <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em">Tax (%)</label>
@@ -10076,6 +10102,66 @@ function openCombineForm(items, firstCust, applyMin, leadTime){
   document.body.appendChild(overlay);
   document.getElementById("cc-cancel").onclick = () => overlay.remove();
   overlay.addEventListener("click", e => { if(e.target===overlay) overlay.remove(); });
+
+  // ── reorder the lines (items is reordered in place, so the print reads it in the new order) ──
+  const ccBox = document.getElementById("cc-items");
+  const ccSync = () => items.forEach((it,idx)=>{   // keep what was typed before redrawing
+    it.desc = document.getElementById("ci-desc-"+idx).value;
+    it.qtyS = document.getElementById("ci-qty-"+idx).value;
+    it.rateS = document.getElementById("ci-rate-"+idx).value;
+  });
+  // a part line plus the fee line(s) that ride under it
+  const ccBlocks = () => items.reduce((b,it)=>{ if(it.fee && b.length && b[b.length-1][0].srcId===it.srcId) b[b.length-1].push(it); else b.push([it]); return b; }, []);
+  const ccSet = blocks => { ccSync(); const flat = blocks.flat(); items.splice(0, items.length, ...flat); ccBox.innerHTML = items.map(itemRow).join(''); ccMinHint(); };
+  const ccBlockOf = idx => ccBlocks().findIndex(b => b.includes(items[idx]));
+  ccBox.addEventListener("click", e => {
+    const b = e.target.closest(".cc-mv"); if(!b) return;
+    ccSync();
+    const blocks = ccBlocks(), i = ccBlockOf(+b.dataset.idx), j = i + (+b.dataset.dir);
+    if(i < 0 || j < 0 || j >= blocks.length) return;
+    [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
+    ccSet(blocks);
+    const moved = ccBox.querySelector(`.cc-mv[data-idx="${items.indexOf(blocks[j][0])}"][data-dir="${b.dataset.dir}"]`);
+    if(moved) moved.focus();
+  });
+  const ccSortBtn = document.getElementById("cc-sort");
+  if(ccSortBtn) ccSortBtn.onclick = () => {
+    ccSync();
+    const key = b => String(b[0].desc||'').split('\n')[0].trim();
+    const desc = ccSortBtn.dataset.dir === 'asc';   // second press reverses
+    const blocks = ccBlocks().sort((a,b)=> key(a).localeCompare(key(b), undefined, {numeric:true, sensitivity:'base'}) * (desc ? -1 : 1));
+    ccSortBtn.dataset.dir = desc ? 'desc' : 'asc';
+    ccSortBtn.textContent = desc ? 'Sort by part # A→Z' : 'Sort by part # Z→A';
+    ccSet(blocks);
+  };
+  // drag by the ⠿ handle only, so selecting text in a description still works
+  let ccDrag = -1;
+  ccBox.addEventListener("mousedown", e => { const g = e.target.closest(".cc-grip"); if(g) g.closest(".cc-item").draggable = true; });
+  ccBox.addEventListener("dragstart", e => {
+    const row = e.target.closest && e.target.closest(".cc-item"); if(!row || !row.draggable) return;
+    ccDrag = ccBlockOf(+row.dataset.idx); row.style.opacity = '.45';
+    e.dataTransfer.effectAllowed = 'move'; try{ e.dataTransfer.setData('text/plain', ''); }catch(_){}
+  });
+  const ccMark = (row, after) => { ccBox.querySelectorAll(".cc-item").forEach(r=>{ r.style.boxShadow=''; }); if(row) row.style.boxShadow = after ? '0 3px 0 #dc2626' : '0 -3px 0 #dc2626'; };
+  ccBox.addEventListener("dragover", e => {
+    if(ccDrag < 0) return; e.preventDefault();
+    const row = e.target.closest(".cc-item"); if(!row) return;
+    const r = row.getBoundingClientRect(); ccMark(row, e.clientY > r.top + r.height/2);
+  });
+  ccBox.addEventListener("drop", e => {
+    if(ccDrag < 0) return; e.preventDefault();
+    const row = e.target.closest(".cc-item"); const from = ccDrag; ccDrag = -1;
+    if(!row){ ccSet(ccBlocks()); return; }
+    ccSync();
+    const blocks = ccBlocks(), r = row.getBoundingClientRect();
+    // dropped on a fee line = after the part it belongs to
+    let to = ccBlockOf(+row.dataset.idx) + ((items[+row.dataset.idx].fee || e.clientY > r.top + r.height/2) ? 1 : 0);
+    const [blk] = blocks.splice(from, 1); if(to > from) to--;
+    blocks.splice(to, 0, blk);
+    ccSet(blocks);
+  });
+  ccBox.addEventListener("dragend", () => { ccDrag = -1; ccBox.querySelectorAll(".cc-item").forEach(r=>{ r.style.opacity=''; r.style.boxShadow=''; r.draggable=false; }); });
+
   const ccSubtotal = () => items.reduce((s,it,idx)=> s + (parseFloat(document.getElementById("ci-qty-"+idx).value)||0)*(parseFloat(document.getElementById("ci-rate-"+idx).value)||0), 0);
   const ccMinHint = () => minOrderHint(document.getElementById("cc-minorder-hint"), document.getElementById("cc-minorder"), ccSubtotal());
   overlay.addEventListener("input", ccMinHint); overlay.addEventListener("change", ccMinHint);
