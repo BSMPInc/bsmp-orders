@@ -19,7 +19,7 @@ styles = '\n'.join(re.findall(r'<style[\s\S]*?</style>', head))
 modal = grab('<!-- AI Modal -->', '<!-- Add/Edit Customer Modal -->')
 js = grab("window.closeModal=(id)=>", "\nwindow.exportCSV")
 fmt = grab('function fmtMoney(v){', '\n')
-esc = grab('function esc2(s){', '\n')
+esc = grab('function esc2(s){', '\n') + '\n' + grab('function fmtDate(d){', '\n') + '\n' + grab('const podKey = ', '\n') + '\n' + grab('const podHit = ', '\n')
 
 # ── a tiny 2-page PDF (hand-written objects, xref offsets computed) ──
 def pdf(pages):
@@ -129,7 +129,7 @@ async function runChecks(){
   r3[0].value='CVR-17'; r3[0].dispatchEvent(new Event('input'));
   ok('fixing the part clears the flag', !r3[0].classList.contains('miss'));
   const r1=document.querySelectorAll('#ai-rows .ai-row')[0].querySelectorAll('.ai-grid input');
-  r1[1].value='55'; r1[1].dispatchEvent(new Event('input'));
+  r1[2].value='55'; r1[2].dispatchEvent(new Event('input'));   // inputs: part, rev, qty…
   ok('line total updates', /55 × \\$12.4 = \\$682.00/.test($('ai-tot-0').textContent), $('ai-tot-0').textContent);
   $('ai-po').value='45110-A'; $('ai-po').dispatchEvent(new Event('input'));
   aiAddRow(); ok('add line', aiParsed.length===4&&aiParsed[3].po==='45110-A');

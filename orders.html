@@ -480,6 +480,26 @@ tr:hover .del-btn{opacity:1}
 .ai-draw .btn{height:28px;padding:0 10px;font-size:11.5px}
 .ai-draw-status{font-size:12px;color:var(--text2);margin:8px 2px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ai-draw-status:empty{display:none}
+/* PO change mode: the PO is already in Orders, so the lines it read update those orders */
+.ai-chg{border:1px solid var(--inset-border);background:var(--inset-bg);padding:9px 11px;margin-top:10px;font-size:12.5px;color:var(--text);line-height:1.45}
+.ai-chg-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ai-chg-top i{color:var(--blue);font-size:15px}
+.ai-chg-top .sp{flex:1}
+.ai-chg-mode{display:inline-flex;border:1px solid var(--inset-border)}
+.ai-chg-mode button{border:0;background:#fff;padding:4px 10px;font:inherit;font-size:11.5px;cursor:pointer;color:var(--text2)}
+.ai-chg-mode button.on{background:var(--blue);color:#fff}
+.ai-chg-gone{margin-top:8px;border-top:1px solid var(--inset-border);padding-top:7px}
+.ai-chg-gone-h{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.ai-chg-gone label{display:flex;align-items:center;gap:7px;padding:2px 0;cursor:pointer}
+.ai-chg-gone label.on{color:var(--red);text-decoration:line-through}
+.ai-mtag{font-size:10px;padding:1px 6px;border:1px solid;letter-spacing:.4px}
+.ai-mtag.upd{color:var(--blue);border-color:var(--blue)}
+.ai-mtag.new{color:var(--green);border-color:var(--green)}
+.ai-mtag.same{color:var(--text3);border-color:var(--border2)}
+.ai-diff{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:5px 6px;align-items:center;font-size:12px;color:var(--text2)}
+.ai-diff select{min-width:0;max-width:100%;padding:4px 6px;font-size:12px;border:1px solid var(--inset-border);background:#fff;font-family:inherit}
+.ai-d{padding:2px 7px;background:#fdf3dd;border:1px solid #e8d3a2;color:var(--text);font-variant-numeric:tabular-nums}
+.ai-d.skip{background:#f3f3f1;border-color:var(--border2);color:var(--text3)}
 @media (max-width:900px){
   .ai-modal.has-src{height:auto;max-height:94vh;overflow-y:auto}
   .ai-modal.has-src .ai-split{display:flex;flex-direction:column;flex:none}
@@ -2533,6 +2553,7 @@ body.sb-hidden .topbar{padding-left:24px}
     <div class="ai-head">
       <div class="form-group"><label>Order date <span style="color:var(--text3);font-weight:400">(received)</span></label><input id="ai-ordered" type="date"></div>
     </div>
+    <div class="ai-chg" id="ai-chg" style="display:none"></div>
     <div class="ai-rows" id="ai-rows"></div>
     <div class="ai-draw-status" id="ai-draw-status"></div>
     <div class="modal-actions" style="margin-top:10px">
@@ -5863,7 +5884,7 @@ window.closeModal=(id)=>document.getElementById(id).style.display='none';
 // the lines it pulled out, which stay editable until Import. Same pane as mail.html's
 // Save prices window (mpLoadSources / mpRenderSrc there). _aiSrcSeq drops a slow read
 // that belongs to an earlier file.
-let _aiSrc={docs:[], text:'', tab:'text'}, _aiSrcSeq=0, _aiMixed=false;
+let _aiSrc={docs:[], text:'', tab:'text'}, _aiSrcSeq=0, _aiMixed=false, _aiChg=null;
 function aiSrcFree(){ (_aiSrc.docs||[]).forEach(d=>{ if(d.url) URL.revokeObjectURL(d.url); }); }
 function aiSrcReset(text){ aiSrcFree(); _aiSrc={docs:[], text:text||'', tab:'text'}; }
 function aiSrcDoc(name, mime){ const d={name:name||'PO', img:String(mime||'').startsWith('image/'), file:null, url:'', err:''}; _aiSrc.docs.push(d); return d; }
@@ -5895,7 +5916,7 @@ function aiStatus(h, err){ const el=document.getElementById('ai-status'); el.inn
 
 window.openAI=()=>{
   _aiSrcSeq++; aiSrcReset(''); aiShowSrc(false); aiRenderSrc();
-  aiParsed=[]; _aiMixed=false; aiStatus('');
+  aiParsed=[]; _aiMixed=false; _aiChg=null; aiStatus('');
   document.getElementById('ai-result-box').style.display='none';
   document.getElementById('file-input').value='';
   document.getElementById('ai-drop-label').textContent='Drop file here or click to browse';
@@ -6004,7 +6025,7 @@ async function aiReadUpload(file){
   aiShowSrc(true); aiRenderSrc();
   await readPOFile([file], _aiSrc.text, seq, '');
 }
-const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, rev, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number or drawing number, WITHOUT the revision (e.g. B66735, 610-1094). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. rev = ONLY the revision of that part when the PO gives one, just the letter/number with no \"Rev\" word (e.g. \"B66735 Rev.6\" -> part B66735, rev 6; \"610-1094 Rev A\" -> part 610-1094, rev A; \"REV: C\" in a column -> rev C). Empty string when no revision is stated; never guess one. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. Empty string for other missing fields.';
+const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, rev, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number or drawing number, WITHOUT the revision (e.g. B66735, 610-1094). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. rev = ONLY the revision of that part when the PO gives one, just the letter/number with no \"Rev\" word (e.g. \"B66735 Rev.6\" -> part B66735, rev 6; \"610-1094 Rev A\" -> part 610-1094, rev A; \"REV: C\" in a column -> rev C). Empty string when no revision is stated; never guess one. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. (7) A REVISED / CHANGE-ORDER PO (marked Revision, Change Order, Amended, or showing was/now values): return every line as it stands NOW, unchanged lines included, with the new qty / cost / due; leave out lines it marks cancelled or deleted, and say what changed in poNotes (e.g. "Change order 2: qty 10 -> 15"). Empty string for other missing fields.';
 // the AI reader itself — used by the upload box above and by the mail hand-off, which
 // fetches the PO document(s) out of the email and passes them in as Files with the email text
 async function readPOFile(files, text, seq, note){
@@ -6257,27 +6278,147 @@ function aiSetRows(rows){
   const od=document.getElementById('ai-ordered');
   if(!od.value) od.value=_fromMailRcvd||new Date().toLocaleDateString('en-CA');
   document.getElementById('ai-result-box').style.display='block';
+  aiChgDetect();
   aiRenderRows();
 }
+
+// ── PO change mode ── A revised PO (customer changed qty / price / due date, added or
+// dropped lines) used to import as a second copy of every line. When the PO # read is
+// already on the board for that customer, the review switches to "changes": each line
+// read is paired with its existing order by part #, shows old → new, and Apply updates
+// those orders IN PLACE (job #, schedule progress, drawings and notes kept), adds the
+// new lines under the same PO, and only deletes a dropped line if it is ticked.
+// part / PO # compare key: case, spaces and punctuation ignored, a trailing "Rev x" dropped
+const aiKey=s=>String(s==null?'':s).replace(/\s*\brev\b.*$/i,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+// "Fluid Line Products, Inc." on the PO vs "Fluid Line" on the board
+function aiCustNear(a, b){
+  const w=s=>String(s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
+    .filter(x=>x&&!['inc','llc','co','corp','corporation','company','ltd','the','products','mfg','manufacturing'].includes(x));
+  const A=w(a), B=w(b); if(!A.length||!B.length) return !A.length||!B.length;
+  const ja=A.join(''), jb=B.join('');
+  return ja===jb || ja.includes(jb) || jb.includes(ja) || A[0]===B[0];
+}
+function aiChgDetect(){
+  const prev=_aiChg; _aiChg=null;
+  if(_aiMixed) return;
+  const po=aiKey(document.getElementById('ai-po').value), cust=document.getElementById('ai-cust').value;
+  if(!po) return;
+  const lines=orders.filter(o=>!o.archived && aiKey(o.po)===po && aiCustNear(o.customer, cust));
+  if(!lines.length) return;
+  // same PO as before (a keystroke in the header): keep the mode and the ticked deletes
+  const same=prev&&prev.po===po;
+  _aiChg={po, lines, cust:lines[0].customer, poLabel:lines[0].po, mode:same?prev.mode:'change',
+    drop:same?new Set([...prev.drop].filter(id=>lines.some(o=>o.id===id))):new Set()};
+}
+// ids of the existing orders a line read from the PO updates ([] = a new line).
+// r._m is the reviewer's pick: 'new', 'id:<orderId>' or 'grp:<part key>' (all split lines).
+function aiChgMatches(){
+  const C=_aiChg, used=new Set(), out=[];
+  aiParsed.forEach(r=>{
+    let ids=[];
+    if(r._m==='new') ids=[];
+    else if(r._m&&r._m.startsWith('id:')) ids=C.lines.filter(o=>o.id===r._m.slice(3)).map(o=>o.id);
+    else if(r._m&&r._m.startsWith('grp:')) ids=C.lines.filter(o=>aiKey(o.part)===r._m.slice(4)).map(o=>o.id);
+    else {
+      const k=aiKey(r.part);
+      // a part split into runs / partial deliveries is several orders: they move together
+      if(k) ids=C.lines.filter(o=>aiKey(o.part)===k && !used.has(o.id)).map(o=>o.id);
+    }
+    ids.forEach(id=>used.add(id)); out.push(ids);
+  });
+  return {rows:out, used};
+}
+// old → new for one line. apply:false = shown but left alone (and why).
+function aiChgDiff(r, ids){
+  const ex=ids.map(id=>orders.find(o=>o.id===id)).filter(Boolean); if(!ex.length) return [];
+  const grp=ex.length>1, inv=ex.some(o=>o.status==='Invoiced'), d=[];
+  const one=f=>{ const v=ex.map(o=>o[f]==null?'':String(o[f])); return v.every(x=>x===v[0])?v[0]:'(varies)'; };
+  const qNew=aiNum(r.qty), cNew=aiNum(r.cost), rev=aiRev(r.rev), due=r.due||'';
+  const qOld=ex.reduce((s,o)=>s+(parseFloat(o.qty)||0),0);
+  if(qNew>0 && Math.abs(qNew-qOld)>1e-9) d.push({f:'qty', label:'Qty', from:qOld, to:qNew, apply:!grp, why:grp?'split line: change the runs by hand':''});
+  const cOld=one('cost');
+  if(cNew>0 && !ex.every(o=>o.buildOnly) && !(Math.abs((parseFloat(cOld)||0)-cNew)<0.00001 && cOld!=='(varies)'))
+    d.push({f:'cost', label:'Unit $', from:cOld==='(varies)'?cOld:fmtMoney(parseFloat(cOld)||0), to:fmtMoney(cNew), val:cNew, apply:true});
+  const dOld=one('due');
+  if(due && due!==dOld) d.push({f:'due', label:'Due', from:dOld==='(varies)'?dOld:(fmtDate(dOld)||'—'), to:fmtDate(due), val:due, apply:!grp, why:grp?'split line: each run keeps its own date':''});
+  const rOld=one('rev');
+  if(rev && rev.toLowerCase()!==String(rOld).toLowerCase()) d.push({f:'rev', label:'Rev', from:rOld||'—', to:rev, val:rev, apply:true});
+  if(inv) d.forEach(x=>{ x.apply=false; x.why='already invoiced'; });
+  return d;
+}
+function aiChgLineLabel(o){ return [o.part||'(no part #)', 'qty '+(o.qty||0), o.job&&('job '+o.job), o.status==='Invoiced'&&'invoiced'].filter(Boolean).join(' · '); }
+function aiChgRowHtml(r, i, ids){
+  const C=_aiChg, esc=esc2, groups={};
+  C.lines.forEach(o=>{ const k=aiKey(o.part); (groups[k]=groups[k]||[]).push(o); });
+  const cur=r._m || (ids.length>1?'grp:'+aiKey(orders.find(o=>o.id===ids[0])?.part):ids.length?'id:'+ids[0]:'new');
+  const opts=[`<option value="new"${cur==='new'?' selected':''}>New line on this PO</option>`]
+    .concat(Object.entries(groups).filter(([,g])=>g.length>1).map(([k,g])=>`<option value="grp:${esc(k)}"${cur==='grp:'+k?' selected':''}>Updates all ${g.length} lines of ${esc(g[0].part)} (split)</option>`))
+    .concat(C.lines.map(o=>`<option value="id:${esc(o.id)}"${cur==='id:'+o.id?' selected':''}>Updates ${esc(aiChgLineLabel(o))}</option>`));
+  const d=aiChgDiff(r, ids);
+  const chips=!ids.length?''
+    :d.length?d.map(x=>`<span class="ai-d${x.apply?'':' skip'}" title="${esc(x.apply?'Will be changed':'Not changed: '+x.why)}">${esc(x.label)} ${esc(String(x.from))} → <b>${esc(String(x.to))}</b>${x.apply?'':' · '+esc(x.why)}</span>`).join('')
+    :'<span>No change</span>';
+  return `<div class="ai-diff" id="ai-diff-${i}"><select onchange="aiChgPick(${i},this.value)" title="Which existing order this line updates">${opts.join('')}</select>${chips}</div>`;
+}
+function aiChgTag(ids, r){
+  if(!ids.length) return '<span class="ai-mtag new">New line</span>';
+  return aiChgDiff(r, ids).some(x=>x.apply)?'<span class="ai-mtag upd">Changes</span>':'<span class="ai-mtag same">No change</span>';
+}
+window.aiChgPick=(i,v)=>{ const r=aiParsed[i]; if(!r) return; r._m=v; aiRenderRows(); };
+window.aiChgMode=(m)=>{ if(_aiChg){ _aiChg.mode=m; aiRenderRows(); } };
+window.aiChgDrop=(id,on)=>{ if(!_aiChg) return; on?_aiChg.drop.add(id):_aiChg.drop.delete(id); aiRenderRows(); };
+// what Apply would do, for the banner and the button
+function aiChgPlan(){
+  const m=aiChgMatches(), rows=aiParsed.map((r,i)=>({r, ids:m.rows[i], d:aiChgDiff(r, m.rows[i])}));
+  const live=rows.filter(x=>x.r.part.trim()||x.r.desc.trim()||aiNum(x.r.qty));
+  const gone=_aiChg.lines.filter(o=>!m.used.has(o.id));
+  // only a line that is still unmatched can be deleted (a tick survives re-pairing otherwise)
+  return {rows:live, changed:live.filter(x=>x.d.some(y=>y.apply)), added:live.filter(x=>!x.ids.length),
+    gone, drop:gone.filter(o=>_aiChg.drop.has(o.id)&&o.status!=='Invoiced').map(o=>o.id)};
+}
+function aiChgRender(){
+  const box=document.getElementById('ai-chg'), C=_aiChg;
+  if(!C){ box.style.display='none'; box.innerHTML=''; return; }
+  const esc=esc2, p=aiChgPlan(), on=C.mode==='change';
+  const sum=on?[p.changed.length+' changed', p.added.length+' new', p.drop.length?p.drop.length+' to delete':''].filter(Boolean).join(' · '):'every line imports as a new order';
+  box.innerHTML=`<div class="ai-chg-top"><i class="ti ti-git-compare"></i><span><b>PO ${esc(C.poLabel)}</b> is already in Orders for ${esc(C.cust)} (${C.lines.length} line${C.lines.length!==1?'s':''}). <span style="color:var(--text2)">${esc(sum)}</span></span><span class="sp"></span>
+    <span class="ai-chg-mode"><button type="button" class="${on?'on':''}" onclick="aiChgMode('change')">Update this PO</button><button type="button" class="${on?'':'on'}" onclick="aiChgMode('new')">Import as new lines</button></span></div>`
+    +(on&&p.gone.length?`<div class="ai-chg-gone"><div class="ai-chg-gone-h">On the board but not on this revision</div>`
+      +p.gone.map(o=>`<label class="${C.drop.has(o.id)?'on':''}"><input type="checkbox"${C.drop.has(o.id)?' checked':''}${o.status==='Invoiced'?' disabled':''} onchange="aiChgDrop('${esc(o.id)}',this.checked)"> ${esc(aiChgLineLabel(o))}${o.status==='Invoiced'?' (invoiced, kept)':' · tick to delete (goes to Recently Deleted)'}</label>`).join('')
+      +`</div>`:'');
+  box.style.display='block';
+}
+
 function aiRenderRows(){
-  const esc=esc2, mixed=_aiMixed;
+  const esc=esc2, mixed=_aiMixed, chg=_aiChg&&_aiChg.mode==='change';
+  const m=chg?aiChgMatches():null;
+  aiChgRender();
   document.getElementById('ai-head').style.display=mixed?'none':'';
   document.getElementById('ai-rows').innerHTML=aiParsed.map((r,i)=>{
     const miss=k=>(k==='part'&&!r.part)||(k==='qty'&&!(aiNum(r.qty)>0));
     const f=(k,label,cls,type)=>`<div class="form-group ${cls||''}"><label>${label}</label><input type="${type||'text'}"${k==='qty'||k==='cost'?' inputmode="decimal"':''} value="${esc(r[k])}" class="${miss(k)?'miss':''}" oninput="aiSet(${i},'${k}',this)"></div>`;
     return `<div class="ai-row">
-      <div class="ai-row-top">Line ${i+1}<span class="ai-tot" id="ai-tot-${i}">${aiTot(r)}</span><button type="button" class="ai-x" title="Remove this line" onclick="aiDelRow(${i})"><i class="ti ti-trash"></i></button></div>
+      <div class="ai-row-top">Line ${i+1}<span id="ai-mtag-${i}">${chg?aiChgTag(m.rows[i], r):''}</span><span class="ai-tot" id="ai-tot-${i}">${aiTot(r)}</span><button type="button" class="ai-x" title="Remove this line" onclick="aiDelRow(${i})"><i class="ti ti-trash"></i></button></div>
       <div class="ai-grid">
         ${mixed?f('customer','Customer','w2')+f('po','PO #','w2'):''}
         ${f('part','Part #')}${f('rev','Rev')}${f('qty','Qty')}${f('cost','Unit $')}
         ${f('due','Due','','date')}
         ${f('desc','Material','w3')}${f('poNotes','PO notes','full')}
+        ${chg?aiChgRowHtml(r,i,m.rows[i]):''}
         ${aiDrawHtml(r,i)}
       </div>
     </div>`;
   }).join('')||'<div class="ai-status">No line items — add one, or read a different file.</div>';
   aiDrawStatus();
+  aiImportBtn();
+}
+function aiImportBtn(){
   const ib=document.getElementById('ai-import-btn'), n=aiParsed.length;
+  if(_aiChg&&_aiChg.mode==='change'){
+    const p=aiChgPlan(), k=p.changed.length+p.added.length+p.drop.length;
+    ib.disabled=!k; ib.innerHTML='<i class="ti ti-git-compare"></i> '+(k?'Apply changes to PO '+esc2(_aiChg.poLabel):'Nothing to change');
+    return;
+  }
   ib.disabled=!n; ib.innerHTML='<i class="ti ti-download"></i> Import '+(n?n+' order'+(n!==1?'s':''):'Orders');
 }
 window.aiSet=(i,k,el)=>{
@@ -6286,11 +6427,21 @@ window.aiSet=(i,k,el)=>{
   if(k==='part') el.classList.toggle('miss', !el.value.trim());
   if(k==='qty') el.classList.toggle('miss', !(aiNum(el.value)>0));
   if(k==='qty'||k==='cost'){ const t=document.getElementById('ai-tot-'+i); if(t) t.textContent=aiTot(r); }
+  // change mode: refresh this line's old → new without redrawing the input being typed in
+  if(_aiChg&&_aiChg.mode==='change'&&['part','rev','qty','cost','due'].includes(k)){
+    const m=aiChgMatches(), d=document.getElementById('ai-diff-'+i), t=document.getElementById('ai-mtag-'+i);
+    if(d) d.outerHTML=aiChgRowHtml(r,i,m.rows[i]);
+    if(t) t.innerHTML=aiChgTag(m.rows[i], r);
+    aiChgRender(); aiImportBtn();
+  }
 };
 window.aiHead=()=>{
   if(_aiMixed) return;
   const c=document.getElementById('ai-cust').value, p=document.getElementById('ai-po').value;
   aiParsed.forEach(r=>{ r.customer=c; r.po=p; });
+  const was=!!_aiChg;
+  aiChgDetect();
+  if(was||_aiChg) aiRenderRows();
 };
 window.aiAddRow=()=>{
   const last=aiParsed[aiParsed.length-1]||{};
@@ -6301,8 +6452,72 @@ window.aiAddRow=()=>{
   if(rows.length){ const el=rows[rows.length-1].querySelectorAll('.ai-grid input')[_aiMixed?2:0]; if(el){ el.scrollIntoView({block:'nearest'}); el.focus(); } }
 };
 window.aiDelRow=(i)=>{ aiParsed.splice(i,1); aiRenderRows(); };
-window.aiClear=()=>{ aiParsed=[]; document.getElementById('ai-result-box').style.display='none'; document.getElementById('ai-ordered').value=''; aiStatus(''); };
+window.aiClear=()=>{ aiParsed=[]; _aiChg=null; aiChgRender(); document.getElementById('ai-result-box').style.display='none'; document.getElementById('ai-ordered').value=''; aiStatus(''); };
+// one line read from a PO → a new order (job # assigned per customer+PO)
+function aiNewOrder(r, ordered, drawJobs){
+  const qty=aiNum(r.qty), cost=aiNum(r.cost);
+  const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),rev:aiRev(r.rev),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered,due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
+  if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
+  if(r._dw!=null) drawJobs.push({id:o.id, k:r._dw});
+  // assign job number considering existing + already-added-this-batch orders
+  o.job = suggestJobNumber(o.customer, o.po);
+  orders.unshift(o);                 // add first so same-PO siblings get -2, -3…
+  maybeAdvanceCounter(o.job);         // advance counter only when a new base is claimed
+  if(o.customer) autoIndexCustomer(o.customer, r.poNotes||"");
+  expanded.add(o.id);                 // every imported card opens, ready for details
+  return o;
+}
+// PO change mode: update the matched orders in place, add the new lines, delete the ticked ones
+function aiApplyChanges(){
+  const C=_aiChg, p=aiChgPlan(), stamp=fmtDate(new Date().toLocaleDateString('en-CA'));
+  const ordered=document.getElementById('ai-ordered').value||'';
+  const drawJobs=[], drawCands=_aiDraw.cands.slice(), touched=[];
+  let nChanged=0, nAdded=0, nGone=0;
+  p.rows.forEach(({r, ids, d})=>{
+    if(!ids.length){
+      // a new line joins the PO exactly as it's spelled on the board, so it groups with the rest
+      const o=aiNewOrder({...r, customer:C.cust, po:C.poLabel}, ordered, drawJobs);
+      o.notes='Added on PO change '+stamp; touched.push(o.id); nAdded++;
+      return;
+    }
+    const ap=d.filter(x=>x.apply);
+    const ex=ids.map(id=>orders.find(o=>o.id===id)).filter(Boolean);
+    if(ap.length){
+      const note='PO change '+stamp+': '+ap.map(x=>x.label+' '+x.from+' → '+x.to).join('; ');
+      ex.forEach(o=>{
+        ap.forEach(x=>{ if(x.f==='qty') o.qty=x.to; else o[x.f]=x.val; });
+        o.total=o.buildOnly?0:(parseFloat(o.qty)||0)*(parseFloat(o.cost)||0);
+        o.notes=(o.notes?o.notes+'\n':'')+note;
+        if(_fromMailKey && !o.mailKey) o.mailKey=_fromMailKey;
+        expanded.add(o.id);
+      });
+      touched.push(ex[0].id); nChanged++;
+    }
+    // a drawing picked for a line that has none on the board yet
+    if(r._dw!=null) ex.filter(o=>!o.drawing).forEach(o=>drawJobs.push({id:o.id, k:r._dw}));
+  });
+  const deleted=[];
+  p.drop.forEach(id=>{
+    const o=orders.find(x=>x.id===id); if(!o || o.status==='Invoiced') return;
+    // same soft delete as the trash button: Recently Deleted can restore it
+    set(ref(db,'trash/'+id), {...o, deletedAt:new Date().toISOString(), deletedWhy:'Not on PO change '+stamp});
+    orders=orders.filter(x=>x.id!==id); expanded.delete(id); deleteDB(id);
+    deleted.push(id); nGone++;
+  });
+  const firstId=touched[0]||C.lines.find(o=>!deleted.includes(o.id))?.id||null;
+  if(_fromMailKey && firstId){
+    const first=orders.find(x=>x.id===firstId)||{};
+    update(ref(db,'mail/threads/'+_fromMailKey),{link:{app:'orders', id:firstId, label:'Order'+(first.job?(' '+first.job):(first.po?(' PO '+first.po):''))}})
+      .catch(()=>{/* mail link-back is best-effort; the orders themselves are saved */});
+  }
+  _fromMailKey=''; _fromMailText=''; _fromMailRcvd=''; document.getElementById('ai-ordered').value='';
+  saveDB();closeAI();aiParsed=[];_aiChg=null;
+  const what='PO '+C.poLabel+' updated: '+[nChanged+' changed', nAdded&&(nAdded+' added'), nGone&&(nGone+' deleted')].filter(Boolean).join(' · ')+' · '+C.cust;
+  if(firstId) landOnNewOrders(firstId, 0, what); else render();
+  aiAttachDrawings(drawJobs, drawCands);
+}
 window.importAIOrders=()=>{
+  if(_aiChg && _aiChg.mode==='change') return aiApplyChanges();
   const rows=(aiParsed||[]).filter(r=>r.part.trim()||r.desc.trim()||aiNum(r.qty));   // a line left blank is skipped
   if(!rows.length)return;
   // build new order objects, then assign internal job numbers per customer+PO
@@ -6310,16 +6525,7 @@ window.importAIOrders=()=>{
   const ordered=document.getElementById('ai-ordered').value||'';
   const drawJobs=[], drawCands=_aiDraw.cands.slice();   // picked drawings upload after the orders are saved
   rows.forEach(r=>{
-    const qty=aiNum(r.qty), cost=aiNum(r.cost);
-    const o={id:uid(),customer:r.customer.trim(),po:r.po.trim(),job:'',part:r.part.trim(),rev:aiRev(r.rev),desc:r.desc.trim(),qty,cost,total:qty*cost,ordered,due:r.due||'',status:STATUSES.includes(r.status)?r.status:'Received',invoice:'',payment:'Unpaid',notes:'',currentProcess:'',completedProcesses:[]};
-    if(_fromMailKey) o.mailKey=_fromMailKey;   // every line item on the PO links back to the email
-    if(r._dw!=null) drawJobs.push({id:o.id, k:r._dw});
-    // assign job number considering existing + already-added-this-batch orders
-    o.job = suggestJobNumber(o.customer, o.po);
-    orders.unshift(o);                 // add first so same-PO siblings get -2, -3…
-    maybeAdvanceCounter(o.job);         // advance counter only when a new base is claimed
-    if(o.customer) autoIndexCustomer(o.customer, r.poNotes||"");
-    expanded.add(o.id);                 // every imported card opens, ready for details
+    const o=aiNewOrder(r, ordered, drawJobs);
     if(!firstNewId) firstNewId=o.id;
   });
   if(firstNewId) revealNewOrder(firstNewId);
@@ -6338,14 +6544,14 @@ window.importAIOrders=()=>{
 // After an import: show the open-orders list with nothing hiding the new lines (a
 // search, a status/process filter, another page), flash them, and offer the next
 // step of the workflow — the customer confirmation for that PO — as one click.
-function landOnNewOrders(firstId, n){
+function landOnNewOrders(firstId, n, msg){
   if(document.getElementById('orders-page')?.style.display!=='block') window.showPage('orders');
   ['search','filter-status','filter-process'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   render(); revealNewOrder(firstId);
   const r=orders.find(o=>o.id===firstId)||{};
   let el=document.getElementById('next-toast');
   if(!el){ el=document.createElement('div'); el.id='next-toast'; el.className='undo-toast'; document.body.appendChild(el); }
-  const what=n+' order'+(n!==1?'s':'')+' added'+(r.po?(' — PO '+r.po):'')+(r.customer?(' · '+r.customer):'');
+  const what=msg||(n+' order'+(n!==1?'s':'')+' added'+(r.po?(' — PO '+r.po):'')+(r.customer?(' · '+r.customer):''));
   el.innerHTML=`<span class="ut-msg"><i class="ti ti-circle-check"></i> ${esc2(what)}</span><button class="ut-undo" id="nt-go"><i class="ti ti-receipt"></i> Order confirmation</button><button class="ut-x" id="nt-x" title="Dismiss"><i class="ti ti-x"></i></button>`;
   el.classList.add('show');
   clearTimeout(el._t);
