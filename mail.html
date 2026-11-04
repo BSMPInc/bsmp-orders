@@ -96,14 +96,39 @@ body.sb-pinned .dock{left:var(--sb)}
 .btn.primary:hover{background:var(--accent-2)}
 .btn.sm{height:32px;padding:0 10px;font-size:12.5px}
 .btn:disabled{opacity:.5;cursor:default}
-.search{flex:1;min-width:180px;max-width:340px;height:35px;padding:0 12px;border:1px solid var(--border2);background:#fff;outline:none}
+.search-wrap{position:relative;display:flex;flex:1;min-width:180px;max-width:340px}
+.search{flex:1;width:100%;min-width:0;height:35px;padding:0 12px;border:1px solid var(--border2);background:#fff;outline:none}
 .search:focus{border-color:var(--accent)}
+/* recent searches: drops down under the search box */
+.rs-menu{display:none;position:absolute;top:100%;left:0;right:0;min-width:260px;margin-top:2px;background:#fff;border:1px solid var(--border2);box-shadow:0 6px 18px rgba(16,24,40,.14);z-index:60;max-height:340px;overflow-y:auto}
+.rs-head{display:flex;align-items:center;justify-content:space-between;padding:7px 11px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border)}
+.rs-clear{color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0;font-size:12px;font-weight:700}
+.rs-row{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:13px;color:var(--text);cursor:pointer}
+.rs-row:hover,.rs-row.on{background:var(--accent-soft)}
+.rs-row>.ti-history{color:var(--text3);font-size:15px;flex:none}
+.rs-row .t{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.rs-row .t small{color:var(--text3);font-size:11.5px;margin-left:6px}
+.rs-act{flex:none;font-size:15px;color:var(--text3);cursor:pointer;padding:2px}
+.rs-act:hover{color:var(--accent)}
+.rs-act.pinned{color:var(--accent)}
+/* quick search buttons: one row, slides sideways when the panel is narrow */
+.qs-row{display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;margin-bottom:8px}
+.qs-row::-webkit-scrollbar{display:none}
+.qs-row:empty{display:none}
+.qs-chip{flex:none;gap:5px;padding:4px 8px;max-width:220px}
+.qs-chip .qs-t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.qs-chip.sug{border-style:dashed}
+.qs-chip .ti{font-size:13px;flex:none;color:var(--text3)}
+.qs-chip .ti:hover{color:var(--accent)}
+.qs-chip .pinned{color:var(--accent)}
+.qs-chip.on .ti,.qs-chip.on .pinned{color:#fff}
 .fchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
 .fchip{display:inline-flex;align-items:center;gap:7px;padding:6px 12px;font-size:12px;font-weight:700;background:#fff;border:1px solid var(--border);color:var(--text2);cursor:pointer}
 .fchip .n{font-size:10.5px;font-weight:800;background:var(--bg);border:1px solid var(--border);padding:0 6px;color:var(--text3)}
 .fchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .fchip.on .n{background:rgba(255,255,255,.16);border-color:transparent;color:#fff}
 .fchip:hover:not(.on){border-color:var(--border2);color:var(--text)}
+.fchip.ico{gap:5px;padding:6px 8px}
 
 /* status badges */
 .badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.02em;padding:2px 8px;white-space:nowrap;text-transform:uppercase}
@@ -502,7 +527,7 @@ body.sb-pinned .dock{left:var(--sb)}
 @media (min-width:1000px){
   #v-list{display:flex;flex-direction:column;flex:none;height:calc(100vh - 84px);padding:12px 22px calc(14px + var(--dock-h))}
   .pane-list .toolbar{margin-bottom:8px;gap:6px}
-  .pane-list .search{min-width:120px}
+  .pane-list .search-wrap{min-width:120px}
   .pane-list .fchips{margin-bottom:8px}
   .pane-list .connect-banner{margin-bottom:10px}
   .split{display:flex;gap:14px;flex:1;min-height:0;align-items:stretch}
@@ -603,9 +628,13 @@ body.sb-pinned .dock{left:var(--sb)}
       <div class="toolbar">
         <button class="btn primary" title="New email — keyboard: Ctrl+M" onclick="openCompose()"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Compose</button>
         <span class="fchips" id="mbxpick" style="margin:0" title="Show one mailbox at a time"></span>
-        <input class="search" id="search" placeholder="Search — Enter searches all history, incl. text inside PDF/Word attachments…" oninput="window.searchInput()" onkeydown="if(event.key==='Enter')window.searchAll()">
+        <div class="search-wrap">
+          <input class="search" id="search" autocomplete="off" placeholder="Search — Enter searches all history, incl. text inside PDF/Word attachments…" oninput="window.searchInput()" onkeydown="window.searchKey(event)" onfocus="window.recentShow()" onclick="window.recentShow()" onblur="window.recentHide()">
+          <div class="rs-menu" id="search-recent" onmousedown="event.preventDefault()"></div>
+        </div>
         <span class="hint" style="margin-left:auto" id="list-count"></span>
       </div>
+      <div class="qs-row" id="qsearch"></div>
       <div class="fchips" id="fchips"></div>
       <div class="card" id="rows"><div class="empty"><i class="ti ti-mail-off"></i>No mail loaded yet</div></div>
           <div class="hint" style="margin-top:8px">The <b>BOTH</b> tag = the same email landed in more than one mailbox — shown once, so nobody answers it twice.</div>
@@ -1150,9 +1179,178 @@ window.searchAll=()=>{
 };
 window.searchInput=()=>{
   // clearing the box automatically leaves search mode and reloads the inbox
-  if(!($('search').value||'').trim() && _searchQ){ leaveSearch(); return; }
+  if(!($('search').value||'').trim() && _searchQ){ leaveSearch(); _rsIdx=-1; renderRecent(); return; }
   // typing filters what's loaded — paint once you pause, not on every keystroke
   clearTimeout(_typeTimer); _typeTimer=setTimeout(renderList, 90);
+  _rsIdx=-1; renderRecent();
+};
+// ── quick searches + recent searches (per person, mail/searches/<userKey>/<key>) ──
+// One record per remembered search: {q, label, at, n, pin, pinAt, hide}. Written one
+// record at a time, never the whole list. at=0 means "not in the recent list".
+let SEARCHES={};
+let _searchBase='';
+let _qsSuggest=null;      // starter suggestions, worked out once a visit so the buttons don't jump around
+let _qsFlagsIn=false, _qsMutedIn=false;   // suggestions need both lists, or ads and muted senders slip in
+let _qsShown=[], _rsShown=[], _rsIdx=-1;
+const QS_MAX=8, RS_MAX=10, RS_KEEP=40;
+const qsKey=(q)=>mkey(String(q).trim()).replace(/[\x00-\x1f\x7f]/g,'_').slice(0,120);
+function qsSave(k,rec){
+  SEARCHES[k]=rec;
+  if(_searchBase) set(ref(db,_searchBase+'/'+k),rec).catch(()=>toast('Could not save that search.',true));
+}
+function qsDrop(k){
+  delete SEARCHES[k];
+  if(_searchBase) remove(ref(db,_searchBase+'/'+k)).catch(()=>toast('Could not remove that search.',true));
+}
+function rememberSearch(q,label){
+  q=String(q||'').trim(); if(q.length<2) return;
+  const k=qsKey(q), old=SEARCHES[k]||{};
+  const rec=Object.assign({},old,{q,at:Date.now(),n:(old.n||0)+1});
+  if(label&&!rec.label) rec.label=label;
+  qsSave(k,rec);
+  // keep the list from growing forever: the oldest plain searches go first
+  Object.keys(SEARCHES).filter(x=>!SEARCHES[x].pin&&!SEARCHES[x].hide)
+    .sort((a,b)=>(SEARCHES[b].at||0)-(SEARCHES[a].at||0)).slice(RS_KEEP).forEach(qsDrop);
+}
+function qsLabel(s){
+  if(s.label) return s.label;
+  const c=CONTACTS[mkey(s.q)];
+  return (c&&(c.name||c.company))||s.q;
+}
+// until someone has their own, offer the real business contacts who show up most:
+// senders with a flagged conversation or a saved contact, so ads and receipts stay out
+function qsSuggestions(){
+  if(_qsSuggest) return _qsSuggest;
+  if(!_qsFlagsIn||!_qsMutedIn) return [];
+  const src=_inboxBackup?_inboxBackup.threads:THREADS;
+  if(!src||!src.length) return [];
+  const tally={};
+  src.forEach(t=>{
+    const e=String(addrOf(t.fromEmail||'')||'').toLowerCase();
+    if(!e||/@bertsmp\.com$/.test(e)||/no-?reply|do-?not-?reply|mailer-daemon|postmaster|notifications?@|newsletter|bounce/.test(e)||mutedOf(t)) return;
+    const rec=tally[e]=tally[e]||{q:e,label:'',n:0,real:false};
+    rec.n++;
+    if(flagOf(t)||CONTACTS[mkey(e)]) rec.real=true;
+    // threads we started are named "To: someone" in the list; that isn't a name
+    if(!rec.label&&t.fromName&&!/^to:/i.test(t.fromName)) rec.label=t.fromName;
+  });
+  const out=Object.values(tally).filter(x=>x.real&&x.n>=2).sort((a,b)=>b.n-a.n).slice(0,QS_MAX).map(x=>({q:x.q,label:x.label,sug:true}));
+  if(src.length>=25) _qsSuggest=out;   // only settle once a real inbox has loaded
+  return out;
+}
+// starred first, then what this person searches again and again, then suggestions
+function quickSearches(){
+  const all=Object.values(SEARCHES||{}).filter(s=>s&&s.q);
+  const pins=all.filter(s=>s.pin).sort((a,b)=>(a.pinAt||0)-(b.pinAt||0));
+  const freq=all.filter(s=>!s.pin&&!s.hide&&(s.n||0)>=2).sort((a,b)=>(b.n-a.n)||((b.at||0)-(a.at||0)));
+  const out=pins.concat(freq), seen=new Set(out.map(s=>qsKey(s.q)));
+  qsSuggestions().forEach(s=>{
+    const k=qsKey(s.q);
+    if(!seen.has(k)&&!(SEARCHES[k]&&SEARCHES[k].hide)){ seen.add(k); out.push(s); }
+  });
+  return out.slice(0,Math.max(QS_MAX,pins.length));
+}
+function renderQuickSearch(){
+  const host=$('qsearch'); if(!host) return;
+  _qsShown=quickSearches();
+  const cur=(_searchQ||'').toLowerCase();
+  host.innerHTML=`<span class="fchip qs-chip" title="Star what's in the search box so it stays here" onclick="window.qsPinBox()"><i class="ti ti-star"></i>Star search</span>`+
+    _qsShown.map((s,i)=>{
+      const on=cur&&s.q.toLowerCase()===cur;
+      const tip=(on?'Click to leave this search':'Search all mail for '+s.q)+(s.sug?' (suggested from your inbox)':'');
+      return `<span class="fchip qs-chip${on?' on':''}${s.sug?' sug':''}" title="${esc(tip)}" onclick="window.qsRun(${i})">`+
+        `<i class="ti ${s.pin?'ti-star-filled pinned':'ti-star'}" title="${s.pin?'Remove the star':'Star it'}" onclick="window.qsPin(event,${i})"></i>`+
+        `<span class="qs-t">${esc(qsLabel(s))}</span>`+
+        `<i class="ti ti-x" title="Take it off this row" onclick="window.qsHide(event,${i})"></i></span>`;
+    }).join('');
+}
+function runSearch(q,label){
+  window.recentHide();
+  if(_searchQ&&_searchQ.toLowerCase()===q.toLowerCase()){ $('search').value=''; leaveSearch(); return; }
+  $('search').value=q;
+  rememberSearch(q,label);
+  window.searchAll();
+}
+window.qsRun=(i)=>{ const s=_qsShown[i]; if(s) runSearch(s.q,s.label); };
+function qsPinToggle(s){
+  const k=qsKey(s.q), old=SEARCHES[k]||{q:s.q,label:s.label||'',at:0,n:0};
+  qsSave(k,Object.assign({},old,old.pin?{pin:false}:{pin:true,pinAt:Date.now(),hide:false}));
+  renderQuickSearch();
+}
+window.qsPin=(ev,i)=>{ ev.stopPropagation(); const s=_qsShown[i]; if(s) qsPinToggle(s); };
+window.qsHide=(ev,i)=>{
+  ev.stopPropagation();
+  const s=_qsShown[i]; if(!s) return;
+  const k=qsKey(s.q), old=SEARCHES[k]||{q:s.q,label:s.label||'',at:0,n:0};
+  qsSave(k,Object.assign({},old,{pin:false,hide:true}));
+  renderQuickSearch();
+};
+window.qsPinBox=()=>{
+  const q=($('search').value||'').trim();
+  if(q.length<2){ $('search').focus(); toast('Type a search first, then tap Star search.'); return; }
+  const k=qsKey(q);
+  if(SEARCHES[k]&&SEARCHES[k].pin){ toast('Already starred.'); return; }
+  qsPinToggle({q});
+  toast('Starred “'+q+'”.');
+};
+// the recent list: newest first, narrowed by whatever is typed in the box
+function recentList(){
+  const typed=($('search').value||'').trim().toLowerCase();
+  return Object.values(SEARCHES||{}).filter(s=>s&&s.q&&(s.at||0)>0&&(s.n||0)>0)
+    .filter(s=>{ const v=s.q.toLowerCase(); return !typed||(v.includes(typed)&&v!==typed); })
+    .sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,RS_MAX);
+}
+function renderRecent(){
+  const box=$('search-recent'); if(!box) return;
+  if(document.activeElement!==$('search')){ box.style.display='none'; return; }
+  _rsShown=recentList();
+  if(!_rsShown.length){ box.style.display='none'; _rsIdx=-1; return; }
+  if(_rsIdx>=_rsShown.length) _rsIdx=-1;
+  box.innerHTML=`<div class="rs-head"><span>Recent searches</span><span class="rs-clear" onclick="window.rsClear()">Clear</span></div>`+
+    _rsShown.map((s,i)=>{
+      const label=qsLabel(s);
+      return `<div class="rs-row${i===_rsIdx?' on':''}" onclick="window.rsPick(${i})"><i class="ti ti-history"></i>`+
+        `<span class="t">${esc(label)}${label!==s.q?`<small>${esc(s.q)}</small>`:''}</span>`+
+        `<i class="ti ${s.pin?'ti-star-filled pinned':'ti-star'} rs-act${s.pin?' pinned':''}" title="${s.pin?'Remove the star':'Star it: keep a quick button for this search'}" onclick="window.rsPin(event,${i})"></i>`+
+        `<i class="ti ti-x rs-act" title="Remove from recent" onclick="window.rsDrop(event,${i})"></i></div>`;
+    }).join('');
+  box.style.display='block';
+}
+window.recentShow=()=>{ _rsIdx=-1; renderRecent(); };
+window.recentHide=()=>{ _rsIdx=-1; const box=$('search-recent'); if(box) box.style.display='none'; };
+window.rsPick=(i)=>{ const s=_rsShown[i]; if(s){ $('search').blur(); runSearch(s.q,s.label); } };
+window.rsPin=(ev,i)=>{ ev.stopPropagation(); const s=_rsShown[i]; if(s){ qsPinToggle(s); renderRecent(); } };
+function rsForget(s){
+  const k=qsKey(s.q), old=SEARCHES[k]; if(!old) return;
+  // a starred or hidden search keeps its record and only leaves the recent list
+  if(old.pin||old.hide) qsSave(k,Object.assign({},old,{at:0})); else qsDrop(k);
+}
+window.rsDrop=(ev,i)=>{ ev.stopPropagation(); const s=_rsShown[i]; if(s){ rsForget(s); renderRecent(); renderQuickSearch(); } };
+window.rsClear=()=>{
+  Object.values(SEARCHES||{}).filter(s=>s&&s.q&&(s.at||0)>0).forEach(rsForget);
+  window.recentHide(); renderQuickSearch();
+};
+// typed searches go through here. "Find this invoice" and other in-app searches call
+// searchAll directly, so they stay out of this person's recent list.
+window.searchEnter=()=>{
+  const q=($('search').value||'').trim();
+  window.recentHide();
+  if(q) rememberSearch(q);
+  window.searchAll();
+};
+window.searchKey=(ev)=>{
+  const open=$('search-recent').style.display==='block';
+  if(ev.key==='Enter'){
+    ev.preventDefault();
+    if(open&&_rsIdx>=0) window.rsPick(_rsIdx); else window.searchEnter();
+  }else if(open&&(ev.key==='ArrowDown'||ev.key==='ArrowUp')){
+    ev.preventDefault(); ev.stopPropagation();
+    const n=_rsShown.length;
+    _rsIdx=ev.key==='ArrowDown'?(_rsIdx+1)%n:(_rsIdx<=0?n-1:_rsIdx-1);
+    renderRecent();
+  }else if(open&&ev.key==='Escape'){
+    ev.stopPropagation(); window.recentHide();
+  }
 };
 function leaveSearch(){
   _searchQ='';
@@ -2276,6 +2474,7 @@ function visibleThreads(){
 }
 window.renderList=()=>{
   renderBoxPick();
+  renderQuickSearch();
   // filter chips with live counts (within the current nav page + mailbox pick)
   const m=NAV_META[navPage]||NAV_META.inbox;
   let base=(_searchQ?THREADS:allThreads()).filter(m[2]);
@@ -2285,12 +2484,13 @@ window.renderList=()=>{
   const counts={all:base.length, unread:base.filter(t=>t.unread).length, none:base.filter(t=>!flagOf(t)).length};
   FLAG_DEFS.forEach(f=>counts[f.k]=base.filter(t=>flagOf(t)===f.k).length);
   $('fchips').innerHTML =
-    `<span class="fchip${chipFilter==='all'?' on':''}" onclick="setChip('all')">All <span class="n">${counts.all}</span></span>`+
-    `<span class="fchip${chipFilter==='unread'?' on':''}" onclick="setChip('unread')"><span class="udot" style="margin-top:0"></span>Unread <span class="n">${counts.unread}</span></span>`+
+    // icons only to save room: the name shows on hover and is read out by screen readers
+    `<span class="fchip ico${chipFilter==='all'?' on':''}" title="All" aria-label="All" onclick="setChip('all')"><i class="ti ti-mail" style="font-size:14px"></i><span class="n">${counts.all}</span></span>`+
+    `<span class="fchip ico${chipFilter==='unread'?' on':''}" title="Unread" aria-label="Unread" onclick="setChip('unread')"><span class="udot" style="margin-top:0"></span><span class="n">${counts.unread}</span></span>`+
     FLAG_DEFS.filter(f=>counts[f.k]>0||chipFilter===f.k).map(f=>
-      `<span class="fchip${chipFilter===f.k?' on':''}" onclick="setChip('${f.k}')">${flagIcon(f,14)}${f.label==='Waiting on customer'?'Waiting':f.label} <span class="n">${counts[f.k]}</span></span>`).join('')+
-    `<span class="fchip${chipFilter==='none'?' on':''}" onclick="setChip('none')">Unflagged <span class="n">${counts.none}</span></span>`+
-    ((mutedCount>0||chipFilter==='muted')?`<span class="fchip${chipFilter==='muted'?' on':''}" onclick="setChip('muted')"><i class="ti ti-volume-off" style="font-size:14px"></i>Muted <span class="n">${mutedCount}</span></span>`:'');
+      `<span class="fchip ico${chipFilter===f.k?' on':''}" title="${esc(f.label)}" aria-label="${esc(f.label)}" onclick="setChip('${f.k}')">${flagIcon(f,14)}<span class="n">${counts[f.k]}</span></span>`).join('')+
+    `<span class="fchip ico${chipFilter==='none'?' on':''}" title="Unflagged" aria-label="Unflagged" onclick="setChip('none')"><i class="ti ti-flag-off" style="font-size:14px"></i><span class="n">${counts.none}</span></span>`+
+    ((mutedCount>0||chipFilter==='muted')?`<span class="fchip ico${chipFilter==='muted'?' on':''}" title="Muted" aria-label="Muted" onclick="setChip('muted')"><i class="ti ti-volume-off" style="font-size:14px"></i><span class="n">${mutedCount}</span></span>`:'');
 
   const list=visibleThreads();
   const unread=list.filter(t=>t.unread).length;
@@ -2307,7 +2507,7 @@ window.renderList=()=>{
   // typing only filters what's loaded — offer the all-history search right in the list
   const typed=($('search').value||'').trim();
   const searchBar=(typed && !_searchQ)
-    ? `<div class="searchmore" onclick="window.searchAll()"><i class="ti ti-search"></i>Searching everything ever received for “${esc(typed)}” — including text inside PDF &amp; Word attachments — click here or press <span class="key">Enter</span></div>`
+    ? `<div class="searchmore" onclick="window.searchEnter()"><i class="ti ti-search"></i>Searching everything ever received for “${esc(typed)}” — including text inside PDF &amp; Word attachments — click here or press <span class="key">Enter</span></div>`
     : '';
   if(!list.length){
     rows.innerHTML=searchBar+`<div class="empty"><i class="ti ti-mail-off"></i>${_searchQ?`Nothing in all mail history matches “${esc(_searchQ)}”`:(THREADS.length?'Nothing matches this view':'No mail loaded yet')}</div>`;
@@ -5018,6 +5218,7 @@ onAuthStateChanged(auth,(user)=>{
       });
       onValue(ref(db,'mail/threads'),snap=>{
         FLAGS=snap.val()||{};
+        _qsFlagsIn=true;
         backfillFlagMeta();
         renderList(); renderNavCounts();
         maybeOpenDeep();
@@ -5025,6 +5226,7 @@ onAuthStateChanged(auth,(user)=>{
       });
       onValue(ref(db,'mail/muted'),snap=>{
         MUTED=snap.val()||{};
+        _qsMutedIn=true;
         renderList(); renderNavCounts(); renderMuteBtn();
       });
       onValue(ref(db,'mail/notes'),snap=>{
@@ -5076,6 +5278,11 @@ onAuthStateChanged(auth,(user)=>{
         SIGS=snap.val()||{};
         if(document.getElementById('v-settings').style.display!=='none') renderSettings();
         renderSigHints();
+      });
+      _searchBase='mail/searches/'+mkey(user.email);
+      onValue(ref(db,_searchBase),snap=>{
+        SEARCHES=snap.val()||{};
+        renderQuickSearch(); renderRecent();
       });
       _draftBase='mail/drafts/'+mkey(user.email);
       onValue(ref(db,_draftBase),snap=>{
