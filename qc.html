@@ -406,7 +406,9 @@ table.tbl.dc-tbl{min-width:660px;font-size:12.5px}
 .pv-nav.prev{left:8px}
 .pv-nav.next{right:8px}
 .pv-nav:hover{background:rgba(35,39,46,.95)}
-#ov-ed{position:fixed;inset:0;z-index:10000;background:#14171b;display:flex;flex-direction:column;color:#e9ecef}
+#ov-ed{position:fixed;inset:0;z-index:10000;background:#14171b;display:flex;flex-direction:column;color:#e9ecef;touch-action:manipulation}
+#ov-ed.ov-pagezoom #ov-stage{touch-action:auto}
+#ov-zoomnote{position:absolute;z-index:5;display:none;box-sizing:border-box;padding:.6em .9em;background:#ffd166;color:#1b1e23;font-weight:800;text-align:center}
 .ov-row{gap:6px 12px;font-size:12px;padding:6px 10px}
 .ov-ttl{font-size:13px;display:flex;align-items:center;gap:6px;margin-right:4px}
 .ov-grp{display:inline-flex;align-items:center;gap:4px}
@@ -949,6 +951,13 @@ const I18N = {
     'Remove this overlay from the inspection?':'¿Quitar esta superposición de la inspección?','Overlay removed.':'Superposición quitada.',
     'Drawing over photo':'Plano sobre la foto','Upload a drawing':'Subir un plano','Save image':'Guardar imagen','Saves a picture to this device, with the date and time stamped on it':'Guarda una imagen en este dispositivo, con la fecha y la hora estampadas','Keeps the stamped picture with this inspection':'Guarda la imagen estampada con esta inspección','Save to inspection':'Guardar en la inspección',
     'Opacity':'Opacidad','Lines':'Líneas','Size':'Tamaño','Rotate':'Girar','Rotation':'Rotación','Mirror':'Espejo','Mirrored':'En espejo',
+    'Match 4 points':'Alinear 4 puntos','Undo straighten':'Deshacer enderezado','For a photo taken at an angle: straightens the photo so 4 points land on the drawing. The original photo is kept.':'Para una foto tomada en ángulo: endereza la foto para que 4 puntos coincidan con el plano. La foto original se conserva.',
+    'Click point {n} of 4 on the DRAWING — spread them around one flat surface of the part.':'Haz clic en el punto {n} de 4 del PLANO — repártelos en una misma superficie plana de la pieza.','Now click point {n} on the PHOTO — the same feature, same order.':'Ahora haz clic en el punto {n} de la FOTO — el mismo detalle, en el mismo orden.',
+    'Pick this point farther from the others — it makes the match accurate.':'Elige este punto más lejos de los otros — así la alineación es precisa.','That is almost in a straight line with two other points — pick a spot off that line.':'Está casi en línea recta con otros dos puntos — elige un lugar fuera de esa línea.',
+    'These points are mirrored compared to the drawing. If the photo shows the back of the part, turn on Mirror first, then match again.':'Estos puntos están invertidos respecto al plano. Si la foto muestra el reverso de la pieza, activa Espejo primero y vuelve a alinear.',
+    'These points don’t fit one flat shape — check they were clicked in the same order on the drawing and the photo, then try again.':'Estos puntos no forman una sola figura plana — revisa que estén en el mismo orden en el plano y en la foto, e inténtalo de nuevo.',
+    'these 4 points do not give a usable match':'estos 4 puntos no dan una alineación útil','Could not straighten this photo:':'No se pudo enderezar esta foto:','Straightening the photo…':'Enderezando la foto…','Photo straightened. The original photo is kept.':'Foto enderezada. La foto original se conserva.',
+    'Photo straightened, 4-point match':'Foto enderezada, alineación de 4 puntos','px per drawing px':'px por px del plano','Photo straightened: lines up only on the flat surface of the 4 points. Original photo kept.':'Foto enderezada: coincide solo en la superficie plana de los 4 puntos. Se conserva la foto original.',
     'Match 2 points':'Alinear 2 puntos','Reset':'Restablecer','Shift-click = 10 % steps':'Shift-clic = pasos de 10 %',
     '+ = clockwise · Shift-click = 5° steps':'+ = sentido horario · Shift-clic = pasos de 5°',
     'For a part photographed from the back side':'Para una parte fotografiada por el reverso','Hand: drag moves the view, not the drawing':'Mano: arrastrar mueve la vista, no el plano',
@@ -961,7 +970,7 @@ const I18N = {
     'Step':'Paso','Click point 1 on the DRAWING — a hole centre or a sharp corner.':'Haz clic en el punto 1 del PLANO — el centro de un barreno o una esquina viva.',
     'Click point 2 on the DRAWING — far from point 1.':'Haz clic en el punto 2 del PLANO — lejos del punto 1.',
     'Now click point 1 on the PHOTO — the same feature.':'Ahora haz clic en el punto 1 de la FOTO — la misma característica.',
-    'Click point 2 on the PHOTO.':'Haz clic en el punto 2 de la FOTO.','Wheel = zoom · right-drag = pan':'Rueda = zoom · arrastrar con clic derecho = mover vista',
+    'Click point 2 on the PHOTO.':'Haz clic en el punto 2 de la FOTO.','Drag or arrow keys = move around · wheel, pinch or + / − = zoom · Fit = whole picture':'Arrastrar o flechas = moverse · rueda, pellizco o + / − = zoom · Ajustar = imagen completa','Tap = pick the point · one finger = move around · two fingers = zoom · Fit = whole picture':'Tocar = elegir el punto · un dedo = moverse · dos dedos = zoom · Ajustar = imagen completa','The whole page is zoomed in. Pinch out with two fingers to go back to normal.':'Toda la página tiene zoom. Pellizca con dos dedos para volver a la normalidad.','See the whole picture':'Ver la imagen completa','Undo point':'Deshacer punto',
     'Drag = move drawing · wheel = zoom · right-drag or Shift-drag = pan · Alt+wheel = size · arrow keys = nudge · two fingers = size / turn':'Arrastrar = mover plano · rueda = zoom · clic derecho o Shift + arrastrar = mover vista · Alt+rueda = tamaño · flechas = ajuste fino · dos dedos = tamaño / giro',
     'Pick a drawing first.':'Elige primero un plano.','That spot is off the drawing.':'Ese punto está fuera del plano.','That spot is off the photo.':'Ese punto está fuera de la foto.',
     'Pick point 2 farther from point 1 — it makes the match accurate.':'Elige el punto 2 más lejos del punto 1 — así la alineación es precisa.',
@@ -2360,7 +2369,7 @@ async function qcOverlayOpen(ctx,want){
   else { o.msg={text:t('No drawing on this inspection yet — pick one from the library or upload it (top bar).'), kind:'pick'}; ovFillSelects(); ovDraw(); }
 }
 window.qcOverlayOpen=qcOverlayOpen;
-window.qcOvClose=()=>{ if(_ov&&_ov.raf) cancelAnimationFrame(_ov.raf); _ov=null; const el=$('ov-ed'); if(el) el.remove(); };
+window.qcOvClose=()=>{ if(_ov&&_ov.raf) cancelAnimationFrame(_ov.raf); if(_ov&&_ov.ro) _ov.ro.disconnect(); _ov=null; const el=$('ov-ed'); if(el) el.remove(); };
 function ovBuild(){
   let el=$('ov-ed'); if(el) el.remove();
   el=document.createElement('div'); el.id='ov-ed'; document.body.appendChild(el);
@@ -2382,17 +2391,28 @@ function ovBuild(){
       <span class="ov-grp" title="${esc(t('Shift-click = 10 % steps'))}"><label>${t('Size')}</label><button class="btn sm ov-ic" onclick="ovNudge('s',-1,event)">−</button><input class="in ov-num" id="ov-s" inputmode="decimal" onchange="ovSetNum('s',this.value)"><span class="ov-val">%</span><button class="btn sm ov-ic" onclick="ovNudge('s',1,event)">+</button></span>
       <span class="ov-grp" title="${esc(t('+ = clockwise · Shift-click = 5° steps'))}"><label>${t('Rotate')}</label><button class="btn sm ov-ic" title="−90°" onclick="ovNudge('r90',-1)"><i class="ti ti-rotate-2"></i></button><button class="btn sm ov-ic" onclick="ovNudge('r',-1,event)">−</button><input class="in ov-num" id="ov-r" inputmode="decimal" onchange="ovSetNum('r',this.value)"><span class="ov-val">°</span><button class="btn sm ov-ic" onclick="ovNudge('r',1,event)">+</button><button class="btn sm ov-ic" title="+90°" onclick="ovNudge('r90',1)"><i class="ti ti-rotate-clockwise-2"></i></button></span>
       <button class="btn sm" id="ov-flip" onclick="ovSet('flip',!_ov.flip)" title="${esc(t('For a part photographed from the back side'))}"><i class="ti ti-flip-vertical"></i> ${t('Mirror')}</button>
-      <button class="btn sm" id="ov-pick-btn" onclick="ovPickStart()"><i class="ti ti-target-arrow"></i> ${t('Match 2 points')}</button>
+      <button class="btn sm" id="ov-pick-btn" onclick="ovPickStart(2)"><i class="ti ti-target-arrow"></i> ${t('Match 2 points')}</button>
+      <button class="btn sm" id="ov-pick4-btn" title="${esc(t('For a photo taken at an angle: straightens the photo so 4 points land on the drawing. The original photo is kept.'))}" onclick="ovPickStart(4)"><i class="ti ti-perspective"></i> ${t('Match 4 points')}</button>
+      <button class="btn sm" id="ov-unrect-btn" style="display:none" onclick="ovStraightenUndo()"><i class="ti ti-arrow-back-up"></i> ${t('Undo straighten')}</button>
       <button class="btn sm" onclick="ovResetDrawing()"><i class="ti ti-refresh"></i> ${t('Reset')}</button>
       <span class="ov-grp"><button class="btn sm ov-ic" id="ov-pan" title="${esc(t('Hand: drag moves the view, not the drawing'))}" onclick="ovSet('pan',!_ov.pan)"><i class="ti ti-hand-stop"></i></button><button class="btn sm ov-ic" onclick="ovZoom(1/1.25)"><i class="ti ti-zoom-out"></i></button><button class="btn sm" onclick="ovFitView();ovDraw()">${t('Fit')}</button><button class="btn sm ov-ic" onclick="ovZoom(1.25)"><i class="ti ti-zoom-in"></i></button></span>
     </div>
     <div id="ov-stage"><canvas id="ov-cv"></canvas><div id="ov-busy"></div></div>
-    <div class="ov-status" id="ov-status"></div>`;
+    <div class="ov-status" id="ov-status"></div><div id="ov-zoomnote"></div>`;
+  // iPad: Safari zooms the whole page on a pinch or a double-tap, and the stage then refuses the gestures that would undo it
+  const noPageZoom=e=>{ if(!ovPageZoomed()) e.preventDefault(); };
+  el.addEventListener('gesturestart',noPageZoom); el.addEventListener('gesturechange',noPageZoom);
   const cv=$('ov-cv');
   cv.addEventListener('contextmenu',e=>e.preventDefault());
   cv.addEventListener('pointerdown',ovPDown); cv.addEventListener('pointermove',ovPMove);
-  cv.addEventListener('pointerup',ovPUp); cv.addEventListener('pointercancel',ovPUp);
+  cv.addEventListener('pointerup',ovPUp); cv.addEventListener('pointercancel',ovPCancel);
   cv.addEventListener('wheel',ovWheel,{passive:false});
+  // the bars above and below change height (status text, a wrapped button row): keep the canvas pixels and the view in step
+  // with the stage, or the picture stretches and clicks land off from the points they record
+  const o=_ov, st=$('ov-stage');
+  o.ro=new ResizeObserver(()=>{ if(_ov!==o||(st.clientWidth===o.cw&&st.clientHeight===o.ch)) return; ovResize(false); ovPaint(); });
+  o.ro.observe(st);
+  ovPageZoomSync();
   ovFillSelects(); ovSyncControls(); ovResize(true);
 }
 function ovFillSelects(){
@@ -2415,6 +2435,7 @@ async function ovLoadPhoto(pi,keepDrawing){
   try{
     const r=await ovLoadImage(p.url, !p.file); if(_ov!==o) return;
     o.photoImg=r.img; o.photoTainted=r.tainted; o.pw=r.img.naturalWidth; o.ph=r.img.naturalHeight;
+    o.base={img:r.img, w:o.pw, h:o.ph}; o.rect=null;   // the photo as taken; 4-point straightening works from this
   }catch(e){ o.msg={text:t('Could not load the photo.')+' '+((e&&e.message)||''), kind:'err'}; }
   finally{ ovBusy(''); }
   if(_ov!==o) return;
@@ -2445,7 +2466,8 @@ async function ovLoadDrawing(di,pageNo,align){
     }
     if(_ov!==o) return;
     o.page=pn; o.draw={cv, w:cv.width, h:cv.height, pages, tainted, ink:{}}; o.msg=null;
-    if(align&&align.s) ovApplyAlign(align); else ovPlaceDefault();
+    if(align&&align.s) ovApplyAlign(align);
+    else { if(o.rect){ ovRectClear(); ovFitView(); } ovPlaceDefault(); }   // a straightening belongs to the drawing its points were picked on
   }catch(e){
     console.error('overlay drawing load failed', e);
     if(_ov!==o) return;
@@ -2474,14 +2496,21 @@ function ovPlaceDefault(){
   o.s0=Math.min(o.pw/d.w, o.ph/d.h)*0.85; o.s=o.s0; o.T={x:o.pw/2, y:o.ph/2}; o.rot=0; o.fit=null;
 }
 function ovApplyAlign(a){
-  const o=_ov, d=o.draw; o.s0=Math.min(o.pw/d.w, o.ph/d.h)*0.85;
+  const o=_ov, d=o.draw, prev=o.rect&&o.rect.prev;
+  ovRectClear();
+  if(a.rect&&a.rect.d&&o.base){
+    try{ const r=ovRectMake({d:a.rect.d, p:a.rect.p, flip:!!a.rect.flip}); r.prev=prev||null; r.adjusted=!!a.rect.adjusted; ovRectUse(r); ovFitView(); }
+    catch(e){ console.error('overlay straighten failed', e); o.msg={text:t('Could not straighten this photo:')+' '+((e&&e.message)||e), kind:'err'}; ovFitView(); ovPlaceDefault(); return; }
+  }
+  o.s0=o.rect?o.rect.k:Math.min(o.pw/d.w, o.ph/d.h)*0.85;
   o.s=+a.s||o.s0; o.T={x:+a.tx||o.pw/2, y:+a.ty||o.ph/2}; o.rot=+a.rot||0; o.flip=!!a.flip;
   if(a.op!=null) o.op=+a.op; if(a.look) o.look=a.look;
   o.fit=a.fit?JSON.parse(JSON.stringify(a.fit)):null;
 }
-function ovAlign(){ const o=_ov; return {tx:+o.T.x.toFixed(2), ty:+o.T.y.toFixed(2), s:+o.s.toFixed(6), rot:+o.rot.toFixed(3), flip:!!o.flip, op:+o.op.toFixed(2), look:o.look, fit:o.fit||null}; }
-window.ovResetDrawing=()=>{ if(!_ov||!_ov.draw) return; _ov.flip=false; ovPlaceDefault(); ovSyncControls(); ovDraw(); };
-function ovTouched(){ if(_ov&&_ov.fit) _ov.fit.adjusted=true; }
+function ovAlign(){ const o=_ov, r=o.rect; return {tx:+o.T.x.toFixed(2), ty:+o.T.y.toFixed(2), s:+o.s.toFixed(6), rot:+o.rot.toFixed(3), flip:!!o.flip, op:+o.op.toFixed(2), look:o.look, fit:o.fit||null,
+  rect:r?{d:r.d, p:r.p, flip:r.flip, k:+r.k.toFixed(5), adjusted:!!r.adjusted}:null}; }
+window.ovResetDrawing=()=>{ if(!_ov||!_ov.draw) return; if(_ov.rect) ovRectFit(); else { _ov.flip=false; ovPlaceDefault(); } ovSyncControls(); ovDraw(); };
+function ovTouched(){ if(!_ov) return; if(_ov.fit) _ov.fit.adjusted=true; if(_ov.rect) _ov.rect.adjusted=true; }
 function ovNormDeg(d){ d=((d+180)%360+360)%360-180; return Math.abs(d)<1e-9?0:d; }
 function ovDeg(d,n){ return (d<0?'−':'')+Math.abs(d).toFixed(n==null?1:n)+'°'; }
 window.ovSet=(k,v)=>{
@@ -2511,7 +2540,8 @@ function ovSyncControls(){
   set('ov-op',Math.round(o.op*100)); const ovv=$('ov-op-v'); if(ovv) ovv.textContent=Math.round(o.op*100)+'%';
   set('ov-look',o.look); set('ov-s',o.draw?(o.s/o.s0*100).toFixed(1):''); set('ov-r',o.draw?o.rot.toFixed(1):'');
   const tg=(id,on)=>{ const b=$(id); if(b) b.classList.toggle('on',!!on); };
-  tg('ov-flip',o.flip); tg('ov-pick-btn',o.pick); tg('ov-pan',o.pan);
+  tg('ov-flip',o.flip); tg('ov-pick-btn',o.pick&&o.pick.n===2); tg('ov-pick4-btn',o.pick&&o.pick.n===4); tg('ov-pan',o.pan);
+  const un=$('ov-unrect-btn'); if(un) un.style.display=o.rect?'':'none';
   const cv=$('ov-cv'); if(cv) cv.style.cursor=o.pick?'crosshair':((o.pan||!o.draw)?'grab':'move');
 }
 function ovResize(refit){
@@ -2566,7 +2596,7 @@ function ovPaint(){
   g.fillStyle='#14171b'; g.fillRect(0,0,cv.width,cv.height);
   if(o.photoImg){
     g.setTransform(dpr*v.s,0,0,dpr*v.s,dpr*v.x,dpr*v.y); g.imageSmoothingQuality='high';
-    const pk=o.pick, onDraw=pk&&pk.step<2, onPhoto=pk&&pk.step>=2;
+    const pk=o.pick, onDraw=pk&&pk.step<pk.n, onPhoto=pk&&pk.step>=pk.n;
     g.globalAlpha=onDraw?0.25:1; g.drawImage(o.photoImg,0,0); g.globalAlpha=1;
     const L=ovLayer();
     if(L){
@@ -2578,12 +2608,12 @@ function ovPaint(){
       g.lineWidth=u; g.setLineDash([6*u,4*u]); g.strokeStyle='rgba(255,209,102,.6)'; g.strokeRect(-d.w/2,-d.h/2,d.w,d.h); g.setLineDash([]);
       g.restore();
     }
-    // 2-point markers: yellow rings = drawing points, blue crosses = photo points
+    // match-point markers: yellow rings = drawing points, blue crosses = photo points
     const mk=(P,label,col,cross)=>{ const r=9/v.s; g.lineWidth=2/v.s; g.strokeStyle=col; g.beginPath();
       if(cross){ g.moveTo(P.x-r*1.5,P.y); g.lineTo(P.x+r*1.5,P.y); g.moveTo(P.x,P.y-r*1.5); g.lineTo(P.x,P.y+r*1.5); }
       g.moveTo(P.x+r,P.y); g.arc(P.x,P.y,r,0,Math.PI*2); g.stroke();
       g.fillStyle=col; g.font='bold '+(13/v.s)+'px sans-serif'; g.fillText(label,P.x+r+3/v.s,P.y-r); };
-    const show=pk||(o.fit&&!o.fit.adjusted?o.fit:null);
+    const show=pk||(o.fit&&!o.fit.adjusted?o.fit:null)||(o.rect&&!o.rect.adjusted?{d:o.rect.d}:null);
     if(show&&o.draw){ (show.d||[]).forEach((q,i)=>mk(ovD2P(q),String(i+1),'#ffd166',false)); (show.p||[]).forEach((q,i)=>mk(q,String(i+1),'#4cc9f0',true)); }
   }
   ovHint();
@@ -2592,14 +2622,18 @@ function ovWorkText(){
   const o=_ov; if(!o||!o.draw) return t('No drawing');
   const parts=[t('Size')+' '+(o.s/o.s0*100).toFixed(1)+'% ('+t('scale')+' '+o.s.toFixed(4)+')', t('Rotation')+' '+ovDeg(o.rot,2), o.flip?t('Mirrored'):'', t('Opacity')+' '+Math.round(o.op*100)+'%', t('ovlook:'+o.look)];
   if(o.fit) parts.push(t('2-point match')+': '+t('scale')+' = '+t('photo')+' '+o.fit.photoPx+' px ÷ '+t('drawing')+' '+o.fit.drawPx+' px = '+(+o.fit.s).toFixed(4)+', '+t('rotation')+' '+ovDeg(+o.fit.rot,2)+(o.fit.adjusted?(' — '+t('then adjusted by hand')):''));
+  if(o.rect){ const r=o.rect; parts.push(t('Photo straightened, 4-point match')+': '+r.d.map((q,i)=>(i+1)+') '+t('drawing')+' '+Math.round(q.x)+','+Math.round(q.y)+' → '+t('photo')+' '+Math.round(r.p[i].x)+','+Math.round(r.p[i].y)).join('; ')+'; '+r.k.toFixed(3)+' '+t('px per drawing px')+(r.adjusted?(' — '+t('then adjusted by hand')):'')); }
   return parts.filter(Boolean).join(' · ');
 }
 function ovHint(){
   const o=_ov, el=$('ov-status'); if(!o||!el) return;
   let h;
   if(o.pick){
-    const steps=[t('Click point 1 on the DRAWING — a hole centre or a sharp corner.'), t('Click point 2 on the DRAWING — far from point 1.'), t('Now click point 1 on the PHOTO — the same feature.'), t('Click point 2 on the PHOTO.')];
-    h=`<span class="pick"><i class="ti ti-target-arrow"></i> ${t('Step')} ${o.pick.step+1}/4 — ${esc(steps[o.pick.step])}</span> <button class="btn sm" onclick="ovPickCancel()">${t('Cancel')}</button>${o.pick.warn?` <span class="err">${esc(o.pick.warn)}</span>`:''} <span class="ov-help">${t('Wheel = zoom · right-drag = pan')}</span>`;
+    const pk=o.pick, i4=(pk.step%4)+1;
+    const steps=pk.n===4
+      ? (pk.step<4 ? t('Click point {n} of 4 on the DRAWING — spread them around one flat surface of the part.') : t('Now click point {n} on the PHOTO — the same feature, same order.')).replace('{n}',i4)
+      : [t('Click point 1 on the DRAWING — a hole centre or a sharp corner.'), t('Click point 2 on the DRAWING — far from point 1.'), t('Now click point 1 on the PHOTO — the same feature.'), t('Click point 2 on the PHOTO.')][pk.step];
+    h=`<span class="pick"><i class="ti ti-target-arrow"></i> ${t('Step')} ${pk.step+1}/${pk.n*2} — ${esc(steps)}</span> <button class="btn sm" onclick="ovFitView();ovDraw()" title="${esc(t('See the whole picture'))}"><i class="ti ti-arrows-maximize"></i> ${t('Fit')}</button>${pk.step?`<button class="btn sm" onclick="ovPickBack()"><i class="ti ti-arrow-back-up"></i> ${t('Undo point')}</button>`:''}<button class="btn sm" onclick="ovPickCancel()">${t('Cancel')}</button>${o.pick.warn?` <span class="err">${esc(o.pick.warn)}</span>`:''} <span class="ov-help">${(window.matchMedia&&matchMedia('(pointer:coarse)').matches)?t('Tap = pick the point · one finger = move around · two fingers = zoom · Fit = whole picture'):t('Drag or arrow keys = move around · wheel, pinch or + / − = zoom · Fit = whole picture')}</span>`;
   } else {
     h=(o.msg?`<span class="${o.msg.kind==='err'?'err':'pick'}">${esc(o.msg.text)}</span> `:'')+(o.draw?`<span class="ov-work">${esc(ovWorkText())}</span>`:'')
       +`<span class="ov-help">${t('Drag = move drawing · wheel = zoom · right-drag or Shift-drag = pan · Alt+wheel = size · arrow keys = nudge · two fingers = size / turn')}</span>`;
@@ -2608,14 +2642,24 @@ function ovHint(){
 }
 /* pointer: drag moves the drawing (or pans with the hand / right button / Shift); two fingers size + turn it;
    in 2-point mode a tap picks a point and a drag pans */
+function ovPageZoomed(){ const v=window.visualViewport; return !!v&&v.scale>1.02; }
+// the page itself is zoomed (pinched before opening the editor, say): let Safari have the gestures so it can be pinched back out, and say so
+function ovPageZoomSync(){
+  const el=$('ov-ed'), n=$('ov-zoomnote'), v=window.visualViewport; if(!el||!n||!v) return;
+  const z=ovPageZoomed(); el.classList.toggle('ov-pagezoom',z); n.style.display=z?'block':'none';
+  if(z){ n.style.left=v.offsetLeft+'px'; n.style.top=v.offsetTop+'px'; n.style.width=v.width+'px'; n.style.fontSize=(15/v.scale)+'px'; n.textContent=t('The whole page is zoomed in. Pinch out with two fingers to go back to normal.'); }
+}
+if(window.visualViewport){ visualViewport.addEventListener('resize',ovPageZoomSync); visualViewport.addEventListener('scroll',ovPageZoomSync); }
 function ovPDown(e){
-  const o=_ov; if(!o) return; const q=ovPt(e);
+  const o=_ov; if(!o||ovPageZoomed()) return; const q=ovPt(e);
+  if(e.isPrimary) o.ptrs.clear();   // first finger down: any finger still listed lost its "up", and would turn this touch into a pinch
   try{ e.target.setPointerCapture(e.pointerId); }catch(_){}
   o.ptrs.set(e.pointerId,q);
   if(o.ptrs.size===2){ o.drag={mode:'pinch'}; return; }
   if(o.ptrs.size>2) return;
-  const pan=e.button===1||e.button===2||e.shiftKey||o.pan||!o.draw;
-  if(o.pick&&!pan&&e.button===0){ o.drag={mode:'tap', x:q.x, y:q.y}; return; }
+  // while picking, a left drag already pans: the hand must not stop a tap from picking the point
+  const pan=e.button===1||e.button===2||e.shiftKey||(o.pan&&!o.pick)||!o.draw;
+  if(o.pick&&!pan&&e.button===0){ o.drag={mode:'tap', x:q.x, y:q.y, slop:e.pointerType==='touch'?12:6}; return; }
   o.drag={mode:pan?'pan':'move'};
 }
 function ovPMove(e){
@@ -2630,7 +2674,7 @@ function ovPMove(e){
   }
   o.ptrs.set(e.pointerId,q);
   const d=o.drag; if(!d) return;
-  if(d.mode==='tap'){ if(Math.hypot(q.x-d.x,q.y-d.y)<=6) return; d.mode='pan'; }
+  if(d.mode==='tap'){ if(Math.hypot(q.x-d.x,q.y-d.y)<=d.slop) return; d.mode='pan'; }
   const dx=q.x-prev.x, dy=q.y-prev.y;
   if(d.mode==='pan'){ o.view.x+=dx; o.view.y+=dy; o.viewTouched=true; }
   else if(d.mode==='move'){ o.T.x+=dx/o.view.s; o.T.y+=dy/o.view.s; ovTouched(); }
@@ -2641,7 +2685,13 @@ function ovPUp(e){
   const o=_ov; if(!o) return; const d=o.drag;
   if(d&&d.mode==='tap'&&o.ptrs.size===1&&o.ptrs.has(e.pointerId)) ovPickAt(ovPt(e));
   o.ptrs.delete(e.pointerId);
-  if(!o.ptrs.size) o.drag=null; else if(d&&d.mode==='pinch') o.drag={mode:'none'};
+  if(!o.ptrs.size) o.drag=null; else if(d&&d.mode==='pinch') o.drag={mode:(o.pick||o.pan)?'pan':'none'};   // the finger left on the glass keeps moving the view
+}
+// the browser took the touch over: end it, and never count it as a tap
+function ovPCancel(e){
+  const o=_ov; if(!o) return;
+  o.ptrs.delete(e.pointerId);
+  if(!o.ptrs.size) o.drag=null; else if(o.drag&&o.drag.mode==='pinch') o.drag={mode:'none'};
 }
 function ovPinchDrawing(a0,b0,a1,b1){
   const o=_ov, A0=ovS2P(a0), B0=ovS2P(b0), A1=ovS2P(a1), B1=ovS2P(b1);
@@ -2663,28 +2713,36 @@ function ovWheel(e){
   ovDraw();
 }
 /* ---- 2-point match: the same two features on the drawing and the photo give size, turn and position ---- */
-window.ovPickStart=()=>{
+window.ovPickStart=(n)=>{
   const o=_ov; if(!o) return;
   if(!o.draw){ qcToast(t('Pick a drawing first.'),'err'); return; }
-  if(o.pick){ ovPickCancel(); return; }
-  o.pick={step:0, d:[], p:[]}; o.msg=null; ovSyncControls(); ovDraw();
+  const same=o.pick&&o.pick.n===n;
+  if(o.pick){ ovPickCancel(); if(same) return; }
+  if(n===4&&o.photoTainted){ qcToast(t('The browser was not allowed to copy this photo or drawing into a picture — open the app from the BSMP site and try again.'),'err'); return; }
+  o.pick={n, step:0, d:[], p:[]}; o.msg=null; ovSyncControls(); ovDraw();
 };
 window.ovPickCancel=()=>{ if(!_ov) return; _ov.pick=null; ovSyncControls(); ovDraw(); };
+window.ovPickBack=()=>{ const pk=_ov&&_ov.pick; if(!pk||!pk.step) return; pk.step--; (pk.step<pk.n?pk.d:pk.p).pop(); pk.warn=''; ovDraw(); };
 function ovPickAt(q){
   const o=_ov, pk=o&&o.pick; if(!pk||!o.draw) return;
   const P=ovS2P(q); pk.warn='';
-  if(pk.step<2){
+  const tooClose=pk.n===4?t('Pick this point farther from the others — it makes the match accurate.'):t('Pick point 2 farther from point 1 — it makes the match accurate.');
+  const inLine=(pts,c)=>pk.n===4&&pts.some((a,i)=>pts.slice(i+1).some(b=>ovNearLine(a,b,c)));
+  if(pk.step<pk.n){
     const D=ovP2D(P);
     if(D.x<0||D.y<0||D.x>o.draw.w||D.y>o.draw.h){ pk.warn=t('That spot is off the drawing.'); ovDraw(); return; }
-    if(pk.step===1&&Math.hypot(D.x-pk.d[0].x,D.y-pk.d[0].y)<0.03*Math.max(o.draw.w,o.draw.h)){ pk.warn=t('Pick point 2 farther from point 1 — it makes the match accurate.'); ovDraw(); return; }
+    if(pk.d.some(a=>Math.hypot(D.x-a.x,D.y-a.y)<0.03*Math.max(o.draw.w,o.draw.h))){ pk.warn=tooClose; ovDraw(); return; }
+    if(inLine(pk.d,D)){ pk.warn=t('That is almost in a straight line with two other points — pick a spot off that line.'); ovDraw(); return; }
     pk.d.push({x:+D.x.toFixed(2), y:+D.y.toFixed(2)});
   } else {
     if(P.x<0||P.y<0||P.x>o.pw||P.y>o.ph){ pk.warn=t('That spot is off the photo.'); ovDraw(); return; }
-    if(pk.step===3&&Math.hypot(P.x-pk.p[0].x,P.y-pk.p[0].y)<0.02*Math.max(o.pw,o.ph)){ pk.warn=t('Pick point 2 farther from point 1 — it makes the match accurate.'); ovDraw(); return; }
+    if(pk.p.some(a=>Math.hypot(P.x-a.x,P.y-a.y)<0.02*Math.max(o.pw,o.ph))){ pk.warn=tooClose; ovDraw(); return; }
+    if(inLine(pk.p,P)){ pk.warn=t('That is almost in a straight line with two other points — pick a spot off that line.'); ovDraw(); return; }
     pk.p.push({x:+P.x.toFixed(2), y:+P.y.toFixed(2)});
   }
   pk.step++;
-  if(pk.step===4){ ovSolve(pk); o.pick=null; }
+  if(pk.step===pk.n*2){ if(pk.n===4) ovStraighten(pk); else ovSolve(pk); o.pick=null; }
+  if(pk.step===pk.n||pk.step===pk.n*2) ovFitView();   // zoomed in on the last point: step back out to find the next one / see the result
   ovSyncControls(); ovDraw();
 }
 function ovSolve(pk){
@@ -2696,7 +2754,101 @@ function ovSolve(pk){
   o.s=s; o.rot=ovNormDeg(th*180/Math.PI);
   o.T={x:pk.p[0].x-s*(u[0].x*cs-u[0].y*sn), y:pk.p[0].y-s*(u[0].x*sn+u[0].y*cs)};
   o.fit={d:pk.d, p:pk.p, drawPx:+lu.toFixed(1), photoPx:+lp.toFixed(1), s:+s.toFixed(5), rot:+o.rot.toFixed(2), flip:!!o.flip, adjusted:false};
+  if(o.rect) o.rect.adjusted=true;
 }
+/* ---- 4-point straighten: for a photo taken at an angle. Four features on the drawing and the same four on the photo give a
+   perspective map (homography). A copy of the photo is warped into the drawing's frame and becomes the editor's photo, so
+   size / turn / opacity / save all carry on as usual; o.base keeps the photo as taken and only d + p + flip are stored, so
+   Re-align can rebuild it. H maps u = (flip·(x − w/2), y − h/2) to photo px; straightened px r = k·(u − (fx,fy)). */
+const OV_TRIPLES=[[0,1,2],[0,1,3],[0,2,3],[1,2,3]];
+function ovCross(a,b,c){ return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x); }
+function ovNearLine(a,b,c){ const L=Math.max(Math.hypot(b.x-a.x,b.y-a.y),Math.hypot(c.x-a.x,c.y-a.y),Math.hypot(c.x-b.x,c.y-b.y)); return Math.abs(ovCross(a,b,c))<0.02*L*L; }
+function ovHomog(u,p){
+  const A=[];
+  u.forEach((a,i)=>{ const b=p[i]; A.push([a.x,a.y,1,0,0,0,-a.x*b.x,-a.y*b.x,b.x]); A.push([0,0,0,a.x,a.y,1,-a.x*b.y,-a.y*b.y,b.y]); });
+  for(let c=0;c<8;c++){
+    let m=c; for(let r=c+1;r<8;r++) if(Math.abs(A[r][c])>Math.abs(A[m][c])) m=r;
+    if(Math.abs(A[m][c])<1e-9) return null;
+    const sw=A[c]; A[c]=A[m]; A[m]=sw;
+    for(let r=0;r<8;r++) if(r!==c){ const f=A[r][c]/A[c][c]; if(f) for(let j=c;j<9;j++) A[r][j]-=f*A[c][j]; }
+  }
+  const H=A.map((R,i)=>R[8]/R[i]); H.push(1);
+  return ovHNorm(H,u[0]);
+}
+function ovHApply(H,q){ const w=H[6]*q.x+H[7]*q.y+H[8]; return {x:(H[0]*q.x+H[1]*q.y+H[2])/w, y:(H[3]*q.x+H[4]*q.y+H[5])/w, w}; }
+// scale so w = 1 at a point on the part: then w > 0 means "the part's side of the horizon", whatever the tilt
+function ovHNorm(H,q){ const w=H[6]*q.x+H[7]*q.y+H[8]; return H.map(v=>v/w); }
+function ovHInv(H,q){ const [a,b,c,d,e,f,g,h,i]=H; return ovHNorm([e*i-f*h,c*h-b*i,b*f-c*e, f*g-d*i,a*i-c*g,c*d-a*f, d*h-e*g,b*g-a*h,a*e-b*d],q); }
+function ovPtsArea(pts){ return OV_TRIPLES.reduce((s,[a,b,c])=>s+Math.abs(ovCross(pts[a],pts[b],pts[c])),0); }
+function ovRectMake(spec){
+  const o=_ov, d=o.draw, b=o.base, f=spec.flip?-1:1;
+  const u=spec.d.map(q=>({x:f*(q.x-d.w/2), y:q.y-d.h/2}));
+  const H=ovHomog(u,spec.p); if(!H) throw new Error(t('these 4 points do not give a usable match'));
+  const Hi=ovHInv(H,spec.p[0]);
+  // the frame: where the whole photo lands in drawing units, kept to the drawing page + a quarter all round
+  const L={x0:-d.w*0.75, x1:d.w*0.75, y0:-d.h*0.75, y1:d.h*0.75};
+  const cs=[[0,0],[b.w,0],[b.w,b.h],[0,b.h]].map(([x,y])=>ovHApply(Hi,{x,y}));
+  const front=cs.every(c=>c.w>1e-9);
+  const x0=front?Math.max(L.x0,Math.min(...cs.map(c=>c.x))):L.x0, x1=front?Math.min(L.x1,Math.max(...cs.map(c=>c.x))):L.x1;
+  const y0=front?Math.max(L.y0,Math.min(...cs.map(c=>c.y))):L.y0, y1=front?Math.min(L.y1,Math.max(...cs.map(c=>c.y))):L.y1;
+  const k=Math.min(Math.sqrt(ovPtsArea(spec.p)/ovPtsArea(u)), OV_MAX_SIDE/Math.max(x1-x0,y1-y0));
+  const W=Math.max(1,Math.ceil((x1-x0)*k)), Ht=Math.max(1,Math.ceil((y1-y0)*k));
+  const sc=document.createElement('canvas'); sc.width=b.w; sc.height=b.h;
+  const sg=sc.getContext('2d'); sg.drawImage(b.img,0,0);
+  const s=sg.getImageData(0,0,b.w,b.h).data;   // a photo the browser may not copy throws here
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=Ht;
+  const g=cv.getContext('2d'), out=g.createImageData(W,Ht), a=out.data, bw=b.w, xm=b.w-1, ym=b.h-1;
+  const [h0,h1,h2,h3,h4,h5,h6,h7,h8]=H;
+  for(let y=0,i=0;y<Ht;y++){
+    const uy=y0+(y+0.5)/k;
+    for(let x=0;x<W;x++,i+=4){
+      const ux=x0+(x+0.5)/k, w=h6*ux+h7*uy+h8;
+      a[i+3]=255;
+      if(w>1e-9){
+        const px=(h0*ux+h1*uy+h2)/w-0.5, py=(h3*ux+h4*uy+h5)/w-0.5;
+        if(px>=0&&py>=0&&px<xm&&py<ym){
+          const ix=px|0, iy=py|0, fx=px-ix, fy=py-iy, p0=(iy*bw+ix)*4, p1=p0+4, p2=p0+bw*4, p3=p2+4;
+          for(let c=0;c<3;c++) a[i+c]=(s[p0+c]*(1-fx)+s[p1+c]*fx)*(1-fy)+(s[p2+c]*(1-fx)+s[p3+c]*fx)*fy;
+          continue;
+        }
+      }
+      a[i]=20; a[i+1]=23; a[i+2]=27;   // past the edge of the photo
+    }
+  }
+  g.putImageData(out,0,0);
+  return {d:spec.d, p:spec.p, flip:!!spec.flip, H, k, fx:x0, fy:y0, w:W, h:Ht, cv, adjusted:false, prev:null};
+}
+function ovRectUse(r){ const o=_ov; o.rect=r; o.photoImg=r.cv; o.pw=r.w; o.ph=r.h; o.s0=r.k; }
+function ovRectFit(){ const o=_ov, r=o.rect; o.s=r.k; o.rot=0; o.flip=r.flip; o.T={x:-r.k*r.fx, y:-r.k*r.fy}; o.fit=null; r.adjusted=false; }
+function ovRectClear(){ const o=_ov; o.rect=null; if(o.base){ o.photoImg=o.base.img; o.pw=o.base.w; o.ph=o.base.h; } }
+function ovStraighten(pk){
+  const o=_ov, r0=o.rect, f=o.flip?-1:1, d=o.draw;
+  const fail=m=>{ o.msg={text:m, kind:'err'}; };
+  // already straightened: points were clicked on the straightened copy, so take them back to the photo as taken
+  const p=pk.p.map(q=>{ if(!r0) return q; const m=ovHApply(r0.H,{x:q.x/r0.k+r0.fx, y:q.y/r0.k+r0.fy}); return {x:+m.x.toFixed(2), y:+m.y.toFixed(2)}; });
+  if(p.some(q=>q.x<0||q.y<0||q.x>o.base.w||q.y>o.base.h)){ fail(t('That spot is off the photo.')); return; }
+  const u=pk.d.map(q=>({x:f*(q.x-d.w/2), y:q.y-d.h/2}));
+  const sides=OV_TRIPLES.map(([a,b,c])=>Math.sign(ovCross(u[a],u[b],u[c]))*Math.sign(ovCross(p[a],p[b],p[c])));
+  if(sides.every(v=>v<0)){ fail(t('These points are mirrored compared to the drawing. If the photo shows the back of the part, turn on Mirror first, then match again.')); return; }
+  if(!sides.every(v=>v>0)){ fail(t('These points don’t fit one flat shape — check they were clicked in the same order on the drawing and the photo, then try again.')); return; }
+  const prev=r0?r0.prev:{T:{x:o.T.x,y:o.T.y}, s:o.s, s0:o.s0, rot:o.rot, flip:o.flip, fit:o.fit};
+  ovBusy(t('Straightening the photo…'));
+  setTimeout(()=>{   // let the busy note paint first: a big photo takes a moment
+    if(_ov!==o) return;
+    try{
+      const r=ovRectMake({d:pk.d, p, flip:!!o.flip}); r.prev=prev;
+      ovRectUse(r); ovRectFit(); o.msg=null; ovFitView();
+      qcToast(t('Photo straightened. The original photo is kept.'),'ok');
+    }catch(e){ console.error('overlay straighten failed', e); fail(t('Could not straighten this photo:')+' '+((e&&e.message)||e)); }
+    ovBusy(''); ovSyncControls(); ovDraw();
+  },30);
+}
+window.ovStraightenUndo=()=>{
+  const o=_ov; if(!o||!o.rect) return; const prev=o.rect.prev;
+  ovRectClear();
+  if(prev) Object.assign(o,prev); else ovPlaceDefault();
+  o.msg=null; ovFitView(); ovSyncControls(); ovDraw();
+};
 /* ---- the flattened picture: photo + drawing + a caption strip with the numbers ---- */
 function ovCaption(){
   const o=_ov, inf=qcOvInfoFor(o.ctx,o.rec), c=o.cands[o.di]||{}, p=o.photos[o.pi]||{};
@@ -2704,7 +2856,7 @@ function ovCaption(){
     ['BSMP — '+t('Drawing over photo'), inf.part?(t('Part')+' '+inf.part+(inf.rev?(' Rev '+inf.rev):'')):'', inf.customer, inf.job?(t('Job #')+' '+inf.job):''].filter(Boolean).join('  ·  '),
     t('Photo')+': '+(p.name||'—')+'  ·  '+t('Drawing')+': '+(c.name||'—')+((o.draw&&o.draw.pages>1)?(' ('+t('page')+' '+o.page+'/'+o.draw.pages+')'):''),
     ovWorkText(),
-    [((QC_USER&&QC_USER.email)||'').split('@')[0], t('Visual comparison only — not a measurement.')].filter(Boolean).join('  ·  ')
+    [((QC_USER&&QC_USER.email)||'').split('@')[0], t('Visual comparison only — not a measurement.'), o.rect?t('Photo straightened: lines up only on the flat surface of the 4 points. Original photo kept.'):''].filter(Boolean).join('  ·  ')
   ];
 }
 function ovStampText(d){ return d.toLocaleString(LANG==='es'?'es-MX':'en-US',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
@@ -2770,7 +2922,7 @@ window.ovSave=async ()=>{
     if(!url) throw new Error(t('File upload failed:')+' '+name);
     const ovId=newId('ovl');
     const entry={ id:ovId, url, name, at:o.shotAt.getTime(), by:(QC_USER&&QC_USER.email)||'',
-      photo:{url:p.url, name:p.name||'', w:o.pw, h:o.ph},
+      photo:{url:p.url, name:p.name||'', w:o.base.w, h:o.base.h},
       drawing:{url:c.url, name:c.name||'', type:c.type||'', src:c.src||'', page:o.page||1, w:o.draw.w, h:o.draw.h},
       align, work };
     qcFormKeep();
@@ -2787,7 +2939,10 @@ document.addEventListener('keydown',e=>{
     const typing=/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'');
     if(e.key==='Escape'){ e.preventDefault(); if(_ov.pick) ovPickCancel(); else qcOvClose(); return; }
     if(typing) return;
+    if(e.key==='+'||e.key==='='){ ovZoom(1.25); e.preventDefault(); return; }
+    if(e.key==='-'||e.key==='_'){ ovZoom(1/1.25); e.preventDefault(); return; }
     const k={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
+    if(k&&_ov.pick){ const st=e.shiftKey?200:40; _ov.view.x-=k[0]*st; _ov.view.y-=k[1]*st; _ov.viewTouched=true; ovDraw(); e.preventDefault(); return; }   // picking: move around, never the drawing
     if(k&&_ov.draw){ const st=(e.shiftKey?10:1)/_ov.view.s; _ov.T.x+=k[0]*st; _ov.T.y+=k[1]*st; ovTouched(); ovDraw(); e.preventDefault(); }
     return;
   }

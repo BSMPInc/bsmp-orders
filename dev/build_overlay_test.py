@@ -49,6 +49,37 @@ ph = ph.filter(ImageFilter.GaussianBlur(1.2))
 ph.save(OUT + 'photo1.jpg', quality=88)
 ph.rotate(180).save(OUT + 'photo2.jpg', quality=88)
 
+# photo3: the same plate shot at an angle (true perspective), for Match 4 points. TILT = where the plate's
+# corners TL, TR, BR, BL land in the photo; window.__tilt in the page gives the true photo spot of each feature.
+TILT = [(760, 430), (2560, 760), (2300, 1880), (560, 1500)]
+CORNERS = [(PX0, PY0), (PX1, PY0), (PX1, PY1), (PX0, PY1)]
+def homog(src_pts, dst_pts):
+    A = []
+    for (x, y), (u, v) in zip(src_pts, dst_pts):
+        A.append([x, y, 1, 0, 0, 0, -x * u, -y * u, u]); A.append([0, 0, 0, x, y, 1, -x * v, -y * v, v])
+    for c in range(8):
+        m = max(range(c, 8), key=lambda r: abs(A[r][c])); A[c], A[m] = A[m], A[c]
+        for r in range(8):
+            if r != c:
+                f = A[r][c] / A[c][c]
+                A[r] = [p - f * q for p, q in zip(A[r], A[c])]
+    return [A[i][8] / A[i][i] for i in range(8)] + [1.0]
+def apply_h(h, x, y):
+    w = h[6] * x + h[7] * y + h[8]
+    return ((h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w)
+flat = Image.new('RGB', (W, H), (52, 48, 44)); fd = ImageDraw.Draw(flat)
+fd.rectangle([PX0, PY0, PX1, PY1], fill=(186, 190, 194))
+for hx, hy in HOLES:
+    r = 30 if (hx, hy) == (725, 530) else 16
+    fd.ellipse([hx - r, hy - r, hx + r, hy + r], fill=(30, 28, 26))
+SS = 3  # draw big, so the warp stays sharp
+flat = flat.resize((W * SS, H * SS), Image.LANCZOS)
+to_flat = homog(TILT, [(x * SS, y * SS) for x, y in CORNERS])   # PIL wants photo -> flat
+tilted = flat.transform((PW, PH), Image.PERSPECTIVE, to_flat[:8], Image.BICUBIC, fillcolor=(52, 48, 44))
+tilted.filter(ImageFilter.GaussianBlur(1.0)).save(OUT + 'photo3.jpg', quality=90)
+to_photo = homog(CORNERS, TILT)
+tilt_truth = {'corners': CORNERS, 'holes': HOLES, 'cornersPhoto': TILT, 'holesPhoto': [apply_h(to_photo, x, y) for x, y in HOLES]}
+
 src = io.open(ROOT + 'qc.html', encoding='utf-8').read()
 stub = '''<script>
 /* ---- test stub for the Firebase module ---- */
@@ -70,6 +101,10 @@ __put('qc/inspections/insp_t1', {id:'insp_t1', type:'self', createdAt:Date.now()
 __put('qc/inspections/fair_t2', {id:'fair_t2', type:'fair', mode:'simple', createdAt:Date.now()-7200e3, createdBy:'ofc.edgar@bertsmp.com', partNum:'10-4471', customer:'Test Co', rev:'B', fairStatus:'Draft',
   photos:[{name:'photo1.jpg', url:B+'photo1.jpg', type:'image/jpeg'}], characteristics:[]});
 __put('qc/inspections/insp_t3', {id:'insp_t3', type:'self', createdAt:Date.now()-60e3, createdBy:'ops.luis@bertsmp.com', partNum:'99-0001', customer:'No Photo Co', result:'Pass', status:'Logged'});
+// a photo shot at an angle, with the PNG drawing (so it opens without pdf.js)
+__put('qc/inspections/insp_t4', {id:'insp_t4', type:'self', createdAt:Date.now()-30e3, createdBy:'ops.luis@bertsmp.com', partNum:'10-4471', customer:'Test Co', job:'2617', rev:'B', qty:'10', result:'Pass', status:'Logged',
+  photos:[{name:'photo3.jpg', url:B+'photo3.jpg', type:'image/jpeg'}], drawing:{name:'drawing.png', url:B+'drawing.png', type:'image/png'}, drawings:[{name:'drawing.png', url:B+'drawing.png', type:'image/png'}]});
+window.__tilt=__TILT__;
 __put('qc/drawings/drw_1', {id:'drw_1', name:'10-4471 flat.png', url:B+'drawing.png', type:'image/png', partNum:'10-4471', rev:'B', customer:'Test Co', createdAt:Date.now()-86400e3});
 __put('qc/drawings/drw_2', {id:'drw_2', name:'10-4471.DXF', url:B+'x.dxf', type:'', partNum:'10-4471', createdAt:Date.now()-86400e3});
 window.addEventListener('load', ()=>{
@@ -80,6 +115,7 @@ window.addEventListener('load', ()=>{
 });
 window.__file=async (n,tp)=>new File([await (await fetch(B+n)).blob()], n, {type:tp});
 </script>'''
+stub = stub.replace('__TILT__', json.dumps(tilt_truth))
 out = re.sub(r'<script type="module">.*?</script>', lambda m: stub, src, count=1, flags=re.S)
 assert out != src
 io.open(OUT + 'qc_test.html', 'w', encoding='utf-8', newline='').write(out)
