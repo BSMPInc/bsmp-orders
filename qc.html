@@ -947,7 +947,7 @@ const I18N = {
     'Open original':'Abrir original','Open the photos':'Abrir las fotos','Photo':'Foto','Previous':'Anterior','Next':'Siguiente',
     'not saved yet':'aún sin guardar','Overlay drawing':'Superponer plano','Re-align':'Volver a alinear','Drawing overlays':'Planos superpuestos',
     'Remove this overlay from the inspection?':'¿Quitar esta superposición de la inspección?','Overlay removed.':'Superposición quitada.',
-    'Drawing over photo':'Plano sobre la foto','Upload a drawing':'Subir un plano','Download PNG':'Descargar PNG','Save to inspection':'Guardar en la inspección',
+    'Drawing over photo':'Plano sobre la foto','Upload a drawing':'Subir un plano','Save image':'Guardar imagen','Saves a picture to this device, with the date and time stamped on it':'Guarda una imagen en este dispositivo, con la fecha y la hora estampadas','Keeps the stamped picture with this inspection':'Guarda la imagen estampada con esta inspección','Save to inspection':'Guardar en la inspección',
     'Opacity':'Opacidad','Lines':'Líneas','Size':'Tamaño','Rotate':'Girar','Rotation':'Rotación','Mirror':'Espejo','Mirrored':'En espejo',
     'Match 2 points':'Alinear 2 puntos','Reset':'Restablecer','Shift-click = 10 % steps':'Shift-clic = pasos de 10 %',
     '+ = clockwise · Shift-click = 5° steps':'+ = sentido horario · Shift-clic = pasos de 5°',
@@ -967,7 +967,7 @@ const I18N = {
     'Pick point 2 farther from point 1 — it makes the match accurate.':'Elige el punto 2 más lejos del punto 1 — así la alineación es precisa.',
     'Visual comparison only — not a measurement.':'Solo comparación visual — no es una medición.',
     'The browser was not allowed to copy this photo or drawing into a picture — open the app from the BSMP site and try again.':'El navegador no tuvo permiso para copiar esta foto o plano a una imagen — abre la app desde el sitio de BSMP e inténtalo de nuevo.',
-    'Could not make the PNG:':'No se pudo crear el PNG:','Overlay downloaded.':'Superposición descargada.',
+    'Could not make the PNG:':'No se pudo crear el PNG:','Image saved, stamped':'Imagen guardada, estampada',
     'Save the inspection first, then save the overlay to it.':'Guarda primero la inspección y luego guarda la superposición en ella.',
     'This photo isn’t saved yet — save the inspection first, then save the overlay.':'Esta foto aún no está guardada — guarda primero la inspección y luego la superposición.',
     'Overlay saved to this inspection.':'Superposición guardada en esta inspección.','Overlay NOT saved:':'Superposición NO guardada:',
@@ -2197,7 +2197,7 @@ window.qcSaveSelf=async ()=>{
    yet are Files in _pendingFiles['sc'|'frphoto']. A source key names one set of pictures:
    'rec:<id>' saved photos · 'pend:<bucket>' picked, not saved yet · 'ovl:<id>' saved overlays.
    An overlay lays the part's drawing over a photo (drag / size / turn / mirror, or match 2 points) and
-   flattens it to a PNG with a caption strip that prints the alignment numbers (show-the-work). Saved per
+   flattens it to a PNG with the date + time stamped on the picture and a caption strip that prints the alignment numbers (show-the-work). Saved per
    child at qc/inspections/<id>/overlays/<ovId> — never a whole-record write — together with the numbers
    that made it, so it can be reopened and re-aligned. Coordinates: the drawing maps into PHOTO pixels as
    p = T + s·R(rot)·(flip·(x − w/2), y − h/2); the screen view is a separate pan/zoom (view.s, view.x/y). */
@@ -2372,8 +2372,8 @@ function ovBuild(){
         <button class="btn sm ov-ic" title="${esc(t('From library'))}" onclick="qcDrawPickOpen('ovdraw')"><i class="ti ti-books"></i></button>
         <label class="btn sm ov-ic" title="${esc(t('Upload a drawing'))}"><i class="ti ti-file-upload"></i><input type="file" accept=".pdf,image/*" style="display:none" onchange="ovUpload(this)"></label></span>
       <span style="flex:1"></span>
-      <button class="btn sm" onclick="ovDownload()"><i class="ti ti-download"></i> ${t('Download PNG')}</button>
-      ${canSave?`<button class="btn sm primary" id="ov-save-btn" onclick="ovSave()"><i class="ti ti-device-floppy"></i> ${t('Save to inspection')}</button>`:''}
+      <button class="btn sm primary" id="ov-img-btn" title="${esc(t('Saves a picture to this device, with the date and time stamped on it'))}" onclick="ovDownload()"><i class="ti ti-camera"></i> ${t('Save image')}</button>
+      ${canSave?`<button class="btn sm primary" id="ov-save-btn" title="${esc(t('Keeps the stamped picture with this inspection'))}" onclick="ovSave()"><i class="ti ti-device-floppy"></i> ${t('Save to inspection')}</button>`:''}
       <button class="btn sm ov-ic" onclick="qcOvClose()" title="${esc(t('Close'))} (Esc)"><i class="ti ti-x"></i></button>
     </div>
     <div class="ov-row">
@@ -2704,9 +2704,10 @@ function ovCaption(){
     ['BSMP — '+t('Drawing over photo'), inf.part?(t('Part')+' '+inf.part+(inf.rev?(' Rev '+inf.rev):'')):'', inf.customer, inf.job?(t('Job #')+' '+inf.job):''].filter(Boolean).join('  ·  '),
     t('Photo')+': '+(p.name||'—')+'  ·  '+t('Drawing')+': '+(c.name||'—')+((o.draw&&o.draw.pages>1)?(' ('+t('page')+' '+o.page+'/'+o.draw.pages+')'):''),
     ovWorkText(),
-    ((QC_USER&&QC_USER.email)||'').split('@')[0]+'  ·  '+new Date().toLocaleString(LANG==='es'?'es-MX':'en-US')+'  ·  '+t('Visual comparison only — not a measurement.')
+    [((QC_USER&&QC_USER.email)||'').split('@')[0], t('Visual comparison only — not a measurement.')].filter(Boolean).join('  ·  ')
   ];
 }
+function ovStampText(d){ return d.toLocaleString(LANG==='es'?'es-MX':'en-US',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }
 function ovCompose(){
   const o=_ov; if(!o||!o.photoImg) return null;
   const e=Math.min(1, OV_MAX_SIDE/Math.max(o.pw,o.ph)), W=Math.round(o.pw*e), H=Math.round(o.ph*e);
@@ -2722,6 +2723,12 @@ function ovCompose(){
   g.drawImage(o.photoImg,0,0,W,H);
   const L=ovLayer();
   if(L){ g.save(); g.beginPath(); g.rect(0,0,W,H); g.clip(); g.scale(e,e); ovXf(g); g.globalAlpha=o.op; if(L.multiply) g.globalCompositeOperation='multiply'; g.drawImage(L.cv,-o.draw.w/2,-o.draw.h/2); g.restore(); }
+  // date + time on the picture itself (bottom right, like a camera stamp), so it stays with the part even if the caption is cropped
+  const stamp=ovStampText(o.shotAt), sf=Math.max(22,Math.round(W/42)), sp=Math.round(sf*0.5);
+  g.font='bold '+sf+'px "Hanken Grotesk", Arial, sans-serif'; g.textBaseline='middle';
+  const sw=Math.ceil(g.measureText(stamp).width)+sp*2, sh=Math.round(sf*1.6);
+  g.fillStyle='rgba(20,23,27,.85)'; g.fillRect(W-sw-sp,H-sh-sp,sw,sh);
+  g.fillStyle='#ffffff'; g.fillText(stamp,W-sw,H-sp-sh/2);
   g.fillStyle='#23272e'; g.fillRect(0,H,W,band); g.fillStyle='#ffffff'; g.textBaseline='top';
   lines.forEach(([txt,b],i)=>{ g.font=font(b); g.fillText(txt,pad,H+pad+i*lh); });
   return cv;
@@ -2730,39 +2737,42 @@ async function ovBlob(){
   const o=_ov; if(!o||!o.photoImg) return null;
   if(!o.draw){ qcToast(t('Pick a drawing first.'),'err'); return null; }
   if(o.photoTainted||o.draw.tainted){ qcToast(t('The browser was not allowed to copy this photo or drawing into a picture — open the app from the BSMP site and try again.'),'err'); return null; }
+  o.shotAt=new Date(); // one moment for the stamp, the file name and the saved record
   try{ const cv=ovCompose(); return await new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error('PNG could not be made')),'image/png')); }
   catch(e){ console.error('overlay compose failed', e); qcToast(t('Could not make the PNG:')+' '+((e&&e.message)||e),'err'); return null; }
 }
-function ovFileName(){
-  const inf=qcOvInfoFor(_ov.ctx,_ov.rec), d=new Date();
+function ovFileName(o){
+  const inf=qcOvInfoFor(o.ctx,o.rec), d=o.shotAt;
   const ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'_'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0');
   return ((inf.part||'part')+'_drawing-overlay_'+ds).replace(/[^A-Za-z0-9._-]+/g,'_')+'.png';
 }
 window.ovDownload=async ()=>{
-  const b=await ovBlob(); if(!b) return;
-  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=ovFileName();
+  const o=_ov, b=await ovBlob(); if(!b) return; // o, not _ov: the editor may be closed while the PNG is being made
+  const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=ovFileName(o);
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),30000);
-  qcToast(t('Overlay downloaded.'),'ok');
+  qcToast(t('Image saved, stamped')+' '+ovStampText(o.shotAt),'ok');
 };
 window.ovSave=async ()=>{
   const o=_ov; if(!o) return; const id=o.ctx.recId, rec=id&&INSPECTIONS[id];
   if(!rec){ qcToast(t('Save the inspection first, then save the overlay to it.'),'err'); return; }
   const p=o.photos[o.pi]||{}, c=o.cands[o.di];
   if(p.file){ qcToast(t('This photo isn’t saved yet — save the inspection first, then save the overlay.'),'err'); return; }
+  // the numbers as they are right now, when the picture is flattened: the editor may be moved or closed during the upload
+  const align=ovAlign(), work=ovWorkText();
   const blob=await ovBlob(); if(!blob||!c) return;
   const btn=$('ov-save-btn'), lbl=btn?btn.innerHTML:'';
   if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin"></i> '+t('Saving…'); }
   try{
     // a drawing picked from this computer gets stored too, so the overlay can be re-made later
     if(!c.url&&c.file){ const u=await withTimeout(upload(c.file,'inspections'),90000,t('Drawing upload timed out — check the connection.')); if(!u) throw new Error(t('File upload failed:')+' '+c.name); c.url=u; }
-    const name=ovFileName();
+    const name=ovFileName(o);
     const url=await withTimeout(upload(new File([blob],name,{type:'image/png'}),'inspections'),120000,t('Photo upload timed out — check the connection.'));
     if(!url) throw new Error(t('File upload failed:')+' '+name);
     const ovId=newId('ovl');
-    const entry={ id:ovId, url, name, at:Date.now(), by:(QC_USER&&QC_USER.email)||'',
+    const entry={ id:ovId, url, name, at:o.shotAt.getTime(), by:(QC_USER&&QC_USER.email)||'',
       photo:{url:p.url, name:p.name||'', w:o.pw, h:o.ph},
       drawing:{url:c.url, name:c.name||'', type:c.type||'', src:c.src||'', page:o.page||1, w:o.draw.w, h:o.draw.h},
-      align:ovAlign(), work:ovWorkText() };
+      align, work };
     qcFormKeep();
     await dbSet('qc/inspections/'+id+'/overlays/'+ovId, entry);
     try{ await qcLogAudit([{ inspectionId:id, partNum:rec.partNum||'', field:'overlay', action:'overlay-saved', note:(c.name||'drawing')+' on '+(p.name||'photo')+' · '+entry.work }]); }
