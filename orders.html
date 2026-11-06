@@ -6025,7 +6025,37 @@ async function aiReadUpload(file){
   aiShowSrc(true); aiRenderSrc();
   await readPOFile([file], _aiSrc.text, seq, '');
 }
-const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, rev, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number or drawing number, WITHOUT the revision (e.g. B66735, 610-1094). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. rev = ONLY the revision of that part when the PO gives one, just the letter/number with no \"Rev\" word (e.g. \"B66735 Rev.6\" -> part B66735, rev 6; \"610-1094 Rev A\" -> part 610-1094, rev A; \"REV: C\" in a column -> rev C). Empty string when no revision is stated; never guess one. (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered. (5) cost = the UNIT or PER-PIECE cost (Unit Cost / Rate / Unit Price), NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. (7) A REVISED / CHANGE-ORDER PO (marked Revision, Change Order, Amended, or showing was/now values): return every line as it stands NOW, unchanged lines included, with the new qty / cost / due; leave out lines it marks cancelled or deleted, and say what changed in poNotes (e.g. "Change order 2: qty 10 -> 15"). Empty string for other missing fields.';
+const PO_PROMPT='Extract all order/line-item details from this purchase order. This PO is sent TO Bert\'s Sheet Metal Products (aka Bert\'s Welding / BSMP), who is the vendor doing the work. Return a JSON array with fields: customer, po, job, part, rev, desc, qty, cost, due (YYYY-MM-DD), status, poNotes. RULES: (1) customer = the company ISSUING this PO to Bert\'s (the buyer); NEVER list Bert\'s / Bert\'s Sheet Metal / BSMP as the customer, they are the vendor. (2) part = ONLY the part number or drawing number, WITHOUT the revision (e.g. B66735, 610-1094). It is often embedded inside a longer description or a product/service column; pull just that identifier into part. rev = ONLY the revision of that part when the PO gives one, just the letter/number with no \"Rev\" word (e.g. \"B66735 Rev.6\" -> part B66735, rev 6; \"610-1094 Rev A\" -> part 610-1094, rev A; \"REV: C\" in a column -> rev C). A revision can be jammed against the next word: \"Rev 16061-T6\" means rev 1 followed by 6061-T6, also when \"Rev\" ends one line and \"16061-T6\" starts the next, and an alloy or material is never a revision. Empty string when no revision is stated; never guess one. When several lines share one number and only a detail or item name tells them apart, keep that name in part so each line stays its own part (e.g. \"T0-0440-198 Pivot Arm (Det 3), Rev 1\" -> part \"T0-0440-198 Pivot Arm (Det 3)\", rev 1). (3) desc = a SHORT material spec ONLY — the gauge/thickness, alloy/grade, and finish if stated (e.g. "0.060 thk 304 SS", "11ga CRS", ".25 6061-T6 Alum"). Do NOT copy long customer descriptions, part names, item titles, or usage/assembly notes into desc. If no material is stated, leave desc as an empty string. (4) qty = quantity ordered, taken from the column headed Quantity / Qty / Ordered, the number printed beside the unit of measure (Each, EA). (5) cost = the UNIT or PER-PIECE cost, taken from the column headed Unit Cost / Rate / Unit Price, NOT the extended line total; if only an extended total and qty are given, compute cost as total divided by qty. Read qty and cost by the column header each number sits under on the printed page, never by how the number looks: a quantity can be printed like 6.00 and a price like 130. (6) ALWAYS leave job as an empty string — job numbers are assigned internally by Bert\'s, not taken from the customer PO. If the PO shows the customer\'s own job/reference number, put it in poNotes (e.g. Cust Job 8111) instead of desc. (7) A REVISED / CHANGE-ORDER PO (marked Revision, Change Order, Amended, or showing was/now values): return every line as it stands NOW, unchanged lines included, with the new qty / cost / due; leave out lines it marks cancelled or deleted, and say what changed in poNotes (e.g. "Change order 2: qty 10 -> 15"). Empty string for other missing fields.';
+// A PDF's words laid out as they sit on the page, so each number lines up under its column
+// header. Without this the AI swapped qty and price on ResMed POs, which print "6.00" under
+// Quantity and "130" under Unit Price (PO 67005390, 2026-11-06). A scan has no words, so it
+// gets no layout and the AI reads the picture as before. Pages of solid prose (terms and
+// conditions) are left out. Any failure just means no layout.
+async function aiPdfLayout(file){
+  try{
+    if(!window.pdfjsLib || file.type!=='application/pdf') return '';
+    const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    const pages=[];
+    for(let n=1;n<=Math.min(pdf.numPages,12);n++){
+      const pg=await pdf.getPage(n);
+      const vt=pg.getViewport({scale:1}).transform;
+      const items=(await pg.getTextContent()).items.filter(i=>i.str&&i.str.trim()).map(i=>{
+        const t=pdfjsLib.Util.transform(vt,i.transform);
+        return {s:i.str.trim(),x:t[4],y:t[5]};
+      });
+      if(!items.length || items.reduce((a,i)=>a+i.s.length,0)>8000) continue;
+      items.sort((a,b)=>a.y-b.y||a.x-b.x);
+      const rows=[];
+      items.forEach(i=>{ const r=rows.find(r=>Math.abs(r.y-i.y)<=3); if(r) r.items.push(i); else rows.push({y:i.y,items:[i]}); });
+      pages.push(rows.map(r=>{
+        let line='';
+        r.items.sort((a,b)=>a.x-b.x).forEach(i=>{ const at=Math.round(i.x/4); line+=at>line.length?' '.repeat(at-line.length):(line?' ':''); line+=i.s; });
+        return line;
+      }).join('\n'));
+    }
+    return pages.join('\n\n--- next page ---\n\n');
+  }catch(e){ return ''; }
+}
 // the AI reader itself — used by the upload box above and by the mail hand-off, which
 // fetches the PO document(s) out of the email and passes them in as Files with the email text
 async function readPOFile(files, text, seq, note){
@@ -6045,6 +6075,8 @@ async function readPOFile(files, text, seq, note){
       ? ' The customer\'s email thread that came with '+(files.length>1?'these attachments':'this attachment')+' follows (newest message first). Take the line items from the attached PO; use the email only to fill gaps (e.g. a due date or PO # written in it). If an attachment is a drawing rather than the PO, make no line items from it.'
       : ' There is no attached document: the purchase order is in this email thread from the customer (newest message first). Read the line items from the newest customer message; earlier messages (an RFQ, Bert\'s quote) are history, so make no line items from them unless the PO refers to them.')
       +'\n\nEMAIL:\n'+text+'\n\n';
+    const layouts=(await Promise.all(files.map(aiPdfLayout))).map((l,k)=>l&&(files.length>1?'FILE '+files[k].name+':\n':'')+l).filter(Boolean);
+    if(layouts.length) prompt+=' The PDF text is laid out below with each word at its real position on the page, so a number belongs to the column header directly above it. Trust this layout for which number is in which column.\n\nPAGE LAYOUT:\n'+layouts.join('\n\n')+'\n\n';
     content.push({type:'text',text:prompt+' Return ONLY valid JSON, no markdown.'});
     const resp=await fetch('https://bsmp-ai-extract.frosty-fog-1f12.workers.dev',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:3000,messages:[{role:'user',content}]})});
     const data=await resp.json();
@@ -6267,7 +6299,7 @@ function aiSetRows(rows){
   const s=v=>v==null?'':String(v).trim();
   _aiDraw={seq:-1, cands:[], busy:false, msg:''};
   aiParsed=rows.filter(r=>r&&typeof r==='object').map(r=>({customer:s(r.customer), po:s(r.po), part:s(r.part), rev:aiRev(r.rev), desc:s(r.desc),
-    qty:s(r.qty), cost:s(r.cost), due:/^\d{4}-\d{2}-\d{2}$/.test(s(r.due))?s(r.due):'', poNotes:s(r.poNotes), status:s(r.status)}));
+    qty:s(r.qty).replace(/^(\d[\d,]*)\.0+$/,'$1'), cost:s(r.cost), due:/^\d{4}-\d{2}-\d{2}$/.test(s(r.due))?s(r.due):'', poNotes:s(r.poNotes), status:s(r.status)}));
   // one PO from one customer is the usual case — those two are edited once, above the lines
   _aiMixed=new Set(aiParsed.map(r=>r.customer.toLowerCase()+'|'+r.po.toLowerCase())).size>1;
   const f=aiParsed[0]||{};
