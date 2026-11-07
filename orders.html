@@ -927,6 +927,20 @@ select.ss-vin{width:170px;flex-shrink:0}
 .po-list .po-mini.done{opacity:.45;filter:grayscale(1);background:#e6e8ec;border-color:#d5d9e0;box-shadow:none}
 .po-list .po-mini.done:hover,.po-list .po-mini.done.active{opacity:1;filter:none;background:var(--card)}
 .pm-accent{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
+/* Select mode on Open Orders: tick POs and see a live count */
+.sel-bar{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);padding:8px 12px;margin-bottom:12px}
+.sel-count{font-size:14px;font-weight:700;color:var(--text)}
+.sel-count b{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:var(--accent);margin-right:2px}
+.sel-lines{font-size:12px;color:var(--text2)}
+.sel-actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+.sel-check{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;margin-right:4px;background:none;border:0;cursor:pointer;vertical-align:middle;flex-shrink:0}
+.sel-box{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;background:#fff;border:2px solid #8a93a5;color:#fff;font-size:13px}
+.sel-check:hover .sel-box{border-color:var(--accent)}
+.sel-check:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.sel-check.on .sel-box,.sel-check.part .sel-box{background:var(--accent);border-color:var(--accent)}
+.po-mini.sel-on{padding-left:44px}
+.po-mini .sel-check{position:absolute;left:4px;top:0;bottom:0;width:38px;height:auto;margin:0}
+.po-list .po-mini.sel-picked{background:var(--accent-soft)}
 .pm-top{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .pm-cust{font-size:13.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pm-po{font-size:10.5px;font-weight:700;color:#46506a;background:#dde5f1;border-radius:5px;padding:1px 6px;flex-shrink:0}
@@ -1732,11 +1746,14 @@ body.sb-hidden .topbar{padding-left:24px}
       <button class="btn" id="hide-invoiced-btn" onclick="toggleHideInvoiced()" title="Invoiced POs always sink to the bottom; this hides them completely"><i class="ti ti-eye"></i> Hide invoiced</button>
       <button class="btn" id="incomplete-btn" onclick="toggleOnlyIncomplete()" title="Show only orders missing a due date, qty, price, description, or drawing"><i class="ti ti-alert-triangle"></i> Missing info</button>
       <button class="btn" id="atrisk-btn" onclick="toggleOnlyAtRisk()" title="Show only jobs that are behind or must start now to make their due date"><i class="ti ti-clock-exclamation"></i> At risk</button>
+      <button class="btn" id="select-mode-btn" onclick="toggleSelectMode()" title="Tick open orders to get a count of them"><i class="ti ti-checkbox"></i> Select</button>
       <div class="view-toggle">
         <button id="vt-card" onclick="setViewMode('card')"><i class="ti ti-layout-grid"></i> Cards</button>
         <button id="vt-table" onclick="setViewMode('table')"><i class="ti ti-table"></i> Table</button>
       </div>
     </div>
+
+    <div class="sel-bar no-print" id="sel-bar" style="display:none"></div>
 
     <!-- Card view: sort bar + grid -->
     <div class="sortbar no-print" id="sortbar"></div>
@@ -3000,6 +3017,8 @@ let selectedPO=null;                 // master-detail: which PO group is shown o
 let hideInvoiced=false;              // toggle: remove fully-invoiced POs from the active list
 let onlyIncomplete=false;            // toggle: show only orders missing key info
 let onlyAtRisk=false;               // toggle: show only behind / tight jobs
+let selectMode=false;                // Open Orders "Select" button: tick orders for a live count (on screen only, never saved)
+const selIds=new Set();              // ticked line-item ids, as strings
 const DONE_STATUSES=new Set(['Invoiced']);     // statuses treated as "done" → sink to bottom / hide
 function isDoneRow(r){ return DONE_STATUSES.has(r.status); }
 function isDoneGroup(items){ return items.length>0 && items.every(isDoneRow); }
@@ -3530,6 +3549,7 @@ function render(){
   document.getElementById('vt-card')?.classList.toggle('active', isCard);
   document.getElementById('vt-table')?.classList.toggle('active', !isCard);
   renderSummary();
+  renderSelBar();
   if(isCard){ renderCards(); return; }
   const rows=filteredOrders();
   const mode=document.getElementById('group-mode').value;
@@ -3577,7 +3597,7 @@ function render(){
       const statusBadges = statuses.map(st=>`<span class="status-badge ${STATUS_CLASS[st]||'s-confirmed'}" style="pointer-events:none;margin-right:2px">${st}</span>`).join('');
       html+=`<tr class="po-group-row${stripe}${done?' done':''}" onclick="window._tg('${gkE}')">
         <td style="padding-left:10px;width:36px"><span class="grp-acc" style="background:${accColor}"></span><span class="group-chevron${collapsed?'':' open'}">›</span></td>
-        <td colspan="5">${lbl}<span class="grp-items">${items.length} item${items.length!==1?'s':''}</span>${overdue?`<span class="grp-overdue">● Overdue</span>`:''}</td>
+        <td colspan="5">${selectMode?selCheckHtml(selOpenIds(items)):''}${lbl}<span class="grp-items">${items.length} item${items.length!==1?'s':''}</span>${overdue?`<span class="grp-overdue">● Overdue</span>`:''}</td>
         <td style="text-align:center;color:var(--text2);font-weight:600">${gqty||''}</td>
         <td style="font-weight:700;color:var(--text)">${fmtMoney(gtotal)}</td>
         <td></td>
@@ -3816,8 +3836,11 @@ function condensedCard(g){
   const missTip=g.incompleteCount?`${g.incompleteCount} item${g.incompleteCount!==1?'s':''} missing info`:'';
   const missBadge=g.incompleteCount?`<span class="pm-miss" title="${missTip}"><i class="ti ti-alert-triangle"></i></span>`:'';
   const riskChip=healthBadge(g.health);
-  return `<div class="po-mini${g.gk===selectedPO?' active':''}${g.allInvoiced?' done':(g.doneRank===1?' done-soft':'')}" onclick="window._selPO('${gkE}')">
+  const selOpen=selectMode?selOpenIds(g.items):[];
+  const selCls=selectMode?(' sel-on'+(selOpen.some(id=>selIds.has(id))?' sel-picked':'')):'';
+  return `<div class="po-mini${g.gk===selectedPO?' active':''}${g.allInvoiced?' done':(g.doneRank===1?' done-soft':'')}${selCls}" onclick="window._selPO('${gkE}')">
     <div class="pm-accent" style="background:${accColor}"></div>
+    ${selCheckHtml(selOpen)}
     <div class="pm-top"><span class="pm-cust">${g.customer||'—'}</span>${missBadge}<span class="pm-po">#${g.po}</span></div>
     <div class="pm-mid">${partChip}<span class="pm-count">${g.items.length} item${g.items.length!==1?'s':''}</span></div>
     <div class="pm-bot"><span class="pm-dates">${startVal?`<span class="pm-start" title="Start date">${startVal}</span><span class="pm-arrow">→</span>`:''}<span class="pm-due" style="${g.dueOverdue?'color:var(--red);font-weight:600':''}" title="Due date">${g.overdue?'● ':''}${dueVal}</span></span><span class="pm-val">${g.gtotal?fmtMoney(g.gtotal):'—'}</span></div>
@@ -3995,13 +4018,66 @@ window.toggleOnlyAtRisk=()=>{
   render();
 };
 
+// ── Select mode: tick open orders for a live count ───────────────────────────
+// "Open" means the same as the Open number on Stats: not Completed or Invoiced.
+// Lives only on this screen; nothing here writes to the database.
+function isOpenRow(r){ return !['Completed','Invoiced'].includes(r.status); }
+function selOpenIds(items){ return items.filter(isOpenRow).map(r=>String(r.id)); }
+// A tick box for a set of lines (a whole PO, a customer, or one line). Closed work gets none.
+function selCheckHtml(ids){
+  if(!ids.length) return '';
+  const n=ids.filter(id=>selIds.has(id)).length;
+  const all=n===ids.length;
+  return `<button type="button" class="sel-check no-print${all?' on':(n?' part':'')}" role="checkbox" aria-checked="${all?'true':(n?'mixed':'false')}" aria-label="Select" title="Select" onclick="window._selToggle('${ids.join(',')}',event)"><span class="sel-box">${all?'<i class="ti ti-check"></i>':(n?'<i class="ti ti-minus"></i>':'')}</span></button>`;
+}
+function renderSelBar(){
+  const btn=document.getElementById('select-mode-btn');
+  if(btn) btn.classList.toggle('active',selectMode);
+  const bar=document.getElementById('sel-bar'); if(!bar) return;
+  if(!selectMode){ bar.style.display='none'; return; }
+  // drop anything that was deleted, archived or closed since it was ticked
+  const live=new Map(orders.filter(r=>!r.archived&&isOpenRow(r)).map(r=>[String(r.id),r]));
+  [...selIds].forEach(id=>{ if(!live.has(id)) selIds.delete(id); });
+  const lines=selIds.size;
+  const pos=new Set([...selIds].map(id=>{ const r=live.get(id); return r.customer+'||'+(r.po||'verbal'); })).size;
+  bar.style.display='flex';
+  bar.innerHTML=`<span class="sel-count"><b>${pos}</b> open order${pos!==1?'s':''} selected</span>
+    <span class="sel-lines">${lines} line item${lines!==1?'s':''}</span>
+    <span class="sel-actions">
+      <button class="btn sm" onclick="window._selAll()"><i class="ti ti-checks"></i> Select all shown</button>
+      <button class="btn sm" onclick="window._selClear()"${lines?'':' disabled'}><i class="ti ti-eraser"></i> Clear</button>
+      <button class="btn sm" onclick="toggleSelectMode()"><i class="ti ti-x"></i> Done</button>
+    </span>`;
+}
+function selRefresh(){
+  if(viewMode==='card'){ renderSelBar(); renderCards(); } else render();
+}
+window.toggleSelectMode=()=>{
+  selectMode=!selectMode;
+  selIds.clear();
+  selRefresh();
+};
+window._selToggle=(csv,e)=>{
+  if(e) e.stopPropagation();          // a tick must not open the PO or fold the group
+  const ids=csv.split(',');
+  const all=ids.every(id=>selIds.has(id));
+  ids.forEach(id=>{ if(all) selIds.delete(id); else selIds.add(id); });
+  selRefresh();
+};
+window._selAll=()=>{
+  const shown=viewMode==='card' ? poGroups().flatMap(g=>g.items) : filteredOrders();
+  selOpenIds(shown).forEach(id=>selIds.add(id));
+  selRefresh();
+};
+window._selClear=()=>{ selIds.clear(); selRefresh(); };
+
 
 function lineRow(r,ind){
   const days=daysUntil(r.due), total=rowTotal(r), pay=r.payment||'Unpaid';
   const showPay=['Invoiced','Ready for Invoice'].includes(r.status);
   return`<tr class="line-row${expanded.has(r.id)?' expanded-line':''}${isDoneRow(r)?' done':''}" data-rowid="${r.id}" onclick="window._tl('${r.id}',event)">
     <td style="padding-left:${ind?30:12}px"><span class="group-chevron${expanded.has(r.id)?' open':''}">›</span></td>
-    <td><button class="del-btn" onclick="window._del('${r.id}')" tabindex="-1"><i class="ti ti-x"></i></button></td>
+    <td>${selectMode&&isOpenRow(r)?selCheckHtml([String(r.id)]):`<button class="del-btn" onclick="window._del('${r.id}')" tabindex="-1"><i class="ti ti-x"></i></button>`}</td>
     <td class="editable" title="${r.customer||''}" ondblclick="window._ec(event,this,'${r.id}','customer')">${r.customer||''}</td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','po')">${r.po||''}</td>
     <td class="editable" ondblclick="window._ec(event,this,'${r.id}','job')">${r.job||''}</td>
