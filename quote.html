@@ -5511,6 +5511,10 @@ function resetForm(){
   { const ws=document.getElementById('whole-sheets'); if(ws) ws.checked=false; }
   document.getElementById('notes').value='';
   { const lt=document.getElementById('q-leadtime'); if(lt) lt.value=''; }
+  { const rs=document.getElementById('rounding'); if(rs) rs.value='auto'; }   // a new quote must not keep the rounding of the last quote opened
+  // same for material price breaks: left on, they overrode the next quote's sheet price
+  document.getElementById('matbreaks-rows').innerHTML=''; matBreakRowCount=0;
+  if(document.getElementById('matbreaks-enabled').checked){ document.getElementById('matbreaks-rows').innerHTML=''; toggleMatBreaks(); document.getElementById('matbreaks-rows').innerHTML=''; matBreakRowCount=0; }
   { const et=document.getElementById('exp-type'); if(et) et.value='none';
     const ea=document.getElementById('exp-amount'); if(ea) ea.value='0';
     const mo=document.getElementById('min-order-apply'); if(mo) mo.value='yes'; }   // new quotes carry the shop minimum
@@ -6370,22 +6374,29 @@ function reloadQuote(id){
     sv('bar-width', q.barWidth); sv('bar-height', q.barHeight);
   } else {
     setMatMode('sheet');
-    document.getElementById('material').value=q.material;
-    syncMaterialSelects(q.material);
-    // Sheet size (handle custom)
-    sv('sheetsize', q.sheetsize);
-    if(q.sheetsize === 'custom'){
-      sv('custom-sheet-w', q.customSheetW);
-      sv('custom-sheet-l', q.customSheetL);
-      const row=document.getElementById('custom-sheet-row');
-      if(row) row.style.display='block';
-    }
-    sv('parth', q.parth); sv('partl', q.partl);
-    sv('perim', q.perim); sv('pierces', q.pierces);
-    { const rc=document.getElementById('recool'); if(rc) rc.checked=!!q.recool; }
-    { const ws=document.getElementById('whole-sheets'); if(ws) ws.checked=!!q.wholeSheets; }
-    sv('costsheet', q.costsheet);
   }
+  // Sheet fields are saved on every quote, bar-mode ones too (laser time reads material + perimeter),
+  // so restore them in both modes and write blanks as well. Skipping them left the PREVIOUS quote's
+  // material, size and cut path in the form, and a re-save stored them (LSR Cart with Slide Table, 2026-11-05).
+  const svAlways=(id,val,blank)=>{const el=document.getElementById(id); if(el) el.value=(val===undefined||val===null||val==='')?blank:val;};
+  { const m=(q.material&&q.material!=='—')?q.material:'';
+    document.getElementById('material').value=m;
+    if(m) syncMaterialSelects(m);
+    else { document.getElementById('material-type').value='';
+      document.getElementById('material-thickness').innerHTML='<option value="">— Select type first —</option>'; } }
+  // Sheet size (handle custom)
+  sv('sheetsize', q.sheetsize);
+  if(q.sheetsize === 'custom'){
+    sv('custom-sheet-w', q.customSheetW);
+    sv('custom-sheet-l', q.customSheetL);
+    const row=document.getElementById('custom-sheet-row');
+    if(row) row.style.display='block';
+  }
+  svAlways('parth', q.parth, ''); svAlways('partl', q.partl, '');
+  svAlways('perim', q.perim, ''); svAlways('pierces', q.pierces, '1');
+  { const rc=document.getElementById('recool'); if(rc) rc.checked=!!q.recool; }
+  { const ws=document.getElementById('whole-sheets'); if(ws) ws.checked=!!q.wholeSheets; }
+  svAlways('costsheet', q.costsheet, '0');
   sv('purchasing', q.purchasing);
   sv('out-markup', q.outMarkup);
 
