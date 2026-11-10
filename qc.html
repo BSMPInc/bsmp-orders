@@ -949,7 +949,7 @@ const I18N = {
     'Open original':'Abrir original','Open the photos':'Abrir las fotos','Photo':'Foto','Previous':'Anterior','Next':'Siguiente',
     'not saved yet':'aún sin guardar','Overlay drawing':'Superponer plano','Re-align':'Volver a alinear','Drawing overlays':'Planos superpuestos',
     'Remove this overlay from the inspection?':'¿Quitar esta superposición de la inspección?','Overlay removed.':'Superposición quitada.',
-    'Drawing over photo':'Plano sobre la foto','Upload a drawing':'Subir un plano','Save image':'Guardar imagen','Saves a picture to this device, with the date and time stamped on it':'Guarda una imagen en este dispositivo, con la fecha y la hora estampadas','Keeps the stamped picture with this inspection':'Guarda la imagen estampada con esta inspección','Save to inspection':'Guardar en la inspección',
+    'Drawing over photo':'Plano sobre la foto','Upload a drawing':'Subir un plano','Save to self-check':'Guardar en la autoinspección','Save to first article':'Guardar en el primer artículo','Keeps the picture with this self-check, with the date and time stamped on it':'Guarda la imagen con esta autoinspección, con la fecha y la hora estampadas','Keeps the picture with this first article, with the date and time stamped on it':'Guarda la imagen con este primer artículo, con la fecha y la hora estampadas','Download a copy to this device':'Descargar una copia a este dispositivo','stored when you save this form':'se guardan al guardar este formulario',
     'Opacity':'Opacidad','Lines':'Líneas','Size':'Tamaño','Rotate':'Girar','Rotation':'Rotación','Mirror':'Espejo','Mirrored':'En espejo',
     'Match 4 points':'Alinear 4 puntos','Undo straighten':'Deshacer enderezado','For a photo taken at an angle: straightens the photo so 4 points land on the drawing. The original photo is kept.':'Para una foto tomada en ángulo: endereza la foto para que 4 puntos coincidan con el plano. La foto original se conserva.',
     'Click point {n} of 4 on the DRAWING — spread them around one flat surface of the part.':'Haz clic en el punto {n} de 4 del PLANO — repártelos en una misma superficie plana de la pieza.','Now click point {n} on the PHOTO — the same feature, same order.':'Ahora haz clic en el punto {n} de la FOTO — el mismo detalle, en el mismo orden.',
@@ -976,10 +976,9 @@ const I18N = {
     'Pick point 2 farther from point 1 — it makes the match accurate.':'Elige el punto 2 más lejos del punto 1 — así la alineación es precisa.',
     'Visual comparison only — not a measurement.':'Solo comparación visual — no es una medición.',
     'The browser was not allowed to copy this photo or drawing into a picture — open the app from the BSMP site and try again.':'El navegador no tuvo permiso para copiar esta foto o plano a una imagen — abre la app desde el sitio de BSMP e inténtalo de nuevo.',
-    'Could not make the PNG:':'No se pudo crear el PNG:','Image saved, stamped':'Imagen guardada, estampada',
-    'Save the inspection first, then save the overlay to it.':'Guarda primero la inspección y luego guarda la superposición en ella.',
-    'This photo isn’t saved yet — save the inspection first, then save the overlay.':'Esta foto aún no está guardada — guarda primero la inspección y luego la superposición.',
-    'Overlay saved to this inspection.':'Superposición guardada en esta inspección.','Overlay NOT saved:':'Superposición NO guardada:',
+    'Could not make the PNG:':'No se pudo crear el PNG:','Copy downloaded, stamped':'Copia descargada, estampada',
+    'Overlay added to this page. It is stored when you save the form.':'Superposición agregada a esta página. Se guarda al guardar el formulario.',
+    'Overlay saved. It is on this page under Drawing overlays.':'Superposición guardada. Está en esta página, en Planos superpuestos.','Overlay NOT saved:':'Superposición NO guardada:',
     'drawing overlay saved':'plano superpuesto guardado','drawing overlay removed':'plano superpuesto quitado','AI photo check':'Revisión de foto con IA',
     'ovlook:red':'Líneas rojas','ovlook:blue':'Líneas azules','ovlook:green':'Líneas verdes','ovlook:asis':'Como está dibujado (negro)'
   }
@@ -1134,7 +1133,7 @@ window.showPage=(p)=>{
     // being edited. (Routing OUT of the start page carries state on purpose and
     // goes through qcStartToSelf/qcStartToFair, never through here.)
     editId=null;
-    _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[];
+    _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[]; _pendingOvs.sc=[];
     _scPhotoCheck=null; _scPhotoCheckFor=null;
   }
   render();
@@ -1538,7 +1537,7 @@ window.qcPickFiles=(key,inputEl)=>{
 };
 async function uploadPending(key,prefix){
   const files=_pendingFiles[key]||[]; const urls=[]; const errs=[];
-  for(const f of files){ try{ const u=await upload(f,prefix); if(u) urls.push({name:f.name,url:u,type:f.type}); else errs.push(f.name); }catch(e){ console.warn('upload failed',e); errs.push(f.name+((e&&e.message)?(' — '+e.message):'')); } }
+  for(const f of files){ try{ const u=_uploadedUrl.get(f)||await upload(f,prefix); if(u) urls.push({name:f.name,url:u,type:f.type}); else errs.push(f.name); }catch(e){ console.warn('upload failed',e); errs.push(f.name+((e&&e.message)?(' — '+e.message):'')); } }
   _pendingFiles[key]=[];
   if(errs.length) qcToast(t('File upload failed:')+' '+errs.join(' · '),'err');
   return urls;
@@ -2012,7 +2011,7 @@ function viewInspections(){
     </div>`;
 }
 window.qcOpenSelf=(id)=>{
-  editId=id; _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[];
+  editId=id; _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[]; _pendingOvs.sc=[];
   // bring the saved AI panel (photo verdict + gauge measurements) back on screen
   const rec=INSPECTIONS[id];
   _scPhotoCheck=(rec&&rec.photoCheck)||null; _scPhotoCheckFor=_scPhotoCheck?id:null;
@@ -2037,6 +2036,7 @@ function viewStart(){
       <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('sc',this)"></label>
       <button class="btn sm" onclick="qcOverlayFromForm('sc')"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>
       <div class="thumbs" id="files-sc">${qcPendingBadges('sc')}</div>
+      <div id="ov-strip-sc">${qcOverlayStrip(null,'sc')}</div>
     </div>
     <div class="field"><label class="fl">${t('Reference drawing')}</label>
       <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Add drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('scdraw',this)"></label>
@@ -2078,9 +2078,10 @@ window.qcStartToFair=()=>{
   const ord=gv('st-order');
   const draws=(_pendingFiles['scdraw']||[]).slice(), phs=(_pendingFiles['sc']||[]).slice();
   const pc=(_scPhotoCheck&&_scPhotoCheckFor==='new')?_scPhotoCheck:null;
+  const ovs=_pendingOvs.sc; _pendingOvs.sc=[];
   _pendingFiles['sc']=[]; _pendingFiles['scdraw']=[]; _scPhotoCheck=null; _scPhotoCheckFor=null;
   qcNewFair();                                // clean fair slate (also clears frphoto/_frPhotoCheck)
-  _pendingFiles['frdraw']=draws; _pendingFiles['frphoto']=phs; _frPhotoCheck=pc;
+  _pendingFiles['frdraw']=draws; _pendingFiles['frphoto']=phs; _frPhotoCheck=pc; _pendingOvs.frphoto=ovs;
   render();                                   // repaint the fair page with the carried files + AI panel
   qcStartFill('fr', ord);
 };
@@ -2108,7 +2109,7 @@ function viewSelfCheck(){
       <label class="btn sm"><i class="ti ti-camera"></i> ${t('Add photo')}<input type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="qcPickFiles('sc',this)"></label>
       <button class="btn sm" onclick="qcOverlayFromForm('sc')"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>
       <div class="thumbs" id="files-sc">${qcPendingBadges('sc')}</div>
-      ${r?qcPhotoThumbs('rec:'+r.id):''}${r?qcOverlayThumbs(r.id):''}
+      ${r?qcPhotoThumbs('rec:'+r.id):''}<div id="ov-strip-sc">${qcOverlayStrip(r&&r.id,'sc')}</div>
     </div>
     <div class="field"><label class="fl">${t('Reference drawing')}</label>
       <label class="btn sm"><i class="ti ti-file-upload"></i> ${t('Add drawing')}<input type="file" accept=".pdf,image/*" style="display:none" onchange="qcPickFiles('scdraw',this)"></label>
@@ -2157,6 +2158,8 @@ window.qcSaveSelf=async ()=>{
   try{
   const id=editId||newId('insp');
   const prev=editId?INSPECTIONS[editId]:null;
+  // overlays first: a failure here leaves every photo and drawing still on the form for the retry
+  const ovNew=await withTimeout(qcPendingOvUpload('sc'), 180000, t('Photo upload timed out — check the connection.'));
   // RTDB hands a list back object-shaped (with null holes) once an entry was deleted — normalize first
   const photos=vals(prev&&prev.photos);
   const fresh=await withTimeout(uploadPending('sc','inspections'), 90000, t('Photo upload timed out — check the connection.'));
@@ -2173,9 +2176,10 @@ window.qcSaveSelf=async ()=>{
     updatedAt:Date.now(), orderId:gv('sc-order'),
     partNum:part, customer:cust, rev:gv('sc-rev'), po:gv('sc-po'), job:gv('sc-job'), qty:gv('sc-qty'),
     result, status: result==='Pass'?'Logged':'Flagged', issue:gv('sc-issue'), notes:gv('sc-notes'), photos, drawing, drawings, photoCheck,
-    overlays:(prev&&prev.overlays)||null
+    overlays:qcOverlaysWith(prev,ovNew)
   };
   await dbSet('qc/inspections/'+id, rec);
+  await qcPendingOvDone('sc',id,part,ovNew);
   if(result==='Flag' && !(prev&&prev.ncrId)){
     const ncrId=newId('ncr');
     const ncr={ id:ncrId, createdAt:Date.now(), raisedBy:(QC_USER&&QC_USER.email)||'', status:'open',
@@ -2208,28 +2212,32 @@ window.qcSaveSelf=async ()=>{
    An overlay lays the part's drawing over a photo (drag / size / turn / mirror, or match 2 points) and
    flattens it to a PNG with the date + time stamped on the picture and a caption strip that prints the alignment numbers (show-the-work). Saved per
    child at qc/inspections/<id>/overlays/<ovId> — never a whole-record write — together with the numbers
-   that made it, so it can be reopened and re-aligned. Coordinates: the drawing maps into PHOTO pixels as
+   that made it, so it can be reopened and re-aligned. A form not saved yet (or a photo not saved yet) holds the
+   flattened PNG in _pendingOvs[bucket], shown dashed on the form, and its Save uploads it with the record. Coordinates: the drawing maps into PHOTO pixels as
    p = T + s·R(rot)·(flip·(x − w/2), y − h/2); the screen view is a separate pan/zoom (view.s, view.x/y). */
 const PHOTO_BUCKETS={sc:1, frphoto:1};
 const OV_LOOKS=[{k:'red',c:[230,30,30]},{k:'blue',c:[0,120,255]},{k:'green',c:[0,200,90]},{k:'asis',c:null}];
 const OV_MAX_SIDE=2800;      // longest side of the downloaded / saved PNG (photo part)
 const _pvUrls=new WeakMap();
 let _pv=null, _ov=null, _formKeep=null;
+const _pendingOvs={sc:[], frphoto:[]};   // overlays waiting for their form's Save
+const _uploadedUrl=new WeakMap();        // File → Storage URL, so a photo an overlay already stored isn't uploaded twice
 function qcFileUrl(f){ let u=_pvUrls.get(f); if(!u){ u=URL.createObjectURL(f); _pvUrls.set(f,u); } return u; }
 function qcIsDxf(x){ return /\.(dxf|dwg)$/i.test(String((x&&x.name)||''))||/dxf|dwg/i.test(String((x&&x.type)||'')); }
 function qcIsPdf(x){ return /pdf/i.test(String((x&&x.type)||''))||/\.pdf$/i.test(String((x&&x.name)||''))||/\.pdf$/i.test(String((x&&x.url)||'').split('?')[0]); }
 function qcPhotoItems(key){
   const k=String(key||''), i=k.indexOf(':'), kind=k.slice(0,i), ref=k.slice(i+1);
   if(kind==='pend') return (_pendingFiles[ref]||[]).filter(Boolean).map(f=>({name:f.name||'', url:qcFileUrl(f), type:f.type||'', file:f}));
+  if(kind==='pov') return (_pendingOvs[ref]||[]).map(x=>({name:x.name, url:x.thumb, type:'image/png', pov:x.id}));
   const r=INSPECTIONS[ref]; if(!r) return [];
   if(kind==='rec') return vals(r.photos).filter(p=>p&&p.url).map(p=>({name:p.name||'', url:p.url, type:p.type||''}));
-  if(kind==='ovl') return vals(r.overlays).filter(o=>o&&o.url).sort((a,b)=>(a.at||0)-(b.at||0)).map(o=>({name:o.name||'', url:o.url, type:'image/png', ov:o}));
+  if(kind==='ovl') return vals(r&&r.overlays).filter(o=>o&&o.url).sort((a,b)=>(a.at||0)-(b.at||0)).map(o=>({name:o.name||'', url:o.url, type:'image/png', ov:o}));
   return [];
 }
 // clickable thumbnails; bare = just the <img>s (for a strip that already is a .thumbs box)
 function qcPhotoThumbs(key,bare){
   const items=qcPhotoItems(key); if(!items.length) return '';
-  const pend=key.indexOf('pend:')===0;
+  const pend=key.indexOf('pend:')===0||key.indexOf('pov:')===0;
   const imgs=items.map((p,i)=>`<img class="thumb pv-click${pend?' pend':''}" src="${esc(p.url)}" alt="" title="${esc((p.name||'')+(pend?' · '+t('not saved yet'):''))}" onclick="qcPhotoView('${esc(key)}',${i})">`).join('');
   return bare?imgs:`<div class="thumbs">${imgs}</div>`;
 }
@@ -2237,10 +2245,45 @@ function qcOverlayThumbs(id){
   const n=qcPhotoItems('ovl:'+id).length; if(!n) return '';
   return `<div class="hint" style="margin-top:8px"><i class="ti ti-layers-intersect"></i> ${t('Drawing overlays')} (${n})</div>${qcPhotoThumbs('ovl:'+id)}`;
 }
-// little "N photos" chip on a list row — opens the viewer without opening the record
+// the form's overlays: stored ones, then any waiting for this form's Save
+function qcOverlayStrip(id,bucket){
+  const n=(_pendingOvs[bucket]||[]).length;
+  return (id?qcOverlayThumbs(id):'')+(n?`<div class="hint" style="margin-top:8px"><i class="ti ti-layers-intersect"></i> ${t('Drawing overlays')} (${n}) · ${t('stored when you save this form')}</div>${qcPhotoThumbs('pov:'+bucket)}`:'');
+}
+function qcOverlayStripSync(bucket){ const el=$('ov-strip-'+bucket); if(el) el.innerHTML=qcOverlayStrip((editId&&INSPECTIONS[editId])?editId:null,bucket); }
+// the form's Save: put waiting overlays in Storage; returns {ovId:entry} to go on the record. Safe to run again after a failed save.
+async function qcPendingOvUpload(bucket){
+  const out={};
+  const urlOf=async f=>{ let u=_uploadedUrl.get(f); if(!u){ u=await upload(f,'inspections'); if(!u) throw new Error(t('File upload failed:')+' '+f.name); _uploadedUrl.set(f,u); } return u; };
+  for(const x of (_pendingOvs[bucket]||[])){
+    if(!x.entry){
+      const photoUrl=x.photo.file?await urlOf(x.photo.file):x.photo.url, drawUrl=x.drawing.file?await urlOf(x.drawing.file):x.drawing.url;
+      const url=await upload(new File([x.blob],x.name,{type:'image/png'}),'inspections');
+      if(!url) throw new Error(t('File upload failed:')+' '+x.name);
+      const {file:_pf,...photo}=x.photo, {file:_df,...drawing}=x.drawing;
+      x.entry={ id:x.id, url, name:x.name, at:x.at, by:x.by, photo:{...photo,url:photoUrl}, drawing:{...drawing,url:drawUrl}, align:x.align, work:x.work };
+    }
+    out[x.id]=x.entry;
+  }
+  return out;
+}
+function qcOverlaysWith(prev,ovNew){ const all={...((prev&&prev.overlays)||{}),...ovNew}; return Object.keys(all).length?all:null; }
+async function qcPendingOvDone(bucket,id,part,ovNew){
+  _pendingOvs[bucket]=[];
+  const es=Object.values(ovNew); if(!es.length) return;
+  try{ await qcLogAudit(es.map(e=>({ inspectionId:id, partNum:part||'', field:'overlay', action:'overlay-saved', note:(e.drawing.name||'drawing')+' on '+(e.photo.name||'photo')+' · '+e.work }))); }
+  catch(e){ console.error('audit log failed', e); }
+}
+window.qcPovDrop=()=>{
+  if(!_pv) return; const it=_pv.items[_pv.i], b=_pv.key.slice(4);
+  _pendingOvs[b]=(_pendingOvs[b]||[]).filter(x=>x.id!==it.pov);
+  qcPhotoClose(); qcOverlayStripSync(b); qcToast(t('Overlay removed.'),'ok');
+};
+// little "N photos" / "N overlays" chips on a list row — open the viewer without opening the record
 function qcPhotoChip(i){
-  const n=vals(i&&i.photos).filter(p=>p&&p.url).length; if(!n) return '';
-  return ` <span class="pv-chip" title="${esc(t('Open the photos'))}" onclick="event.stopPropagation();qcPhotoView('rec:${esc(i.id)}',0)"><i class="ti ti-photo"></i> ${n}</span>`;
+  const n=vals(i&&i.photos).filter(p=>p&&p.url).length, m=qcPhotoItems('ovl:'+(i&&i.id)).length;
+  return (n?` <span class="pv-chip" title="${esc(t('Open the photos'))}" onclick="event.stopPropagation();qcPhotoView('rec:${esc(i.id)}',0)"><i class="ti ti-photo"></i> ${n}</span>`:'')
+    +(m?` <span class="pv-chip" title="${esc(t('Drawing overlays'))}" onclick="event.stopPropagation();qcPhotoView('ovl:${esc(i.id)}',0)"><i class="ti ti-layers-intersect"></i> ${m}</span>`:'');
 }
 
 /* ---- full-size viewer ---- */
@@ -2257,12 +2300,12 @@ function pvRender(){
     el.addEventListener('click',e=>{ if(e.target===el||e.target.id==='pv-stage') qcPhotoClose(); });
   }
   const it=_pv.items[_pv.i], n=_pv.items.length, ov=it.ov;
-  const meta=ov?[ov.drawing&&ov.drawing.name, (ov.by||'').split('@')[0], fmtWhen(ov.at)].filter(Boolean).join(' · '):(it.file?t('not saved yet'):'');
+  const meta=ov?[ov.drawing&&ov.drawing.name, (ov.by||'').split('@')[0], fmtWhen(ov.at)].filter(Boolean).join(' · '):((it.file||it.pov)?t('not saved yet'):'');
   el.innerHTML=`<div class="pv-bar">
       <div class="pv-ttl"><b>${esc(it.name||t('Photo'))}</b>${n>1?` <span>${_pv.i+1} / ${n}</span>`:''}${meta?` <span>· ${esc(meta)}</span>`:''}</div>
       <button class="btn sm" onclick="qcPhotoZoom()"><i class="ti ti-${_pv.zoom?'zoom-out':'zoom-in'}"></i> ${_pv.zoom?t('Fit'):'100%'}</button>
       ${ov?`<button class="btn sm primary" onclick="qcOvReopen()"><i class="ti ti-adjustments"></i> ${t('Re-align')}</button>${isMgr()?`<button class="btn sm" style="color:var(--red)" title="${esc(t('Remove this overlay from the inspection?'))}" onclick="qcOvDelete()"><i class="ti ti-trash"></i></button>`:''}`
-          :`<button class="btn sm primary" onclick="qcPhotoToOverlay()"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>`}
+          :(it.pov?`<button class="btn sm" style="color:var(--red)" onclick="qcPovDrop()"><i class="ti ti-trash"></i> ${t('Remove')}</button>`:`<button class="btn sm primary" onclick="qcPhotoToOverlay()"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>`)}
       <a class="btn sm" href="${esc(it.url)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> ${t('Open original')}</a>
       <button class="btn sm" onclick="qcPhotoClose()" title="${esc(t('Close'))} (Esc)"><i class="ti ti-x"></i></button>
     </div>
@@ -2373,7 +2416,7 @@ window.qcOvClose=()=>{ if(_ov&&_ov.raf) cancelAnimationFrame(_ov.raf); if(_ov&&_
 function ovBuild(){
   let el=$('ov-ed'); if(el) el.remove();
   el=document.createElement('div'); el.id='ov-ed'; document.body.appendChild(el);
-  const canSave=!!(_ov.ctx.recId&&INSPECTIONS[_ov.ctx.recId]);
+  const fair=_ov.ctx.bucket==='frphoto';
   el.innerHTML=`<div class="ov-row ov-top">
       <b class="ov-ttl"><i class="ti ti-layers-intersect"></i> ${t('Drawing over photo')}</b>
       <span class="ov-grp" id="ov-photo-grp"></span>
@@ -2381,8 +2424,8 @@ function ovBuild(){
         <button class="btn sm ov-ic" title="${esc(t('From library'))}" onclick="qcDrawPickOpen('ovdraw')"><i class="ti ti-books"></i></button>
         <label class="btn sm ov-ic" title="${esc(t('Upload a drawing'))}"><i class="ti ti-file-upload"></i><input type="file" accept=".pdf,image/*" style="display:none" onchange="ovUpload(this)"></label></span>
       <span style="flex:1"></span>
-      <button class="btn sm primary" id="ov-img-btn" title="${esc(t('Saves a picture to this device, with the date and time stamped on it'))}" onclick="ovDownload()"><i class="ti ti-camera"></i> ${t('Save image')}</button>
-      ${canSave?`<button class="btn sm primary" id="ov-save-btn" title="${esc(t('Keeps the stamped picture with this inspection'))}" onclick="ovSave()"><i class="ti ti-device-floppy"></i> ${t('Save to inspection')}</button>`:''}
+      <button class="btn sm primary" id="ov-save-btn" title="${esc(t(fair?'Keeps the picture with this first article, with the date and time stamped on it':'Keeps the picture with this self-check, with the date and time stamped on it'))}" onclick="ovSave()"><i class="ti ti-device-floppy"></i> ${t(fair?'Save to first article':'Save to self-check')}</button>
+      <button class="btn sm ov-ic" id="ov-img-btn" title="${esc(t('Download a copy to this device'))}" onclick="ovDownload()"><i class="ti ti-download"></i></button>
       <button class="btn sm ov-ic" onclick="qcOvClose()" title="${esc(t('Close'))} (Esc)"><i class="ti ti-x"></i></button>
     </div>
     <div class="ov-row">
@@ -2902,18 +2945,31 @@ window.ovDownload=async ()=>{
   const o=_ov, b=await ovBlob(); if(!b) return; // o, not _ov: the editor may be closed while the PNG is being made
   const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download=ovFileName(o);
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),30000);
-  qcToast(t('Image saved, stamped')+' '+ovStampText(o.shotAt),'ok');
+  qcToast(t('Copy downloaded, stamped')+' '+ovStampText(o.shotAt),'ok');
 };
 window.ovSave=async ()=>{
-  const o=_ov; if(!o) return; const id=o.ctx.recId, rec=id&&INSPECTIONS[id];
-  if(!rec){ qcToast(t('Save the inspection first, then save the overlay to it.'),'err'); return; }
+  const o=_ov; if(!o||o.saving) return; const id=o.ctx.recId, rec=id&&INSPECTIONS[id];
   const p=o.photos[o.pi]||{}, c=o.cands[o.di];
-  if(p.file){ qcToast(t('This photo isn’t saved yet — save the inspection first, then save the overlay.'),'err'); return; }
   // the numbers as they are right now, when the picture is flattened: the editor may be moved or closed during the upload
   const align=ovAlign(), work=ovWorkText();
-  const blob=await ovBlob(); if(!blob||!c) return;
   const btn=$('ov-save-btn'), lbl=btn?btn.innerHTML:'';
+  o.saving=true;
   if(btn){ btn.disabled=true; btn.innerHTML='<i class="ti ti-loader-2 spin"></i> '+t('Saving…'); }
+  const blob=await ovBlob();
+  if(!blob||!c){ o.saving=false; if(btn){ btn.disabled=false; btn.innerHTML=lbl; } return; }
+  // the form or this photo isn't saved yet: hold it on the form until the form's Save
+  if(!rec||p.file){
+    const b=o.ctx.bucket; o.saving=false;
+    _pendingOvs[b]=_pendingOvs[b]||[];
+    _pendingOvs[b].push({ id:newId('ovl'), blob, thumb:URL.createObjectURL(blob), name:ovFileName(o), at:o.shotAt.getTime(), by:(QC_USER&&QC_USER.email)||'',
+      photo:{file:p.file||null, url:p.file?'':p.url, name:p.name||'', w:o.base.w, h:o.base.h},
+      drawing:{file:c.url?null:c.file, url:c.url||'', name:c.name||'', type:c.type||'', src:c.src||'', page:o.page||1, w:o.draw.w, h:o.draw.h},
+      align, work });
+    if(_ov===o) qcOvClose();
+    qcOverlayStripSync(b);
+    qcToast(t('Overlay added to this page. It is stored when you save the form.'),'ok');
+    return;
+  }
   try{
     // a drawing picked from this computer gets stored too, so the overlay can be re-made later
     if(!c.url&&c.file){ const u=await withTimeout(upload(c.file,'inspections'),90000,t('Drawing upload timed out — check the connection.')); if(!u) throw new Error(t('File upload failed:')+' '+c.name); c.url=u; }
@@ -2929,9 +2985,10 @@ window.ovSave=async ()=>{
     await dbSet('qc/inspections/'+id+'/overlays/'+ovId, entry);
     try{ await qcLogAudit([{ inspectionId:id, partNum:rec.partNum||'', field:'overlay', action:'overlay-saved', note:(c.name||'drawing')+' on '+(p.name||'photo')+' · '+entry.work }]); }
     catch(e){ console.error('audit log failed', e); }
-    qcToast(t('Overlay saved to this inspection.'),'ok');
+    if(_ov===o) qcOvClose();
+    qcToast(t('Overlay saved. It is on this page under Drawing overlays.'),'ok');
   }catch(e){ console.error('overlay save failed', e); qcToast(t('Overlay NOT saved:')+' '+((e&&e.message)||e),'err'); }
-  finally{ if(btn){ btn.disabled=false; btn.innerHTML=lbl; } }
+  finally{ o.saving=false; if(btn){ btn.disabled=false; btn.innerHTML=lbl; } }
 };
 document.addEventListener('keydown',e=>{
   if(_ov&&$('ov-ed')){
@@ -4986,8 +5043,8 @@ function viewFairs(){
 }
 // mode for a NEW report only ('simple' | 'as9102' | 'manual'); a saved record carries its own mode
 let _fairNewMode='simple';
-window.qcNewFair=(m)=>{ editId=null; _fairNewMode=(m==='manual'||m==='as9102')?m:'simple'; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[]; _frPhotoCheck=null; page='fair'; render(); };
-window.qcOpenFair=(id)=>{ editId=id; _fairNewMode='simple'; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[]; _frPhotoCheck=null; page='fair'; render(); };
+window.qcNewFair=(m)=>{ editId=null; _fairNewMode=(m==='manual'||m==='as9102')?m:'simple'; _chars=[]; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[]; _pendingOvs.frphoto=[]; _frPhotoCheck=null; page='fair'; render(); };
+window.qcOpenFair=(id)=>{ editId=id; _fairNewMode='simple'; _fairBubbles=[]; _bubUndo=[]; _fairImg=null; _fairBalloonedUrl=null; _pendingFiles['frdraw']=[]; _pendingFiles['frphoto']=[]; _pendingFiles['frscan']=[]; _pendingOvs.frphoto=[]; _frPhotoCheck=null; page='fair'; render(); };
 /* ---- handwritten (manual) first article helpers ----
    The inspector works on paper: print the blank sheet with the drawing, fill it in by hand,
    then the completed pages are scanned/photographed and uploaded onto the same record. */
@@ -5687,7 +5744,7 @@ function viewFair(){
             <button class="btn sm" onclick="qcOverlayFromForm('frphoto')"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>
           </div>
           <div class="thumbs" id="files-frphoto">${qcPendingBadges('frphoto')}</div>
-          ${r?qcPhotoThumbs('rec:'+r.id):''}${r?qcOverlayThumbs(r.id):''}
+          ${r?qcPhotoThumbs('rec:'+r.id):''}<div id="ov-strip-frphoto">${qcOverlayStrip(r&&r.id,'frphoto')}</div>
           <div id="fr-ai-panel" style="display:${(_frPhotoCheck||(r&&r.photoCheck))?'block':'none'};margin-top:8px">${_frPhotoCheck?qcSelfAIHtml(_frPhotoCheck,{measure:false}):((r&&r.photoCheck)?qcSelfAIHtml(r.photoCheck,{measure:false}):'')}</div>
         </div>
       </div>
@@ -6016,6 +6073,8 @@ window.qcSaveFair=async (action)=>{
   try{
   const id=editId||newId('fair');
   const prev=editId?INSPECTIONS[editId]:null;
+  // overlays first: a failure here leaves every photo and drawing still on the form for the retry
+  const ovNew=await withTimeout(qcPendingOvUpload('frphoto'), 180000, t('Photo upload timed out — check the connection.'));
   let drawing=(prev&&prev.drawing)||null;
   const fresh=await withTimeout(uploadPending('frdraw','fair-drawings'), 90000, t('Drawing upload timed out — check the connection.'));
   if(fresh.length) drawing=fresh[0];
@@ -6043,7 +6102,7 @@ window.qcSaveFair=async (action)=>{
     createdAt:(prev&&prev.createdAt)||Date.now(), createdBy:(prev&&prev.createdBy)||(QC_USER&&QC_USER.email)||'', updatedAt:Date.now(),
     orderId:gv('fr-order'), partNum:part, rev:gv('fr-rev'), customer:cust, material:gv('fr-material'),
     po:gv('fr-po'), job:gv('fr-job'), date:gv('fr-date'), inspectedBy:gv('fr-by'), itar:gc('fr-itar'),
-    drawing, photos, photoCheck, overlays:(prev&&prev.overlays)||null, characteristics:_chars, fairStatus:status, tolDefaults:qcReadTolDefaults(),
+    drawing, photos, photoCheck, overlays:qcOverlaysWith(prev,ovNew), characteristics:_chars, fairStatus:status, tolDefaults:qcReadTolDefaults(),
     ballooned:_fairBalloonedUrl||(prev&&prev.ballooned)||null,
     bubbles: _fairBubbles.length ? _fairBubbles.map(b=>({no:b.no,bx:b.bx,by:b.by,value:b.value||'',tol:b.tol||'',category:b.category||'',group:b.group||null,box:b.box||null})) : ((prev&&prev.bubbles)||null)
   };
@@ -6120,6 +6179,7 @@ window.qcSaveFair=async (action)=>{
   }
 
   await dbSet('qc/inspections/'+id, rec);
+  await qcPendingOvDone('frphoto',id,part,ovNew);
   // never let an audit-trail write block the main save (e.g. if the qc/audit rule is missing)
   if(audits.length){ try{ await qcLogAudit(audits); }catch(e){ console.error('audit log failed', e); } }
   qcToast(t('First article saved.'),'ok');
