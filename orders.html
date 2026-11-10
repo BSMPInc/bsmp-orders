@@ -2573,6 +2573,7 @@ body.sb-hidden .topbar{padding-left:24px}
     <div class="ai-chg" id="ai-chg" style="display:none"></div>
     <div class="ai-rows" id="ai-rows"></div>
     <div class="ai-draw-status" id="ai-draw-status"></div>
+    <input type="file" id="ai-draw-file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.dxf,.dwg" style="display:none" onchange="aiDrawFiles(this)">
     <div class="modal-actions" style="margin-top:10px">
       <button class="btn sm" style="margin-right:auto" onclick="aiAddRow()"><i class="ti ti-plus"></i> Add line</button>
       <button class="btn" onclick="aiClear()">Clear</button>
@@ -6191,7 +6192,7 @@ function aiDrawFits(c, r){
 }
 function aiDrawScore(c, r){
   const rv=String(r.rev||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-  return (c.same?8:0) + (/\.pdf$/i.test(c.name)?3:/\.(png|jpe?g|tiff?)$/i.test(c.name)?1:0)
+  return (c.local?16:0) + (c.same?8:0) + (/\.pdf$/i.test(c.name)?3:/\.(png|jpe?g|tiff?)$/i.test(c.name)?1:0)
     + (rv && aiDrawNorm(c.name).includes('rev'+rv)?2:0) + (c.date||0)/1e13;
 }
 function aiDrawAuto(){
@@ -6203,7 +6204,8 @@ function aiDrawAuto(){
   });
 }
 function aiDrawHtml(r, i){
-  if(!_aiDraw.cands.length) return '';
+  const attach=`<button type="button" class="btn sm" onclick="aiDrawBrowse(${i})" title="Attach a drawing from this computer to this line"><i class="ti ti-file-plus"></i> Attach file</button>`;
+  if(!_aiDraw.cands.length) return `<div class="ai-draw full"><i class="ti ti-paperclip"></i><span style="flex:1">No drawing</span>${attach}</div>`;
   const esc=esc2, fits=_aiDraw.cands.map((c,k)=>({c,k})).filter(x=>aiDrawFits(x.c,r)), rest=_aiDraw.cands.map((c,k)=>({c,k})).filter(x=>!aiDrawFits(x.c,r));
   const opt=x=>`<option value="${x.k}"${r._dw===x.k?' selected':''}>${esc(x.c.name)} — ${esc(x.c.from)}</option>`;
   const c=r._dw!=null?_aiDraw.cands[r._dw]:null;
@@ -6212,8 +6214,42 @@ function aiDrawHtml(r, i){
       <option value="">No drawing</option>
       ${fits.length?`<optgroup label="Named for this part">${fits.map(opt).join('')}</optgroup>`:''}
       ${rest.length?`<optgroup label="Other drawings found">${rest.map(opt).join('')}</optgroup>`:''}
-    </select>${c&&c.doc!=null?`<button type="button" class="btn sm" onclick="aiSrcTab(${c.doc})">View</button>`:''}</div>`;
+    </select>${c&&c.doc!=null?`<button type="button" class="btn sm" onclick="aiSrcTab(${c.doc})">View</button>`:''}${attach}</div>`;
 }
+// drawings picked from this computer: one line's "Attach file", or "Attach drawing files"
+// under the lines (several at once, each to the line whose part # is in its file name).
+// They join the same pick lists as the drawings found in the mail and upload on Import.
+let _aiDrawFor=-1;
+window.aiDrawBrowse=i=>{
+  _aiDrawFor=i;
+  const el=document.getElementById('ai-draw-file'); el.multiple=i<0; el.value=''; el.click();
+};
+window.aiDrawFiles=inp=>{
+  const files=[...(inp.files||[])], line=_aiDrawFor; inp.value=''; _aiDrawFor=-1;
+  if(!files.length) return;
+  const added=[], skipped=[]; let last=null, shown=null;
+  files.forEach(f=>{
+    if(!AI_DRAW_EXT.test(f.name)){ skipped.push(f.name); return; }
+    let k=_aiDraw.cands.findIndex(c=>c.local&&c.name===f.name&&c.size===f.size);
+    if(k<0){
+      const viewable=/\.(pdf|png|jpe?g)$/i.test(f.name);
+      const file=viewable?new File([f], f.name, {type:aiMime(f.name,f.type)}):f;
+      const c={box:'local', msg:'', att:'local-'+Date.now()+'-'+_aiDraw.cands.length, name:f.name, mime:file.type, size:f.size,
+        date:Date.now(), from:'this computer', same:false, local:true, aiPart:'', file, doc:null};
+      if(viewable){ const d=aiSrcDoc('Drawing · '+f.name, file.type); aiSrcSet(d, file); c.doc=_aiSrc.docs.indexOf(d); shown=c.doc; }
+      _aiDraw.cands.push(c); k=_aiDraw.cands.length-1;
+    }
+    added.push(k); last=k;
+  });
+  if(line>=0 && aiParsed[line] && last!=null){ aiParsed[line]._dw=last; aiParsed[line]._dwSet=true; }
+  else aiDrawAuto();
+  if(shown!=null){ _aiSrc.tab=shown; aiShowSrc(true); aiRenderSrc(); }
+  aiRenderRows();
+  const loose=line<0?added.filter(k=>!aiParsed.some(r=>r._dw===k)).map(k=>_aiDraw.cands[k].name):[];
+  const msg=[skipped.length&&('Not a drawing file (PDF, image, DXF or DWG), left out:\n'+skipped.join('\n')),
+    loose.length&&('No line’s part # is in these file names — pick them from a line’s drawing list:\n'+loose.join('\n'))].filter(Boolean);
+  if(msg.length) alert(msg.join('\n\n'));
+};
 window.aiDrawPick=async(i,v)=>{
   const r=aiParsed[i]; if(!r) return;
   r._dw=v===''?null:+v; r._dwSet=true;
@@ -6223,10 +6259,13 @@ window.aiDrawPick=async(i,v)=>{
 };
 function aiDrawStatus(){
   const el=document.getElementById('ai-draw-status'); if(!el) return;
+  if(!aiParsed.length){ el.innerHTML=''; return; }
   const n=aiParsed.filter(r=>r._dw!=null).length, tot=aiParsed.filter(r=>podKey(r.part).length>=3).length;
-  el.innerHTML=_aiDraw.busy?`<i class="ti ti-loader-2 spin"></i> ${esc2(_aiDraw.msg||'Looking for drawings in the emails…')}`
-    : _aiDraw.seq===_aiSrcSeq&&tot ? `<i class="ti ti-paperclip"></i> ${n?`Drawing found for ${n} of ${tot} line${tot!==1?'s':''} — check each one in its tab before importing.`:'No drawings named for these parts in the emails.'}${_aiDraw.msg?' '+esc2(_aiDraw.msg):''} <button type="button" class="btn sm" onclick="aiDrawAgain()"><i class="ti ti-refresh"></i> Search again</button>`
-    : '';
+  const searched=_aiDraw.seq===_aiSrcSeq;
+  const attach=`<button type="button" class="btn sm" onclick="aiDrawBrowse(-1)" title="Pick drawing files from this computer — each one goes to the line whose part # is in its file name"><i class="ti ti-file-plus"></i> Attach drawing files</button>`;
+  el.innerHTML=(_aiDraw.busy?`<i class="ti ti-loader-2 spin"></i> ${esc2(_aiDraw.msg||'Looking for drawings in the emails…')} `
+    : (searched||n)&&tot ? `<i class="ti ti-paperclip"></i> ${n?`Drawing found for ${n} of ${tot} line${tot!==1?'s':''} — check each one in its tab before importing.`:'No drawings named for these parts in the emails.'}${_aiDraw.msg?' '+esc2(_aiDraw.msg):''} ${searched?'<button type="button" class="btn sm" onclick="aiDrawAgain()"><i class="ti ti-refresh"></i> Search again</button>':''}`
+    : '')+attach;
 }
 async function aiMailCfg(){
   const s=await get(ref(db,'mail/settings'));
