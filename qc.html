@@ -769,6 +769,8 @@ const I18N = {
     'Guides, equipment manuals and maintenance schedules. Open a document in a new tab and print from there.':'Guías, manuales de equipos y calendarios de mantenimiento. Abre un documento en una pestaña nueva e imprime desde ahí.',
     'Search resources — title, ID, tag':'Buscar recursos — título, ID, etiqueta','No resources match your search.':'Ningún recurso coincide con tu búsqueda.',
     'Equipment manuals & maintenance':'Manuales de equipos y mantenimiento','Quality documents':'Documentos de calidad','Forms':'Formularios',
+    'Customer & industry standards':'Normas de clientes y de la industria','Signed-in users only':'Solo usuarios con sesión iniciada',
+    'Could not open this document. Check your connection and try again.':'No se pudo abrir este documento. Revisa tu conexión e inténtalo de nuevo.',
     'Document':'Documento','ID / Rev':'ID / Rev','Updated':'Actualizado','Open':'Abrir','Word file':'Archivo Word','Supplier document':'Documento del proveedor',
     'Maintenance schedule':'Calendario de mantenimiento','Task':'Tarea','How often':'Frecuencia','Who':'Quién','Full procedure':'Procedimiento completo',
     'Laser air compressor':'Compresor de aire del láser','Laser operator':'Operador del láser','Manager':'Gerente','Anyone':'Cualquiera',
@@ -1219,8 +1221,11 @@ function viewSettings(){
    Static registry, on purpose: the documents live in the repo's docs/ folder and GitHub Pages
    serves them next to this file, so a relative link is all a row needs. To add or revise a
    document: drop the file into docs/<area>/, then edit RESOURCES below (title, id/rev, date, file).
-   Keep RES_UPDATED current — it prints at the bottom of the page. */
-const RES_UPDATED='2026-10-29';
+   Keep RES_UPDATED current — it prints at the bottom of the page.
+   The repo is PUBLIC. A licensed or customer document (an SAE standard, a customer spec) must not go in
+   docs/: upload it to Storage with qcUpload(file,'resources') and give the row `store:'<storage path>'`
+   instead of `file` — it then opens through resOpenStored() for signed-in users only. */
+const RES_UPDATED='2026-11-17';
 const RESOURCES=[
   { key:'equipment', title:'Equipment manuals & maintenance', icon:'ti-tool', items:[
     { title:'Laser Air Compressor — Maintenance Guide', id:'BSMP-MG-001', rev:'B', date:'2026-09-19', tags:'laser compressor air grease alarm schedule parts overload troubleshooting voltage second compressor',
@@ -1243,6 +1248,11 @@ const RESOURCES=[
     { title:'Quality Manual', id:'QM-001', rev:'A', date:'2026-08-13', tags:'quality manual survey as9100 policy',
       desc:'BSMP quality system as written for supplier surveys: inspection, first articles, NCRs, material traceability, approved vendors, records.',
       file:'docs/quality/BSMP Quality Manual QM-001 Rev A.pdf', docx:'docs/quality/BSMP Quality Manual QM-001 Rev A.docx' },
+  ]},
+  { key:'standards', title:'Customer & industry standards', icon:'ti-certificate', items:[
+    { title:'SAE AS5131 — Tube End, Beaded (Design Standard)', id:'SAE AS5131', rev:'', date:'1997-01 (reaffirmed 2001-12)', tags:'dynamo bead beaded beading tube end hose clamp coupling as5131 as5131a16 as5131b16 style a b c ms33660 first article fai far standard sae',
+      desc:'Bead dimensions for tube ends, used when we form beads on Dynamo tubes. Sheet 1 shows Style A, B and C; sheet 2 has the dimension table by size code (16 = 1.000 OD tube) and the notes. Check the bead against it at first article and keep a copy with the first-article paperwork. Cleaned-up scan, 3 sheets. Licensed SAE document: opens for signed-in users only.',
+      store:'qc/resources/1794956797402_3838_SAE_AS5131_Tube_End_Beaded_-_Design_Standard.pdf' },
   ]},
   { key:'forms', title:'Forms', icon:'ti-forms', items:[
     { title:'Calibration Register', id:'QF-001', rev:'A', date:'2026-08-13', tags:'calibration gauge caliper register form',
@@ -1282,6 +1292,19 @@ const MAINTENANCE=[
 ];
 let RES_FILTER='';
 function resUrl(f){ return encodeURI(f); }
+// A row with `store` (a Firebase Storage path under qc/resources/) instead of `file` is NOT in the public
+// repo: licensed standards and customer documents live in Storage, readable only when signed in.
+async function resOpenStored(path){
+  const w=window.open('','_blank');   // open inside the click so the pop-up blocker allows it
+  try{
+    const url=await window.qcFileUrl(path);
+    if(w){ w.opener=null; w.location.replace(url); } else location.href=url;
+  }catch(e){
+    if(w) w.close();
+    console.warn('resource open failed', path, e);
+    qcToast(t('Could not open this document. Check your connection and try again.'),'err');
+  }
+}
 function resItemById(id){ for(const sec of RESOURCES){ for(const it of sec.items){ if(it.id===id) return it; } } return null; }
 function resMatches(it,q){
   q=(q||'').trim().toLowerCase(); if(!q) return true;
@@ -1295,7 +1318,9 @@ function resRow(it){
     <td style="white-space:nowrap">${esc(it.date||'')}</td>
     <td style="white-space:nowrap;text-align:right">
       ${it.fill&&!(it.mgrOnly&&QC_ROLE==='operator')?`<button class="btn sm primary" onclick="showPage('${it.fill}')"><i class="ti ti-pencil"></i> ${t('Fill in')}</button> `:''}
-      <a class="btn sm${it.fill?'':' primary'}" href="${resUrl(it.file)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> ${t('Open')}</a>
+      ${it.store
+        ?`<button class="btn sm primary" onclick="resOpenStored('${esc(it.store)}')" title="${esc(t('Signed-in users only'))}"><i class="ti ti-lock"></i> ${t('Open')}</button>`
+        :`<a class="btn sm${it.fill?'':' primary'}" href="${resUrl(it.file)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> ${t('Open')}</a>`}
       ${it.docx?` <a class="btn sm" href="${resUrl(it.docx)}" download title="${esc(t('Word file'))}"><i class="ti ti-file-type-docx"></i></a>`:''}
     </td></tr>`;
 }
@@ -8290,6 +8315,8 @@ window.qcUpload = async (file, prefix)=>{
   await task;
   return await getDownloadURL(task.snapshot.ref);
 };
+// download link for a file already in Storage (Resources rows that use `store`)
+window.qcFileUrl = (path)=> getDownloadURL(sRef(storage,path));
 
 function startListeners(){
   onValue(ref(db,'qc/inspections'), s=> window.qcOnData('inspections', s.val()||{}));
