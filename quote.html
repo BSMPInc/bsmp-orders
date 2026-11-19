@@ -709,6 +709,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
         <button class="dv-btn" onclick="dvFit()" title="Fit to view"><i class="ti ti-arrows-minimize"></i></button>
         <button class="dv-btn" onclick="dvActual()" title="Actual size (100%)">1:1</button>
         <button class="dv-btn" onclick="dvFull()" title="Full screen"><i class="ti ti-maximize"></i></button>
+        <button class="dv-btn" id="dv-print" onclick="printCurrentDrawing()" title="Print the drawing only, full page" style="gap:5px;white-space:nowrap"><i class="ti ti-printer"></i> Print drawing</button>
         <button class="dv-btn dv-collapse" onclick="dvToggleCollapse()" title="Minimize"><i class="ti ti-chevron-up"></i></button>
         <button class="dv-btn dv-expand" onclick="dvToggleCollapse()" title="Expand"><i class="ti ti-chevron-down"></i></button>
       </span>
@@ -4885,6 +4886,88 @@ function showFullDrawing(dataUrl){
   document.body.appendChild(overlay);
 }
 
+// ===================== PRINT THE ATTACHED DRAWING =====================
+// Prints only the drawing, one per page, scaled to fit, landscape or portrait to suit it.
+// Runs in a hidden frame: it never touches the quote, its number, or the saved record.
+function drawingIsPdf(src){ return /^data:application\/pdf/i.test(src) || /\.pdf(\?|#|$)/i.test(String(src).split('?')[0]); }
+async function drawingPdfPages(src){
+  if(!window.pdfjsLib) throw new Error('PDF reader not loaded');
+  const buf = await (await fetch(src)).arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const out = [];
+  for(let n=1; n<=pdf.numPages; n++){
+    const page = await pdf.getPage(n);
+    const viewport = page.getViewport({scale: 2.4});
+    const c = document.createElement('canvas');
+    c.width = viewport.width; c.height = viewport.height;
+    await page.render({canvasContext: c.getContext('2d'), viewport}).promise;
+    out.push(c.toDataURL('image/jpeg', 0.92));
+  }
+  return out;
+}
+let _printDrawingBusy = false;
+async function printDrawing(src, title){
+  if(!src){ showToast({type:'error', title:'No drawing on this quote'}); return; }
+  if(_printDrawingBusy) return;
+  _printDrawingBusy = true;
+  try{
+    let pages = [src];
+    if(drawingIsPdf(src)){
+      try{ pages = await Promise.race([drawingPdfPages(src), new Promise((_, rej) => setTimeout(() => rej(new Error('PDF render timed out')), 20000))]); }
+      catch(e){ console.error('Drawing PDF render failed', e); window.open(src, '_blank'); return; }   // let the browser's PDF viewer print it
+    }
+    const old = document.getElementById('drawing-print-frame'); if(old) old.remove();
+    const frame = document.createElement('iframe');
+    frame.id = 'drawing-print-frame';
+    frame.setAttribute('aria-hidden','true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    doc.open(); doc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title></title></head><body></body></html>'); doc.close();
+    doc.title = (title ? String(title)+' ' : '') + 'drawing';
+    const imgs = await Promise.all(pages.map(p => new Promise((res, rej) => {
+      const im = doc.createElement('img');
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error('drawing image failed to load'));
+      im.src = p;
+    })));
+    const land = imgs[0].naturalWidth >= imgs[0].naturalHeight;
+    // Box sizes fit inside both Letter and A4 with the 0.25in margin, so a page never spills onto a blank second sheet.
+    const st = doc.createElement('style');
+    st.textContent = '@page{size:' + (land?'landscape':'portrait') + ';margin:0.25in}'
+      + 'html,body{margin:0;padding:0;background:#fff}'
+      + '.pg{width:' + (land?'10.4in':'7.7in') + ';height:' + (land?'7.7in':'10.4in') + ';margin:0 auto;display:flex;align-items:center;justify-content:center;overflow:hidden;page-break-after:always;break-after:page}'
+      + '.pg:last-child{page-break-after:auto;break-after:auto}'
+      + '.pg img{max-width:100%;max-height:100%;object-fit:contain;display:block}';
+    doc.head.appendChild(st);
+    imgs.forEach(im => { const d = doc.createElement('div'); d.className = 'pg'; d.appendChild(im); doc.body.appendChild(d); });
+    const win = frame.contentWindow;
+    win.onafterprint = () => setTimeout(() => frame.remove(), 500);
+    await new Promise(r => setTimeout(r, 150));
+    win.focus();
+    win.print();
+  }catch(e){
+    console.error('Print drawing failed', e);
+    showToast({type:'error', title:'Could not print the drawing', sub:'The drawing image did not load. Check the connection and try again.'});
+  }finally{
+    _printDrawingBusy = false;
+  }
+}
+// Quote form: the full-size drawing on the open quote (not yet uploaded, then stored, then whatever the viewer shows).
+function printCurrentDrawing(){
+  const img = document.getElementById('dv-img');
+  const src = (currentDrawingUpload && currentDrawingUpload.dataUrl) || currentDrawingUrl || (img && img.getAttribute('src')) || '';
+  printDrawing(src, (document.getElementById('partnum')||{}).value || '');
+}
+// History list: the stored full-size drawing of a saved quote.
+function printDrawingFromHistory(id){
+  const q = HISTORY.find(x => x.id === id);
+  if(!q || !q.drawingUrl){ showToast({type:'error', title:'No drawing on this quote'}); return; }
+  printDrawing(q.drawingUrl, q.partNum || '');
+}
+window.printCurrentDrawing = printCurrentDrawing;
+window.printDrawingFromHistory = printDrawingFromHistory;
+
 // ===================== STICKY ZOOMABLE DRAWING VIEWER =====================
 const dv = { scale:1, x:0, y:0, natW:0, natH:0, min:0.05, max:16, drag:null };
 function dvEls(){ return {
@@ -5609,6 +5692,7 @@ function renderHistory(){
         <td style="white-space:nowrap;text-align:right">
           <button class="btn btn-sm" onclick="reloadQuote(${q.id})">Load</button>
           <button class="btn btn-sm" title="Print quote" aria-label="Print quote" onclick="printQuoteFromHistory(${q.id})" style="margin-left:3px;padding:5px 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+          ${q.drawingUrl?`<button class="btn btn-sm" title="Print drawing" aria-label="Print drawing" onclick="printDrawingFromHistory(${q.id})" style="margin-left:3px;padding:5px 7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="3" y="3" width="18" height="18"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>`:''}
           ${q.mailKey?`<a class="btn btn-sm" title="Open the RFQ email this quote came from" aria-label="Open source email" href="mail.html?thread=${encodeURIComponent(q.mailKey)}" style="margin-left:3px;padding:5px 7px;text-decoration:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg></a>`:''}
           <button class="btn btn-sm btn-danger" title="Delete quote" aria-label="Delete quote" onclick="deleteQuote(${q.id})" style="margin-left:3px;padding:5px 8px">×</button>
         </td>
