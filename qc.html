@@ -1030,7 +1030,7 @@ function qcToast(msg,kind){
   if(!el){ el=document.createElement('div'); el.id='qc-toast'; el.className='qc-toast'; document.body.appendChild(el); }
   el.className='qc-toast '+(kind||'')+' show';
   el.innerHTML='<i class="ti ti-'+(kind==='err'?'alert-triangle':'circle-check')+'"></i> '+esc(msg);
-  clearTimeout(el._t); el._t=setTimeout(()=>{ el.className='qc-toast '+(kind||''); }, 3400);
+  clearTimeout(el._t); el._t=setTimeout(()=>{ el.className='qc-toast '+(kind||''); }, kind==='err'?9000:3400);
 }
 window.qcToast=qcToast;
 const isMgr=()=>QC_ROLE!=='operator';
@@ -1299,7 +1299,7 @@ function resUrl(f){ return encodeURI(f); }
 async function resOpenStored(path){
   const w=window.open('','_blank');   // open inside the click so the pop-up blocker allows it
   try{
-    const url=await window.qcFileUrl(path);
+    const url=await window.qcStoreUrl(path);
     if(w){ w.opener=null; w.location.replace(url); } else location.href=url;
   }catch(e){
     if(w) w.close();
@@ -1562,12 +1562,22 @@ window.qcPickFiles=(key,inputEl)=>{
   if(strip) strip.innerHTML=qcPendingBadges(key);
   inputEl.value='';
 };
-async function uploadPending(key,prefix){
+// strict: a file that did not upload stops the save (throws) and every picked file stays on the form
+// for the retry — without it the record saved without its photo and "saved" covered the error toast
+async function uploadPending(key,prefix,strict){
   const files=_pendingFiles[key]||[]; const urls=[]; const errs=[];
-  for(const f of files){ try{ const u=_uploadedUrl.get(f)||await upload(f,prefix); if(u) urls.push({name:f.name,url:u,type:f.type}); else errs.push(f.name); }catch(e){ console.warn('upload failed',e); errs.push(f.name+((e&&e.message)?(' — '+e.message):'')); } }
+  for(const f of files){ try{ const u=_uploadedUrl.get(f)||await upload(f,prefix); if(u){ urls.push({name:f.name,url:u,type:f.type}); if(strict) _uploadedUrl.set(f,u); } else errs.push(f.name); }catch(e){ console.warn('upload failed',e); errs.push(f.name+' — '+qcUploadWhy(e,f)); } }
+  if(strict && errs.length) throw new Error(t('File upload failed:')+' '+errs.join(' · '));
   _pendingFiles[key]=[];
   if(errs.length) qcToast(t('File upload failed:')+' '+errs.join(' · '),'err');
   return urls;
+}
+// plain-words reason for a refused upload (the Storage rule takes images and PDFs under 25 MB)
+function qcUploadWhy(e,f){
+  const c=String((e&&e.code)||'');
+  if(c==='storage/unauthorized') return (f&&f.size>=25*1024*1024)?t('file is over 25 MB'):t('not allowed — only pictures and PDFs can be stored, and you must be signed in');
+  if(c==='storage/retry-limit-exceeded'||c==='storage/unknown') return t('no connection to storage');
+  return (e&&e.message)||c||t('unknown error');
 }
 function qcStripHtml(key){ return (_pendingFiles[key]||[]).map((f,i)=>`<span class="badge neutral"><i class="ti ti-paperclip"></i> ${esc(f.name)} <i class="ti ti-x" style="cursor:pointer" onclick="qcDropFile('${key}',${i})"></i></span>`).join(' '); }
 function qcRenderStrip(key){
@@ -2189,9 +2199,9 @@ window.qcSaveSelf=async ()=>{
   const ovNew=await withTimeout(qcPendingOvUpload('sc'), 180000, t('Photo upload timed out — check the connection.'));
   // RTDB hands a list back object-shaped (with null holes) once an entry was deleted — normalize first
   const photos=vals(prev&&prev.photos);
-  const fresh=await withTimeout(uploadPending('sc','inspections'), 90000, t('Photo upload timed out — check the connection.'));
+  const fresh=await withTimeout(uploadPending('sc','inspections',true), 90000, t('Photo upload timed out — check the connection.'));
   fresh.forEach(f=>photos.push(f));
-  const dfresh=await withTimeout(uploadPending('scdraw','inspections'), 90000, t('Drawing upload timed out — check the connection.'));
+  const dfresh=await withTimeout(uploadPending('scdraw','inspections',true), 90000, t('Drawing upload timed out — check the connection.'));
   // keep every attached drawing (flat pattern + dimensioned customer print);
   // rec.drawing stays the first one so older readers keep working
   const prevDraws=vals(prev&&prev.drawings);
@@ -2306,6 +2316,13 @@ window.qcPovDrop=()=>{
   _pendingOvs[b]=(_pendingOvs[b]||[]).filter(x=>x.id!==it.pov);
   qcPhotoClose(); qcOverlayStripSync(b); qcToast(t('Overlay removed.'),'ok');
 };
+// take a picked-but-not-saved photo back off the form (wrong picture, or one storage refused)
+window.qcPendDrop=()=>{
+  if(!_pv||_pv.key.indexOf('pend:')!==0) return; const it=_pv.items[_pv.i], b=_pv.key.slice(5);
+  _pendingFiles[b]=(_pendingFiles[b]||[]).filter(f=>f!==it.file);
+  qcPhotoClose(); const strip=$('files-'+b); if(strip) strip.innerHTML=qcPendingBadges(b);
+  qcToast(t('Photo removed.'),'ok');
+};
 // little "N photos" / "N overlays" chips on a list row — open the viewer without opening the record
 function qcPhotoChip(i){
   const n=vals(i&&i.photos).filter(p=>p&&p.url).length, m=qcPhotoItems('ovl:'+(i&&i.id)).length;
@@ -2333,6 +2350,7 @@ function pvRender(){
       <button class="btn sm" onclick="qcPhotoZoom()"><i class="ti ti-${_pv.zoom?'zoom-out':'zoom-in'}"></i> ${_pv.zoom?t('Fit'):'100%'}</button>
       ${ov?`<button class="btn sm primary" onclick="qcOvReopen()"><i class="ti ti-adjustments"></i> ${t('Re-align')}</button>${isMgr()?`<button class="btn sm" style="color:var(--red)" title="${esc(t('Remove this overlay from the inspection?'))}" onclick="qcOvDelete()"><i class="ti ti-trash"></i></button>`:''}`
           :(it.pov?`<button class="btn sm" style="color:var(--red)" onclick="qcPovDrop()"><i class="ti ti-trash"></i> ${t('Remove')}</button>`:`<button class="btn sm primary" onclick="qcPhotoToOverlay()"><i class="ti ti-layers-intersect"></i> ${t('Overlay drawing')}</button>`)}
+      ${it.file?`<button class="btn sm" style="color:var(--red)" onclick="qcPendDrop()"><i class="ti ti-trash"></i> ${t('Remove')}</button>`:''}
       <a class="btn sm" href="${esc(it.url)}" target="_blank" rel="noopener"><i class="ti ti-external-link"></i> ${t('Open original')}</a>
       <button class="btn sm" onclick="qcPhotoClose()" title="${esc(t('Close'))} (Esc)"><i class="ti ti-x"></i></button>
     </div>
@@ -5527,7 +5545,7 @@ async function pkgBuildPdf(spec, say){
   for(const d of (spec.drawings||[])) await section('Drawing — '+(d.part||d.name)+(d.rev?' Rev '+d.rev:''),async()=>{ await addUrl(d.url,d.type,d.name); });
   // reference standards kept in Storage (Resources rows with `store`): the link is made at build time, signed-in only
   for(const s of (spec.standards||[])) await section('Reference standard: '+s.title,async()=>{
-    let url=''; try{ url=await window.qcFileUrl(s.key); }catch(e){ console.warn('standard link failed', s.key, e); warnings.push(s.title); return; }
+    let url=''; try{ url=await window.qcStoreUrl(s.key); }catch(e){ console.warn('standard link failed', s.key, e); warnings.push(s.title); return; }
     await addUrl(url,'application/pdf',s.title);
   });
   await section('Material / plating certifications',async()=>{
@@ -8328,13 +8346,15 @@ window.qcUpload = async (file, prefix)=>{
   // contentDisposition makes the browser save the file under its real name instead of the storage path
   // a file with no type (some email / cloud-drive downloads) would be refused by the Storage rule (image|pdf only)
   const ext=String(file.name||'').toLowerCase().split('.').pop();
-  const type=file.type||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',tif:'image/tiff',tiff:'image/tiff'})[ext]||'';
+  const type=file.type||({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',gif:'image/gif',tif:'image/tiff',tiff:'image/tiff',heic:'image/heic',heif:'image/heif'})[ext]||'';
   const task=uploadBytesResumable(sRef(storage,path), file, {contentType:type, contentDisposition:'inline; filename="'+String(file.name||'file').replace(/["\\\r\n]/g,'')+'"'});
   await task;
   return await getDownloadURL(task.snapshot.ref);
 };
 // download link for a file already in Storage (Resources rows that use `store`)
-window.qcFileUrl = (path)=> getDownloadURL(sRef(storage,path));
+// NOT named qcFileUrl: that is the app script's File → preview-URL helper, and a window.* of the same
+// name replaced it — every picked photo then threw "t.split is not a function" and never showed
+window.qcStoreUrl = (path)=> getDownloadURL(sRef(storage,path));
 
 function startListeners(){
   onValue(ref(db,'qc/inspections'), s=> window.qcOnData('inspections', s.val()||{}));
