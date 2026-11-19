@@ -304,8 +304,41 @@ body.sb-pinned .dock{left:var(--sb)}
 .chat-del{margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);padding:0 2px;font-size:13px}
 .chat-del:hover{color:var(--red)}
 .chat-text{font-size:13px;color:var(--text);white-space:pre-wrap;word-break:break-word}
-.msg{padding:15px 16px;border-bottom:1px solid var(--border)}
-.msg:last-child{border-bottom:none}
+/* stacked-deck conversation — earlier emails tuck into a stack of header-only bubbles,
+   the newest sits open underneath; click the stack (or the pill) to fan it out */
+#cv-msgs{padding:14px;background:var(--bg)}
+.msg{position:relative;width:94%;padding:11px 14px;margin:0 0 10px;background:#fff;border:1px solid var(--border);border-radius:14px 14px 14px 3px;overflow:hidden}
+.msg.out{margin-left:auto;background:var(--accent-soft);border-color:#b9d8d3;border-radius:14px 14px 3px 14px}
+.msg.out .msg-html{background:transparent}   /* our emails: the body sits straight on the tinted bubble, no white box */
+.msg.new{width:100%;border:2px solid var(--accent);margin-bottom:0}
+.msg.old{transition:margin .35s ease,transform .35s ease,width .35s ease}
+.msg .mbody{display:grid;grid-template-rows:1fr;transition:grid-template-rows .35s ease}
+.msg .mbody>div{min-height:0;overflow:hidden}
+.msg .mh .sn{display:none;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text2)}
+.msg .mh .clip{display:none;font-size:13px;color:var(--text3);align-self:center}
+.msg.old .mh{cursor:pointer}
+#cv-msgs:not(.deck-open) .msg.old{width:100%;margin-bottom:-12px;padding-bottom:20px;transform:scale(var(--s,1));transform-origin:top center;cursor:pointer}
+#cv-msgs:not(.deck-open) .msg.old:hover{border-color:var(--accent)}
+#cv-msgs:not(.deck-open) .msg.old .mh{flex-wrap:nowrap;margin-bottom:0}
+#cv-msgs:not(.deck-open) .msg.old .mh .e{display:none}
+#cv-msgs:not(.deck-open) .msg.old .mh .sn{display:block}
+#cv-msgs:not(.deck-open) .msg.old .mh .clip{display:inline}
+#cv-msgs:not(.deck-open) .msg.old .mh .d{margin-left:0;flex:none}
+#cv-msgs:not(.deck-open) .msg.old .mbody{grid-template-rows:0fr}
+.deck-more{display:flex;align-items:center;gap:6px;margin:24px auto 12px;padding:4px 14px;font:inherit;font-size:12px;font-weight:700;color:var(--accent);background:#fff;border:1px solid var(--accent);border-radius:14px;cursor:pointer;position:relative;transition:margin .35s ease}
+.deck-more:hover{background:var(--accent-soft)}
+.deck-more i{font-size:14px}
+#cv-msgs.deck-open .deck-more{margin-top:2px}
+.msg .ntag{align-self:center;background:var(--spark);color:#fff;font-size:10px;font-weight:800;letter-spacing:.05em;padding:1px 8px;border-radius:9px}
+.msg .ndot{align-self:center;flex:none;width:8px;height:8px;border-radius:50%;background:var(--spark);animation:deckPulse 1.6s 4}
+@keyframes deckPulse{0%{box-shadow:0 0 0 0 rgba(212,43,43,.55)}100%{box-shadow:0 0 0 9px rgba(212,43,43,0)}}
+@keyframes deckInL{from{opacity:0;translate:-28px 0}}
+@keyframes deckInR{from{opacity:0;translate:28px 0}}
+@keyframes deckPop{0%{opacity:0;scale:.92;translate:0 16px}70%{opacity:1;scale:1.015}}
+#cv-msgs.deck-anim .msg.old{animation:deckInL .4s backwards;animation-delay:calc(var(--i,0)*60ms)}
+#cv-msgs.deck-anim .msg.old.out{animation-name:deckInR}
+#cv-msgs.deck-anim .msg.new{animation:deckPop .5s backwards;animation-delay:calc(var(--i,0)*60ms + 120ms)}
+@media (prefers-reduced-motion:reduce){.msg,.msg .mbody,.deck-more{transition:none!important;animation:none!important}.msg .ndot{animation:none}}
 .msg .mh{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
 .msg .mh .f{font-weight:800;font-size:13px}
 .msg .mh .e{font-size:12px;color:var(--text3)}
@@ -3120,20 +3153,57 @@ async function hydrateAttThumbs(){
     }catch(e){ /* keep the type icon */ }
   }
 }
+// ── stacked deck: earlier emails tuck away, the newest stays open ────────────
+let _deckOpen=false;      // true = the stack is fanned out (every email shown in full)
+let _deckAnim=false;      // set when a conversation opens → the next render plays the slide-in
+let _deckAnimT=null;
+function deckLabel(n){
+  const open=$('cv-msgs').classList.contains('deck-open');
+  return open?`<i class="ti ti-chevrons-up"></i> Tuck ${n} earlier email${n!==1?'s':''} away`
+             :`<i class="ti ti-chevrons-down"></i> Show ${n} earlier email${n!==1?'s':''}`;
+}
+window.toggleDeck=()=>{
+  if(_printSel) return;   // print-select keeps every email open
+  const el=$('cv-msgs'); _deckOpen=!_deckOpen;
+  el.classList.toggle('deck-open',_deckOpen);
+  const b=$('deck-more'), n=el.querySelectorAll('.msg.old').length;
+  if(b) b.innerHTML=deckLabel(n);
+  // tucking away a long history leaves you scrolled past the end — bring the newest back
+  if(!_deckOpen) setTimeout(()=>{ const nw=el.querySelector('.msg.new'); if(nw) try{ nw.scrollIntoView({block:'nearest',behavior:'smooth'}); }catch(e){} },380);
+};
+// a tucked card opens the deck from anywhere on it; once open only its header bar toggles,
+// so selecting text or clicking attachments inside an email never folds it away
+window.deckClick=(ev)=>{
+  if(ev.target.closest('.psel')) return;
+  if(!$('cv-msgs').classList.contains('deck-open') || ev.target.closest('.mh')) toggleDeck();
+};
 function renderMsgs(){
   const t=CURRENT; if(!t||!t.messages) return;
   const box=(t.mailboxes||[])[0];
   _msgTables={};
-  $('cv-msgs').innerHTML=t.messages.map((m,i)=>{
+  // stacked deck: every email but the newest is ".old" (header-only while the deck
+  // is shut); print-select mode fans the deck out so every tick-box is reachable
+  const el=$('cv-msgs'), last=t.messages.length-1;
+  el.classList.toggle('deck-open', _deckOpen||!!_printSel);
+  if(_deckAnim){ _deckAnim=false; el.classList.add('deck-anim'); clearTimeout(_deckAnimT); _deckAnimT=setTimeout(()=>el.classList.remove('deck-anim'),1600); }
+  el.innerHTML=t.messages.map((m,i)=>{
     const atts=(m.attachments||[]).filter(a=>!sigJunk(m,a));
     const tbls=detectMsgTables(m); _msgTables[i]=tbls;
     const pchk=_printSel?`<label class="psel" title="Include this email in the printout"><input type="checkbox" ${_printSel[i]?'checked':''} onchange="printSelToggle(${i},this.checked)"></label>`:'';
-    return `
-      <div class="msg">
-        <div class="mh">${pchk}<span class="f">${esc(m.fromName||m.fromEmail)}</span><span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
+    const isNew=i===last;
+    const snip=String(m.snippet||m.bodyText||'').replace(/\s+/g,' ').trim().slice(0,160);
+    const cls='msg '+(ownAddr(m.fromEmail)?'out':'in')+(isNew?' new':' old');
+    // cards further back in the stack sit a touch narrower, like a real deck
+    const sty=`--i:${Math.min(i,8)}`+(isNew?'':`;--s:${(1-Math.min(last-i,4)*0.012).toFixed(3)}`);
+    const more=(isNew&&last>0)?`<button class="deck-more" id="deck-more" onclick="toggleDeck()">${deckLabel(last)}</button>`:'';
+    return `${more}
+      <div class="${cls}" style="${sty}"${isNew?'':' onclick="deckClick(event)"'}>
+        <div class="mh">${pchk}${isNew&&last>0?'<span class="ndot"></span>':''}<span class="f">${esc(m.fromName||m.fromEmail)}</span>${isNew&&last>0?'<span class="ntag">NEWEST</span>':''}<span class="e">${esc(m.fromEmail)} → ${esc((m.to||[]).join(', '))}</span><span class="sn">${esc(snip)}</span>${atts.length?'<i class="ti ti-paperclip clip"></i>':''}<span class="d">${esc(new Date(Number(m.date)).toLocaleString('en-US',{month:'numeric',day:'numeric',year:'2-digit',hour:'numeric',minute:'2-digit'}))}</span></div>
+        <div class="mbody"><div>
         ${msgBodyHtml(m,i)}
         ${tbls.length?`<div class="msg-tbls">${tbls.map((r,ti)=>`<button class="btn sm" title="Copy this table into the reply so you can fill it in and send it back" onclick="useMsgTable(${i},${ti})"><i class="ti ti-table"></i> Copy table to reply · ${r.length}×${r[0].length}</button>`).join('')}</div>`:''}
         ${atts.length?`<div class="attcards">${atts.map(a=>attCard(box,m,a)).join('')}</div>`:''}
+        </div></div>
       </div>`;
   }).join('');
   hydrateCids();
@@ -3266,7 +3336,8 @@ window.openThread=async (key)=>{
     setTimeout(()=>autoGrowReply($('reply-body')),40);
   }
   _msgQuoteOpen={};
-  _printSel=null; renderPrintBar();   // print-select mode doesn't follow you to another conversation
+  _deckOpen=false; _deckAnim=true;   // every conversation opens with its history tucked
+  _printSel=null; renderPrintBar();  // print-select mode doesn't follow you to another conversation
   // already have this conversation (read earlier or prefetched)? show it now
   // and refresh behind it — only re-render if something actually changed
   const cachedShown=Array.isArray(t.messages)&&t.messages.length>0;
