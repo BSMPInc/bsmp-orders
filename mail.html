@@ -3108,7 +3108,11 @@ function msgBodyHtml(m,i){
   const chip=`<div class="qtoggle" onclick="toggleQuote(${i})"><i class="ti ti-dots"></i> ${open?'Hide quoted history':'Show quoted history'}</div>`;
   if(m.bodyHtml){
     const collapsible=htmlHasTrimmableQuote(m.bodyHtml);
-    const doc=((collapsible&&!open?QUOTE_HIDE_CSS:'')+MSG_HTML_WRAP+m.bodyHtml).replace(/"/g,'&quot;');
+    // our own emails sit on the tinted bubble: paint the frame the same tint and multiply
+    // images onto it, so the white box baked into the signature logo melts into the bubble
+    // (blending can't reach through an iframe, hence the matching background inside it)
+    const tint=ownAddr(m.fromEmail)?`<style>html,body{background:${(getComputedStyle(document.documentElement).getPropertyValue('--accent-soft')||'').trim()||'#e8eff0'}}img{mix-blend-mode:multiply}</style>`:'';
+    const doc=((collapsible&&!open?QUOTE_HIDE_CSS:'')+MSG_HTML_WRAP+tint+m.bodyHtml).replace(/"/g,'&quot;');
     return `<iframe class="msg-html" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" srcdoc="${doc}" onload="try{this.style.height=Math.min(this.contentDocument.documentElement.scrollHeight+24,3200)+'px'}catch(e){this.style.height='500px'}"></iframe>${collapsible?chip:''}`;
   }
   const s=textQuoteSplit(m.bodyText||m.snippet||'');
